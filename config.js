@@ -12,8 +12,8 @@
 
 // Configuration Supabase (à remplir)
 window.MAHOUTO_CONFIG = {
-  SUPABASE_URL: "https://TON-PROJET.supabase.co",
-  SUPABASE_ANON_KEY: "TON-ANON-KEY"
+  SUPABASE_URL: "https://kbnhmddwiimkjaehiwyi.supabase.co",
+  SUPABASE_ANON_KEY: "sb_publishable_NGzIuUtP2T-uamuMq5rdSA_RBVfNZWu"
 };
 
 // =========================================================
