@@ -1,0 +1,42 @@
+# Fichiers à ignorer lors du déploiement Vercel
+
+# Git
+.git
+.gitignore
+.github
+
+# Node
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environnement
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Rapports
+RAPPORT_*.md
+AUDIT_*.md
+INSTRUCTIONS_*.md
+FICHIERS_*.txt
+
+# Logs
+logs
+*.log
+
+# Tests
+test
+tests
+__tests__
