@@ -32,7 +32,7 @@ async function checkUser() {
     const userPhoto = user.user_metadata.avatar_url || "";
 
     // Masquer le bouton Google
-    const googleButton = document.querySelector(".chip");
+    const googleButton = document.getElementById("google-login-button");
     if (googleButton) {
       googleButton.innerHTML = `
         <img src="${userPhoto}" 
