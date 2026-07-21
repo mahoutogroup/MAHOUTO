@@ -21,3 +21,30 @@ async function loginGoogle() {
     alert("La connexion Google a échoué.");
   }
 }
+// Vérifier si un utilisateur est connecté
+async function checkUser() {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (user) {
+    const userName = user.user_metadata.full_name || "Utilisateur";
+    const userPhoto = user.user_metadata.avatar_url || "";
+
+    // Masquer le bouton Google
+    const googleButton = document.querySelector(".chip");
+    if (googleButton) {
+      googleButton.innerHTML = `
+        <img src="${userPhoto}" 
+             style="width:24px;height:24px;border-radius:50%;vertical-align:middle;margin-right:8px;">
+        ${userName}
+      `;
+      googleButton.removeAttribute("onclick");
+    }
+
+    console.log("Utilisateur connecté :", userName);
+  }
+}
+
+// Exécuter la vérification au chargement
+checkUser();
