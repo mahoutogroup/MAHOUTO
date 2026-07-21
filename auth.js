@@ -7,6 +7,7 @@ const supabase = window.supabase.createClient(
 // Vérification de la connexion
 console.log("MAHOUTO+ connecté à Supabase !");
 console.log("URL :", window.MAHOUTO_CONFIG.SUPABASE_URL);
+
 // Connexion avec Google
 async function loginGoogle() {
   const { error } = await supabase.auth.signInWithOAuth({
@@ -21,6 +22,17 @@ async function loginGoogle() {
     alert("La connexion Google a échoué.");
   }
 }
+
+// Crée ou met à jour la ligne du profil (table "profiles"),
+// pour que le pseudo soit cohérent sur toutes les pages
+// (Messages, School, Profil...) dès la première connexion.
+async function ensureProfile(userId, username) {
+  const { error } = await supabase
+    .from("profiles")
+    .upsert({ id: userId, username: username }, { onConflict: "id" });
+  if (error) console.error("Profil non enregistré :", error.message);
+}
+
 // Vérifier si un utilisateur est connecté
 async function checkUser() {
   const {
@@ -28,8 +40,20 @@ async function checkUser() {
   } = await supabase.auth.getUser();
 
   if (user) {
-    const userName = user.user_metadata.full_name || "Utilisateur";
+    const userName = user.user_metadata.full_name || user.user_metadata.name || "Utilisateur";
     const userPhoto = user.user_metadata.avatar_url || "";
+
+    // Ne crée le profil que s'il n'existe pas déjà, pour ne jamais
+    // écraser un pseudo que la personne aurait modifié depuis Profil.
+    const { data: existingProfile } = await supabase
+      .from("profiles")
+      .select("username")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (!existingProfile) {
+      await ensureProfile(user.id, userName);
+    }
 
     // Masquer le bouton Google
     const googleButton = document.getElementById("google-login-button");
@@ -37,7 +61,7 @@ async function checkUser() {
       googleButton.innerHTML = `
         <img src="${userPhoto}" 
              style="width:24px;height:24px;border-radius:50%;vertical-align:middle;margin-right:8px;">
-        ${userName}
+        ${existingProfile ? existingProfile.username : userName}
       `;
       googleButton.removeAttribute("onclick");
     }
