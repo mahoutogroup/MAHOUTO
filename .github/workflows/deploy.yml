@@ -1,0 +1,39 @@
+name: Deploy to Vercel
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Verify no secrets in code
+      run: |
+        if grep -r "sk_live\|sk_test\|FEDAPAY_SECRET\|SUPABASE_SERVICE_ROLE" . --include="*.html" --include="*.js" --include="*.json" 2>/dev/null | grep -v node_modules | grep -v ".git"; then
+          echo "❌ ERREUR: Clés API détectées dans le code!"
+          exit 1
+        fi
+        echo "✅ Aucune clé API en dur détectée"
+    
+    - name: Verify file structure
+      run: |
+        test -f index.html && echo "✅ index.html trouvé"
+        test -f manifest.json && echo "✅ manifest.json trouvé"
+        test -f sw.js && echo "✅ sw.js trouvé"
+        test -f config.js && echo "✅ config.js trouvé"
+        test -f api/fedapay-webhook.js && echo "✅ api/fedapay-webhook.js trouvé"
+        test -d icons && echo "✅ dossier icons trouvé"
+    
+    - name: Deploy to Vercel
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      uses: vercel/action@master
+      with:
+        vercel-token: ${{ secrets.VERCEL_TOKEN }}
+        vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+        vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
