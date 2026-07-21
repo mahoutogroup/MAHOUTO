@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Discussions — MAHOUTO+</title>
+<meta name="theme-color" content="#0A0A0A">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="theme.css">
+<style>
+  html, body { background: #0A0A0A; color: #F1F5F9; }
+
+  body { display: flex; flex-direction: column; }
+
+  /* ---------- En-tête ---------- */
+  header {
+    padding: 18px 16px 10px;
+    background: #0A0A0A;
+  }
+
+  .title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+
+  .title-row h1 {
+    font-size: 26px;
+    color: #FFD700;
+  }
+
+  .title-row .plus { color: #22C55E; }
+
+  .title-row .icons { display: flex; gap: 18px; color: #CBD5E1; font-size: 20px; }
+
+  .search-bar {
+    background: #1A1A1A;
+    border-radius: 14px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #94A3B8;
+  }
+
+  .search-bar input {
+    background: transparent;
+    border: none;
+    outline: none;
+    color: white;
+    font-size: 15px;
+    width: 100%;
+  }
+
+  /* ---------- Onglets ---------- */
+  .tabs {
+    display: flex;
+    gap: 8px;
+    padding: 14px 16px 6px;
+    overflow-x: auto;
+  }
+
+  .tab {
+    flex: none;
+    padding: 8px 16px;
+    border-radius: 20px;
+    background: #1A1A1A;
+    color: #CBD5E1;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+  }
+
+  .tab.active { background: #22C55E; color: #0A0A0A; }
+
+  .tab .count {
+    background: rgba(0,0,0,.2);
+    border-radius: 10px;
+    padding: 1px 7px;
+    font-size: 12px;
+  }
+
+  .tab.active .count { background: rgba(0,0,0,.25); }
+
+  /* ---------- Liste des discussions ---------- */
+  #room-list {
+    flex: 1;
+    overflow-y: auto;
+    padding-bottom: 90px;
+  }
+
+  .room-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 16px;
+    cursor: pointer;
+    border-bottom: 1px solid #2A2A2A;
+  }
+
+  .room-row:active { background: #2A2A2A; }
+
+  .avatar {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    flex: none;
+    color: #0A0A0A;
+    font-weight: bold;
+  }
+
+  .room-info { flex: 1; min-width: 0; }
+
+  .room-info .top-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+
+  .room-info .name {
+    font-weight: bold;
+    font-size: 16px;
+    color: #F1F5F9;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .room-info .time { font-size: 12px; color: #64748B; flex: none; margin-left: 8px; }
+
+  .room-info .bottom-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 4px;
+  }
+
+  .room-info .preview {
+    font-size: 13.5px;
+    color: #94A3B8;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 220px;
+  }
+
+  .unread-badge {
+    background: #22C55E;
+    color: #0A0A0A;
+    font-size: 12px;
+    font-weight: bold;
+    min-width: 20px;
+    height: 20px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 6px;
+    flex: none;
+  }
+
+  #empty-state, #loading-state {
+    text-align: center;
+    color: #64748B;
+    padding: 60px 24px;
+    font-size: 14px;
+  }
+
+  /* ---------- Bouton flottant ---------- */
+  #fab {
+    position: fixed;
+    right: 20px;
+    bottom: 92px;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: #FFD700;
+    color: #0A0A0A;
+    border: none;
+    font-size: 26px;
+    font-weight: bold;
+    box-shadow: 0 6px 16px rgba(0,0,0,.4);
+    cursor: pointer;
+  }
+
+  /* ---------- Écran de connexion ---------- */
+  #login-screen {
+    position: fixed;
+    inset: 0;
+    background: #0A0A0A;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 24px;
+    text-align: center;
+    z-index: 20;
+  }
+
+  #login-screen h2 { color: #FFD700; font-size: 24px; }
+  #login-screen p { color: #94A3B8; max-width: 320px; }
+
+  #login-screen input {
+    padding: 12px 16px;
+    border-radius: 12px;
+    border: none;
+    background: #1A1A1A;
+    color: white;
+    width: 100%;
+    max-width: 300px;
+    font-size: 15px;
+  }
+
+  #login-screen button {
+    padding: 12px 30px;
+    border: none;
+    border-radius: 12px;
+    background: #FFD700;
+    font-weight: bold;
+    cursor: pointer;
+  }
+
+  #status-message { color: #94A3B8; font-size: 13px; min-height: 18px; }
+
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<div id="login-screen">
+  <h2>MAHOUTO<span style="color:#22C55E">+</span></h2>
+  <p>Connecte-toi pour accéder à tes discussions.</p>
+  <button id="google-btn" style="display:flex;align-items:center;gap:10px;background:white;color:#111;border:none;border-radius:12px;padding:12px 24px;font-weight:bold;cursor:pointer;">
+    <span style="font-size:18px;">G</span> Se connecter avec Google
+  </button>
+  <div style="color:#64748B;font-size:12px;">— ou —</div>
+  <input id="username-input" type="text" placeholder="Ton pseudo" maxlength="24" autocomplete="off">
+  <button id="join-btn">Continuer sans compte Google</button>
+  <div id="status-message"></div>
+</div>
+
+<div id="app" class="hidden">
+
+  <header>
+    <div class="title-row">
+      <h1>MAHOUTO<span class="plus">+</span></h1>
+      <div class="icons">
+        <span title="Nouvelle discussion">📷</span>
+        <span title="Menu">⋮</span>
+      </div>
+    </div>
+    <div class="search-bar">
+      🔍
+      <input id="search-input" type="text" placeholder="Rechercher...">
+    </div>
+  </header>
+
+  <div class="tabs">
+    <div class="tab active" data-filter="toutes">Toutes</div>
+    <div class="tab" data-filter="non-lues">Non lues <span class="count" id="unread-tab-count">0</span></div>
+    <div class="tab" data-filter="groupes">Groupes</div>
+  </div>
+
+  <div id="room-list">
+    <div id="loading-state">Chargement des discussions...</div>
+  </div>
+
+  <button id="fab" title="Nouvelle discussion">＋</button>
+
+  <nav class="bottom-nav">
+    <a class="nav-item" href="index.html"><span class="icon">🏠</span>Accueil</a>
+    <a class="nav-item active" href="discussions.html"><span class="icon">💬</span>Messages</a>
+    <a class="nav-item" href="ai.html"><span class="icon">🧠</span>MAHOUTO AI</a>
+    <a class="nav-item" href="school.html"><span class="icon">🎓</span>School</a>
+    <a class="nav-item" href="profil.html"><span class="icon">👤</span>Profil</a>
+  </nav>
+
+</div>
+
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+(function () {
+  const cfg = window.MAHOUTO_CONFIG;
+  const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+
+  const loginScreen = document.getElementById("login-screen");
+  const appEl = document.getElementById("app");
+  const usernameInput = document.getElementById("username-input");
+  const joinBtn = document.getElementById("join-btn");
+  const statusMessage = document.getElementById("status-message");
+  const roomListEl = document.getElementById("room-list");
+  const searchInput = document.getElementById("search-input");
+  const tabs = document.querySelectorAll(".tab");
+  const unreadTabCount = document.getElementById("unread-tab-count");
+  const fab = document.getElementById("fab");
+
+  let currentUser = null;
+  let roomsData = []; // { id, name, emoji, color, is_group, lastMessage, lastTime, unread }
+  let activeFilter = "toutes";
+  let searchTerm = "";
+
+  function setStatus(text) { statusMessage.textContent = text || ""; }
+
+  function escapeHtml(str) {
+    const div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function formatTime(iso) {
+    if (!iso) return "";
+    const d = new Date(iso);
+    const now = new Date();
+    const sameDay = d.toDateString() === now.toDateString();
+    if (sameDay) return d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+    return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
+  }
+
+  async function ensureProfile(userId, username) {
+    const { error } = await supabase
+      .from("profiles")
+      .upsert({ id: userId, username: username }, { onConflict: "id" });
+    if (error) console.error("Profil non enregistré :", error);
+  }
+
+  async function loadRooms() {
+    roomListEl.innerHTML = '<div id="loading-state">Chargement des discussions...</div>';
+
+    const { data: rooms, error: roomsError } = await supabase
+      .from("rooms")
+      .select("*")
+      .order("created_at", { ascending: true });
+
+    if (roomsError) {
+      roomListEl.innerHTML = '<div id="empty-state">Impossible de charger les discussions.</div>';
+      console.error(roomsError);
+      return;
+    }
+
+    const { data: readStates } = await supabase
+      .from("read_state")
+      .select("room_id, last_read_at")
+      .eq("user_id", currentUser.id);
+
+    const readMap = {};
+    (readStates || []).forEach((r) => { readMap[r.room_id] = r.last_read_at; });
+
+    const enriched = await Promise.all(
+      rooms.map(async (room) => {
+        const { data: lastMsgs } = await supabase
+          .from("messages")
+          .select("content, attachment_type, created_at, username")
+          .eq("room_id", room.id)
+          .order("created_at", { ascending: false })
+          .limit(1);
+
+        const lastMessage = lastMsgs && lastMsgs[0] ? lastMsgs[0] : null;
+        const lastReadAt = readMap[room.id];
+
+        let unreadQuery = supabase
+          .from("messages")
+          .select("id", { count: "exact", head: true })
+          .eq("room_id", room.id);
+
+        if (lastReadAt) unreadQuery = unreadQuery.gt("created_at", lastReadAt);
+
+        const { count } = await unreadQuery;
+
+        return {
+          ...room,
+          lastMessage: lastMessage
+            ? (lastMessage.content || (lastMessage.attachment_type === "image" ? "📷 Photo" : lastMessage.attachment_type === "video" ? "🎥 Vidéo" : lastMessage.attachment_type ? "📄 Fichier" : ""))
+            : "Aucun message pour le moment.",
+          lastTime: lastMessage ? lastMessage.created_at : room.created_at,
+          unread: count || 0
+        };
+      })
+    );
+
+    enriched.sort((a, b) => new Date(b.lastTime) - new Date(a.lastTime));
+    roomsData = enriched;
+    renderRooms();
+  }
+
+  function renderRooms() {
+    let filtered = roomsData;
+
+    if (activeFilter === "non-lues") filtered = filtered.filter((r) => r.unread > 0);
+    if (activeFilter === "groupes") filtered = filtered.filter((r) => r.is_group);
+
+    if (searchTerm.trim()) {
+      const q = searchTerm.trim().toLowerCase();
+      filtered = filtered.filter((r) => r.name.toLowerCase().includes(q));
+    }
+
+    const totalUnreadRooms = roomsData.filter((r) => r.unread > 0).length;
+    unreadTabCount.textContent = totalUnreadRooms;
+
+    if (!filtered.length) {
+      roomListEl.innerHTML = '<div id="empty-state">Aucune discussion ici.</div>';
+      return;
+    }
+
+    roomListEl.innerHTML = "";
+    filtered.forEach((room) => {
+      const row = document.createElement("div");
+      row.className = "room-row";
+      row.innerHTML = `
+        <div class="avatar" style="background:${room.color}">${room.emoji}</div>
+        <div class="room-info">
+          <div class="top-line">
+            <span class="name">${escapeHtml(room.name)}</span>
+            <span class="time">${formatTime(room.lastTime)}</span>
+          </div>
+          <div class="bottom-line">
+            <span class="preview">${escapeHtml(room.lastMessage)}</span>
+            ${room.unread > 0 ? `<span class="unread-badge">${room.unread}</span>` : ""}
+          </div>
+        </div>
+      `;
+      row.addEventListener("click", () => {
+        window.location.href = "chat.html?room=" + encodeURIComponent(room.id) + "&name=" + encodeURIComponent(room.name);
+      });
+      roomListEl.appendChild(row);
+    });
+  }
+
+  tabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
+      tabs.forEach((t) => t.classList.remove("active"));
+      tab.classList.add("active");
+      activeFilter = tab.dataset.filter;
+      renderRooms();
+    });
+  });
+
+  searchInput.addEventListener("input", (e) => {
+    searchTerm = e.target.value;
+    renderRooms();
+  });
+
+  fab.addEventListener("click", async () => {
+    const name = prompt("Nom du nouveau salon :");
+    if (!name || !name.trim()) return;
+    const id = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || ("salon-" + Date.now());
+
+    const { error } = await supabase
+      .from("rooms")
+      .insert({ id, name: name.trim(), emoji: "💬", color: "#38BDF8", is_group: true });
+
+    if (error) {
+      alert("Impossible de créer ce salon (peut-être déjà existant).");
+      console.error(error);
+      return;
+    }
+    loadRooms();
+  });
+
+  async function joinChat() {
+    const username = usernameInput.value.trim();
+    if (!username) { setStatus("Entre un pseudo pour continuer."); return; }
+
+    joinBtn.disabled = true;
+    setStatus("Connexion...");
+
+    try {
+      const { data, error } = await supabase.auth.signInAnonymously();
+      if (error) throw error;
+
+      currentUser = data.user;
+      await ensureProfile(currentUser.id, username);
+
+      loginScreen.classList.add("hidden");
+      appEl.classList.remove("hidden");
+
+      await loadRooms();
+    } catch (err) {
+      console.error(err);
+      setStatus("Connexion impossible. Vérifie config.js.");
+      joinBtn.disabled = false;
+    }
+  }
+
+  async function trySilentResume() {
+    const { data } = await supabase.auth.getSession();
+    if (data && data.session && data.session.user) {
+      currentUser = data.session.user;
+
+      const { data: existingProfile } = await supabase
+        .from("profiles").select("username").eq("id", currentUser.id).maybeSingle();
+
+      if (!existingProfile) {
+        const googleName =
+          currentUser.user_metadata && (currentUser.user_metadata.full_name || currentUser.user_metadata.name);
+        const fallbackName = currentUser.email ? currentUser.email.split("@")[0] : "Utilisateur";
+        await ensureProfile(currentUser.id, googleName || fallbackName);
+      }
+
+      loginScreen.classList.add("hidden");
+      appEl.classList.remove("hidden");
+      await loadRooms();
+    }
+  }
+
+  document.getElementById("google-btn").addEventListener("click", async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: window.location.origin + "/discussions.html" }
+    });
+    if (error) { setStatus("Connexion Google indisponible : " + error.message); console.error(error); }
+  });
+
+  joinBtn.addEventListener("click", joinChat);
+  usernameInput.addEventListener("keydown", (e) => { if (e.key === "Enter") joinChat(); });
+
+  trySilentResume();
+
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js").catch((err) => console.log(err));
+    });
+  }
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chat — MAHOUTO+</title>
+<meta name="theme-color" content="#0A0A0A">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
+
+  html, body { height: 100%; background: #0A0A0A; color: #F1F5F9; }
+
+  body { display: flex; flex-direction: column; }
+
+  header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 20px;
+    background: #151515;
+    border-bottom: 1px solid #1A1A1A;
+  }
+
+  header a.back {
+    color: #FFD700;
+    text-decoration: none;
+    font-size: 22px;
+    line-height: 1;
+  }
+
+  header h1 { font-size: 18px; color: #FFD700; }
+
+  header .room {
+    margin-left: auto;
+    font-size: 12px;
+    color: #22C55E;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  header .room::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #22C55E;
+    display: inline-block;
+  }
+
+  #messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .bubble {
+    max-width: 75%;
+    padding: 10px 14px;
+    border-radius: 16px;
+    background: #1A1A1A;
+    align-self: flex-start;
+    word-wrap: break-word;
+  }
+
+  .bubble.mine { background: #FFD700; color: #0A0A0A; align-self: flex-end; }
+
+  .bubble .meta { font-size: 11px; opacity: .65; margin-bottom: 4px; font-weight: bold; }
+
+  form#composer {
+    display: flex;
+    gap: 10px;
+    padding: 14px;
+    background: #151515;
+    border-top: 1px solid #1A1A1A;
+  }
+
+  #composer input[type="text"] {
+    flex: 1;
+    padding: 12px 16px;
+    border-radius: 20px;
+    border: none;
+    background: #1A1A1A;
+    color: white;
+    font-size: 15px;
+  }
+
+  #composer input[type="text"]:focus { outline: 2px solid #FFD700; }
+
+  #composer button {
+    padding: 0 22px;
+    border: none;
+    border-radius: 20px;
+    background: #FFD700;
+    font-weight: bold;
+    cursor: pointer;
+  }
+
+  #composer button:disabled { opacity: .5; cursor: not-allowed; }
+
+  #login-screen {
+    position: fixed;
+    inset: 0;
+    background: #0A0A0A;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 24px;
+    text-align: center;
+  }
+
+  #login-screen h2 { color: #FFD700; font-size: 24px; }
+  #login-screen p { color: #94A3B8; max-width: 320px; }
+
+  #login-screen input {
+    padding: 12px 16px;
+    border-radius: 12px;
+    border: none;
+    background: #1A1A1A;
+    color: white;
+    width: 100%;
+    max-width: 300px;
+    font-size: 15px;
+  }
+
+  #login-screen button {
+    padding: 12px 30px;
+    border: none;
+    border-radius: 12px;
+    background: #FFD700;
+    font-weight: bold;
+    cursor: pointer;
+  }
+
+  #status-message { color: #94A3B8; font-size: 13px; min-height: 18px; }
+
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<div id="login-screen">
+  <h2>Rejoindre la discussion</h2>
+  <p>Choisis un pseudo pour commencer à discuter en temps réel.</p>
+  <input id="username-input" type="text" placeholder="Ton pseudo" maxlength="24" autocomplete="off">
+  <button id="join-btn">Entrer dans le chat</button>
+  <div id="status-message"></div>
+</div>
+
+<header class="hidden" id="chat-header">
+  <a class="back" href="discussions.html" aria-label="Retour">←</a>
+  <h1 id="room-title">💬 Discussion</h1>
+  <span class="room">En direct</span>
+</header>
+
+<div id="messages" class="hidden"></div>
+
+<form id="composer" class="hidden">
+  <button type="button" id="attach-btn" title="Envoyer un fichier" style="background:#1A1A1A;border:none;border-radius:20px;width:44px;color:#FFD700;font-size:18px;cursor:pointer;">📎</button>
+  <input type="file" id="file-input" accept="image/*,video/*,application/pdf" class="hidden">
+  <input id="message-input" type="text" placeholder="Écrire un message..." autocomplete="off" maxlength="2000">
+  <button type="submit">Envoyer</button>
+</form>
+
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+(function () {
+  const cfg = window.MAHOUTO_CONFIG;
+  const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+
+  const params = new URLSearchParams(window.location.search);
+  const ROOM_ID = params.get("room") || "general";
+  const ROOM_NAME = params.get("name") || "Général";
+
+  document.getElementById("room-title").textContent = "💬 " + ROOM_NAME;
+
+  const loginScreen = document.getElementById("login-screen");
+  const usernameInput = document.getElementById("username-input");
+  const joinBtn = document.getElementById("join-btn");
+  const statusMessage = document.getElementById("status-message");
+  const chatHeader = document.getElementById("chat-header");
+  const messagesEl = document.getElementById("messages");
+  const composer = document.getElementById("composer");
+  const messageInput = document.getElementById("message-input");
+
+  let currentUser = null;
+  let currentUsername = null;
+
+  function setStatus(text) { statusMessage.textContent = text || ""; }
+
+  function escapeHtml(str) {
+    const div = document.createElement("div");
+    div.textContent = str;
+    return div.innerHTML;
+  }
+
+  function renderMessage(msg) {
+    const bubble = document.createElement("div");
+    bubble.className = "bubble" + (msg.user_id === currentUser.id ? " mine" : "");
+    const time = new Date(msg.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+    let mediaHtml = "";
+    if (msg.attachment_url) {
+      if (msg.attachment_type === "image") {
+        mediaHtml = `<img src="${msg.attachment_url}" style="max-width:100%;border-radius:12px;margin-top:6px;display:block;">`;
+      } else if (msg.attachment_type === "video") {
+        mediaHtml = `<video src="${msg.attachment_url}" controls style="max-width:100%;border-radius:12px;margin-top:6px;display:block;"></video>`;
+      } else {
+        mediaHtml = `<a href="${msg.attachment_url}" target="_blank" style="color:inherit;text-decoration:underline;display:block;margin-top:6px;">📄 Ouvrir le fichier</a>`;
+      }
+    }
+    bubble.innerHTML =
+      '<div class="meta">' + escapeHtml(msg.username) + " · " + time + "</div>" +
+      (msg.content ? escapeHtml(msg.content) : "") + mediaHtml;
+    messagesEl.appendChild(bubble);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  async function loadHistory() {
+    const { data, error } = await supabase
+      .from("messages")
+      .select("*")
+      .eq("room_id", ROOM_ID)
+      .order("created_at", { ascending: true })
+      .limit(200);
+
+    if (error) { setStatus("Erreur de chargement des messages."); console.error(error); return; }
+    data.forEach(renderMessage);
+  }
+
+  function subscribeToNewMessages() {
+    supabase
+      .channel("room:" + ROOM_ID)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "messages", filter: "room_id=eq." + ROOM_ID },
+        (payload) => { renderMessage(payload.new); markAsRead(); }
+      )
+      .subscribe();
+  }
+
+  async function ensureProfile(userId, username) {
+    const { error } = await supabase
+      .from("profiles")
+      .upsert({ id: userId, username: username }, { onConflict: "id" });
+    if (error) console.error("Profil non enregistré :", error);
+  }
+
+  async function markAsRead() {
+    if (!currentUser) return;
+    await supabase
+      .from("read_state")
+      .upsert(
+        { user_id: currentUser.id, room_id: ROOM_ID, last_read_at: new Date().toISOString() },
+        { onConflict: "user_id,room_id" }
+      );
+  }
+
+  async function joinChat() {
+    const username = usernameInput.value.trim();
+    if (!username) { setStatus("Entre un pseudo pour continuer."); return; }
+
+    joinBtn.disabled = true;
+    setStatus("Connexion...");
+
+    try {
+      const { data, error } = await supabase.auth.signInAnonymously();
+      if (error) throw error;
+
+      currentUser = data.user;
+      currentUsername = username;
+
+      await ensureProfile(currentUser.id, currentUsername);
+      await enterRoom();
+    } catch (err) {
+      console.error(err);
+      setStatus("Connexion impossible. Vérifie ta configuration Supabase (config.js).");
+      joinBtn.disabled = false;
+    }
+  }
+
+  async function enterRoom() {
+    loginScreen.classList.add("hidden");
+    chatHeader.classList.remove("hidden");
+    messagesEl.classList.remove("hidden");
+    composer.classList.remove("hidden");
+
+    await loadHistory();
+    subscribeToNewMessages();
+    await markAsRead();
+    messageInput.focus();
+  }
+
+  async function trySilentResume() {
+    const { data } = await supabase.auth.getSession();
+    if (data && data.session && data.session.user) {
+      currentUser = data.session.user;
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("username")
+        .eq("id", currentUser.id)
+        .maybeSingle();
+      currentUsername = profile ? profile.username : "Utilisateur";
+      await enterRoom();
+    }
+  }
+
+  joinBtn.addEventListener("click", joinChat);
+  usernameInput.addEventListener("keydown", (e) => { if (e.key === "Enter") joinChat(); });
+
+  composer.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const content = messageInput.value.trim();
+    if (!content || !currentUser) return;
+
+    messageInput.value = "";
+    const { error } = await supabase.from("messages").insert({
+      room_id: ROOM_ID,
+      user_id: currentUser.id,
+      username: currentUsername,
+      content: content
+    });
+
+    if (error) { console.error(error); setStatus("Message non envoyé."); }
+    else await markAsRead();
+  });
+
+  const attachBtn = document.getElementById("attach-btn");
+  const fileInput = document.getElementById("file-input");
+
+  attachBtn.addEventListener("click", () => fileInput.click());
+
+  fileInput.addEventListener("change", async () => {
+    const file = fileInput.files[0];
+    fileInput.value = "";
+    if (!file || !currentUser) return;
+
+    attachBtn.textContent = "⏳";
+    attachBtn.disabled = true;
+
+    try {
+      const signResp = await fetch("/api/cloudinary-sign");
+      const sign = await signResp.json();
+      if (!signResp.ok) throw new Error(sign.error || "Signature indisponible");
+
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("api_key", sign.apiKey);
+      formData.append("timestamp", sign.timestamp);
+      formData.append("signature", sign.signature);
+      formData.append("folder", sign.folder);
+
+      const uploadResp = await fetch(sign.uploadUrl, { method: "POST", body: formData });
+      const uploadData = await uploadResp.json();
+      if (!uploadResp.ok) throw new Error(uploadData.error?.message || "Envoi échoué");
+
+      let attachmentType = "raw";
+      if (uploadData.resource_type === "image") attachmentType = "image";
+      else if (uploadData.resource_type === "video") attachmentType = "video";
+
+      const { error } = await supabase.from("messages").insert({
+        room_id: ROOM_ID,
+        user_id: currentUser.id,
+        username: currentUsername,
+        content: "",
+        attachment_url: uploadData.secure_url,
+        attachment_type: attachmentType
+      });
+
+      if (error) throw error;
+      await markAsRead();
+    } catch (err) {
+      console.error(err);
+      setStatus("Envoi du fichier impossible : " + err.message);
+    } finally {
+      attachBtn.textContent = "📎";
+      attachBtn.disabled = false;
+    }
+  });
+
+  trySilentResume();
+
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js").catch((err) => console.log(err));
+    });
+  }
+})();
+</script>
+
+</body>
+</html>

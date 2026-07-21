@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MAHOUTO+</title>
+<meta name="description" content="MAHOUTO+ — L'Intelligence Artificielle, la Formation et le Business réunis dans une seule application.">
+<meta name="theme-color" content="#0A0A0A">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="theme.css">
+<style>
+  .hero {
+    padding: 36px 20px 10px;
+    text-align: center;
+  }
+
+  .logo-badge {
+    width: 76px;
+    height: 76px;
+    margin: 0 auto 18px;
+    border-radius: 22px;
+    background: linear-gradient(135deg, #1A1A1A, #0A0A0A);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 30px;
+    font-weight: bold;
+    color: var(--gold);
+  }
+
+  .hero h1 { font-size: 30px; }
+  .hero h1 .plus { color: var(--accent-green); }
+
+  .hero .welcome { font-size: 15px; color: var(--text-muted); margin-top: 14px; }
+  .hero .tagline { font-size: 13.5px; color: var(--text-dim); margin-top: 8px; line-height: 1.6; max-width: 320px; margin-left: auto; margin-right: auto; }
+
+  /* ---------- Chips de fonctionnalités (scroll horizontal) ---------- */
+  .feature-chips {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    padding: 4px 20px 4px;
+  }
+
+  .feature-chips .chip {
+    flex: none;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 9px 16px;
+    font-size: 12.5px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* ---------- Grille des modules principaux ---------- */
+  .module-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    padding: 0 20px;
+  }
+
+  .module-card h2 {
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+
+  .module-card p {
+    font-size: 12.5px;
+    color: var(--text-muted);
+    line-height: 1.5;
+    margin-bottom: 12px;
+    min-height: 36px;
+  }
+
+  .module-card .go {
+    font-size: 12.5px;
+    color: var(--gold);
+    font-weight: bold;
+  }
+
+  /* ---------- Bloc Messages (pleine largeur, style WhatsApp) ---------- */
+  .messages-block {
+    margin: 0 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .messages-block .icon-circle {
+    width: 54px;
+    height: 54px;
+    border-radius: 50%;
+    background: var(--accent-green);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    flex: none;
+  }
+
+  .messages-block ul {
+    list-style: none;
+    font-size: 12.5px;
+    color: var(--text-muted);
+    line-height: 1.8;
+  }
+
+  footer {
+    text-align: center;
+    padding: 26px 20px 10px;
+    color: var(--text-dim);
+    font-size: 11.5px;
+    line-height: 1.7;
+  }
+</style>
+</head>
+<body>
+
+<div class="page-content">
+
+  <div class="hero">
+    <div class="logo-badge">M+</div>
+    <h1>MAHOUTO<span class="plus">+</span></h1>
+    <p class="welcome">Bienvenue sur MAHOUTO+</p>
+    <p class="tagline">L'Intelligence Artificielle, la Formation et le Business réunis dans une seule application.</p>
+  </div>
+
+  <div class="feature-chips">
+    <div class="chip">🔐 Connexion Google</div>
+    <div class="chip">🧠 MAHOUTO AI</div>
+    <div class="chip">🎓 MAHOUTO School</div>
+    <div class="chip">🛍️ Marketplace</div>
+    <div class="chip">🔔 Notifications</div>
+    <div class="chip">📜 Certificats</div>
+    <div class="chip">💳 Mobile Money</div>
+  </div>
+
+  <div class="section-title">🔥 Explorer</div>
+
+  <div class="module-grid">
+
+    <a class="card module-card" href="discussions.html">
+      <h2>💬 Messages</h2>
+      <p>Discussions, groupes, appels — comme WhatsApp.</p>
+      <div class="go">Ouvrir →</div>
+    </a>
+
+    <a class="card module-card" href="ai.html">
+      <h2>🧠 MAHOUTO AI</h2>
+      <p>Assistant IA, prompts, analyse de documents.</p>
+      <div class="go">Ouvrir →</div>
+    </a>
+
+    <a class="card module-card" href="school.html">
+      <h2>🎓 School</h2>
+      <p>Formations en imprimerie, design, web, IA.</p>
+      <div class="go">Ouvrir →</div>
+    </a>
+
+    <a class="card module-card" href="profil.html">
+      <h2>👤 Profil</h2>
+      <p>Compte, abonnements, certificats, commandes.</p>
+      <div class="go">Ouvrir →</div>
+    </a>
+
+  </div>
+
+  <div class="section-title">🛍️ Marketplace <span class="badge-soon">Bientôt</span></div>
+  <div class="module-grid">
+    <div class="card module-card" style="opacity:.55">
+      <h2>🛒 Produits &amp; Services</h2>
+      <p>Achats, commandes et paiements Mobile Money.</p>
+      <div class="go" style="color:var(--text-dim)">Bientôt disponible</div>
+    </div>
+  </div>
+
+  <div class="section-title">💬 Messages, façon WhatsApp</div>
+  <div class="messages-block">
+    <div class="icon-circle">💬</div>
+    <ul>
+      <li>Discussions privées &amp; groupes</li>
+      <li>Notes vocales, photos, vidéos, PDF</li>
+      <li>Appels audio &amp; vidéo (à venir)</li>
+      <li>Statuts &amp; partage de position (à venir)</li>
+    </ul>
+  </div>
+
+  <footer>
+    © 2026 MAHOUTO+ — Tous droits réservés.<br>
+    Style premium — WhatsApp · Telegram · ChatGPT · LinkedIn.
+  </footer>
+
+</div>
+
+<nav class="bottom-nav">
+  <a class="nav-item active" href="index.html"><span class="icon">🏠</span>Accueil</a>
+  <a class="nav-item" href="discussions.html"><span class="icon">💬</span>Messages</a>
+  <a class="nav-item" href="ai.html"><span class="icon">🧠</span>MAHOUTO AI</a>
+  <a class="nav-item" href="school.html"><span class="icon">🎓</span>School</a>
+  <a class="nav-item" href="profil.html"><span class="icon">👤</span>Profil</a>
+</nav>
+
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("sw.js").catch((err) => console.log(err));
+  });
+}
+</script>
+
+</body>
+</html>

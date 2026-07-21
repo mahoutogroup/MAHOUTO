@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Profil — MAHOUTO+</title>
+<meta name="theme-color" content="#0A0A0A">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="theme.css">
+<style>
+  .profile-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 34px 20px 24px;
+    text-align: center;
+  }
+
+  .avatar-circle {
+    width: 84px; height: 84px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--gold-bright), var(--gold));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 32px; font-weight: bold; color: #0A0A0A;
+    margin-bottom: 14px;
+  }
+
+  .profile-header .name-row { display: flex; align-items: center; gap: 8px; }
+  .profile-header h1 { font-size: 20px; }
+  .profile-header .edit-btn { background: none; border: none; color: var(--text-muted); font-size: 16px; cursor: pointer; }
+  .profile-header .status { font-size: 12.5px; color: var(--accent-green); margin-top: 6px; }
+
+  .menu-list { padding: 0 20px; display: flex; flex-direction: column; gap: 10px; }
+
+  .menu-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 18px;
+  }
+
+  .menu-item .emoji { font-size: 20px; width: 26px; text-align: center; }
+  .menu-item .label { flex: 1; font-size: 14.5px; }
+  .menu-item .sub { font-size: 11.5px; color: var(--text-dim); }
+
+  #edit-modal {
+    position: fixed; inset: 0; background: rgba(0,0,0,.7);
+    display: flex; align-items: center; justify-content: center; z-index: 50; padding: 24px;
+  }
+
+  #edit-modal .box {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); padding: 22px; width: 100%; max-width: 320px;
+  }
+
+  #edit-modal h3 { color: var(--gold); font-size: 16px; margin-bottom: 14px; }
+  #edit-modal input {
+    width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border);
+    background: var(--bg); color: white; font-size: 14.5px; margin-bottom: 14px;
+  }
+  #edit-modal .actions { display: flex; gap: 10px; }
+  #edit-modal .actions button { flex: 1; }
+</style>
+</head>
+<body>
+
+<div class="page-content">
+
+  <div class="profile-header">
+    <div class="avatar-circle" id="avatar-initial">?</div>
+    <div class="name-row">
+      <h1 id="profile-name">Non connecté</h1>
+      <button class="edit-btn" id="edit-btn" title="Modifier le pseudo">✏️</button>
+    </div>
+    <div class="status" id="profile-status"></div>
+  </div>
+
+  <div class="section-title">Mon compte</div>
+  <div class="menu-list">
+    <div class="card menu-item"><span class="emoji">💳</span><span class="label">Paiements</span><span class="sub">Bientôt</span></div>
+    <div class="card menu-item"><span class="emoji">📜</span><span class="label">Certificats</span><span class="sub">Bientôt</span></div>
+    <div class="card menu-item"><span class="emoji">⭐</span><span class="label">Abonnements</span><span class="sub">Bientôt</span></div>
+    <div class="card menu-item"><span class="emoji">📦</span><span class="label">Commandes</span><span class="sub">Bientôt</span></div>
+    <div class="card menu-item"><span class="emoji">🔳</span><span class="label">QR Code</span><span class="sub">Bientôt</span></div>
+    <div class="card menu-item"><span class="emoji">⚙️</span><span class="label">Paramètres</span><span class="sub">Bientôt</span></div>
+  </div>
+
+</div>
+
+<div id="edit-modal" class="hidden">
+  <div class="box">
+    <h3>Modifier ton pseudo</h3>
+    <input id="new-username" type="text" maxlength="24" placeholder="Nouveau pseudo">
+    <div class="actions">
+      <button class="btn-outline" id="cancel-edit">Annuler</button>
+      <button class="btn-gold" id="save-edit">Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<nav class="bottom-nav">
+  <a class="nav-item" href="index.html"><span class="icon">🏠</span>Accueil</a>
+  <a class="nav-item" href="discussions.html"><span class="icon">💬</span>Messages</a>
+  <a class="nav-item" href="ai.html"><span class="icon">🧠</span>MAHOUTO AI</a>
+  <a class="nav-item" href="school.html"><span class="icon">🎓</span>School</a>
+  <a class="nav-item active" href="profil.html"><span class="icon">👤</span>Profil</a>
+</nav>
+
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+(function () {
+  const cfg = window.MAHOUTO_CONFIG;
+  const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+
+  const nameEl = document.getElementById("profile-name");
+  const statusEl = document.getElementById("profile-status");
+  const avatarEl = document.getElementById("avatar-initial");
+  const editBtn = document.getElementById("edit-btn");
+  const modal = document.getElementById("edit-modal");
+  const newUsernameInput = document.getElementById("new-username");
+  const cancelEdit = document.getElementById("cancel-edit");
+  const saveEdit = document.getElementById("save-edit");
+
+  let currentUser = null;
+  let currentUsername = null;
+
+  function render() {
+    nameEl.textContent = currentUsername || "Non connecté";
+    avatarEl.textContent = currentUsername ? currentUsername.trim()[0].toUpperCase() : "?";
+    statusEl.textContent = currentUsername ? "Connecté (compte anonyme)" : "Ouvre Messages pour créer ton profil";
+  }
+
+  async function loadProfile() {
+    const { data } = await supabase.auth.getSession();
+    if (data && data.session && data.session.user) {
+      currentUser = data.session.user;
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("username")
+        .eq("id", currentUser.id)
+        .maybeSingle();
+      currentUsername = profile ? profile.username : null;
+    }
+    render();
+  }
+
+  editBtn.addEventListener("click", () => {
+    if (!currentUser) {
+      window.location.href = "discussions.html";
+      return;
+    }
+    newUsernameInput.value = currentUsername || "";
+    modal.classList.remove("hidden");
+  });
+
+  cancelEdit.addEventListener("click", () => modal.classList.add("hidden"));
+
+  saveEdit.addEventListener("click", async () => {
+    const value = newUsernameInput.value.trim();
+    if (!value) return;
+
+    const { error } = await supabase
+      .from("profiles")
+      .upsert({ id: currentUser.id, username: value }, { onConflict: "id" });
+
+    if (!error) {
+      currentUsername = value;
+      render();
+      modal.classList.add("hidden");
+    } else {
+      alert("Impossible d'enregistrer le pseudo.");
+      console.error(error);
+    }
+  });
+
+  loadProfile();
+
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js").catch((err) => console.log(err));
+    });
+  }
+})();
+</script>
+
+</body>
+</html>
