@@ -164,6 +164,7 @@ nav.bottom-nav .nav-item:active { transform: scale(.92); }
   font-weight: 700;
   letter-spacing: .03em;
   text-align: center;
+  animation:sloganFade 4s infinite ease-in-out;
 }
 
 .hero .vision {
