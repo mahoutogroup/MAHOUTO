@@ -1,17 +1,45 @@
 {
   "name": "MAHOUTO+",
   "short_name": "MAHOUTO+",
-  "description": "MAHOUTO+ — L'Intelligence Artificielle, la Formation et le Business réunis dans une seule application.",
-  "start_url": "./index.html",
-  "scope": "./",
+  "description": "MAHOUTO+ — L'Afrique qui apprend, crée et entreprend. Construire l'Afrique numérique de demain.",
+  "lang": "fr",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
   "background_color": "#0A0A0A",
   "theme_color": "#0A0A0A",
-  "lang": "fr",
+
   "icons": [
-    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
-  ]
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+
+  "categories": [
+    "education",
+    "business",
+    "productivity",
+    "social",
+    "utilities"
+  ],
+
+  "screenshots": [],
+
+  "prefer_related_applications": false
 }
