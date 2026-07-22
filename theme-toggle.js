@@ -1,186 +1,377 @@
-/* =======================================================
+/* =========================================================
    MAHOUTO+
-   Theme Manager officiel
-   ======================================================= */
-
-document.addEventListener("DOMContentLoaded", () => {
-
-    /* ==========================
-       Animation des cartes
-       ========================== */
-
-    const cards = document.querySelectorAll(".card");
-
-    cards.forEach((card) => {
-
-        card.addEventListener("touchstart", () => {
-            card.style.transform = "scale(.98)";
-        });
-
-        card.addEventListener("touchend", () => {
-            card.style.transform = "";
-        });
-
-    });
-
-
-    /* ==========================
-       Animation des boutons
-       ========================== */
-
-    const buttons = document.querySelectorAll(
-        ".btn-gold, .btn-outline"
-    );
-
-    buttons.forEach((button)=>{
-
-        button.addEventListener("click",()=>{
-
-            button.animate([
-                {
-                    transform:"scale(1)"
-                },
-                {
-                    transform:"scale(.95)"
-                },
-                {
-                    transform:"scale(1)"
-                }
-
-            ],{
-
-                duration:250
-
-            });
-
-        });
-
-    });
-
-
-
-    /* ==========================
-       Animation du logo
-       ========================== */
-
-    const logo = document.querySelector(".logo-badge");
-
-    if(logo){
-
-        logo.animate([
-
-            {
-                transform:"scale(1)"
-            },
-
-            {
-                transform:"scale(1.03)"
-            },
-
-            {
-                transform:"scale(1)"
-            }
-
-        ],{
-
-            duration:4000,
-            iterations:Infinity
-
-        });
-
-    }
-
-
-
-    /* ==========================
-       Animation du slogan
-       ========================== */
-
-    const slogan = document.querySelector(".slogan");
-
-    if(slogan){
-
-        slogan.animate([
-
-            {
-                opacity:.85
-            },
-
-            {
-                opacity:1
-            },
-
-            {
-                opacity:.85
-            }
-
-        ],{
-
-            duration:5000,
-            iterations:Infinity
-
-        });
-
-    }
-
-
-
-    /* ==========================
-       Détection PWA installée
-       ========================== */
-
-    if(window.matchMedia("(display-mode: standalone)").matches){
-
-        console.log("MAHOUTO+ installé.");
-
-    }
-
-
-
-    /* ==========================
-       Effet premium des modules
-       ========================== */
-
-    const modules = document.querySelectorAll(".module-card");
-
-    modules.forEach((module)=>{
-
-        module.addEventListener("mouseenter",()=>{
-
-            module.style.boxShadow =
-            "0 0 25px rgba(255,215,0,.12)";
-
-        });
-
-
-        module.addEventListener("mouseleave",()=>{
-
-            module.style.boxShadow = "";
-
-        });
-
-    });
-
-
-
-    /* ==========================
-       Sauvegarde des préférences
-       ========================== */
-
-    localStorage.setItem(
-        "mahouto-theme",
-        "premium-dark"
-    );
-
-
-    console.log(
-        "MAHOUTO+ Premium Theme chargé."
-    );
-
-
-});
-
-
-/* =======================================================
-   FIN DU FICHIER
-   ======================================================= */
+   Design officiel
+
+   Construire l'Afrique numérique de demain.
+   Apprendre • Créer • Entreprendre • Innover
+
+   L'Afrique apprend, crée et entreprend avec l'Intelligence Artificielle.
+
+   ========================================================= */
+
+:root {
+  --bg: #0A0A0A;
+  --bg-elevated: #151515;
+  --bg-card: #1A1A1A;
+  --border: #2A2A2A;
+  --gold: #D4AF37;
+  --gold-bright: #FFD700;
+  --white: #FFFFFF;
+  --text-muted: #A3A3A3;
+  --text-dim: #6B6B6B;
+  --accent-green: #22C55E;
+  --radius-lg: 22px;
+  --radius-md: 16px;
+  --radius-sm: 10px;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--white);
+}
+
+body{
+  display:flex;
+  flex-direction:column;
+  animation:fadeIn .35s ease;
+  background:
+  radial-gradient(
+  circle at top,
+  rgba(255,215,0,.05),
+  transparent 40%),
+  var(--bg);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+a { color: inherit; text-decoration: none; }
+
+/* ---------- Cartes ---------- */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  transition: transform .25s ease, border-color .25s ease;
+}
+
+.card:active { transform: scale(.98); }
+.card:hover { border-color: var(--gold); }
+
+/* ---------- Boutons ---------- */
+.btn-gold {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: linear-gradient(135deg, var(--gold-bright), var(--gold));
+  color: #0A0A0A;
+  font-weight: bold;
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 13px 24px;
+  cursor: pointer;
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+
+.btn-gold:active { transform: scale(.97); }
+
+.btn-gold:hover {
+  box-shadow: 0 0 25px rgba(255,215,0,.25);
+}
+
+.btn-outline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: transparent;
+  color: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 13px 24px;
+  cursor: pointer;
+  transition: border-color .2s ease;
+}
+
+.btn-outline:hover {
+  border-color: var(--gold);
+  box-shadow: 0 0 18px rgba(255,215,0,.12);
+}
+
+.btn-outline:active { border-color: var(--gold); }
+
+.badge-soon {
+  font-size: 11px;
+  color: var(--text-dim);
+  background: rgba(255,255,255,.05);
+  border-radius: 8px;
+  padding: 2px 8px;
+  font-weight: normal;
+}
+
+/* ---------- Barre de navigation basse (5 onglets) ---------- */
+nav.bottom-nav {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  display: flex;
+  background: rgba(10,10,10,.92);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid var(--border);
+  padding: 10px 0 max(10px, env(safe-area-inset-bottom));
+  z-index: 30;
+}
+
+nav.bottom-nav .nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-dim);
+  font-size: 11px;
+  transition: color .2s ease, transform .2s ease;
+}
+
+nav.bottom-nav .nav-item .icon { font-size: 21px; }
+
+nav.bottom-nav .nav-item.active {
+  color: var(--gold-bright);
+  text-shadow: 0 0 8px rgba(255,215,0,.40);
+}
+
+nav.bottom-nav .nav-item:active { transform: scale(.92); }
+
+/* ---------- Utilitaires ---------- */
+.hidden { display: none !important; }
+
+.page-content {
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 100px;
+}
+
+.section-title {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--gold);
+  font-weight: bold;
+  margin: 26px 20px 14px;
+}
+/* =========================================================
+   MAHOUTO+ — Signature officielle
+   ========================================================= */
+
+.hero .slogan {
+  margin-top: 14px;
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--gold-bright);
+  font-weight: 700;
+  letter-spacing: .03em;
+  text-align: center;
+  animation:sloganFade 5s infinite ease-in-out;
+  text-shadow: 0 0 12px rgba(255,215,0,.15);
+}
+
+.hero .vision {
+  margin-top: 8px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text-muted);
+  text-align: center;
+  max-width: 340px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+
+/* =========================================================
+   Animation premium du logo
+   ========================================================= */
+
+.logo-badge{
+  box-shadow:
+    0 0 20px rgba(255,215,0,.10),
+    inset 0 0 12px rgba(255,215,0,.05);
+  animation: logoGlow 4s infinite ease-in-out;
+}
+
+
+@keyframes logoGlow{
+  0%{
+    box-shadow:
+      0 0 8px rgba(255,215,0,.08),
+      inset 0 0 8px rgba(255,215,0,.05);
+  }
+
+  50%{
+    box-shadow:
+      0 0 25px rgba(255,215,0,.25),
+      inset 0 0 15px rgba(255,215,0,.10);
+  }
+
+  100%{
+    box-shadow:
+      0 0 8px rgba(255,215,0,.08),
+      inset 0 0 8px rgba(255,215,0,.05);
+  }
+}
+
+/* ---------- Animation du slogan ---------- */
+@keyframes sloganFade{
+  0%{ opacity:.85; }
+  50%{ opacity:1; }
+  100%{ opacity:.85; }
+}
+
+/* ---------- Animation du titre MAHOUTO+ ---------- */
+.hero h1{
+  animation: titleGlow 5s infinite ease-in-out;
+}
+
+@keyframes titleGlow{
+  0%{
+    text-shadow: 0 0 8px rgba(255,215,0,.05);
+  }
+
+  50%{
+    text-shadow: 0 0 18px rgba(255,215,0,.25);
+  }
+
+  100%{
+    text-shadow: 0 0 8px rgba(255,215,0,.05);
+  }
+}
+
+
+/* =========================================================
+   Effet premium des cartes
+   ========================================================= */
+
+.card:hover{
+  border-color: var(--gold);
+  box-shadow:
+      0 0 18px rgba(255,215,0,.08);
+}
+
+
+.module-card{
+  transition:
+      transform .25s ease,
+      box-shadow .25s ease,
+      border-color .25s ease;
+}
+
+
+.module-card:hover{
+  transform: translateY(-2px);
+  box-shadow: 0 0 25px rgba(255,215,0,.12);
+}
+
+
+.module-card:active{
+  transform: scale(.98);
+}
+
+
+/* =========================================================
+   Responsive
+   ========================================================= */
+
+@media(max-width:480px){
+
+.hero h1{
+  font-size:30px;
+}
+
+.hero .tagline{
+  font-size:13px;
+}
+
+.hero .slogan{
+  font-size:12px;
+}
+
+.hero .vision{
+  font-size:11px;
+}
+
+}
+
+
+/* =========================================================
+   Transition fluide entre thèmes
+   ========================================================= */
+
+html,
+body,
+.card,
+.bottom-nav,
+.module-card,
+.auth-btn{
+  transition:
+    background .35s ease,
+    color .35s ease,
+    border-color .35s ease,
+    box-shadow .35s ease;
+}
+
+
+/* =========================================================
+   Mode clair
+   ========================================================= */
+
+body.light-theme{
+  --bg:#F7F7F7;
+  --bg-elevated:#FFFFFF;
+  --bg-card:#FFFFFF;
+
+  --border:#D9D9D9;
+
+  --white:#111111;
+
+  --text-muted:#555555;
+  --text-dim:#777777;
+
+  --gold:#D4AF37;
+  --gold-bright:#FFD700;
+
+  background:#F7F7F7;
+  color:#111111;
+}
+
+body.light-theme .card{
+  background:#FFFFFF;
+}
+
+body.light-theme nav.bottom-nav{
+  background:#FFFFFF;
+}
+
+body.light-theme .auth-btn{
+  background:#FFFFFF;
+  color:#111111;
+}
+
+body.light-theme .btn-outline{
+  color:#111111;
+}
+
+
+/* =========================================================
+   FIN DU THÈME MAHOUTO+
+   ========================================================= */
