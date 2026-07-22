@@ -1,4 +1,4 @@
-    /* =========================================================
+/* =========================================================
    MAHOUTO+
    Design officiel
 
@@ -369,6 +369,38 @@ body.light-theme .auth-btn{
 
 body.light-theme .btn-outline{
   color:#111111;
+}
+
+
+/* =========================================================
+   Bouton de bascule du thème
+   ========================================================= */
+
+.theme-toggle-fab{
+  position: fixed;
+  top: max(14px, env(safe-area-inset-top));
+  right: 16px;
+  z-index: 50;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  color: var(--white);
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.theme-toggle-fab:active{
+  transform: scale(.92);
+}
+
+body.light-theme .theme-toggle-fab{
+  background: #FFFFFF;
+  border-color: var(--border);
 }
 
 
