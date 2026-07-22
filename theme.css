@@ -34,10 +34,16 @@ html, body {
   color: var(--white);
 }
 
-body {
-  display: flex;
-  flex-direction: column;
-  animation: fadeIn .35s ease;
+body{
+  display:flex;
+  flex-direction:column;
+  animation:fadeIn .35s ease;
+  background:
+  radial-gradient(
+  circle at top,
+  rgba(255,215,0,.05),
+  transparent 40%),
+  var(--bg);
 }
 
 @keyframes fadeIn {
