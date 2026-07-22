@@ -211,6 +211,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
         themeBtn.addEventListener("click",()=>{
 
+            themeBtn.animate([
+                { transform:"rotate(0deg)" },
+                { transform:"rotate(360deg)" }
+            ],{
+                duration:400,
+                easing:"ease"
+            });
+
             document.body.classList.toggle(
                 "light-theme"
             );
