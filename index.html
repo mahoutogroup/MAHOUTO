@@ -3,205 +3,235 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MAHOUTO+</title>
-<meta name="description" content="MAHOUTO+ — L'Intelligence Artificielle, la Formation et le Business réunis dans une seule application.">
+<title>MAHOUTO+ — Apprendre, Créer, Entreprendre</title>
+<meta name="description" content="MAHOUTO+ — Construire l'Afrique numérique de demain.">
 <meta name="theme-color" content="#0A0A0A">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="theme.css">
+<script src="theme-toggle.js"></script>
 <style>
-  .hero {
-    padding: 36px 20px 10px;
-    text-align: center;
-  }
+  /* index.html : interface uniquement. Toute logique réelle vit
+     dans config.js, auth.js, theme.css, theme-toggle.js, sw.js. */
+
+  .hero { padding: 40px 20px 8px; text-align: center; }
 
   .logo-badge {
-    width: 76px;
-    height: 76px;
-    margin: 0 auto 18px;
-    border-radius: 22px;
-    background: linear-gradient(135deg, #1A1A1A, #0A0A0A);
+    width: 72px; height: 72px; margin: 0 auto 16px; border-radius: 20px;
+    background: linear-gradient(135deg, var(--bg-card), var(--bg));
     border: 1px solid var(--border);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 30px;
-    font-weight: bold;
-    color: var(--gold);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px; font-weight: bold; color: var(--gold);
   }
 
-  .hero h1 { font-size: 30px; }
+  .hero h1 { font-size: 28px; letter-spacing: .01em; }
   .hero h1 .plus { color: var(--accent-green); }
+  .hero .tagline { font-size: 14px; color: var(--text-muted); margin-top: 10px; font-weight: 600; }
+  .hero .subtagline { font-size: 12.5px; color: var(--text-dim); margin-top: 4px; }
 
-  .hero .welcome { font-size: 15px; color: var(--text-muted); margin-top: 14px; }
-  .hero .tagline { font-size: 13.5px; color: var(--text-dim); margin-top: 8px; line-height: 1.6; max-width: 320px; margin-left: auto; margin-right: auto; }
+  #auth-zone { padding: 18px 20px 6px; }
 
-  /* ---------- Chips de fonctionnalités (scroll horizontal) ---------- */
-  .feature-chips {
-    display: flex;
-    gap: 10px;
-    overflow-x: auto;
-    padding: 4px 20px 4px;
+  .auth-methods { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  .auth-btn {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 13px 10px; border-radius: var(--radius-md); border: 1px solid var(--border);
+    background: var(--bg-card); color: var(--white); font-size: 13.5px; font-weight: bold; cursor: pointer;
   }
+  .auth-btn.primary { background: var(--gold-bright); color: #0A0A0A; border: none; grid-column: span 2; }
+  .auth-btn:active { transform: scale(.98); }
 
-  .feature-chips .chip {
-    flex: none;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    padding: 9px 16px;
-    font-size: 12.5px;
-    color: var(--text-muted);
-    white-space: nowrap;
-    display: flex;
-    align-items: center;
-    gap: 6px;
+  .auth-note { text-align: center; font-size: 11.5px; color: var(--text-dim); margin-top: 10px; }
+
+  .profile-summary {
+    display: none;
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 18px;
   }
+  .profile-summary.visible { display: block; }
+  .auth-methods.hidden-by-auth { display: none; }
 
-  /* ---------- Grille des modules principaux ---------- */
-  .module-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 14px;
-    padding: 0 20px;
+  .profile-summary .top { display: flex; align-items: center; gap: 12px; }
+
+  .profile-summary .avatar {
+    width: 52px; height: 52px; border-radius: 50%; background: var(--gold-bright);
+    display: flex; align-items: center; justify-content: center;
+    font-weight: bold; color: #0A0A0A; font-size: 20px; flex: none; overflow: hidden;
   }
+  .profile-summary .avatar img { width: 100%; height: 100%; object-fit: cover; }
 
-  .module-card h2 {
-    font-size: 16px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 6px;
+  .profile-summary .name { font-weight: bold; font-size: 15.5px; }
+  .profile-summary .mahouto-id { font-size: 11.5px; color: var(--text-dim); margin-top: 2px; }
+
+  .profile-stats {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 16px;
   }
+  .profile-stats .stat { text-align: center; background: var(--bg-elevated); border-radius: var(--radius-sm); padding: 10px 4px; }
+  .profile-stats .stat .value { font-size: 16px; font-weight: bold; color: var(--gold); }
+  .profile-stats .stat .label { font-size: 10px; color: var(--text-dim); margin-top: 2px; }
 
-  .module-card p {
-    font-size: 12.5px;
-    color: var(--text-muted);
-    line-height: 1.5;
-    margin-bottom: 12px;
-    min-height: 36px;
+  #auth-modal, #confirm-modal, #info-modal {
+    position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.6);
+    display: flex; align-items: flex-end; justify-content: center;
   }
-
-  .module-card .go {
-    font-size: 12.5px;
-    color: var(--gold);
-    font-weight: bold;
-  }
-
-  /* ---------- Bloc Messages (pleine largeur, style WhatsApp) ---------- */
-  .messages-block {
-    margin: 0 20px;
-    display: flex;
-    align-items: center;
-    gap: 16px;
-  }
-
-  .messages-block .icon-circle {
-    width: 54px;
-    height: 54px;
-    border-radius: 50%;
-    background: var(--accent-green);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 24px;
-    flex: none;
-  }
-
-  .messages-block ul {
-    list-style: none;
-    font-size: 12.5px;
-    color: var(--text-muted);
-    line-height: 1.8;
-  }
-
-  footer {
+  #auth-modal .sheet, #confirm-modal .sheet, #info-modal .sheet {
+    width: 100%; max-width: 480px; background: var(--bg-elevated);
+    border-radius: 24px 24px 0 0; padding: 22px 20px 28px; max-height: 85vh; overflow-y: auto; position: relative;
     text-align: center;
-    padding: 26px 20px 10px;
-    color: var(--text-dim);
-    font-size: 11.5px;
-    line-height: 1.7;
   }
+  .sheet-handle { width: 40px; height: 4px; background: var(--border); border-radius: 3px; margin: 0 auto 16px; }
+
+  #auth-modal h3, #confirm-modal h3, #info-modal h3 { font-size: 18px; color: var(--gold); margin-bottom: 4px; }
+
+  #auth-error {
+    background: rgba(239,68,68,.12); color: #F87171; border-radius: 10px; padding: 10px 12px; font-size: 12.5px; display: none;
+    text-align: left;
+  }
+
+  .modal-text { font-size: 14.5px; color: var(--white); margin: 6px 0 20px; line-height: 1.6; }
+  .modal-actions { display: flex; gap: 10px; }
+  .modal-actions button { flex: 1; padding: 13px; border-radius: 12px; font-weight: bold; cursor: pointer; }
+  .modal-btn-primary { background: var(--gold-bright); color: #0A0A0A; border: none; }
+  .modal-btn-secondary { background: var(--bg-card); color: var(--white); border: 1px solid var(--border); }
+
+  .module-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 0 20px; }
+  .module-card { position: relative; }
+  .module-card h2 { font-size: 15.5px; display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .module-card p { font-size: 12px; color: var(--text-muted); line-height: 1.5; margin-bottom: 12px; min-height: 32px; }
+  .module-card .go { font-size: 12px; color: var(--gold); font-weight: bold; }
+  .module-card.disabled { opacity: .55; }
+  .module-card.disabled .go { color: var(--text-dim); }
+
+  .plans-row { display: flex; gap: 10px; overflow-x: auto; padding: 4px 20px 4px; }
+  .plan-chip { flex: none; background: var(--bg-card); border: 1px solid var(--border); border-radius: 999px; padding: 8px 16px; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+
+  footer { text-align: center; padding: 24px 20px 10px; color: var(--text-dim); font-size: 11px; line-height: 1.7; }
+
+  .hidden { display: none !important; }
 </style>
 </head>
 <body>
+<button id="theme-toggle-btn" class="theme-toggle-fab">🌙</button>
+
 <div class="page-content">
 
   <div class="hero">
     <div class="logo-badge">M+</div>
     <h1>MAHOUTO<span class="plus">+</span></h1>
-    <p class="welcome">Bienvenue sur MAHOUTO+</p>
-    <p class="tagline">L'Intelligence Artificielle, la Formation et le Business réunis dans une seule application.</p>
+    <p class="tagline">Apprendre • Créer • Entreprendre</p>
+    <p class="subtagline">Construire l'Afrique numérique de demain.</p>
   </div>
 
-  <div class="feature-chips">
-    <div id="google-login-button"
-class="chip"
-onclick="alert('Le bouton fonctionne !');loginGoogle()"
-style="cursor:pointer;">
-  🔐 Connexion Google
-</div>
-    <div class="chip">🧠 MAHOUTO AI</div>
-    <div class="chip">🎓 MAHOUTO School</div>
-    <div class="chip">🛍️ Marketplace</div>
-    <div class="chip">🔔 Notifications</div>
-    <div class="chip">📜 Certificats</div>
-    <div class="chip">💳 Mobile Money</div>
+  <div id="auth-zone">
+
+    <div id="auth-methods" class="auth-methods">
+      <button class="auth-btn primary" id="btn-login-google">🔐 Continuer avec Google</button>
+      <button class="auth-btn" id="btn-login-phone">📱 Téléphone</button>
+      <button class="auth-btn" id="btn-login-email">✉️ Email</button>
+    </div>
+    <p class="auth-note" id="auth-guest-note">Ou explore l'application sans compte.</p>
+
+    <div class="profile-summary" id="profile-summary">
+      <div class="top">
+        <div class="avatar" id="profile-avatar">?</div>
+        <div>
+          <div class="name" id="profile-name">—</div>
+          <div class="mahouto-id">ID MAHOUTO+ : —</div>
+        </div>
+      </div>
+      <div class="profile-stats">
+        <div class="stat"><div class="value">—</div><div class="label">Certificats</div></div>
+        <div class="stat"><div class="value">—</div><div class="label">Formations</div></div>
+        <div class="stat"><div class="value">—</div><div class="label">Ancienneté</div></div>
+        <div class="stat"><div class="value">—</div><div class="label">Messages</div></div>
+        <div class="stat"><div class="value">—</div><div class="label">Pays</div></div>
+      </div>
+    </div>
+
   </div>
 
-  <div class="section-title">🔥 Explorer</div>
-
+  <div class="section-title">🔥 Modules</div>
   <div class="module-grid">
 
-    <a class="card module-card" href="discussions.html">
-      <h2>💬 Messages</h2>
-      <p>Discussions, groupes, appels — comme WhatsApp.</p>
-      <div class="go">Ouvrir →</div>
-    </a>
-
     <a class="card module-card" href="ai.html">
-      <h2>🧠 MAHOUTO AI</h2>
+      <h2>🧠 MAJESTÉ AI</h2>
       <p>Assistant IA, prompts, analyse de documents.</p>
       <div class="go">Ouvrir →</div>
     </a>
 
+    <a class="card module-card" href="discussions.html">
+      <h2>💬 Messages</h2>
+      <p>Discussions, groupes — en temps réel.</p>
+      <div class="go">Ouvrir →</div>
+    </a>
+
     <a class="card module-card" href="school.html">
-      <h2>🎓 School</h2>
+      <h2>🎓 MAHOUTO School</h2>
       <p>Formations en imprimerie, design, web, IA.</p>
       <div class="go">Ouvrir →</div>
     </a>
 
+    <div class="card module-card disabled">
+      <h2>🏫 Institut SAYÉ LOUIS</h2>
+      <p>Programme académique dédié.</p>
+      <div class="go">Bientôt disponible</div>
+    </div>
+
+    <div class="card module-card" id="card-majeste-presse" style="cursor:pointer;">
+      <h2>🖨️ Majesté Presse</h2>
+      <p>L'atelier de sérigraphie et d'imprimerie.</p>
+      <div class="go">Visiter le site →</div>
+    </div>
+
+    <div class="card module-card disabled">
+      <h2>🛍️ MAHOUTO Market</h2>
+      <p>Produits, services, commandes.</p>
+      <div class="go">Bientôt disponible</div>
+    </div>
+
+    <div class="card module-card disabled">
+      <h2>💳 MAHOUTO Pay</h2>
+      <p>Portefeuille et paiements Mobile Money.</p>
+      <div class="go">Bientôt disponible</div>
+    </div>
+
     <a class="card module-card" href="profil.html">
       <h2>👤 Profil</h2>
-      <p>Compte, abonnements, certificats, commandes.</p>
+      <p>Compte, informations personnelles.</p>
       <div class="go">Ouvrir →</div>
     </a>
 
-  </div>
-
-  <div class="section-title">🛍️ Marketplace <span class="badge-soon">Bientôt</span></div>
-  <div class="module-grid">
-    <div class="card module-card" style="opacity:.55">
-      <h2>🛒 Produits &amp; Services</h2>
-      <p>Achats, commandes et paiements Mobile Money.</p>
-      <div class="go" style="color:var(--text-dim)">Bientôt disponible</div>
+    <div class="card module-card disabled">
+      <h2>📜 Certificats</h2>
+      <p>Diplômes numériques.</p>
+      <div class="go">Bientôt disponible</div>
     </div>
+
+    <div class="card module-card disabled">
+      <h2>🔔 Notifications</h2>
+      <p>Alertes et rappels.</p>
+      <div class="go">Bientôt disponible</div>
+    </div>
+
+    <div class="card module-card disabled">
+      <h2>⚙️ Paramètres</h2>
+      <p>Préférences du compte et de l'application.</p>
+      <div class="go">Bientôt disponible</div>
+    </div>
+
   </div>
 
-  <div class="section-title">💬 Messages, façon WhatsApp</div>
-  <div class="messages-block">
-    <div class="icon-circle">💬</div>
-    <ul>
-      <li>Discussions privées &amp; groupes</li>
-      <li>Notes vocales, photos, vidéos, PDF</li>
-      <li>Appels audio &amp; vidéo (à venir)</li>
-      <li>Statuts &amp; partage de position (à venir)</li>
-    </ul>
+  <div class="section-title">⭐ Abonnements</div>
+  <div class="plans-row">
+    <div class="plan-chip">MAHOUTO FREE</div>
+    <div class="plan-chip">MAHOUTO PREMIUM</div>
+    <div class="plan-chip">MAHOUTO BUSINESS</div>
+    <div class="plan-chip">MAHOUTO ENTERPRISE</div>
+    <div class="plan-chip">MAHOUTO ORGANISATION</div>
   </div>
 
   <footer>
-    © 2026 MAHOUTO+ — Tous droits réservés.<br>
-    Style premium — WhatsApp · Telegram · ChatGPT · LinkedIn.
+    © 2026 MAHOUTO+ — Tous droits réservés.
   </footer>
 
 </div>
@@ -209,21 +239,158 @@ style="cursor:pointer;">
 <nav class="bottom-nav">
   <a class="nav-item active" href="index.html"><span class="icon">🏠</span>Accueil</a>
   <a class="nav-item" href="discussions.html"><span class="icon">💬</span>Messages</a>
-  <a class="nav-item" href="ai.html"><span class="icon">🧠</span>MAHOUTO AI</a>
+  <a class="nav-item" href="ai.html"><span class="icon">🧠</span>MAJESTÉ AI</a>
   <a class="nav-item" href="school.html"><span class="icon">🎓</span>School</a>
   <a class="nav-item" href="profil.html"><span class="icon">👤</span>Profil</a>
 </nav>
 
-<script src="config.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="auth.js"></script>
+<!-- Confirmation obligatoire avant tout lien externe (Majesté Presse) -->
+<div id="confirm-modal" class="hidden">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h3>Confirmation</h3>
+    <p class="modal-text" id="confirm-text"></p>
+    <div class="modal-actions">
+      <button class="modal-btn-secondary" id="confirm-no">NON</button>
+      <button class="modal-btn-primary" id="confirm-yes">OUI</button>
+    </div>
+  </div>
+</div>
 
+<!-- Message générique pour toute méthode de connexion non configurée -->
+<div id="info-modal" class="hidden">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h3>Information</h3>
+    <p class="modal-text" id="info-text"></p>
+    <div class="modal-actions">
+      <button class="modal-btn-primary" id="info-close">Fermer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Erreur de connexion Google (affichée uniquement en cas d'échec réel) -->
+<div id="auth-modal" class="hidden">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <h3>Connexion</h3>
+    <div id="auth-error"></div>
+    <div class="modal-actions">
+      <button class="modal-btn-primary" id="auth-error-close">Fermer</button>
+    </div>
+  </div>
+</div>
+
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="auth.js"></script>
 <script>
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("sw.js").catch((err) => console.log(err));
+(function () {
+  "use strict";
+
+  // -------- Modale d'information générique --------
+  const infoModal = document.getElementById("info-modal");
+  const infoText = document.getElementById("info-text");
+  function showInfo(message) {
+    infoText.textContent = message;
+    infoModal.classList.remove("hidden");
+  }
+  document.getElementById("info-close").addEventListener("click", () => infoModal.classList.add("hidden"));
+  infoModal.addEventListener("click", (e) => { if (e.target === infoModal) infoModal.classList.add("hidden"); });
+
+  // -------- Modale de confirmation générique (Majesté Presse) --------
+  const confirmModal = document.getElementById("confirm-modal");
+  const confirmText = document.getElementById("confirm-text");
+  const confirmYes = document.getElementById("confirm-yes");
+  const confirmNo = document.getElementById("confirm-no");
+  let pendingUrl = null;
+
+  function askConfirm(message, url) {
+    confirmText.textContent = message;
+    pendingUrl = url;
+    confirmModal.classList.remove("hidden");
+  }
+  confirmNo.addEventListener("click", () => { confirmModal.classList.add("hidden"); pendingUrl = null; });
+  confirmModal.addEventListener("click", (e) => { if (e.target === confirmModal) confirmNo.click(); });
+  confirmYes.addEventListener("click", () => {
+    if (pendingUrl) window.location.href = pendingUrl;
+    confirmModal.classList.add("hidden");
   });
-}
+
+  const MAJESTE_PRESSE_URL = "https://majestepresse.com";
+
+  document.getElementById("card-majeste-presse").addEventListener("click", () => {
+    askConfirm("Voulez-vous visiter MAJESTÉ PRESSE ?", MAJESTE_PRESSE_URL);
+  });
+
+  // -------- Authentification --------
+  const authModal = document.getElementById("auth-modal");
+  const authErrorEl = document.getElementById("auth-error");
+  document.getElementById("auth-error-close").addEventListener("click", () => authModal.classList.add("hidden"));
+  authModal.addEventListener("click", (e) => { if (e.target === authModal) authModal.classList.add("hidden"); });
+
+  function showAuthError(message) {
+    authErrorEl.textContent = message;
+    authErrorEl.style.display = "block";
+    authModal.classList.remove("hidden");
+  }
+
+  // Google : utilise loginGoogle(), définie dans auth.js.
+  document.getElementById("btn-login-google").addEventListener("click", async () => {
+    try {
+      if (typeof window.loginGoogle !== "function") {
+        showInfo("Cette méthode de connexion n'est pas encore configurée.");
+        return;
+      }
+      await window.loginGoogle();
+    } catch (err) {
+      showAuthError(err.message);
+      console.error(err);
+    }
+  });
+
+  // Téléphone : aucune fonction correspondante n'existe dans auth.js.
+  document.getElementById("btn-login-phone").addEventListener("click", () => {
+    showInfo("Cette méthode de connexion n'est pas encore configurée.");
+  });
+
+  // Email : aucune fonction correspondante n'existe dans auth.js.
+  document.getElementById("btn-login-email").addEventListener("click", () => {
+    showInfo("Cette méthode de connexion n'est pas encore configurée.");
+  });
+
+  // -------- Affichage de l'identité si une session existe --------
+  // "supabase" est le client créé par auth.js (déclaration top-level
+  // partagée entre les scripts classiques de cette page).
+  async function refreshIdentityUI() {
+    try {
+      if (typeof supabase === "undefined" || !supabase.auth || typeof supabase.auth.getUser !== "function") return;
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      document.getElementById("auth-methods").classList.add("hidden-by-auth");
+      document.getElementById("auth-guest-note").classList.add("hidden");
+      document.getElementById("profile-summary").classList.add("visible");
+
+      const name = (user.user_metadata && (user.user_metadata.full_name || user.user_metadata.name)) || user.email || "Utilisateur";
+      document.getElementById("profile-name").textContent = name;
+
+      const avatarEl = document.getElementById("profile-avatar");
+      const photo = user.user_metadata && user.user_metadata.avatar_url;
+      avatarEl.innerHTML = photo ? '<img src="' + photo + '" alt="">' : name.trim()[0].toUpperCase();
+    } catch (err) {
+      console.error("Vérification de session impossible :", err);
+    }
+  }
+
+  refreshIdentityUI();
+
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js").catch((err) => console.log(err));
+    });
+  }
+})();
 </script>
 
 </body>
