@@ -1,4 +1,4 @@
-/* =========================================================
+  /* =========================================================
    MAHOUTO+
    Design officiel
 
@@ -350,7 +350,12 @@ body.light-theme{
   --gold:#D4AF37;
   --gold-bright:#FFD700;
 
-  background:#F7F7F7;
+  background:
+    radial-gradient(
+      circle at top,
+      rgba(212,175,55,.08),
+      transparent 40%),
+    #F7F7F7;
   color:#111111;
 }
 
@@ -365,6 +370,11 @@ body.light-theme nav.bottom-nav{
 body.light-theme .auth-btn{
   background:#FFFFFF;
   color:#111111;
+}
+
+body.light-theme .auth-btn.primary{
+  background: linear-gradient(135deg, var(--gold-bright), var(--gold));
+  color: #0A0A0A;
 }
 
 body.light-theme .btn-outline{
