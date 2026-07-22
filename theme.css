@@ -1,7 +1,12 @@
 /* =========================================================
-   MAHOUTO+ — Thème partagé
-   Noir premium + Or + Blanc, coins arrondis, style
-   WhatsApp / Telegram / ChatGPT / LinkedIn
+   MAHOUTO+
+   Design officiel
+
+   Construire l'Afrique numérique de demain.
+   Apprendre • Créer • Entreprendre • Innover
+
+   L'Afrique apprend, crée et entreprend avec l'Intelligence Artificielle.
+
    ========================================================= */
 
 :root {
@@ -83,6 +88,10 @@ a { color: inherit; text-decoration: none; }
 
 .btn-gold:active { transform: scale(.97); }
 
+.btn-gold:hover {
+  box-shadow: 0 0 25px rgba(255,215,0,.25);
+}
+
 .btn-outline {
   display: inline-flex;
   align-items: center;
@@ -95,6 +104,11 @@ a { color: inherit; text-decoration: none; }
   padding: 13px 24px;
   cursor: pointer;
   transition: border-color .2s ease;
+}
+
+.btn-outline:hover {
+  border-color: var(--gold);
+  box-shadow: 0 0 18px rgba(255,215,0,.12);
 }
 
 .btn-outline:active { border-color: var(--gold); }
@@ -132,7 +146,12 @@ nav.bottom-nav .nav-item {
 }
 
 nav.bottom-nav .nav-item .icon { font-size: 21px; }
-nav.bottom-nav .nav-item.active { color: var(--gold); }
+
+nav.bottom-nav .nav-item.active {
+  color: var(--gold-bright);
+  text-shadow: 0 0 8px rgba(255,215,0,.40);
+}
+
 nav.bottom-nav .nav-item:active { transform: scale(.92); }
 
 /* ---------- Utilitaires ---------- */
@@ -164,7 +183,8 @@ nav.bottom-nav .nav-item:active { transform: scale(.92); }
   font-weight: 700;
   letter-spacing: .03em;
   text-align: center;
-  animation:sloganFade 4s infinite ease-in-out;
+  animation:sloganFade 5s infinite ease-in-out;
+  text-shadow: 0 0 12px rgba(255,215,0,.15);
 }
 
 .hero .vision {
@@ -211,6 +231,32 @@ nav.bottom-nav .nav-item:active { transform: scale(.92); }
   }
 }
 
+/* ---------- Animation du slogan ---------- */
+@keyframes sloganFade{
+  0%{ opacity:.85; }
+  50%{ opacity:1; }
+  100%{ opacity:.85; }
+}
+
+/* ---------- Animation du titre MAHOUTO+ ---------- */
+.hero h1{
+  animation: titleGlow 5s infinite ease-in-out;
+}
+
+@keyframes titleGlow{
+  0%{
+    text-shadow: 0 0 8px rgba(255,215,0,.05);
+  }
+
+  50%{
+    text-shadow: 0 0 18px rgba(255,215,0,.25);
+  }
+
+  100%{
+    text-shadow: 0 0 8px rgba(255,215,0,.05);
+  }
+}
+
 
 /* =========================================================
    Effet premium des cartes
@@ -233,6 +279,7 @@ nav.bottom-nav .nav-item:active { transform: scale(.92); }
 
 .module-card:hover{
   transform: translateY(-2px);
+  box-shadow: 0 0 25px rgba(255,215,0,.12);
 }
 
 
