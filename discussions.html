@@ -8,15 +8,16 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="theme.css">
+<script src="theme-toggle.js"></script>
 <style>
-  html, body { background: #0A0A0A; color: #F1F5F9; }
+  html, body { background: var(--bg); color: var(--white); }
 
   body { display: flex; flex-direction: column; }
 
   /* ---------- En-tête ---------- */
   header {
     padding: 18px 16px 10px;
-    background: #0A0A0A;
+    background: var(--bg);
   }
 
   .title-row {
@@ -28,28 +29,28 @@
 
   .title-row h1 {
     font-size: 26px;
-    color: #FFD700;
+    color: var(--gold-bright);
   }
 
-  .title-row .plus { color: #22C55E; }
+  .title-row .plus { color: var(--accent-green); }
 
-  .title-row .icons { display: flex; gap: 18px; color: #CBD5E1; font-size: 20px; }
+  .title-row .icons { display: flex; gap: 18px; color: var(--text-muted); font-size: 20px; }
 
   .search-bar {
-    background: #1A1A1A;
+    background: var(--bg-card);
     border-radius: 14px;
     padding: 12px 16px;
     display: flex;
     align-items: center;
     gap: 10px;
-    color: #94A3B8;
+    color: var(--text-muted);
   }
 
   .search-bar input {
     background: transparent;
     border: none;
     outline: none;
-    color: white;
+    color: var(--white);
     font-size: 15px;
     width: 100%;
   }
@@ -66,8 +67,8 @@
     flex: none;
     padding: 8px 16px;
     border-radius: 20px;
-    background: #1A1A1A;
-    color: #CBD5E1;
+    background: var(--bg-card);
+    color: var(--text-muted);
     font-size: 14px;
     font-weight: bold;
     cursor: pointer;
@@ -77,7 +78,7 @@
     white-space: nowrap;
   }
 
-  .tab.active { background: #22C55E; color: #0A0A0A; }
+  .tab.active { background: var(--accent-green); color: #0A0A0A; }
 
   .tab .count {
     background: rgba(0,0,0,.2);
@@ -101,10 +102,10 @@
     gap: 14px;
     padding: 14px 16px;
     cursor: pointer;
-    border-bottom: 1px solid #2A2A2A;
+    border-bottom: 1px solid var(--border);
   }
 
-  .room-row:active { background: #2A2A2A; }
+  .room-row:active { background: var(--bg-elevated); }
 
   .avatar {
     width: 52px;
@@ -130,13 +131,13 @@
   .room-info .name {
     font-weight: bold;
     font-size: 16px;
-    color: #F1F5F9;
+    color: var(--white);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
 
-  .room-info .time { font-size: 12px; color: #64748B; flex: none; margin-left: 8px; }
+  .room-info .time { font-size: 12px; color: var(--text-dim); flex: none; margin-left: 8px; }
 
   .room-info .bottom-line {
     display: flex;
@@ -147,7 +148,7 @@
 
   .room-info .preview {
     font-size: 13.5px;
-    color: #94A3B8;
+    color: var(--text-muted);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -155,7 +156,7 @@
   }
 
   .unread-badge {
-    background: #22C55E;
+    background: var(--accent-green);
     color: #0A0A0A;
     font-size: 12px;
     font-weight: bold;
@@ -171,7 +172,7 @@
 
   #empty-state, #loading-state {
     text-align: center;
-    color: #64748B;
+    color: var(--text-dim);
     padding: 60px 24px;
     font-size: 14px;
   }
@@ -184,7 +185,7 @@
     width: 56px;
     height: 56px;
     border-radius: 50%;
-    background: #FFD700;
+    background: var(--gold-bright);
     color: #0A0A0A;
     border: none;
     font-size: 26px;
@@ -197,7 +198,7 @@
   #login-screen {
     position: fixed;
     inset: 0;
-    background: #0A0A0A;
+    background: var(--bg);
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -208,15 +209,15 @@
     z-index: 20;
   }
 
-  #login-screen h2 { color: #FFD700; font-size: 24px; }
-  #login-screen p { color: #94A3B8; max-width: 320px; }
+  #login-screen h2 { color: var(--gold-bright); font-size: 24px; }
+  #login-screen p { color: var(--text-muted); max-width: 320px; }
 
   #login-screen input {
     padding: 12px 16px;
     border-radius: 12px;
     border: none;
-    background: #1A1A1A;
-    color: white;
+    background: var(--bg-card);
+    color: var(--white);
     width: 100%;
     max-width: 300px;
     font-size: 15px;
@@ -226,17 +227,19 @@
     padding: 12px 30px;
     border: none;
     border-radius: 12px;
-    background: #FFD700;
+    background: var(--gold-bright);
     font-weight: bold;
     cursor: pointer;
   }
 
-  #status-message { color: #94A3B8; font-size: 13px; min-height: 18px; }
+  #status-message { color: var(--text-muted); font-size: 13px; min-height: 18px; }
 
   .hidden { display: none !important; }
 </style>
 </head>
 <body>
+
+<button id="theme-toggle-btn" class="theme-toggle-fab">🌙</button>
 
 <div id="login-screen">
   <h2>MAHOUTO<span style="color:#22C55E">+</span></h2>
