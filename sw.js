@@ -4,7 +4,7 @@
 // network-first pour tout le reste (données dynamiques).
 // =========================================================
 
-const CACHE_NAME = "mahoutoplus-shell-v6";
+const CACHE_NAME = "mahoutoplus-shell-v5";
 
 const APP_SHELL = [
   "./",
@@ -18,9 +18,13 @@ const APP_SHELL = [
   "./config.js",
   "./theme.css",
   "./theme-toggle.js",
-  "./icons/icon-192.png",
-  "./icons/icon-512.png",
-  "./icons/icon-maskable-512.png"
+  "./assets/favicon.png",
+  "./assets/apple-touch-icon.png",
+  "./assets/logo-mahouto-plus.png",
+  "./assets/splash-screen.png",
+  "./assets/icon-192.png",
+  "./assets/icon-512.png",
+  "./assets/icon-maskable-512.png"
 ];
 
 // Installation : met en cache la coquille de l'application
