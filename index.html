@@ -7,8 +7,9 @@
 <meta name="description" content="MAHOUTO+ — Construire l'Afrique numérique de demain.">
 <meta name="theme-color" content="#0A0A0A">
 <link rel="manifest" href="manifest.json">
-<link rel="icon" href="icons/icon-192.png">
-<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="icon" href="assets/favicon.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="preload" as="image" href="assets/logo-mahouto-plus.png">
 <link rel="stylesheet" href="theme.css">
 <script src="theme-toggle.js"></script>
 <style>
@@ -18,11 +19,15 @@
   .hero { padding: 40px 20px 8px; text-align: center; }
 
   .logo-badge {
-    width: 72px; height: 72px; margin: 0 auto 16px; border-radius: 20px;
-    background: linear-gradient(135deg, var(--bg-card), var(--bg));
-    border: 1px solid var(--border);
+    width: 110px; height: 110px; margin: 0 auto 16px;
+    border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
-    font-size: 28px; font-weight: bold; color: var(--gold);
+  }
+
+  .logo-badge img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
   }
 
   .hero h1 { font-size: 28px; letter-spacing: .01em; }
@@ -116,7 +121,9 @@
 <div class="page-content">
 
   <div class="hero">
-    <div class="logo-badge">M+</div>
+    <div class="logo-badge">
+      <img src="assets/logo-mahouto-plus.png" alt="MAHOUTO+" loading="eager">
+    </div>
     <h1>MAHOUTO<span class="plus">+</span></h1>
     <p class="tagline">Apprendre • Créer • Entreprendre</p>
     <p class="subtagline">Construire l'Afrique numérique de demain.</p>
