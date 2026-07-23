@@ -8,6 +8,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="theme.css">
+<script src="theme-toggle.js"></script>
 <style>
   .profile-header {
     display: flex;
@@ -56,13 +57,15 @@
   #edit-modal h3 { color: var(--gold); font-size: 16px; margin-bottom: 14px; }
   #edit-modal input {
     width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border);
-    background: var(--bg); color: white; font-size: 14.5px; margin-bottom: 14px;
+    background: var(--bg); color: var(--white); font-size: 14.5px; margin-bottom: 14px;
   }
   #edit-modal .actions { display: flex; gap: 10px; }
   #edit-modal .actions button { flex: 1; }
 </style>
 </head>
 <body>
+
+<button id="theme-toggle-btn" class="theme-toggle-fab">🌙</button>
 
 <div class="page-content">
 
