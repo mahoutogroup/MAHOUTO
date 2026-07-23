@@ -1,4 +1,4 @@
-  /* =========================================================
+/* =========================================================
    MAHOUTO+
    Design officiel
 
@@ -406,6 +406,31 @@ body.light-theme .btn-outline{
 
 .theme-toggle-fab:active{
   transform: scale(.92);
+}
+
+
+/* =========================================================
+   Bouton « Se connecter avec Google »
+   Reste doré en mode clair ET en mode sombre (aucune
+   surcharge body.light-theme n'est appliquée ici)
+   ========================================================= */
+
+.btn-google-gold{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: linear-gradient(135deg, var(--gold-bright), var(--gold));
+  color: #0A0A0A;
+  border: none;
+  border-radius: 12px;
+  padding: 12px 24px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.btn-google-gold:active{
+  transform: scale(.97);
 }
 
 body.light-theme .theme-toggle-fab{
