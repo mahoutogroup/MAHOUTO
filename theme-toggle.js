@@ -172,6 +172,20 @@ document.addEventListener("DOMContentLoaded", () => {
     );
 
 
+    // synchronise la couleur de la barre de statut (Android/Chrome)
+    // avec le thème actif
+    function syncThemeColorMeta(isLight){
+        const meta = document.querySelector(
+            'meta[name="theme-color"]'
+        );
+        if(!meta) return;
+        meta.setAttribute(
+            "content",
+            isLight ? "#F7F7F7" : "#0A0A0A"
+        );
+    }
+
+
     // récupération du thème
     let currentTheme = localStorage.getItem(
         "mahouto-theme"
@@ -196,11 +210,15 @@ document.addEventListener("DOMContentLoaded", () => {
             themeBtn.textContent="☀️";
         }
 
+        syncThemeColorMeta(true);
+
     }else{
 
         if(themeBtn){
             themeBtn.textContent="🌙";
         }
+
+        syncThemeColorMeta(false);
 
     }
 
@@ -239,6 +257,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
                 themeBtn.textContent="☀️";
+                syncThemeColorMeta(true);
 
             }else{
 
@@ -249,6 +268,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 
                 themeBtn.textContent="🌙";
+                syncThemeColorMeta(false);
 
             }
 
