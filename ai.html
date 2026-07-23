@@ -8,12 +8,14 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icons/icon-192.png">
 <link rel="stylesheet" href="theme.css">
+<script src="theme-toggle.js"></script>
 <style>
   header {
     display: flex;
     align-items: center;
     gap: 12px;
     padding: 16px 20px;
+    padding-right: 60px;
     background: var(--bg-elevated);
     border-bottom: 1px solid var(--border);
   }
@@ -77,7 +79,7 @@
     border-radius: 18px;
     border: 1px solid var(--border);
     background: var(--bg-card);
-    color: white;
+    color: var(--white);
     font-size: 14.5px;
     font-family: inherit;
   }
@@ -111,7 +113,7 @@
     border-radius: 12px;
     border: 1px solid var(--border);
     background: var(--bg-card);
-    color: white;
+    color: var(--white);
     width: 100%;
     max-width: 300px;
     font-size: 14px;
@@ -121,6 +123,8 @@
 </style>
 </head>
 <body>
+
+<button id="theme-toggle-btn" class="theme-toggle-fab">🌙</button>
 
 <div id="key-screen">
   <h2>🧠 MAHOUTO AI</h2>
