@@ -10,6 +10,7 @@
 <link rel="icon" href="assets/favicon.png">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <link rel="preload" as="image" href="assets/logo-mahouto-plus.png">
+<link rel="preload" as="image" href="assets/splash-screen.png" fetchpriority="high">
 <link rel="stylesheet" href="theme.css">
 <script src="theme-toggle.js"></script>
 <style>
@@ -113,9 +114,97 @@
   footer { text-align: center; padding: 24px 20px 10px; color: var(--text-dim); font-size: 11px; line-height: 1.7; }
 
   .hidden { display: none !important; }
+
+  /* =========================================================
+     Splash Screen officiel MAHOUTO+
+     ========================================================= */
+
+  #splash-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background: #000000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    animation: splashFadeIn .6s ease forwards;
+  }
+
+  #splash-screen.splash-fade-out {
+    animation: splashFadeOut .6s ease forwards;
+  }
+
+  #splash-screen .splash-glow {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: min(70vw, 420px);
+    height: min(70vw, 420px);
+    transform: translate(-50%, -50%);
+    background: radial-gradient(circle, rgba(255,215,0,.35), transparent 70%);
+    filter: blur(30px);
+    animation: splashGlowPulse 2.5s infinite ease-in-out;
+    pointer-events: none;
+  }
+
+  #splash-screen img {
+    position: relative;
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    display: block;
+  }
+
+  @keyframes splashFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes splashFadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+  }
+
+  @keyframes splashGlowPulse {
+    0%   { opacity: .5; }
+    50%  { opacity: 1; }
+    100% { opacity: .5; }
+  }
+
+  @media (min-width: 700px) {
+    #splash-screen img { max-width: 420px; }
+  }
 </style>
 </head>
 <body>
+<div id="splash-screen">
+  <div class="splash-glow"></div>
+  <img src="assets/splash-screen.png" alt="MAHOUTO+" loading="eager">
+</div>
+<script>
+(function () {
+  var splash = document.getElementById("splash-screen");
+  if (!splash) return;
+
+  // Le splash ne s'affiche qu'une fois par session (premier chargement)
+  if (sessionStorage.getItem("mahouto_splash_shown")) {
+    splash.style.display = "none";
+    return;
+  }
+  sessionStorage.setItem("mahouto_splash_shown", "1");
+
+  setTimeout(function () {
+    splash.classList.add("splash-fade-out");
+    splash.addEventListener("animationend", function () {
+      splash.style.display = "none";
+    }, { once: true });
+  }, 2500);
+})();
+</script>
+
 <button id="theme-toggle-btn" class="theme-toggle-fab">🌙</button>
 
 <div class="page-content">
