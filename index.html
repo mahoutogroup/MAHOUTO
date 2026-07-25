@@ -12,6 +12,12 @@
 <link rel="preload" as="image" href="assets/logo-mahouto-plus.png">
 <link rel="preload" as="image" href="assets/splash-screen.png" fetchpriority="high">
 <link rel="stylesheet" href="theme.css">
+<script>
+  // === DIAGNOSTIC TEMPORAIRE — à retirer une fois le bug résolu ===
+  window.addEventListener("error", function (e) {
+    alert("ERREUR JS :\n" + e.message + "\nFichier : " + e.filename + "\nLigne : " + e.lineno);
+  });
+</script>
 <script src="theme-toggle.js"></script>
 <style>
   /* index.html : interface uniquement. Toute logique réelle vit
