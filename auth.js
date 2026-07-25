@@ -2,262 +2,276 @@
 // MAHOUTO+ - AUTH.JS
 //=========================================================
 
-// Initialisation du client Supabase
-const supabase = window.supabase.createClient(
-    window.MAHOUTO_CONFIG.SUPABASE_URL,
-    window.MAHOUTO_CONFIG.SUPABASE_ANON_KEY
-);
+// Protection : si ce fichier est chargé deux fois sur la même page
+// (balise dupliquée, cache, etc.), on ignore la seconde exécution
+// au lieu de planter sur "Identifier 'supabase' has already been declared".
+if (window.__MAHOUTO_AUTH_LOADED__) {
 
-// Rendre Supabase accessible partout
-window.supabase = supabase;
+    console.warn("⚠️ auth.js déjà chargé — exécution ignorée.");
 
-console.log("✅ MAHOUTO+ connecté à Supabase !");
-console.log("URL :", window.MAHOUTO_CONFIG.SUPABASE_URL);
+} else {
 
-
-//=========================================================
-// CONNEXION GOOGLE
-//=========================================================
-
-async function loginGoogle() {
-
-    const { error } = await supabase.auth.signInWithOAuth({
-
-        provider: "google",
-
-        options: {
-            redirectTo: window.location.origin
-        }
-
-    });
-
-    if (error) {
-
-        console.error("Erreur Google :", error.message);
-
-        throw new Error(
-            "La connexion Google a échoué."
-        );
-
-    }
-
-}
+    window.__MAHOUTO_AUTH_LOADED__ = true;
 
 
-//=========================================================
-// DECONNEXION
-//=========================================================
+    // Initialisation du client Supabase
+    const supabase = window.supabase.createClient(
+        window.MAHOUTO_CONFIG.SUPABASE_URL,
+        window.MAHOUTO_CONFIG.SUPABASE_ANON_KEY
+    );
 
-async function logout() {
+    // Rendre Supabase accessible partout
+    window.supabase = supabase;
 
-    const { error } = await supabase.auth.signOut();
-
-    if (error) {
-
-        console.error("Erreur :", error.message);
-
-        throw new Error(
-            "Impossible de se déconnecter."
-        );
-
-    }
-
-    window.location.href = "index.html";
-
-}
+    console.log("✅ MAHOUTO+ connecté à Supabase !");
+    console.log("URL :", window.MAHOUTO_CONFIG.SUPABASE_URL);
 
 
-//=========================================================
-// CREATION DU PROFIL
-//=========================================================
+    //=========================================================
+    // CONNEXION GOOGLE
+    //=========================================================
 
-async function ensureProfile(userId, username) {
+    async function loginGoogle() {
 
-    const { error } = await supabase
-        .from("profiles")
-        .upsert(
+        const { error } = await supabase.auth.signInWithOAuth({
 
-            {
-                id: userId,
-                username: username
-            },
+            provider: "google",
 
-            {
-                onConflict: "id"
+            options: {
+                redirectTo: window.location.origin
             }
 
-        );
+        });
 
+        if (error) {
 
-    if (error) {
+            console.error("Erreur Google :", error.message);
 
-        console.error(
-            "Profil non enregistré :",
-            error.message
-        );
+            throw new Error(
+                "La connexion Google a échoué."
+            );
+
+        }
 
     }
 
-}
+
+    //=========================================================
+    // DECONNEXION
+    //=========================================================
+
+    async function logout() {
+
+        const { error } = await supabase.auth.signOut();
+
+        if (error) {
+
+            console.error("Erreur :", error.message);
+
+            throw new Error(
+                "Impossible de se déconnecter."
+            );
+
+        }
+
+        window.location.href = "index.html";
+
+    }
+
+
+    //=========================================================
+    // CREATION DU PROFIL
+    //=========================================================
+
+    async function ensureProfile(userId, username) {
+
+        const { error } = await supabase
+            .from("profiles")
+            .upsert(
+
+                {
+                    id: userId,
+                    username: username
+                },
+
+                {
+                    onConflict: "id"
+                }
+
+            );
+
+
+        if (error) {
+
+            console.error(
+                "Profil non enregistré :",
+                error.message
+            );
+
+        }
+
+    }
 
 
 
-//=========================================================
-// VERIFICATION DE SESSION
-//=========================================================
+    //=========================================================
+    // VERIFICATION DE SESSION
+    //=========================================================
 
-async function checkUser() {
+    async function checkUser() {
 
-    try {
+        try {
 
-        const {
+            const {
 
-            data: { user }
+                data: { user }
 
-        } = await supabase.auth.getUser();
+            } = await supabase.auth.getUser();
 
 
-        if (!user) {
+            if (!user) {
+
+                console.log(
+                    "Aucun utilisateur connecté."
+                );
+
+                return null;
+
+            }
+
+
+            const userName =
+
+                user.user_metadata?.full_name ||
+                user.user_metadata?.name ||
+                user.email ||
+                "Utilisateur";
+
+
+            const userPhoto =
+
+                user.user_metadata?.avatar_url ||
+                "";
+
+
+            // Vérifier si le profil existe déjà
+
+            const {
+
+                data: existingProfile
+
+            } = await supabase
+
+                .from("profiles")
+                .select("username")
+                .eq("id", user.id)
+                .maybeSingle();
+
+
+
+            // Le créer uniquement si nécessaire
+
+            if (!existingProfile) {
+
+                await ensureProfile(
+                    user.id,
+                    userName
+                );
+
+            }
+
+
+            // Compatibilité avec les anciennes pages
+
+            const googleButton =
+                document.getElementById(
+                    "google-login-button"
+                );
+
+
+            if (googleButton) {
+
+                googleButton.innerHTML = `
+
+                <img src="${userPhoto}"
+                style="
+                width:24px;
+                height:24px;
+                border-radius:50%;
+                vertical-align:middle;
+                margin-right:8px;
+                ">
+
+                ${existingProfile ?
+                existingProfile.username :
+                userName}
+
+                `;
+
+
+                googleButton
+                .removeAttribute("onclick");
+
+            }
+
 
             console.log(
-                "Aucun utilisateur connecté."
+                "Utilisateur connecté :",
+                userName
+            );
+
+
+            return user;
+
+
+        } catch (error) {
+
+            console.error(
+                "Erreur de session :",
+                error.message
             );
 
             return null;
 
         }
 
-
-        const userName =
-
-            user.user_metadata?.full_name ||
-            user.user_metadata?.name ||
-            user.email ||
-            "Utilisateur";
-
-
-        const userPhoto =
-
-            user.user_metadata?.avatar_url ||
-            "";
-
-
-        // Vérifier si le profil existe déjà
-
-        const {
-
-            data: existingProfile
-
-        } = await supabase
-
-            .from("profiles")
-            .select("username")
-            .eq("id", user.id)
-            .maybeSingle();
-
-
-
-        // Le créer uniquement si nécessaire
-
-        if (!existingProfile) {
-
-            await ensureProfile(
-                user.id,
-                userName
-            );
-
-        }
-
-
-        // Compatibilité avec les anciennes pages
-
-        const googleButton =
-            document.getElementById(
-                "google-login-button"
-            );
-
-
-        if (googleButton) {
-
-            googleButton.innerHTML = `
-
-            <img src="${userPhoto}"
-            style="
-            width:24px;
-            height:24px;
-            border-radius:50%;
-            vertical-align:middle;
-            margin-right:8px;
-            ">
-
-            ${existingProfile ?
-            existingProfile.username :
-            userName}
-
-            `;
-
-
-            googleButton
-            .removeAttribute("onclick");
-
-        }
-
-
-        console.log(
-            "Utilisateur connecté :",
-            userName
-        );
-
-
-        return user;
-
-
-    } catch (error) {
-
-        console.error(
-            "Erreur de session :",
-            error.message
-        );
-
-        return null;
-
     }
+
+
+
+    //=========================================================
+    // RAFRAICHISSEMENT AUTOMATIQUE
+    //=========================================================
+
+    supabase.auth.onAuthStateChange(
+        (event, session) => {
+
+            console.log(
+                "Etat de session :",
+                event
+            );
+
+            checkUser();
+
+        }
+    );
+
+
+    //=========================================================
+    // EXPORT DES FONCTIONS
+    //=========================================================
+
+    window.loginGoogle = loginGoogle;
+
+    window.logout = logout;
+
+    window.checkUser = checkUser;
+
+
+    //=========================================================
+    // LANCEMENT
+    //=========================================================
+
+    checkUser();
 
 }
-
-
-
-//=========================================================
-// RAFRAICHISSEMENT AUTOMATIQUE
-//=========================================================
-
-supabase.auth.onAuthStateChange(
-    (event, session) => {
-
-        console.log(
-            "Etat de session :",
-            event
-        );
-
-        checkUser();
-
-    }
-);
-
-
-//=========================================================
-// EXPORT DES FONCTIONS
-//=========================================================
-
-window.loginGoogle = loginGoogle;
-
-window.logout = logout;
-
-window.checkUser = checkUser;
-
-
-//=========================================================
-// LANCEMENT
-//=========================================================
-
-checkUser();
