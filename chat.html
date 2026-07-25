@@ -586,7 +586,7 @@
 
     supabase
       .from("messages")
-      .update({ is_deleted: true, content: null, attachment_url: null })
+      .update({ is_deleted: true, content: "", attachment_url: "" })
       .eq("id", msg.id)
       .then(({ error }) => {
         if (error) { console.error(error); alert("Impossible de supprimer ce message."); }
