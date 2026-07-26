@@ -59,6 +59,27 @@
   }
   .formation-row .save-btn:disabled { opacity: .5; cursor: wait; }
   .formation-row .save-status { font-size: 11px; color: var(--accent-green); align-self: center; }
+  .formation-row .delete-btn {
+    background: rgba(239,68,68,.15); color: #F87171; border: none; border-radius: 8px;
+    padding: 9px 14px; font-size: 12.5px; font-weight: bold; cursor: pointer;
+  }
+
+  #new-formation-form {
+    margin: 20px 20px 40px; padding: 16px; display: flex; flex-direction: column; gap: 10px;
+  }
+  #new-formation-form h3 { color: var(--gold); font-size: 15px; margin-bottom: 4px; }
+  #new-formation-form label { font-size: 11px; color: var(--text-dim); display: block; margin-bottom: 3px; }
+  #new-formation-form input, #new-formation-form select, #new-formation-form textarea {
+    width: 100%; padding: 9px 10px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--white); font-size: 13.5px; font-family: inherit;
+  }
+  #new-formation-form textarea { resize: vertical; min-height: 50px; }
+  #new-formation-form .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  #new-formation-form button {
+    margin-top: 6px; background: var(--gold-bright); color: #0A0A0A; border: none;
+    border-radius: 10px; padding: 12px; font-weight: bold; font-size: 14px; cursor: pointer;
+  }
+  #new-formation-status { font-size: 12px; color: var(--accent-green); min-height: 16px; }
 </style>
 </head>
 <body>
@@ -76,6 +97,37 @@
   <div id="access-denied" class="hidden">🔒 Accès réservé aux administrateurs.</div>
 
   <div id="formations-container" class="hidden"></div>
+
+  <form id="new-formation-form" class="card hidden">
+    <h3>➕ Ajouter une formation</h3>
+    <div>
+      <label>Académie / plateforme</label>
+      <select id="nf-provider">
+        <option value="mahouto_school">MAHOUTO School</option>
+        <option value="academie_majestepresse">Académie Majesté Presse</option>
+      </select>
+    </div>
+    <div>
+      <label>Nom de la formation</label>
+      <input type="text" id="nf-nom" placeholder="Ex : Photographie produit" required>
+    </div>
+    <div>
+      <label>Description courte</label>
+      <textarea id="nf-description" placeholder="Ex : Prise de vue et retouche pour la vente en ligne."></textarea>
+    </div>
+    <div class="row-2">
+      <div>
+        <label>Emoji</label>
+        <input type="text" id="nf-emoji" placeholder="📷" value="📘">
+      </div>
+      <div>
+        <label>Prix (FCFA)</label>
+        <input type="number" id="nf-prix" min="0" required>
+      </div>
+    </div>
+    <button type="submit">Créer la formation</button>
+    <div id="new-formation-status"></div>
+  </form>
 
 </div>
 
@@ -134,12 +186,32 @@
           </label>
           <div class="actions">
             <button class="save-btn">Enregistrer</button>
+            <button type="button" class="delete-btn">🗑️</button>
             <span class="save-status hidden">✓ Enregistré</span>
           </div>
         `;
 
         const saveBtn = row.querySelector(".save-btn");
+        const deleteBtn = row.querySelector(".delete-btn");
         const statusEl = row.querySelector(".save-status");
+
+        deleteBtn.addEventListener("click", async () => {
+          if (!confirm(`Supprimer définitivement "${f.nom}" ?`)) return;
+          deleteBtn.disabled = true;
+
+          const { error } = await supabase
+            .from("formations")
+            .delete()
+            .eq("id", f.id);
+
+          if (error) {
+            console.error(error);
+            alert("Impossible de supprimer : " + error.message);
+            deleteBtn.disabled = false;
+          } else {
+            row.remove();
+          }
+        });
 
         saveBtn.addEventListener("click", async () => {
           saveBtn.disabled = true;
@@ -192,6 +264,13 @@
   async function init() {
     const { data } = await supabase.auth.getSession();
 
+    // === DIAGNOSTIC TEMPORAIRE — à retirer une fois résolu ===
+    alert(
+      "DIAGNOSTIC ADMIN\n" +
+      "Session trouvée : " + (data && data.session ? "OUI" : "NON") + "\n" +
+      "User ID : " + (data && data.session ? data.session.user.id : "—")
+    );
+
     if (!data || !data.session || !data.session.user) {
       loadingEl.classList.add("hidden");
       deniedEl.classList.remove("hidden");
@@ -199,11 +278,18 @@
       return;
     }
 
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from("profiles")
       .select("role")
       .eq("id", data.session.user.id)
       .maybeSingle();
+
+    // === DIAGNOSTIC TEMPORAIRE — à retirer une fois résolu ===
+    alert(
+      "Profil trouvé : " + (profile ? "OUI" : "NON") + "\n" +
+      "Rôle lu : " + (profile ? profile.role : "—") + "\n" +
+      "Erreur : " + (profileError ? profileError.message : "aucune")
+    );
 
     const role = profile ? profile.role : "user";
 
@@ -215,8 +301,47 @@
 
     loadingEl.classList.add("hidden");
     containerEl.classList.remove("hidden");
+    document.getElementById("new-formation-form").classList.remove("hidden");
     await loadFormations();
   }
+
+  document.getElementById("new-formation-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const provider = document.getElementById("nf-provider").value;
+    const nom = document.getElementById("nf-nom").value.trim();
+    const description = document.getElementById("nf-description").value.trim();
+    const emoji = document.getElementById("nf-emoji").value.trim() || "📘";
+    const prix = parseInt(document.getElementById("nf-prix").value, 10);
+    const statusEl = document.getElementById("new-formation-status");
+
+    if (!nom || !prix) return;
+
+    const slug = nom.toLowerCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+    const prefix = provider === "academie_majestepresse" ? "amp-" : "";
+    const id = prefix + slug + "-" + Date.now().toString(36);
+
+    statusEl.textContent = "Création en cours...";
+
+    const { error } = await supabase.from("formations").insert({
+      id, provider, nom, description, emoji, prix, disponible: true
+    });
+
+    if (error) {
+      console.error(error);
+      statusEl.style.color = "#F87171";
+      statusEl.textContent = "Erreur : " + error.message;
+      return;
+    }
+
+    statusEl.style.color = "";
+    statusEl.textContent = "✓ Formation créée.";
+    document.getElementById("new-formation-form").reset();
+    document.getElementById("nf-emoji").value = "📘";
+    await loadFormations();
+  });
 
   init();
 })();
