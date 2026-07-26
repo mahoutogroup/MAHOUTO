@@ -1,1 +1,226 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Administration — Formations — MAHOUTO+</title>
+<meta name="theme-color" content="#0A0A0A">
+<link rel="manifest" href="../manifest.json">
+<link rel="icon" href="../assets/favicon.png">
+<link rel="stylesheet" href="../theme.css">
+<script src="../theme-toggle.js"></script>
+<style>
+  header { padding: 20px; background: var(--bg-elevated); border-bottom: 1px solid var(--border); }
+  header h1 { font-size: 20px; color: var(--gold); }
+  header p { font-size: 12.5px; color: var(--text-muted); margin-top: 6px; }
 
+  #access-denied, #loading-state {
+    text-align: center; color: var(--text-dim); padding: 60px 24px; font-size: 14px;
+  }
+
+  .provider-group { padding: 16px 20px 4px; }
+  .provider-title {
+    font-size: 12px; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--gold); font-weight: bold; margin-bottom: 10px;
+  }
+
+  .formation-row {
+    display: flex; flex-direction: column; gap: 8px;
+    margin-bottom: 12px; padding: 14px;
+  }
+
+  .formation-row .top-line {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .formation-row .emoji { font-size: 20px; }
+  .formation-row .nom { font-weight: bold; font-size: 14.5px; flex: 1; }
+
+  .formation-row .fields {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+  }
+  .formation-row label {
+    font-size: 10.5px; color: var(--text-dim); display: block; margin-bottom: 3px;
+  }
+  .formation-row input[type="number"], .formation-row input[type="text"] {
+    width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--white); font-size: 13.5px;
+  }
+
+  .formation-row .toggle-row {
+    display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-muted);
+  }
+
+  .formation-row .actions {
+    display: flex; gap: 8px; margin-top: 4px;
+  }
+  .formation-row .save-btn {
+    flex: 1; font-size: 12.5px; font-weight: bold; background: var(--gold-bright);
+    color: #0A0A0A; border: none; border-radius: 8px; padding: 9px; cursor: pointer;
+  }
+  .formation-row .save-btn:disabled { opacity: .5; cursor: wait; }
+  .formation-row .save-status { font-size: 11px; color: var(--accent-green); align-self: center; }
+</style>
+</head>
+<body>
+
+<button id="theme-toggle-btn" class="theme-toggle-fab">🌙</button>
+
+<div class="page-content">
+
+  <header>
+    <h1>⚙️ Administration — Formations</h1>
+    <p>Modifie les prix, promotions et disponibilités sans toucher au code.</p>
+  </header>
+
+  <div id="loading-state">Vérification des droits...</div>
+  <div id="access-denied" class="hidden">🔒 Accès réservé aux administrateurs.</div>
+
+  <div id="formations-container" class="hidden"></div>
+
+</div>
+
+<script src="../config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+(function () {
+  const cfg = window.MAHOUTO_CONFIG;
+  const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+
+  const loadingEl = document.getElementById("loading-state");
+  const deniedEl = document.getElementById("access-denied");
+  const containerEl = document.getElementById("formations-container");
+
+  const PROVIDER_LABELS = {
+    mahouto_school: "MAHOUTO School",
+    academie_majestepresse: "Académie Majesté Presse"
+  };
+
+  function money(xof) { return xof.toLocaleString("fr-FR") + " FCFA"; }
+
+  function renderFormations(formations) {
+    containerEl.innerHTML = "";
+    const byProvider = {};
+    formations.forEach((f) => {
+      if (!byProvider[f.provider]) byProvider[f.provider] = [];
+      byProvider[f.provider].push(f);
+    });
+
+    Object.keys(byProvider).forEach((provider) => {
+      const group = document.createElement("div");
+      group.className = "provider-group";
+      group.innerHTML = `<div class="provider-title">${PROVIDER_LABELS[provider] || provider}</div>`;
+
+      byProvider[provider].forEach((f) => {
+        const row = document.createElement("div");
+        row.className = "card formation-row";
+        row.innerHTML = `
+          <div class="top-line">
+            <span class="emoji">${f.emoji}</span>
+            <span class="nom">${f.nom}</span>
+          </div>
+          <div class="fields">
+            <div>
+              <label>Prix (FCFA)</label>
+              <input type="number" class="f-prix" value="${f.prix}" min="0">
+            </div>
+            <div>
+              <label>Promotion (FCFA, optionnel)</label>
+              <input type="number" class="f-promo" value="${f.promotion ?? ""}" min="0" placeholder="Aucune">
+            </div>
+          </div>
+          <label class="toggle-row">
+            <input type="checkbox" class="f-dispo" ${f.disponible ? "checked" : ""}>
+            Disponible à l'achat
+          </label>
+          <div class="actions">
+            <button class="save-btn">Enregistrer</button>
+            <span class="save-status hidden">✓ Enregistré</span>
+          </div>
+        `;
+
+        const saveBtn = row.querySelector(".save-btn");
+        const statusEl = row.querySelector(".save-status");
+
+        saveBtn.addEventListener("click", async () => {
+          saveBtn.disabled = true;
+          statusEl.classList.add("hidden");
+
+          const prix = parseInt(row.querySelector(".f-prix").value, 10);
+          const promoRaw = row.querySelector(".f-promo").value;
+          const promotion = promoRaw === "" ? null : parseInt(promoRaw, 10);
+          const disponible = row.querySelector(".f-dispo").checked;
+
+          const { error } = await supabase
+            .from("formations")
+            .update({ prix, promotion, disponible })
+            .eq("id", f.id);
+
+          saveBtn.disabled = false;
+
+          if (error) {
+            console.error(error);
+            alert("Impossible d'enregistrer : " + error.message);
+          } else {
+            statusEl.classList.remove("hidden");
+            setTimeout(() => statusEl.classList.add("hidden"), 2000);
+          }
+        });
+
+        group.appendChild(row);
+      });
+
+      containerEl.appendChild(group);
+    });
+  }
+
+  async function loadFormations() {
+    const { data, error } = await supabase
+      .from("formations")
+      .select("*")
+      .order("provider", { ascending: true })
+      .order("nom", { ascending: true });
+
+    if (error) {
+      containerEl.innerHTML = '<div style="padding:20px;color:var(--text-dim);">Erreur de chargement des formations.</div>';
+      console.error(error);
+      return;
+    }
+
+    renderFormations(data || []);
+  }
+
+  async function init() {
+    const { data } = await supabase.auth.getSession();
+
+    if (!data || !data.session || !data.session.user) {
+      loadingEl.classList.add("hidden");
+      deniedEl.classList.remove("hidden");
+      deniedEl.textContent = "🔒 Connecte-toi avec un compte administrateur pour accéder à cette page.";
+      return;
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", data.session.user.id)
+      .maybeSingle();
+
+    const role = profile ? profile.role : "user";
+
+    if (role !== "admin" && role !== "super_admin" && role !== "founder") {
+      loadingEl.classList.add("hidden");
+      deniedEl.classList.remove("hidden");
+      return;
+    }
+
+    loadingEl.classList.add("hidden");
+    containerEl.classList.remove("hidden");
+    await loadFormations();
+  }
+
+  init();
+})();
+</script>
+
+</body>
+</html>
