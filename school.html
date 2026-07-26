@@ -95,14 +95,32 @@
   const cfg = window.MAHOUTO_CONFIG;
   const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
 
-  const COURSES = [
-    { id: "imprimerie", name: "Imprimerie", emoji: "🖨️", desc: "Techniques et machines d'impression", amount: 5000 },
-    { id: "serigraphie", name: "Sérigraphie", emoji: "🎨", desc: "Impression textile et supports rigides", amount: 5000 },
-    { id: "graphisme", name: "Graphisme", emoji: "🖌️", desc: "Identité visuelle et outils de design", amount: 7500 },
-    { id: "dev-web", name: "Développement Web", emoji: "💻", desc: "Créer des sites et applications modernes", amount: 10000 },
-    { id: "ia", name: "Intelligence Artificielle", emoji: "🧠", desc: "Utiliser l'IA pour son business", amount: 10000 },
-    { id: "informatique", name: "Informatique", emoji: "🖥️", desc: "Bases et maintenance informatique", amount: 5000 }
-  ];
+  const COURSES_PROVIDER = "mahouto_school";
+  let COURSES = [];
+
+  async function loadCourseCatalog() {
+    const { data, error } = await supabase
+      .from("formations")
+      .select("*")
+      .eq("provider", COURSES_PROVIDER)
+      .eq("disponible", true)
+      .order("nom", { ascending: true });
+
+    if (error) {
+      console.error("Catalogue indisponible :", error);
+      COURSES = [];
+      return;
+    }
+
+    COURSES = (data || []).map((f) => ({
+      id: f.id,
+      name: f.nom,
+      emoji: f.emoji,
+      desc: f.description,
+      amount: f.promotion ?? f.prix,
+      originalAmount: f.promotion ? f.prix : null
+    }));
+  }
 
   const listEl = document.getElementById("course-list");
   const bannerEl = document.getElementById("payment-banner");
@@ -123,7 +141,7 @@
         <div class="info">
           <h3>${course.name}</h3>
           <p>${course.desc}</p>
-          <div class="price">${money(course.amount)}</div>
+          <div class="price">${course.originalAmount ? `<span style="text-decoration:line-through;color:var(--text-dim);margin-right:6px;">${money(course.originalAmount)}</span>` : ""}${money(course.amount)}</div>
         </div>
         <button class="buy-btn ${owned ? "owned" : ""}" data-id="${course.id}">
           ${owned ? "✓ Acquis" : "Acheter"}
@@ -238,6 +256,7 @@
   }
 
   (async function init() {
+    await loadCourseCatalog();
     renderCourses();
     await ensureLoggedIn();
     await loadOwnedCourses();
