@@ -12,12 +12,6 @@
 <link rel="preload" as="image" href="assets/logo-mahouto-plus.png">
 <link rel="preload" as="image" href="assets/splash-screen.png" fetchpriority="high">
 <link rel="stylesheet" href="theme.css">
-<script>
-  // === DIAGNOSTIC TEMPORAIRE — à retirer une fois le bug résolu ===
-  window.addEventListener("error", function (e) {
-    alert("ERREUR JS :\n" + e.message + "\nFichier : " + e.filename + "\nLigne : " + e.lineno);
-  });
-</script>
 <script src="theme-toggle.js"></script>
 <style>
   /* index.html : interface uniquement. Toute logique réelle vit
@@ -278,6 +272,12 @@
       <p>Programme académique dédié.</p>
       <div class="go">Bientôt disponible</div>
     </div>
+
+    <a class="card module-card" href="academie-majestepresse.html">
+      <h2>🖨️ Académie Majesté Presse</h2>
+      <p>Formations certifiantes en imprimerie et sérigraphie.</p>
+      <div class="go">Ouvrir →</div>
+    </a>
 
     <div class="card module-card" id="card-majeste-presse" style="cursor:pointer;">
       <h2>🖨️ Majesté Presse</h2>
