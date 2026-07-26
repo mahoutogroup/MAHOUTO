@@ -82,6 +82,7 @@
 
   <div class="section-title">Mon compte</div>
   <div class="menu-list">
+    <a class="card menu-item hidden" id="admin-dashboard-link" href="admin/formations.html"><span class="emoji">⚙️</span><span class="label">Tableau de bord Administrateur</span><span class="sub">→</span></a>
     <div class="card menu-item"><span class="emoji">💳</span><span class="label">Paiements</span><span class="sub">Bientôt</span></div>
     <div class="card menu-item"><span class="emoji">📜</span><span class="label">Certificats</span><span class="sub">Bientôt</span></div>
     <div class="card menu-item"><span class="emoji">⭐</span><span class="label">Abonnements</span><span class="sub">Bientôt</span></div>
@@ -142,10 +143,15 @@
       currentUser = data.session.user;
       const { data: profile } = await supabase
         .from("profiles")
-        .select("username")
+        .select("username, role")
         .eq("id", currentUser.id)
         .maybeSingle();
       currentUsername = profile ? profile.username : null;
+
+      const role = profile ? profile.role : null;
+      if (role === "admin" || role === "super_admin" || role === "founder") {
+        document.getElementById("admin-dashboard-link").classList.remove("hidden");
+      }
     }
     render();
   }
