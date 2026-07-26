@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Académie Majesté Presse — MAHOUTO+</title>
+<meta name="theme-color" content="#0A0A0A">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="assets/favicon.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="preload" as="image" href="assets/logo-mahouto-plus.png">
+<link rel="stylesheet" href="theme.css">
+<script src="theme-toggle.js"></script>
+<style>
+  header { padding: 20px; background: var(--bg-elevated); border-bottom: 1px solid var(--border); }
+  header h1 { font-size: 20px; color: var(--gold); }
+  header p { font-size: 12.5px; color: var(--text-muted); margin-top: 6px; }
+  header .external-link { font-size: 11.5px; color: var(--text-dim); margin-top: 8px; display: block; }
+  header .external-link a { color: var(--gold); }
+
+  #payment-banner {
+    margin: 14px 20px 0;
+    padding: 12px 16px;
+    border-radius: 14px;
+    font-size: 13px;
+    text-align: center;
+  }
+  #payment-banner.pending { background: rgba(212,175,55,.12); color: var(--gold); }
+  #payment-banner.paid { background: rgba(34,197,94,.12); color: var(--accent-green); }
+  #payment-banner.failed { background: rgba(239,68,68,.12); color: #F87171; }
+
+  .course-list { padding: 16px 20px; display: flex; flex-direction: column; gap: 14px; }
+  .course-card { display: flex; align-items: center; gap: 14px; }
+
+  .course-card .emoji {
+    width: 50px; height: 50px; border-radius: 14px;
+    background: rgba(212,175,55,.12);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; flex: none;
+  }
+
+  .course-card .info { flex: 1; }
+  .course-card h3 { font-size: 15.5px; margin-bottom: 4px; }
+  .course-card p { font-size: 12px; color: var(--text-muted); }
+  .course-card .price { font-size: 12.5px; color: var(--gold); font-weight: bold; margin-top: 4px; }
+
+  .buy-btn {
+    font-size: 12.5px;
+    font-weight: bold;
+    background: var(--gold-bright);
+    color: #0A0A0A;
+    border: none;
+    border-radius: 10px;
+    padding: 8px 14px;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+
+  .buy-btn.owned { background: rgba(34,197,94,.18); color: var(--accent-green); }
+  .buy-btn:disabled { opacity: .6; cursor: wait; }
+</style>
+</head>
+<body>
+
+<button id="theme-toggle-btn" class="theme-toggle-fab">🌙</button>
+
+<div class="page-content">
+
+  <header>
+    <h1>🖨️ Académie Majesté Presse</h1>
+    <p>Formations certifiantes en imprimerie et sérigraphie, propulsées par MAHOUTO+.</p>
+    <span class="external-link">Vitrine complète : <a href="https://academie.majestepresse.com" target="_blank" rel="noopener">academie.majestepresse.com</a></span>
+  </header>
+
+  <div id="payment-banner" class="hidden"></div>
+
+  <div class="course-list" id="course-list"></div>
+
+  <div class="section-title">📜 À venir</div>
+  <div style="padding: 0 20px 20px; font-size: 12.5px; color: var(--text-muted); line-height: 1.7;">
+    Certificat numérique avec QR Code, vérifiable, dès qu'une formation est achetée et validée.
+  </div>
+
+</div>
+
+<nav class="bottom-nav">
+  <a class="nav-item" href="index.html"><span class="icon">🏠</span>Accueil</a>
+  <a class="nav-item" href="discussions.html"><span class="icon">💬</span>Messages</a>
+  <a class="nav-item" href="ai.html"><span class="icon">🧠</span>MAHOUTO AI</a>
+  <a class="nav-item" href="school.html"><span class="icon">🎓</span>School</a>
+  <a class="nav-item" href="profil.html"><span class="icon">👤</span>Profil</a>
+</nav>
+
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+(function () {
+  const cfg = window.MAHOUTO_CONFIG;
+  const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+
+  const COURSES_PROVIDER = "academie_majestepresse";
+  let COURSES = [];
+
+  async function loadCourseCatalog() {
+    const { data, error } = await supabase
+      .from("formations")
+      .select("*")
+      .eq("provider", COURSES_PROVIDER)
+      .eq("disponible", true)
+      .order("nom", { ascending: true });
+
+    if (error) {
+      console.error("Catalogue indisponible :", error);
+      COURSES = [];
+      return;
+    }
+
+    COURSES = (data || []).map((f) => ({
+      id: f.id,
+      name: f.nom,
+      emoji: f.emoji,
+      desc: f.description,
+      amount: f.promotion ?? f.prix,
+      originalAmount: f.promotion ? f.prix : null
+    }));
+  }
+
+  const listEl = document.getElementById("course-list");
+  const bannerEl = document.getElementById("payment-banner");
+  let currentUser = null;
+  let currentUsername = null;
+  let ownedCourseIds = new Set();
+
+  function money(xof) { return xof.toLocaleString("fr-FR") + " FCFA"; }
+
+  function renderCourses() {
+    listEl.innerHTML = "";
+    COURSES.forEach((course) => {
+      const owned = ownedCourseIds.has(course.id);
+      const row = document.createElement("div");
+      row.className = "card course-card";
+      row.innerHTML = `
+        <div class="emoji">${course.emoji}</div>
+        <div class="info">
+          <h3>${course.name}</h3>
+          <p>${course.desc}</p>
+          <div class="price">${course.originalAmount ? `<span style="text-decoration:line-through;color:var(--text-dim);margin-right:6px;">${money(course.originalAmount)}</span>` : ""}${money(course.amount)}</div>
+        </div>
+        <button class="buy-btn ${owned ? "owned" : ""}" data-id="${course.id}">
+          ${owned ? "✓ Acquis" : "Acheter"}
+        </button>
+      `;
+      listEl.appendChild(row);
+    });
+
+    listEl.querySelectorAll(".buy-btn").forEach((btn) => {
+      btn.addEventListener("click", () => buyCourse(btn.dataset.id, btn));
+    });
+  }
+
+  async function ensureLoggedIn() {
+    const { data } = await supabase.auth.getSession();
+    if (data && data.session && data.session.user) {
+      currentUser = data.session.user;
+      const { data: profile } = await supabase
+        .from("profiles").select("username").eq("id", currentUser.id).maybeSingle();
+      currentUsername = profile ? profile.username : "Client";
+      return true;
+    }
+    return false;
+  }
+
+  async function loadOwnedCourses() {
+    if (!currentUser) return;
+    const { data } = await supabase
+      .from("purchases")
+      .select("course_id, status")
+      .eq("user_id", currentUser.id)
+      .eq("status", "paid");
+    ownedCourseIds = new Set((data || []).map((p) => p.course_id));
+  }
+
+  async function buyCourse(courseId, btn) {
+    const course = COURSES.find((c) => c.id === courseId);
+    if (!course) return;
+
+    const loggedIn = await ensureLoggedIn();
+    if (!loggedIn) {
+      alert("Connecte-toi d'abord (Google, depuis l'accueil, ou un pseudo depuis Messages), puis reviens ici.");
+      window.location.href = "index.html";
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = "Redirection...";
+
+    try {
+      const resp = await fetch("/api/fedapay-checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          courseId: course.id,
+          courseName: course.name,
+          amount: course.amount,
+          userId: currentUser.id,
+          customerFirstname: currentUsername
+        })
+      });
+
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || "Erreur de paiement");
+
+      window.location.href = data.checkoutUrl;
+    } catch (err) {
+      alert("Paiement indisponible : " + err.message);
+      console.error(err);
+      btn.disabled = false;
+      btn.textContent = "Acheter";
+    }
+  }
+
+  async function checkReturnFromPayment() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("payment") !== "return") return;
+
+    const courseId = params.get("course");
+    bannerEl.classList.remove("hidden");
+    bannerEl.className = "pending";
+    bannerEl.textContent = "⏳ Vérification du paiement en cours...";
+
+    let attempts = 0;
+    const poll = setInterval(async () => {
+      attempts++;
+      const { data } = await supabase
+        .from("purchases")
+        .select("status")
+        .eq("user_id", currentUser.id)
+        .eq("course_id", courseId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (data && data.status === "paid") {
+        clearInterval(poll);
+        bannerEl.className = "paid";
+        bannerEl.textContent = "✅ Paiement confirmé ! Formation débloquée.";
+        await loadOwnedCourses();
+        renderCourses();
+      } else if (data && data.status === "failed") {
+        clearInterval(poll);
+        bannerEl.className = "failed";
+        bannerEl.textContent = "❌ Le paiement a échoué ou a été annulé.";
+      } else if (attempts > 8) {
+        clearInterval(poll);
+        bannerEl.className = "pending";
+        bannerEl.textContent = "⏳ Paiement en attente de confirmation. Reviens dans un instant.";
+      }
+    }, 2000);
+  }
+
+  (async function init() {
+    await loadCourseCatalog();
+    renderCourses();
+    await ensureLoggedIn();
+    await loadOwnedCourses();
+    renderCourses();
+    await checkReturnFromPayment();
+  })();
+
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js").catch((err) => console.log(err));
+    });
+  }
+})();
+</script>
+
+</body>
+</html>
