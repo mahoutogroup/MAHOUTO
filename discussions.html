@@ -108,6 +108,16 @@
     border-bottom: 1px solid var(--border);
   }
 
+  .room-manage-btn {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 20px;
+    padding: 6px 4px;
+    cursor: pointer;
+    flex: none;
+  }
+
   .room-row:active { background: var(--bg-elevated); }
 
   .avatar {
@@ -313,7 +323,8 @@
   const fab = document.getElementById("fab");
 
   let currentUser = null;
-  let roomsData = []; // { id, name, emoji, color, is_group, lastMessage, lastTime, unread }
+  let currentRole = "user";
+  let roomsData = []; // { id, name, emoji, color, is_group, lastMessage, lastTime, unread, created_by }
   let activeFilter = "toutes";
   let searchTerm = "";
 
@@ -421,6 +432,7 @@
 
     roomListEl.innerHTML = "";
     filtered.forEach((room) => {
+      const canManage = room.created_by === currentUser.id || ["admin", "super_admin", "founder"].includes(currentRole);
       const row = document.createElement("div");
       row.className = "room-row";
       row.innerHTML = `
@@ -435,10 +447,21 @@
             ${room.unread > 0 ? `<span class="unread-badge">${room.unread}</span>` : ""}
           </div>
         </div>
+        ${canManage ? '<button type="button" class="room-manage-btn" title="Gérer ce salon">⋮</button>' : ""}
       `;
-      row.addEventListener("click", () => {
+      row.addEventListener("click", (e) => {
+        if (e.target.closest(".room-manage-btn")) return;
         window.location.href = "chat.html?room=" + encodeURIComponent(room.id) + "&name=" + encodeURIComponent(room.name);
       });
+
+      const manageBtn = row.querySelector(".room-manage-btn");
+      if (manageBtn) {
+        manageBtn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          openRoomActions(room);
+        });
+      }
+
       roomListEl.appendChild(row);
     });
   }
@@ -464,7 +487,7 @@
 
     const { error } = await supabase
       .from("rooms")
-      .insert({ id, name: name.trim(), emoji: "💬", color: "#38BDF8", is_group: true });
+      .insert({ id, name: name.trim(), emoji: "💬", color: "#38BDF8", is_group: true, created_by: currentUser.id });
 
     if (error) {
       alert("Impossible de créer ce salon (peut-être déjà existant).");
@@ -514,6 +537,10 @@
         await ensureProfile(currentUser.id, googleName || fallbackName);
       }
 
+      const { data: roleProfile } = await supabase
+        .from("profiles").select("role").eq("id", currentUser.id).maybeSingle();
+      currentRole = roleProfile && roleProfile.role ? roleProfile.role : "user";
+
       loginScreen.classList.add("hidden");
       appEl.classList.remove("hidden");
       await loadRooms();
@@ -530,6 +557,46 @@
 
   joinBtn.addEventListener("click", joinChat);
   usernameInput.addEventListener("keydown", (e) => { if (e.key === "Enter") joinChat(); });
+
+  async function openRoomActions(room) {
+    const choice = prompt(
+      `Gérer "${room.name}" :\ntape "renommer" ou "supprimer"`,
+      ""
+    );
+    if (!choice) return;
+    const action = choice.trim().toLowerCase();
+
+    if (action === "renommer" || action === "1") {
+      const newName = prompt("Nouveau nom du salon :", room.name);
+      if (!newName || !newName.trim()) return;
+
+      const { error } = await supabase
+        .from("rooms")
+        .update({ name: newName.trim() })
+        .eq("id", room.id);
+
+      if (error) {
+        alert("Impossible de renommer ce salon.");
+        console.error(error);
+        return;
+      }
+      await loadRooms();
+    } else if (action === "supprimer" || action === "2") {
+      if (!confirm(`Supprimer définitivement le salon "${room.name}" ?`)) return;
+
+      const { error } = await supabase
+        .from("rooms")
+        .delete()
+        .eq("id", room.id);
+
+      if (error) {
+        alert("Impossible de supprimer ce salon.");
+        console.error(error);
+        return;
+      }
+      await loadRooms();
+    }
+  }
 
   trySilentResume();
 
