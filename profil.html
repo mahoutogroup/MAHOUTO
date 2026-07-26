@@ -89,6 +89,9 @@
     <div class="card menu-item"><span class="emoji">📦</span><span class="label">Commandes</span><span class="sub">Bientôt</span></div>
     <div class="card menu-item"><span class="emoji">🔳</span><span class="label">QR Code</span><span class="sub">Bientôt</span></div>
     <div class="card menu-item"><span class="emoji">⚙️</span><span class="label">Paramètres</span><span class="sub">Bientôt</span></div>
+    <button class="card menu-item hidden" id="logout-btn" style="border:none;width:100%;text-align:left;cursor:pointer;">
+      <span class="emoji">🚪</span><span class="label">Se déconnecter</span><span class="sub"></span>
+    </button>
   </div>
 
 </div>
@@ -152,9 +155,17 @@
       if (role === "admin" || role === "super_admin" || role === "founder") {
         document.getElementById("admin-dashboard-link").classList.remove("hidden");
       }
+
+      document.getElementById("logout-btn").classList.remove("hidden");
     }
     render();
   }
+
+  document.getElementById("logout-btn").addEventListener("click", async () => {
+    if (!confirm("Se déconnecter de MAHOUTO+ ?")) return;
+    await supabase.auth.signOut();
+    window.location.href = "index.html";
+  });
 
   editBtn.addEventListener("click", () => {
     if (!currentUser) {
