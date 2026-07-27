@@ -248,6 +248,56 @@
   #status-message { color: var(--text-muted); font-size: 13px; min-height: 18px; }
 
   .hidden { display: none !important; }
+
+  /* ---------- Menu d'actions sur un salon (renommer / supprimer) ---------- */
+  #room-action-sheet {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.6);
+    z-index: 70;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+  }
+
+  #room-action-sheet .sheet {
+    width: 100%;
+    max-width: 480px;
+    background: var(--bg-elevated);
+    border-radius: 20px 20px 0 0;
+    padding: 10px 0 max(10px, env(safe-area-inset-bottom));
+  }
+
+  #room-action-sheet .sheet-handle {
+    width: 40px;
+    height: 4px;
+    background: var(--border);
+    border-radius: 3px;
+    margin: 0 auto 10px;
+  }
+
+  #room-action-sheet .sheet-title {
+    padding: 4px 22px 12px;
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+
+  #room-action-sheet button {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 14px 22px;
+    background: none;
+    border: none;
+    color: var(--white);
+    font-size: 15px;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  #room-action-sheet button:active { background: var(--bg-card); }
+  #room-action-sheet button.danger { color: #F87171; }
 </style>
 </head>
 <body>
@@ -293,6 +343,16 @@
   </div>
 
   <button id="fab" title="Nouvelle discussion">＋</button>
+
+  <!-- Menu d'actions sur un salon (créateur ou admin uniquement) -->
+  <div id="room-action-sheet" class="hidden">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title" id="room-action-title"></div>
+      <button type="button" data-action="rename">✏️ Renommer le salon</button>
+      <button type="button" class="danger" data-action="delete">🗑️ Supprimer le salon</button>
+    </div>
+  </div>
 
   <nav class="bottom-nav">
     <a class="nav-item" href="index.html"><span class="icon">🏠</span>Accueil</a>
@@ -511,6 +571,10 @@
       currentUser = data.user;
       await ensureProfile(currentUser.id, username);
 
+      const { data: roleProfile } = await supabase
+        .from("profiles").select("role").eq("id", currentUser.id).maybeSingle();
+      currentRole = roleProfile && roleProfile.role ? roleProfile.role : "user";
+
       loginScreen.classList.add("hidden");
       appEl.classList.remove("hidden");
 
@@ -558,45 +622,78 @@
   joinBtn.addEventListener("click", joinChat);
   usernameInput.addEventListener("keydown", (e) => { if (e.key === "Enter") joinChat(); });
 
-  async function openRoomActions(room) {
-    const choice = prompt(
-      `Gérer "${room.name}" :\ntape "renommer" ou "supprimer"`,
-      ""
-    );
-    if (!choice) return;
-    const action = choice.trim().toLowerCase();
+  const roomActionSheet = document.getElementById("room-action-sheet");
+  const roomActionTitle = document.getElementById("room-action-title");
+  let activeRoom = null;
 
-    if (action === "renommer" || action === "1") {
-      const newName = prompt("Nouveau nom du salon :", room.name);
-      if (!newName || !newName.trim()) return;
-
-      const { error } = await supabase
-        .from("rooms")
-        .update({ name: newName.trim() })
-        .eq("id", room.id);
-
-      if (error) {
-        alert("Impossible de renommer ce salon.");
-        console.error(error);
-        return;
-      }
-      await loadRooms();
-    } else if (action === "supprimer" || action === "2") {
-      if (!confirm(`Supprimer définitivement le salon "${room.name}" ?`)) return;
-
-      const { error } = await supabase
-        .from("rooms")
-        .delete()
-        .eq("id", room.id);
-
-      if (error) {
-        alert("Impossible de supprimer ce salon.");
-        console.error(error);
-        return;
-      }
-      await loadRooms();
-    }
+  function openRoomActions(room) {
+    activeRoom = room;
+    roomActionTitle.textContent = room.name;
+    roomActionSheet.classList.remove("hidden");
   }
+
+  function closeRoomActions() {
+    roomActionSheet.classList.add("hidden");
+    activeRoom = null;
+  }
+
+  roomActionSheet.addEventListener("click", (e) => {
+    if (e.target === roomActionSheet) closeRoomActions();
+  });
+
+  roomActionSheet.querySelector('[data-action="rename"]').addEventListener("click", async () => {
+    if (!activeRoom) return;
+    const room = activeRoom;
+    closeRoomActions();
+
+    const newName = prompt("Nouveau nom du salon :", room.name);
+    if (!newName || !newName.trim()) return;
+
+    const { error } = await supabase
+      .from("rooms")
+      .update({ name: newName.trim() })
+      .eq("id", room.id);
+
+    if (error) {
+      alert("Impossible de renommer ce salon.");
+      console.error(error);
+      return;
+    }
+    await loadRooms();
+  });
+
+  roomActionSheet.querySelector('[data-action="delete"]').addEventListener("click", async () => {
+    if (!activeRoom) return;
+    const room = activeRoom;
+    closeRoomActions();
+
+    if (!confirm(`Supprimer définitivement le salon "${room.name}" et tous ses messages ?`)) return;
+
+    // Supprime d'abord les messages du salon (le salon lui-même n'est
+    // effacé qu'ensuite, pour ne jamais laisser de messages orphelins)
+    const { error: msgError } = await supabase
+      .from("messages")
+      .delete()
+      .eq("room_id", room.id);
+
+    if (msgError) {
+      alert("Impossible de supprimer les messages de ce salon.");
+      console.error(msgError);
+      return;
+    }
+
+    const { error: roomError } = await supabase
+      .from("rooms")
+      .delete()
+      .eq("id", room.id);
+
+    if (roomError) {
+      alert("Impossible de supprimer ce salon.");
+      console.error(roomError);
+      return;
+    }
+    await loadRooms();
+  });
 
   trySilentResume();
 
