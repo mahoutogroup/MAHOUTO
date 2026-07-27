@@ -4,7 +4,7 @@
 // network-first pour tout le reste (données dynamiques).
 // =========================================================
 
-const CACHE_NAME = "mahoutoplus-shell-v18";
+const CACHE_NAME = "mahoutoplus-shell-v20";
 
 const APP_SHELL = [
   "./",
