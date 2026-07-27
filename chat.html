@@ -462,7 +462,11 @@
     attachBtn.disabled = true;
 
     try {
-      const signResp = await fetch("/api/cloudinary-sign");
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData && sessionData.session ? sessionData.session.access_token : null;
+      const signResp = await fetch("/api/cloudinary-sign", {
+        headers: accessToken ? { "Authorization": "Bearer " + accessToken } : {}
+      });
       const sign = await signResp.json();
       if (!signResp.ok) throw new Error(sign.error || "Signature indisponible");
 
