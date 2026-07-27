@@ -20,12 +20,36 @@
     text-align: center;
   }
 
+  .avatar-wrap {
+    position: relative;
+    width: 84px;
+    margin: 0 auto 14px;
+    cursor: pointer;
+  }
+
   .avatar-circle {
     width: 84px; height: 84px; border-radius: 50%;
     background: linear-gradient(135deg, var(--gold-bright), var(--gold));
     display: flex; align-items: center; justify-content: center;
     font-size: 32px; font-weight: bold; color: #0A0A0A;
-    margin-bottom: 14px;
+    overflow: hidden;
+  }
+
+  .avatar-circle img { width: 100%; height: 100%; object-fit: cover; }
+
+  .avatar-edit-badge {
+    position: absolute;
+    bottom: -2px;
+    right: -2px;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--bg-card);
+    border: 2px solid var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
   }
 
   .profile-header .name-row { display: flex; align-items: center; gap: 8px; }
@@ -72,7 +96,11 @@
 <div class="page-content">
 
   <div class="profile-header">
-    <div class="avatar-circle" id="avatar-initial">?</div>
+    <div class="avatar-wrap" id="avatar-wrap">
+      <div class="avatar-circle" id="avatar-initial">?</div>
+      <div class="avatar-edit-badge">📷</div>
+    </div>
+    <input type="file" id="avatar-input" accept="image/*" class="hidden">
     <div class="name-row">
       <h1 id="profile-name">Non connecté</h1>
       <button class="edit-btn" id="edit-btn" title="Modifier le pseudo">✏️</button>
@@ -133,11 +161,19 @@
 
   let currentUser = null;
   let currentUsername = null;
+  let currentAvatarUrl = null;
 
   function render() {
     nameEl.textContent = currentUsername || "Non connecté";
-    avatarEl.textContent = currentUsername ? currentUsername.trim()[0].toUpperCase() : "?";
-    statusEl.textContent = currentUsername ? "Connecté (compte anonyme)" : "Ouvre Messages pour créer ton profil";
+    statusEl.textContent = currentUsername
+      ? (currentUser && currentUser.email ? "Connecté avec Google" : "Connecté (compte anonyme)")
+      : "Ouvre Messages pour créer ton profil";
+
+    if (currentAvatarUrl) {
+      avatarEl.innerHTML = `<img src="${currentAvatarUrl}" alt="">`;
+    } else {
+      avatarEl.textContent = currentUsername ? currentUsername.trim()[0].toUpperCase() : "?";
+    }
   }
 
   async function loadProfile() {
@@ -146,10 +182,13 @@
       currentUser = data.session.user;
       const { data: profile } = await supabase
         .from("profiles")
-        .select("username, role")
+        .select("username, role, avatar_url")
         .eq("id", currentUser.id)
         .maybeSingle();
       currentUsername = profile ? profile.username : null;
+      currentAvatarUrl = (profile && profile.avatar_url)
+        || (currentUser.user_metadata && currentUser.user_metadata.avatar_url)
+        || null;
 
       const role = profile ? profile.role : null;
       if (role === "admin" || role === "super_admin" || role === "founder") {
@@ -165,6 +204,58 @@
     if (!confirm("Se déconnecter de MAHOUTO+ ?")) return;
     await supabase.auth.signOut();
     window.location.href = "index.html";
+  });
+
+  // -------- Changer la photo de profil --------
+  const avatarWrap = document.getElementById("avatar-wrap");
+  const avatarInput = document.getElementById("avatar-input");
+
+  avatarWrap.addEventListener("click", () => {
+    if (!currentUser) {
+      alert("Connecte-toi d'abord pour ajouter une photo.");
+      return;
+    }
+    avatarInput.click();
+  });
+
+  avatarInput.addEventListener("change", async () => {
+    const file = avatarInput.files[0];
+    avatarInput.value = "";
+    if (!file || !currentUser) return;
+
+    const previousHtml = avatarEl.innerHTML;
+    avatarEl.textContent = "⏳";
+
+    try {
+      const signResp = await fetch("/api/cloudinary-sign");
+      const sign = await signResp.json();
+      if (!signResp.ok) throw new Error(sign.error || "Signature indisponible");
+
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("api_key", sign.apiKey);
+      formData.append("timestamp", sign.timestamp);
+      formData.append("signature", sign.signature);
+      formData.append("folder", sign.folder);
+
+      const uploadResp = await fetch(sign.uploadUrl, { method: "POST", body: formData });
+      const uploadData = await uploadResp.json();
+      if (!uploadResp.ok) throw new Error(uploadData.error?.message || "Envoi échoué");
+
+      const { error } = await supabase
+        .from("profiles")
+        .update({ avatar_url: uploadData.secure_url })
+        .eq("id", currentUser.id);
+
+      if (error) throw error;
+
+      currentAvatarUrl = uploadData.secure_url;
+      render();
+    } catch (err) {
+      console.error(err);
+      alert("Impossible de mettre à jour la photo : " + err.message);
+      avatarEl.innerHTML = previousHtml;
+    }
   });
 
   editBtn.addEventListener("click", () => {
