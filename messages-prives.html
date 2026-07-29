@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Messages privés — MAHOUTO+</title>
+<meta name="theme-color" content="#0A0A0A">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="assets/favicon.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="preload" as="image" href="assets/logo-mahouto-plus.png">
+<link rel="stylesheet" href="theme.css">
+<script src="theme-toggle.js"></script>
+<style>
+  html, body { background: var(--bg); color: var(--white); }
+  body { display: flex; flex-direction: column; }
+
+  header {
+    padding: 18px 20px 12px;
+    background: var(--bg-elevated);
+    border-bottom: 1px solid var(--border);
+  }
+  header .title-row { display: flex; align-items: center; gap: 10px; }
+  header h1 { font-size: 20px; color: var(--gold); flex: 1; }
+  header a.back { color: var(--gold-bright); text-decoration: none; font-size: 22px; }
+
+  .search-bar {
+    margin-top: 12px;
+    background: var(--bg-card);
+    border-radius: 14px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--text-muted);
+  }
+  .search-bar input {
+    background: transparent; border: none; outline: none;
+    color: var(--white); font-size: 15px; width: 100%;
+  }
+
+  #search-results { padding: 10px 20px; }
+  .search-result-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 14px; cursor: pointer;
+  }
+  .search-result-row .avatar {
+    width: 42px; height: 42px; border-radius: 50%;
+    background: var(--gold-bright); color: #0A0A0A;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: bold; font-size: 16px; flex: none; overflow: hidden;
+  }
+  .search-result-row .avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .search-result-row .username { font-weight: bold; font-size: 14.5px; }
+
+  #conv-list { flex: 1; overflow-y: auto; padding-bottom: 90px; }
+
+  .conv-row {
+    display: flex; align-items: center; gap: 14px;
+    padding: 14px 16px; cursor: pointer;
+    border-bottom: 1px solid var(--border);
+  }
+  .conv-row:active { background: var(--bg-elevated); }
+
+  .conv-row .avatar {
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--gold-bright); color: #0A0A0A;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: bold; font-size: 20px; flex: none; overflow: hidden;
+  }
+  .conv-row .avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+  .conv-info { flex: 1; min-width: 0; }
+  .conv-info .top-line { display: flex; justify-content: space-between; align-items: baseline; }
+  .conv-info .username {
+    font-weight: bold; font-size: 16px; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis;
+  }
+  .conv-info .time { font-size: 12px; color: var(--text-dim); flex: none; margin-left: 8px; }
+  .conv-info .preview {
+    font-size: 13.5px; color: var(--text-muted); margin-top: 3px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .conv-info .bottom-line { display: flex; justify-content: space-between; align-items: center; }
+
+  .unread-badge {
+    background: var(--accent-green); color: #0A0A0A; font-size: 12px; font-weight: bold;
+    min-width: 20px; height: 20px; border-radius: 10px; display: flex; align-items: center;
+    justify-content: center; padding: 0 6px; flex: none;
+  }
+
+  .conv-row .avatar { position: relative; }
+  .online-dot {
+    position: absolute; bottom: 0; right: 0; width: 12px; height: 12px;
+    border-radius: 50%; background: var(--accent-green); border: 2px solid var(--bg);
+  }
+
+  #empty-state, #loading-state {
+    text-align: center; color: var(--text-dim); padding: 60px 24px; font-size: 14px;
+  }
+
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<button id="theme-toggle-btn" class="theme-toggle-fab">🌙</button>
+
+<header>
+  <div class="title-row">
+    <a class="back" href="index.html" aria-label="Retour">←</a>
+    <h1>💌 Messages privés</h1>
+  </div>
+  <div class="search-bar">
+    🔍
+    <input id="search-input" type="text" placeholder="Chercher quelqu'un par pseudo...">
+  </div>
+</header>
+
+<div id="search-results" class="hidden"></div>
+
+<div id="conv-list">
+  <div id="loading-state">Chargement...</div>
+</div>
+
+<nav class="bottom-nav">
+  <a class="nav-item" href="index.html"><span class="icon">🏠</span>Accueil</a>
+  <a class="nav-item active" href="discussions.html"><span class="icon">💬</span>Messages</a>
+  <a class="nav-item" href="ai.html"><span class="icon">🧠</span>MAHOUTO AI</a>
+  <a class="nav-item" href="school.html"><span class="icon">🎓</span>School</a>
+  <a class="nav-item" href="profil.html"><span class="icon">👤</span>Profil</a>
+</nav>
+
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+(function () {
+  const cfg = window.MAHOUTO_CONFIG;
+  const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+
+  const searchInput = document.getElementById("search-input");
+  const searchResultsEl = document.getElementById("search-results");
+  const convListEl = document.getElementById("conv-list");
+
+  let currentUser = null;
+  let searchTimer = null;
+
+  function escapeHtml(str) {
+    const div = document.createElement("div");
+    div.textContent = str || "";
+    return div.innerHTML;
+  }
+
+  function formatTime(iso) {
+    if (!iso) return "";
+    const d = new Date(iso);
+    const now = new Date();
+    const sameDay = d.toDateString() === now.toDateString();
+    if (sameDay) return d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+    return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
+  }
+
+  function avatarHtml(user) {
+    if (user && user.avatar_url) return `<img src="${user.avatar_url}" alt="">`;
+    const initial = user && user.username ? user.username.trim()[0].toUpperCase() : "?";
+    return initial;
+  }
+
+  async function ensureLoggedIn() {
+    const { data } = await supabase.auth.getSession();
+    if (data && data.session && data.session.user) {
+      currentUser = data.session.user;
+      return true;
+    }
+    return false;
+  }
+
+  searchInput.addEventListener("input", () => {
+    clearTimeout(searchTimer);
+    const q = searchInput.value.trim();
+    if (!q) {
+      searchResultsEl.classList.add("hidden");
+      searchResultsEl.innerHTML = "";
+      return;
+    }
+    searchTimer = setTimeout(() => runSearch(q), 350);
+  });
+
+  async function runSearch(q) {
+    const { data, error } = await supabase.rpc("search_profiles", { q });
+    searchResultsEl.classList.remove("hidden");
+
+    if (error) {
+      console.error(error);
+      searchResultsEl.innerHTML = '<div style="padding:14px 20px;color:var(--text-dim);">Recherche indisponible.</div>';
+      return;
+    }
+
+    if (!data || !data.length) {
+      searchResultsEl.innerHTML = '<div style="padding:14px 20px;color:var(--text-dim);">Aucun utilisateur trouvé.</div>';
+      return;
+    }
+
+    searchResultsEl.innerHTML = "";
+    data.forEach((u) => {
+      const row = document.createElement("div");
+      row.className = "search-result-row";
+      row.innerHTML = `
+        <div class="avatar">${avatarHtml(u)}</div>
+        <div class="username">${escapeHtml(u.username || "Utilisateur")}</div>
+      `;
+      row.addEventListener("click", () => startConversation(u));
+      searchResultsEl.appendChild(row);
+    });
+  }
+
+  async function startConversation(user) {
+    if (!(await ensureLoggedIn())) {
+      alert("Connecte-toi d'abord depuis l'accueil.");
+      window.location.href = "index.html";
+      return;
+    }
+
+    const { data: convId, error } = await supabase.rpc("get_or_create_dm_conversation", {
+      other_user_id: user.id
+    });
+
+    if (error) {
+      alert("Impossible de démarrer cette conversation.");
+      console.error(error);
+      return;
+    }
+
+    window.location.href = "dm-chat.html?conv=" + encodeURIComponent(convId) +
+      "&with=" + encodeURIComponent(user.id) + "&name=" + encodeURIComponent(user.username || "Utilisateur");
+  }
+
+  async function loadConversations() {
+    const { data: convs, error } = await supabase
+      .from("dm_conversations")
+      .select("id, user_one, user_two")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      convListEl.innerHTML = '<div id="empty-state">Impossible de charger les conversations.</div>';
+      console.error(error);
+      return;
+    }
+
+    if (!convs || !convs.length) {
+      convListEl.innerHTML = '<div id="empty-state">Aucune conversation privée pour le moment.<br>Cherche quelqu\'un ci-dessus pour commencer.</div>';
+      return;
+    }
+
+    const enriched = await Promise.all(
+      convs.map(async (conv) => {
+        const otherId = conv.user_one === currentUser.id ? conv.user_two : conv.user_one;
+
+        const { data: profileRows } = await supabase.rpc("get_public_profile", { uid: otherId });
+        const otherUser = (profileRows && profileRows[0]) || { id: otherId, username: "Utilisateur", avatar_url: null };
+
+        const { data: lastMsgs } = await supabase
+          .from("dm_messages")
+          .select("content, attachment_type, created_at, is_deleted")
+          .eq("conversation_id", conv.id)
+          .order("created_at", { ascending: false })
+          .limit(1);
+
+        const lastMessage = lastMsgs && lastMsgs[0] ? lastMsgs[0] : null;
+
+        let preview = "Aucun message pour le moment.";
+        if (lastMessage) {
+          if (lastMessage.is_deleted) preview = "🚫 Message supprimé";
+          else if (lastMessage.content) preview = lastMessage.content;
+          else if (lastMessage.attachment_type === "image") preview = "📷 Photo";
+          else if (lastMessage.attachment_type === "video") preview = "🎥 Vidéo";
+          else if (lastMessage.attachment_type === "audio") preview = "🎤 Message vocal";
+          else if (lastMessage.attachment_type) preview = "📄 Fichier";
+        }
+
+        const { data: readRow } = await supabase
+          .from("dm_read_state")
+          .select("last_read_at")
+          .eq("user_id", currentUser.id)
+          .eq("conversation_id", conv.id)
+          .maybeSingle();
+
+        let unreadQuery = supabase
+          .from("dm_messages")
+          .select("id", { count: "exact", head: true })
+          .eq("conversation_id", conv.id)
+          .neq("sender_id", currentUser.id);
+
+        if (readRow && readRow.last_read_at) unreadQuery = unreadQuery.gt("created_at", readRow.last_read_at);
+
+        const { count: unread } = await unreadQuery;
+
+        return {
+          convId: conv.id,
+          otherUser,
+          lastTime: lastMessage ? lastMessage.created_at : null,
+          preview,
+          unread: unread || 0
+        };
+      })
+    );
+
+    convListEl.innerHTML = "";
+    enriched.forEach((c) => {
+      const row = document.createElement("div");
+      row.className = "conv-row";
+      row.innerHTML = `
+        <div class="avatar" data-peer="${c.otherUser.id}">${avatarHtml(c.otherUser)}</div>
+        <div class="conv-info">
+          <div class="top-line">
+            <span class="username">${escapeHtml(c.otherUser.username)}</span>
+            <span class="time">${formatTime(c.lastTime)}</span>
+          </div>
+          <div class="bottom-line">
+            <span class="preview">${escapeHtml(c.preview)}</span>
+            ${c.unread > 0 ? `<span class="unread-badge">${c.unread}</span>` : ""}
+          </div>
+        </div>
+      `;
+      row.addEventListener("click", () => {
+        window.location.href = "dm-chat.html?conv=" + encodeURIComponent(c.convId) +
+          "&with=" + encodeURIComponent(c.otherUser.id) + "&name=" + encodeURIComponent(c.otherUser.username);
+      });
+      convListEl.appendChild(row);
+    });
+
+    subscribeToPresence();
+  }
+
+  // -------- Statut en ligne (même canal partagé que dm-chat.html) --------
+  function subscribeToPresence() {
+    const presenceChannel = supabase.channel("presence:mahouto", {
+      config: { presence: { key: currentUser.id } }
+    });
+
+    presenceChannel.on("presence", { event: "sync" }, () => {
+      const state = presenceChannel.presenceState();
+      document.querySelectorAll("[data-peer]").forEach((el) => {
+        const peerId = el.dataset.peer;
+        const isOnline = Object.prototype.hasOwnProperty.call(state, peerId);
+        let dot = el.querySelector(".online-dot");
+        if (isOnline && !dot) {
+          dot = document.createElement("div");
+          dot.className = "online-dot";
+          el.appendChild(dot);
+        } else if (!isOnline && dot) {
+          dot.remove();
+        }
+      });
+    });
+
+    presenceChannel.subscribe(async (status) => {
+      if (status === "SUBSCRIBED") {
+        await presenceChannel.track({ online_at: new Date().toISOString() });
+      }
+    });
+  }
+
+  (async function init() {
+    if (!(await ensureLoggedIn())) {
+      convListEl.innerHTML = '<div id="empty-state">Connecte-toi depuis l\'accueil pour voir tes messages privés.</div>';
+      return;
+    }
+    await loadConversations();
+  })();
+
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js").catch((err) => console.log(err));
+    });
+  }
+})();
+</script>
+
+</body>
+</html>

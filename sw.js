@@ -4,12 +4,14 @@
 // network-first pour tout le reste (données dynamiques).
 // =========================================================
 
-const CACHE_NAME = "mahoutoplus-shell-v21";
+const CACHE_NAME = "mahoutoplus-shell-v23";
 
 const APP_SHELL = [
   "./",
   "./index.html",
   "./discussions.html",
+  "./messages-prives.html",
+  "./dm-chat.html",
   "./chat.html",
   "./ai.html",
   "./school.html",

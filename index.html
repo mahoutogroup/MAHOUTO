@@ -113,6 +113,26 @@
 
   footer { text-align: center; padding: 24px 20px 10px; color: var(--text-dim); font-size: 11px; line-height: 1.7; }
 
+  .admin-fab {
+    position: fixed;
+    top: max(14px, env(safe-area-inset-top));
+    left: 16px;
+    z-index: 50;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    color: var(--gold);
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .admin-fab:active { transform: scale(.92); }
+
   .hidden { display: none !important; }
 
   /* =========================================================
@@ -258,6 +278,12 @@
     <a class="card module-card" href="discussions.html">
       <h2>💬 Messages</h2>
       <p>Discussions, groupes — en temps réel.</p>
+      <div class="go">Ouvrir →</div>
+    </a>
+
+    <a class="card module-card" href="messages-prives.html">
+      <h2>💌 Messages privés</h2>
+      <p>Conversations 1-à-1, en toute confidentialité.</p>
       <div class="go">Ouvrir →</div>
     </a>
 
