@@ -1,645 +1,91 @@
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Message privé — MAHOUTO+</title>
-<meta name="theme-color" content="#0A0A0A">
-<link rel="manifest" href="manifest.json">
-<link rel="icon" href="assets/favicon.png">
-<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
-<link rel="preload" as="image" href="assets/logo-mahouto-plus.png">
-<link rel="stylesheet" href="theme.css">
-<script src="theme-toggle.js"></script>
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
+// =========================================================
+// MAHOUTO+ — Service Worker
+// Stratégie : cache-first pour les fichiers de l'app (coquille),
+// network-first pour tout le reste (données dynamiques).
+// =========================================================
 
-  html, body { height: 100%; background: var(--bg); color: var(--white); }
+const CACHE_NAME = "mahoutoplus-shell-v24";
 
-  body { display: flex; flex-direction: column; }
+const APP_SHELL = [
+  "./",
+  "./index.html",
+  "./discussions.html",
+  "./messages-prives.html",
+  "./dm-chat.html",
+  "./chat.html",
+  "./ai.html",
+  "./school.html",
+  "./academie-majestepresse.html",
+  "./profil.html",
+  "./manifest.json",
+  "./config.js",
+  "./theme.css",
+  "./theme-toggle.js",
+  "./assets/favicon.png",
+  "./assets/apple-touch-icon.png",
+  "./assets/logo-mahouto-plus.png",
+  "./assets/splash-screen.png",
+  "./assets/icon-192.png",
+  "./assets/icon-512.png",
+  "./assets/icon-maskable-512.png"
+];
 
-  header {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 16px 20px;
-    background: var(--bg-elevated);
-    border-bottom: 1px solid var(--bg-card);
-  }
+// Installation : met en cache la coquille de l'application
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL))
+  );
+  self.skipWaiting();
+});
 
-  header a.back { color: var(--gold-bright); text-decoration: none; font-size: 22px; line-height: 1; }
-
-  header .peer-avatar {
-    width: 34px; height: 34px; border-radius: 50%;
-    background: var(--gold-bright); color: #0A0A0A;
-    display: flex; align-items: center; justify-content: center;
-    font-weight: bold; font-size: 14px; flex: none; overflow: hidden;
-  }
-  header .peer-avatar img { width: 100%; height: 100%; object-fit: cover; }
-
-  header h1 { font-size: 17px; color: var(--gold-bright); }
-
-  #messages {
-    flex: 1;
-    overflow-y: auto;
-    padding: 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
-
-  .bubble {
-    max-width: 75%;
-    padding: 10px 14px;
-    border-radius: 16px;
-    background: var(--bg-card);
-    align-self: flex-start;
-    word-wrap: break-word;
-    cursor: pointer;
-  }
-
-  .bubble.mine { background: var(--gold-bright); color: #0A0A0A; align-self: flex-end; }
-  .bubble .meta { font-size: 11px; opacity: .65; margin-bottom: 4px; font-weight: bold; }
-  .bubble .edited-tag { font-size: 10.5px; opacity: .6; margin-left: 6px; font-style: italic; }
-  .bubble.deleted { font-style: italic; opacity: .6; }
-
-  form#composer {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 12px;
-    background: var(--bg-elevated);
-    border-top: 1px solid var(--bg-card);
-  }
-
-  #composer input[type="text"] {
-    flex: 1;
-    min-width: 0;
-    padding: 12px 14px;
-    border-radius: 20px;
-    border: none;
-    background: var(--bg-card);
-    color: var(--white);
-    font-size: 15px;
-  }
-
-  #composer input[type="text"]:focus { outline: 2px solid var(--gold-bright); }
-
-  #composer button[type="submit"] {
-    padding: 0 16px;
-    border: none;
-    border-radius: 20px;
-    background: var(--gold-bright);
-    font-weight: bold;
-    cursor: pointer;
-    flex: none;
-    font-size: 14px;
-  }
-
-  #composer button:disabled { opacity: .5; cursor: not-allowed; }
-
-  #status-message { color: var(--text-muted); font-size: 13px; min-height: 18px; padding: 0 16px; }
-
-  .hidden { display: none !important; }
-
-  #msg-action-sheet {
-    position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 70;
-    display: flex; align-items: flex-end; justify-content: center;
-  }
-  #msg-action-sheet .sheet {
-    width: 100%; max-width: 480px; background: var(--bg-elevated);
-    border-radius: 20px 20px 0 0; padding: 10px 0 max(10px, env(safe-area-inset-bottom));
-    max-height: 70vh; overflow-y: auto;
-  }
-  #msg-action-sheet .sheet-handle {
-    width: 40px; height: 4px; background: var(--border); border-radius: 3px; margin: 0 auto 10px;
-  }
-  #msg-action-sheet button {
-    display: flex; align-items: center; gap: 12px; width: 100%; padding: 14px 22px;
-    background: none; border: none; color: var(--white); font-size: 15px; text-align: left; cursor: pointer;
-  }
-  #msg-action-sheet button:active { background: var(--bg-card); }
-  #msg-action-sheet button.danger { color: #F87171; }
-
-  header .peer-name-wrap { display: flex; flex-direction: column; }
-  header .peer-status { font-size: 11px; color: var(--text-dim); }
-  header .peer-status.online { color: var(--accent-green); }
-  header .peer-status.online::before {
-    content: ""; display: inline-block; width: 7px; height: 7px;
-    border-radius: 50%; background: var(--accent-green); margin-right: 5px;
-  }
-
-  #mic-btn {
-    background: var(--bg-card); border: none; border-radius: 20px;
-    width: 42px; flex: none; color: var(--gold-bright); font-size: 17px; cursor: pointer;
-  }
-  #mic-btn.recording { background: #F87171; color: #fff; animation: micPulse 1s infinite; }
-  @keyframes micPulse { 0%,100% { opacity: 1; } 50% { opacity: .6; } }
-  #recording-indicator {
-    padding: 6px 16px; font-size: 12.5px; color: #F87171; display: flex; align-items: center; gap: 8px;
-  }
-
-  .bubble audio { width: 220px; max-width: 100%; margin-top: 2px; }
-
-  #not-logged-in {
-    padding: 60px 24px; text-align: center; color: var(--text-dim); font-size: 14px;
-  }
-</style>
-</head>
-<body>
-
-<button id="theme-toggle-btn" class="theme-toggle-fab">🌙</button>
-
-<div id="not-logged-in" class="hidden">
-  Connecte-toi depuis l'accueil pour accéder à tes messages privés.
-</div>
-
-<header id="chat-header" class="hidden">
-  <a class="back" href="messages-prives.html" aria-label="Retour">←</a>
-  <div class="peer-avatar" id="peer-avatar">?</div>
-  <div class="peer-name-wrap">
-    <h1 id="peer-name">Conversation</h1>
-    <span class="peer-status" id="peer-status">Hors ligne</span>
-  </div>
-</header>
-
-<div id="messages" class="hidden"></div>
-<div id="recording-indicator" class="hidden">🔴 Enregistrement... <span id="recording-time">0:00</span></div>
-<div id="status-message"></div>
-
-<!-- Menu d'actions sur un message (modifier / supprimer / copier / partager) -->
-<div id="msg-action-sheet" class="hidden">
-  <div class="sheet">
-    <div class="sheet-handle"></div>
-    <button type="button" data-action="copy">📋 Copier</button>
-    <button type="button" data-action="share">🔗 Partager</button>
-    <button type="button" data-action="edit">✏️ Modifier</button>
-    <button type="button" data-action="delete-me">🙈 Supprimer pour moi</button>
-    <button type="button" class="danger" data-action="delete-all">🗑️ Supprimer pour tous</button>
-  </div>
-</div>
-
-<form id="composer" class="hidden">
-  <button type="button" id="attach-btn" title="Envoyer un fichier" style="background:var(--bg-card);border:none;border-radius:20px;width:42px;flex:none;color:var(--gold-bright);font-size:17px;cursor:pointer;">📎</button>
-  <button type="button" id="mic-btn" title="Message vocal">🎤</button>
-  <input type="file" id="file-input" accept="image/*,video/*,application/pdf" class="hidden">
-  <input id="message-input" type="text" placeholder="Écrire un message..." autocomplete="off" maxlength="2000">
-  <button type="submit">Envoyer</button>
-</form>
-
-<script src="config.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script>
-(function () {
-  const cfg = window.MAHOUTO_CONFIG;
-  const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
-
-  const params = new URLSearchParams(window.location.search);
-  const CONV_ID = params.get("conv");
-  const PEER_ID = params.get("with");
-  const PEER_NAME = params.get("name") || "Utilisateur";
-
-  const notLoggedInEl = document.getElementById("not-logged-in");
-  const chatHeader = document.getElementById("chat-header");
-  const messagesEl = document.getElementById("messages");
-  const composer = document.getElementById("composer");
-  const messageInput = document.getElementById("message-input");
-  const statusMessage = document.getElementById("status-message");
-
-  document.getElementById("peer-name").textContent = PEER_NAME;
-
-  let currentUser = null;
-  let hiddenMessageIds = new Set();
-  let peerAvatarUrl = null;
-
-  function setStatus(text) { statusMessage.textContent = text || ""; }
-
-  function escapeHtml(str) {
-    const div = document.createElement("div");
-    div.textContent = str;
-    return div.innerHTML;
-  }
-
-  function renderMessage(msg) {
-    if (hiddenMessageIds.has(msg.id)) return;
-
-    const bubble = document.createElement("div");
-    bubble.dataset.id = msg.id;
-    const isMine = msg.sender_id === currentUser.id;
-    bubble.className = "bubble" + (isMine ? " mine" : "") + (msg.is_deleted ? " deleted" : "");
-    const time = new Date(msg.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
-
-    let bodyHtml;
-    if (msg.is_deleted) {
-      bodyHtml = "🚫 Message supprimé";
-    } else {
-      let mediaHtml = "";
-      if (msg.attachment_url) {
-        if (msg.attachment_type === "image") {
-          mediaHtml = `<img src="${msg.attachment_url}" style="max-width:100%;border-radius:12px;margin-top:6px;display:block;">`;
-        } else if (msg.attachment_type === "video") {
-          mediaHtml = `<video src="${msg.attachment_url}" controls style="max-width:100%;border-radius:12px;margin-top:6px;display:block;"></video>`;
-        } else if (msg.attachment_type === "audio") {
-          mediaHtml = `<audio src="${msg.attachment_url}" controls></audio>`;
-        } else {
-          mediaHtml = `<a href="${msg.attachment_url}" target="_blank" style="color:inherit;text-decoration:underline;display:block;margin-top:6px;">📄 Ouvrir le fichier</a>`;
-        }
-      }
-      bodyHtml = (msg.content ? escapeHtml(msg.content) : "") + mediaHtml +
-        (msg.edited_at ? '<span class="edited-tag">modifié</span>' : "");
-    }
-
-    bubble.innerHTML = '<div class="meta">' + time + '</div>' + bodyHtml;
-    bubble.addEventListener("click", () => openMessageActions(msg));
-
-    const existing = messagesEl.querySelector('[data-id="' + msg.id + '"]');
-    if (existing) {
-      existing.replaceWith(bubble);
-    } else {
-      messagesEl.appendChild(bubble);
-      messagesEl.scrollTop = messagesEl.scrollHeight;
-    }
-  }
-
-  async function loadHiddenMessageIds() {
-    const { data, error } = await supabase
-      .from("dm_hidden_messages")
-      .select("message_id")
-      .eq("user_id", currentUser.id);
-    if (error) { console.error("dm_hidden_messages indisponible :", error); return; }
-    hiddenMessageIds = new Set((data || []).map((r) => r.message_id));
-  }
-
-  async function loadHistory() {
-    const { data, error } = await supabase
-      .from("dm_messages")
-      .select("*")
-      .eq("conversation_id", CONV_ID)
-      .order("created_at", { ascending: true })
-      .limit(300);
-
-    if (error) { setStatus("Erreur de chargement des messages."); console.error(error); return; }
-    (data || []).forEach(renderMessage);
-  }
-
-  function subscribeToNewMessages() {
-    supabase
-      .channel("dm:" + CONV_ID)
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "dm_messages", filter: "conversation_id=eq." + CONV_ID },
-        (payload) => { renderMessage(payload.new); }
+// Activation : nettoie les anciens caches
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    caches.keys().then((keys) =>
+      Promise.all(
+        keys
+          .filter((key) => key !== CACHE_NAME)
+          .map((key) => caches.delete(key))
       )
-      .on(
-        "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "dm_messages", filter: "conversation_id=eq." + CONV_ID },
-        (payload) => { renderMessage(payload.new); }
-      )
-      .subscribe();
+    )
+  );
+  self.clients.claim();
+});
+
+// Récupération des requêtes
+self.addEventListener("fetch", (event) => {
+  const url = new URL(event.request.url);
+
+  // Jamais toucher aux requêtes non-GET (POST vers /api/... par ex.)
+  if (event.request.method !== "GET") return;
+
+  // Ne jamais mettre en cache les appels à Supabase, Cloudinary, OpenRouter
+  // ou nos fonctions serverless /api — toujours frais depuis le réseau.
+  if (
+    url.hostname.includes("supabase.co") ||
+    url.hostname.includes("cloudinary.com") ||
+    url.hostname.includes("openrouter.ai") ||
+    url.pathname.startsWith("/api/")
+  ) {
+    return;
   }
 
-  async function loadPeerProfile() {
-    const { data } = await supabase.rpc("get_public_profile", { uid: PEER_ID });
-    const profile = data && data[0];
-    if (profile) {
-      peerAvatarUrl = profile.avatar_url;
-      if (profile.username) document.getElementById("peer-name").textContent = profile.username;
-    }
-    const avatarEl = document.getElementById("peer-avatar");
-    if (peerAvatarUrl) {
-      avatarEl.innerHTML = `<img src="${peerAvatarUrl}" alt="">`;
-    } else {
-      const name = document.getElementById("peer-name").textContent;
-      avatarEl.textContent = name ? name.trim()[0].toUpperCase() : "?";
-    }
+  // Coquille de l'app : cache-first
+  if (APP_SHELL.some((path) => url.pathname.endsWith(path.replace("./", "")))) {
+    event.respondWith(
+      caches.match(event.request).then((cached) => cached || fetch(event.request))
+    );
+    return;
   }
 
-  async function enterConversation() {
-    notLoggedInEl.classList.add("hidden");
-    chatHeader.classList.remove("hidden");
-    messagesEl.classList.remove("hidden");
-    composer.classList.remove("hidden");
-
-    await loadPeerProfile();
-    await loadHiddenMessageIds();
-    await loadHistory();
-    subscribeToNewMessages();
-    subscribeToPresence();
-    await markAsRead();
-    messageInput.focus();
-  }
-
-  async function markAsRead() {
-    if (!currentUser) return;
-    await supabase
-      .from("dm_read_state")
-      .upsert(
-        { user_id: currentUser.id, conversation_id: CONV_ID, last_read_at: new Date().toISOString() },
-        { onConflict: "user_id,conversation_id" }
-      );
-  }
-
-  // -------- Statut en ligne (Presence Supabase, rien en base) --------
-  function subscribeToPresence() {
-    const presenceChannel = supabase.channel("presence:mahouto", {
-      config: { presence: { key: currentUser.id } }
-    });
-
-    const statusEl = document.getElementById("peer-status");
-
-    presenceChannel.on("presence", { event: "sync" }, () => {
-      const state = presenceChannel.presenceState();
-      const peerOnline = Object.prototype.hasOwnProperty.call(state, PEER_ID);
-      statusEl.textContent = peerOnline ? "En ligne" : "Hors ligne";
-      statusEl.classList.toggle("online", peerOnline);
-    });
-
-    presenceChannel.subscribe(async (status) => {
-      if (status === "SUBSCRIBED") {
-        await presenceChannel.track({ online_at: new Date().toISOString() });
-      }
-    });
-  }
-
-  composer.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const content = messageInput.value.trim();
-    if (!content || !currentUser) return;
-
-    messageInput.value = "";
-    const { error } = await supabase.from("dm_messages").insert({
-      conversation_id: CONV_ID,
-      sender_id: currentUser.id,
-      content: content
-    });
-
-    if (error) { console.error(error); setStatus("Message non envoyé."); }
-  });
-
-  const attachBtn = document.getElementById("attach-btn");
-  const fileInput = document.getElementById("file-input");
-
-  attachBtn.addEventListener("click", () => fileInput.click());
-
-  fileInput.addEventListener("change", async () => {
-    const file = fileInput.files[0];
-    fileInput.value = "";
-    if (!file || !currentUser) return;
-
-    attachBtn.textContent = "⏳";
-    attachBtn.disabled = true;
-
-    try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const accessToken = sessionData && sessionData.session ? sessionData.session.access_token : null;
-      const signResp = await fetch("/api/cloudinary-sign", {
-        headers: accessToken ? { "Authorization": "Bearer " + accessToken } : {}
-      });
-      const sign = await signResp.json();
-      if (!signResp.ok) throw new Error(sign.error || "Signature indisponible");
-
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("api_key", sign.apiKey);
-      formData.append("timestamp", sign.timestamp);
-      formData.append("signature", sign.signature);
-      formData.append("folder", sign.folder);
-
-      const uploadResp = await fetch(sign.uploadUrl, { method: "POST", body: formData });
-      const uploadData = await uploadResp.json();
-      if (!uploadResp.ok) throw new Error(uploadData.error?.message || "Envoi échoué");
-
-      let attachmentType = "raw";
-      if (uploadData.resource_type === "image") attachmentType = "image";
-      else if (uploadData.resource_type === "video") attachmentType = "video";
-
-      const { error } = await supabase.from("dm_messages").insert({
-        conversation_id: CONV_ID,
-        sender_id: currentUser.id,
-        content: "",
-        attachment_url: uploadData.secure_url,
-        attachment_type: attachmentType
-      });
-
-      if (error) throw error;
-    } catch (err) {
-      console.error(err);
-      setStatus("Envoi du fichier impossible : " + err.message);
-    } finally {
-      attachBtn.textContent = "📎";
-      attachBtn.disabled = false;
-    }
-  });
-
-  // -------- Message vocal --------
-  const micBtn = document.getElementById("mic-btn");
-  const recordingIndicator = document.getElementById("recording-indicator");
-  const recordingTimeEl = document.getElementById("recording-time");
-  let mediaRecorder = null;
-  let recordedChunks = [];
-  let recordingTimer = null;
-  let recordingSeconds = 0;
-
-  micBtn.addEventListener("click", async () => {
-    if (mediaRecorder && mediaRecorder.state === "recording") {
-      mediaRecorder.stop();
-      return;
-    }
-
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      recordedChunks = [];
-      mediaRecorder = new MediaRecorder(stream);
-
-      mediaRecorder.addEventListener("dataavailable", (e) => {
-        if (e.data.size > 0) recordedChunks.push(e.data);
-      });
-
-      mediaRecorder.addEventListener("stop", async () => {
-        stream.getTracks().forEach((t) => t.stop());
-        clearInterval(recordingTimer);
-        recordingIndicator.classList.add("hidden");
-        micBtn.classList.remove("recording");
-        micBtn.textContent = "🎤";
-
-        if (recordedChunks.length) {
-          const blob = new Blob(recordedChunks, { type: "audio/webm" });
-          await sendAudioMessage(blob);
-        }
-      });
-
-      mediaRecorder.start();
-      recordingSeconds = 0;
-      recordingTimeEl.textContent = "0:00";
-      recordingIndicator.classList.remove("hidden");
-      micBtn.classList.add("recording");
-      micBtn.textContent = "⏹️";
-
-      recordingTimer = setInterval(() => {
-        recordingSeconds++;
-        const m = Math.floor(recordingSeconds / 60);
-        const s = recordingSeconds % 60;
-        recordingTimeEl.textContent = m + ":" + (s < 10 ? "0" : "") + s;
-      }, 1000);
-    } catch (err) {
-      console.error(err);
-      alert("Impossible d'accéder au microphone : " + err.message);
-    }
-  });
-
-  async function sendAudioMessage(blob) {
-    setStatus("Envoi du message vocal...");
-    try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const accessToken = sessionData && sessionData.session ? sessionData.session.access_token : null;
-      const signResp = await fetch("/api/cloudinary-sign", {
-        headers: accessToken ? { "Authorization": "Bearer " + accessToken } : {}
-      });
-      const sign = await signResp.json();
-      if (!signResp.ok) throw new Error(sign.error || "Signature indisponible");
-
-      const formData = new FormData();
-      formData.append("file", blob, "vocal.webm");
-      formData.append("api_key", sign.apiKey);
-      formData.append("timestamp", sign.timestamp);
-      formData.append("signature", sign.signature);
-      formData.append("folder", sign.folder);
-
-      const uploadResp = await fetch(sign.uploadUrl, { method: "POST", body: formData });
-      const uploadData = await uploadResp.json();
-      if (!uploadResp.ok) throw new Error(uploadData.error?.message || "Envoi échoué");
-
-      const { error } = await supabase.from("dm_messages").insert({
-        conversation_id: CONV_ID,
-        sender_id: currentUser.id,
-        content: "",
-        attachment_url: uploadData.secure_url,
-        attachment_type: "audio"
-      });
-
-      if (error) throw error;
-      setStatus("");
-    } catch (err) {
-      console.error(err);
-      setStatus("Envoi du message vocal impossible : " + err.message);
-    }
-  }
-
-  // -------- Menu d'actions sur un message --------
-  const actionSheet = document.getElementById("msg-action-sheet");
-  let activeMessage = null;
-
-  function openMessageActions(msg) {
-    if (msg.is_deleted) return;
-    activeMessage = msg;
-
-    const isMine = msg.sender_id === currentUser.id;
-    actionSheet.querySelector('[data-action="edit"]').style.display = isMine && !msg.attachment_url ? "flex" : "none";
-    actionSheet.querySelector('[data-action="delete-all"]').style.display = isMine ? "flex" : "none";
-
-    actionSheet.classList.remove("hidden");
-  }
-
-  function closeMessageActions() {
-    actionSheet.classList.add("hidden");
-    activeMessage = null;
-  }
-
-  actionSheet.addEventListener("click", (e) => {
-    if (e.target === actionSheet) closeMessageActions();
-  });
-
-  actionSheet.querySelector('[data-action="copy"]').addEventListener("click", async () => {
-    if (activeMessage && activeMessage.content) {
-      try { await navigator.clipboard.writeText(activeMessage.content); } catch (err) { console.error(err); }
-    }
-    closeMessageActions();
-  });
-
-  actionSheet.querySelector('[data-action="share"]').addEventListener("click", async () => {
-    const text = activeMessage ? (activeMessage.content || activeMessage.attachment_url || "") : "";
-    closeMessageActions();
-    if (navigator.share) {
-      try { await navigator.share({ text: text, title: "MAHOUTO+" }); } catch (err) { /* annulé */ }
-    } else if (text) {
-      try { await navigator.clipboard.writeText(text); setStatus("Copié — le partage direct n'est pas supporté ici."); } catch (err) { console.error(err); }
-    }
-  });
-
-  actionSheet.querySelector('[data-action="edit"]').addEventListener("click", () => {
-    if (!activeMessage) return;
-    const msg = activeMessage;
-    closeMessageActions();
-
-    const newContent = prompt("Modifier le message :", msg.content || "");
-    if (newContent === null) return;
-    const trimmed = newContent.trim();
-    if (!trimmed) return;
-
-    supabase
-      .from("dm_messages")
-      .update({ content: trimmed, edited_at: new Date().toISOString() })
-      .eq("id", msg.id)
-      .then(({ error }) => {
-        if (error) { console.error(error); alert("Impossible de modifier ce message."); }
-      });
-  });
-
-  actionSheet.querySelector('[data-action="delete-me"]').addEventListener("click", async () => {
-    if (!activeMessage) return;
-    const msg = activeMessage;
-    closeMessageActions();
-
-    const { error } = await supabase
-      .from("dm_hidden_messages")
-      .upsert({ user_id: currentUser.id, message_id: msg.id }, { onConflict: "user_id,message_id" });
-
-    if (error) { console.error(error); alert("Impossible de masquer ce message."); return; }
-
-    hiddenMessageIds.add(msg.id);
-    const el = messagesEl.querySelector('[data-id="' + msg.id + '"]');
-    if (el) el.remove();
-  });
-
-  actionSheet.querySelector('[data-action="delete-all"]').addEventListener("click", () => {
-    if (!activeMessage) return;
-    const msg = activeMessage;
-    closeMessageActions();
-
-    if (!confirm("Supprimer ce message pour tout le monde ?")) return;
-
-    supabase
-      .from("dm_messages")
-      .update({ is_deleted: true, content: "", attachment_url: "" })
-      .eq("id", msg.id)
-      .then(({ error }) => {
-        if (error) { console.error(error); alert("Impossible de supprimer ce message."); }
-      });
-  });
-
-  (async function init() {
-    if (!CONV_ID || !PEER_ID) {
-      notLoggedInEl.classList.remove("hidden");
-      notLoggedInEl.textContent = "Conversation introuvable.";
-      return;
-    }
-
-    const { data } = await supabase.auth.getSession();
-    if (!data || !data.session || !data.session.user) {
-      notLoggedInEl.classList.remove("hidden");
-      return;
-    }
-    currentUser = data.session.user;
-    await enterConversation();
-  })();
-
-  if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => {
-      navigator.serviceWorker.register("sw.js").catch((err) => console.log(err));
-    });
-  }
-})();
-</script>
-
-</body>
-</html>
+  // Reste : network-first avec repli sur le cache
+  event.respondWith(
+    fetch(event.request)
+      .then((response) => {
+        const clone = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        return response;
+      })
+      .catch(() => caches.match(event.request))
+  );
+});
