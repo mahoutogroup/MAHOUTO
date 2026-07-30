@@ -72,18 +72,23 @@
     border-top: 1px solid var(--bg-card);
   }
 
-  #composer input[type="text"] {
+  #composer textarea {
     flex: 1;
     min-width: 0;
-    padding: 12px 14px;
+    padding: 11px 14px;
     border-radius: 20px;
     border: none;
     background: var(--bg-card);
     color: var(--white);
     font-size: 15px;
+    font-family: inherit;
+    resize: none;
+    max-height: 120px;
+    overflow-y: auto;
+    line-height: 1.35;
   }
 
-  #composer input[type="text"]:focus { outline: 2px solid var(--gold-bright); }
+  #composer textarea:focus { outline: 2px solid var(--gold-bright); }
 
   #composer button[type="submit"] {
     padding: 0 16px;
@@ -183,7 +188,7 @@
   <button type="button" id="attach-btn" title="Envoyer un fichier" style="background:var(--bg-card);border:none;border-radius:20px;width:42px;flex:none;color:var(--gold-bright);font-size:17px;cursor:pointer;">📎</button>
   <button type="button" id="mic-btn" title="Message vocal">🎤</button>
   <input type="file" id="file-input" accept="image/*,video/*,application/pdf" class="hidden">
-  <input id="message-input" type="text" placeholder="Écrire un message..." autocomplete="off" maxlength="2000">
+  <textarea id="message-input" rows="1" placeholder="Écrire un message..." maxlength="2000"></textarea>
   <button type="submit">Envoyer</button>
 </form>
 
@@ -367,6 +372,7 @@
     if (!content || !currentUser) return;
 
     messageInput.value = "";
+    autoGrow();
     const { error } = await supabase.from("dm_messages").insert({
       conversation_id: CONV_ID,
       sender_id: currentUser.id,
@@ -374,6 +380,21 @@
     });
 
     if (error) { console.error(error); setStatus("Message non envoyé."); }
+  });
+
+  // -------- Zone de texte extensible (vers le haut, comme WhatsApp) --------
+  function autoGrow() {
+    messageInput.style.height = "auto";
+    messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + "px";
+  }
+
+  messageInput.addEventListener("input", autoGrow);
+
+  messageInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      composer.dispatchEvent(new Event("submit", { cancelable: true }));
+    }
   });
 
   const attachBtn = document.getElementById("attach-btn");
@@ -642,4 +663,4 @@
 </script>
 
 </body>
-    </html> 
+</html>
