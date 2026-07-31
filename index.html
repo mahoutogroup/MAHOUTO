@@ -269,11 +269,11 @@
   <div class="section-title">🔥 Modules</div>
   <div class="module-grid">
 
-    <a class="card module-card" href="ai.html">
+    <div class="card module-card" id="card-majeste-ai" style="cursor:pointer;">
       <h2>🧠 MAJESTÉ AI</h2>
       <p>Assistant IA, prompts, analyse de documents.</p>
       <div class="go">Ouvrir →</div>
-    </a>
+    </div>
 
     <a class="card module-card" href="discussions.html">
       <h2>💬 Messages</h2>
@@ -446,6 +446,11 @@
   });
 
   const MAJESTE_PRESSE_URL = "https://majestepresse.com";
+  const MAJESTE_AI_URL = "https://ai.majestepresse.com/chat";
+
+  document.getElementById("card-majeste-ai").addEventListener("click", () => {
+    askConfirm("Voulez-vous ouvrir MAJESTÉ AI ?", MAJESTE_AI_URL);
+  });
 
   document.getElementById("card-majeste-presse").addEventListener("click", () => {
     askConfirm("Voulez-vous visiter MAJESTÉ PRESSE ?", MAJESTE_PRESSE_URL);
