@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Administration — Utilisateurs — MAHOUTO+</title>
+<meta name="theme-color" content="#0A0A0A">
+<link rel="manifest" href="../manifest.json">
+<link rel="icon" href="../assets/favicon.png">
+<link rel="stylesheet" href="../theme.css">
+<script src="../theme-toggle.js"></script>
+<style>
+  header { padding: 20px; background: var(--bg-elevated); border-bottom: 1px solid var(--border); }
+  header h1 { font-size: 20px; color: var(--gold); }
+  header p { font-size: 12.5px; color: var(--text-muted); margin-top: 6px; }
+
+  .admin-tabs { display: flex; gap: 10px; padding: 14px 20px 0; }
+  .admin-tabs a {
+    font-size: 12.5px; font-weight: bold; color: var(--text-muted);
+    background: var(--bg-card); border-radius: 999px; padding: 8px 16px;
+  }
+  .admin-tabs a.active { color: #0A0A0A; background: var(--gold-bright); }
+
+  #access-denied, #loading-state {
+    text-align: center; color: var(--text-dim); padding: 60px 24px; font-size: 14px;
+  }
+
+  .stats-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 16px 20px 4px;
+  }
+  .stat-card { padding: 14px; text-align: center; }
+  .stat-card .value { font-size: 24px; font-weight: bold; color: var(--gold); }
+  .stat-card .label { font-size: 11.5px; color: var(--text-dim); margin-top: 4px; }
+
+  .chart-block { margin: 16px 20px 4px; padding: 14px; }
+  .chart-block h3 { font-size: 13.5px; color: var(--gold); margin-bottom: 10px; }
+  .chart-block canvas { width: 100%; height: 140px; display: block; }
+  .chart-tabs { display: flex; gap: 8px; margin-bottom: 10px; }
+  .chart-tabs button {
+    font-size: 11.5px; font-weight: bold; padding: 6px 12px; border-radius: 999px;
+    border: none; cursor: pointer; background: var(--bg); color: var(--text-muted);
+  }
+  .chart-tabs button.active { background: var(--gold-bright); color: #0A0A0A; }
+
+  .filters-block { margin: 16px 20px 4px; display: flex; flex-direction: column; gap: 8px; }
+  .filters-block input, .filters-block select {
+    width: 100%; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--border);
+    background: var(--bg-card); color: var(--white); font-size: 14px;
+  }
+  .filters-row { display: flex; gap: 8px; }
+  .filters-row > * { flex: 1; }
+
+  .user-row { margin: 10px 20px; padding: 14px; }
+  .user-row .top-line { display: flex; align-items: center; gap: 12px; }
+  .user-row .avatar {
+    width: 42px; height: 42px; border-radius: 50%; background: var(--gold-bright); color: #0A0A0A;
+    display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 15px; flex: none;
+  }
+  .user-row .info { flex: 1; min-width: 0; }
+  .user-row .name { font-weight: bold; font-size: 14.5px; }
+  .user-row .email { font-size: 12px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .user-row .meta { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .user-row .tag {
+    font-size: 10px; font-weight: bold; padding: 2px 8px; border-radius: 999px; background: var(--bg);
+  }
+  .user-row .tag.role-founder, .user-row .tag.role-admin, .user-row .tag.role-super_admin { color: var(--gold-bright); }
+  .user-row .tag.status-actif { color: var(--accent-green); }
+  .user-row .tag.status-désactivé { color: #F87171; }
+
+  .user-row .actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .user-row .actions button {
+    font-size: 11px; font-weight: bold; padding: 7px 10px; border-radius: 8px; border: none; cursor: pointer;
+  }
+  .btn-view { background: var(--bg); color: var(--text-muted); }
+  .btn-disable { background: rgba(239,68,68,.15); color: #F87171; }
+  .btn-reactivate { background: rgba(34,197,94,.15); color: var(--accent-green); }
+  .btn-delete { background: #F87171; color: #fff; }
+
+  #profile-modal {
+    position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 60;
+    display: flex; align-items: flex-end; justify-content: center;
+  }
+  #profile-modal .sheet {
+    width: 100%; max-width: 480px; background: var(--bg-elevated);
+    border-radius: 20px 20px 0 0; padding: 20px; max-height: 80vh; overflow-y: auto;
+  }
+  #profile-modal h3 { color: var(--gold); margin-bottom: 14px; }
+  #profile-modal .field { margin-bottom: 10px; font-size: 13.5px; }
+  #profile-modal .field .k { color: var(--text-dim); font-size: 11px; }
+  #profile-modal button { margin-top: 10px; width: 100%; padding: 12px; border: none; border-radius: 10px; background: var(--bg-card); color: var(--white); font-weight: bold; cursor: pointer; }
+
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<button id="theme-toggle-btn" class="theme-toggle-fab">🌙</button>
+
+<div class="page-content">
+
+  <header>
+    <h1>👥 Administration — Utilisateurs</h1>
+    <p>Statistiques d'inscription et gestion des comptes.</p>
+  </header>
+
+  <div class="admin-tabs">
+    <a href="formations.html">Formations</a>
+    <a href="users.html" class="active">Utilisateurs</a>
+  </div>
+
+  <div id="loading-state">Vérification des droits...</div>
+  <div id="access-denied" class="hidden">🔒 Accès réservé aux administrateurs.</div>
+
+  <div id="dashboard-content" class="hidden">
+
+    <div class="stats-grid">
+      <div class="card stat-card">
+        <div class="value" id="stat-total">—</div>
+        <div class="label">Utilisateurs au total</div>
+      </div>
+      <div class="card stat-card">
+        <div class="value" id="stat-today">—</div>
+        <div class="label">Nouveaux aujourd'hui</div>
+      </div>
+      <div class="card stat-card">
+        <div class="value" id="stat-week">—</div>
+        <div class="label">Nouveaux cette semaine</div>
+      </div>
+      <div class="card stat-card">
+        <div class="value" id="stat-month">—</div>
+        <div class="label">Nouveaux ce mois-ci</div>
+      </div>
+    </div>
+
+    <div class="card chart-block">
+      <div class="chart-tabs">
+        <button type="button" id="chart-tab-day" class="active">Jour par jour (30j)</button>
+        <button type="button" id="chart-tab-month">Mois par mois (12m)</button>
+      </div>
+      <h3 id="chart-title">Évolution des inscriptions — 30 derniers jours</h3>
+      <canvas id="signup-chart" width="600" height="140"></canvas>
+    </div>
+
+    <div class="filters-block">
+      <input type="text" id="search-input" placeholder="Chercher par nom ou email...">
+      <div class="filters-row">
+        <select id="role-filter">
+          <option value="">Tous les rôles</option>
+          <option value="user">user</option>
+          <option value="premium">premium</option>
+          <option value="business">business</option>
+          <option value="organisation">organisation</option>
+          <option value="formateur">formateur</option>
+          <option value="admin">admin</option>
+          <option value="super_admin">super_admin</option>
+          <option value="founder">founder</option>
+        </select>
+        <select id="date-filter">
+          <option value="">Toute date</option>
+          <option value="today">Aujourd'hui</option>
+          <option value="week">Cette semaine</option>
+          <option value="month">Ce mois-ci</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="user-list"></div>
+
+  </div>
+
+</div>
+
+<div id="profile-modal" class="hidden">
+  <div class="sheet">
+    <h3>Profil utilisateur</h3>
+    <div id="profile-modal-body"></div>
+    <button id="profile-modal-close">Fermer</button>
+  </div>
+</div>
+
+<script src="../config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+(function () {
+  const cfg = window.MAHOUTO_CONFIG;
+  const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+
+  const loadingEl = document.getElementById("loading-state");
+  const deniedEl = document.getElementById("access-denied");
+  const dashboardEl = document.getElementById("dashboard-content");
+  const userListEl = document.getElementById("user-list");
+  const searchInput = document.getElementById("search-input");
+  const roleFilter = document.getElementById("role-filter");
+  const dateFilter = document.getElementById("date-filter");
+
+  let allUsers = [];
+  let accessToken = null;
+  let chartMode = "day";
+
+  function escapeHtml(str) {
+    const div = document.createElement("div");
+    div.textContent = str || "";
+    return div.innerHTML;
+  }
+
+  function formatDate(iso) {
+    return new Date(iso).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
+  }
+
+  async function authorizedFetch(url, options) {
+    options = options || {};
+    options.headers = Object.assign({}, options.headers, {
+      "Authorization": "Bearer " + accessToken,
+      "Content-Type": "application/json"
+    });
+    return fetch(url, options);
+  }
+
+  // -------- Statistiques --------
+  function computeStats(users) {
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfWeek = new Date(startOfToday);
+    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    let today = 0, week = 0, month = 0;
+    users.forEach((u) => {
+      const d = new Date(u.created_at);
+      if (d >= startOfToday) today++;
+      if (d >= startOfWeek) week++;
+      if (d >= startOfMonth) month++;
+    });
+
+    document.getElementById("stat-total").textContent = users.length;
+    document.getElementById("stat-today").textContent = today;
+    document.getElementById("stat-week").textContent = week;
+    document.getElementById("stat-month").textContent = month;
+  }
+
+  // -------- Graphique (canvas léger, sans dépendance externe) --------
+  function drawChart(users, mode) {
+    const canvas = document.getElementById("signup-chart");
+    const ctx = canvas.getContext("2d");
+    const w = canvas.width, h = canvas.height;
+    ctx.clearRect(0, 0, w, h);
+
+    let buckets = [];
+    if (mode === "day") {
+      for (let i = 29; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        d.setHours(0, 0, 0, 0);
+        buckets.push({ key: d.toISOString().slice(0, 10), label: d.getDate(), count: 0 });
+      }
+      users.forEach((u) => {
+        const key = new Date(u.created_at).toISOString().slice(0, 10);
+        const b = buckets.find((x) => x.key === key);
+        if (b) b.count++;
+      });
+    } else {
+      for (let i = 11; i >= 0; i--) {
+        const d = new Date();
+        d.setMonth(d.getMonth() - i);
+        const key = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+        buckets.push({ key, label: d.toLocaleDateString("fr-FR", { month: "short" }), count: 0 });
+      }
+      users.forEach((u) => {
+        const d = new Date(u.created_at);
+        const key = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+        const b = buckets.find((x) => x.key === key);
+        if (b) b.count++;
+      });
+    }
+
+    const max = Math.max(1, ...buckets.map((b) => b.count));
+    const barWidth = w / buckets.length;
+    const gold = getComputedStyle(document.documentElement).getPropertyValue("--gold-bright").trim() || "#FFD700";
+
+    buckets.forEach((b, i) => {
+      const barHeight = (b.count / max) * (h - 24);
+      const x = i * barWidth + barWidth * 0.15;
+      const barW = barWidth * 0.7;
+      const y = h - barHeight - 16;
+      ctx.fillStyle = gold;
+      ctx.globalAlpha = b.count > 0 ? 0.9 : 0.15;
+      ctx.fillRect(x, y, barW, barHeight);
+      ctx.globalAlpha = 1;
+    });
+
+    ctx.fillStyle = "#888";
+    ctx.font = "9px Arial";
+    ctx.textAlign = "center";
+    const step = mode === "day" ? 5 : 1;
+    buckets.forEach((b, i) => {
+      if (i % step === 0) {
+        ctx.fillText(String(b.label), i * barWidth + barWidth / 2, h - 4);
+      }
+    });
+  }
+
+  document.getElementById("chart-tab-day").addEventListener("click", () => {
+    chartMode = "day";
+    document.getElementById("chart-tab-day").classList.add("active");
+    document.getElementById("chart-tab-month").classList.remove("active");
+    document.getElementById("chart-title").textContent = "Évolution des inscriptions — 30 derniers jours";
+    drawChart(allUsers, "day");
+  });
+
+  document.getElementById("chart-tab-month").addEventListener("click", () => {
+    chartMode = "month";
+    document.getElementById("chart-tab-month").classList.add("active");
+    document.getElementById("chart-tab-day").classList.remove("active");
+    document.getElementById("chart-title").textContent = "Évolution des inscriptions — 12 derniers mois";
+    drawChart(allUsers, "month");
+  });
+
+  // -------- Liste + filtres --------
+  function renderList() {
+    const q = searchInput.value.trim().toLowerCase();
+    const role = roleFilter.value;
+    const dateRange = dateFilter.value;
+
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfWeek = new Date(startOfToday);
+    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    let filtered = allUsers.filter((u) => {
+      if (q && !((u.name || "").toLowerCase().includes(q) || (u.email || "").toLowerCase().includes(q))) return false;
+      if (role && u.role !== role) return false;
+      if (dateRange) {
+        const d = new Date(u.created_at);
+        if (dateRange === "today" && d < startOfToday) return false;
+        if (dateRange === "week" && d < startOfWeek) return false;
+        if (dateRange === "month" && d < startOfMonth) return false;
+      }
+      return true;
+    });
+
+    filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+    userListEl.innerHTML = "";
+    if (!filtered.length) {
+      userListEl.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-dim);">Aucun utilisateur ne correspond.</div>';
+      return;
+    }
+
+    filtered.forEach((u) => {
+      const row = document.createElement("div");
+      row.className = "card user-row";
+      row.innerHTML = `
+        <div class="top-line">
+          <div class="avatar">${(u.name || "?").trim()[0].toUpperCase()}</div>
+          <div class="info">
+            <div class="name">${escapeHtml(u.name)}</div>
+            <div class="email">${escapeHtml(u.email || "—")}</div>
+          </div>
+        </div>
+        <div class="meta">
+          <span class="tag role-${u.role}">${escapeHtml(u.role)}</span>
+          <span class="tag status-${u.status}">${escapeHtml(u.status)}</span>
+          <span class="tag">${formatDate(u.created_at)}</span>
+        </div>
+        <div class="actions">
+          <button class="btn-view" data-action="view">👁️ Voir</button>
+          ${u.status === "actif"
+            ? '<button class="btn-disable" data-action="disable">🚫 Désactiver</button>'
+            : '<button class="btn-reactivate" data-action="reactivate">✅ Réactiver</button>'}
+          <button class="btn-delete" data-action="delete">🗑️ Supprimer</button>
+        </div>
+      `;
+
+      row.querySelector('[data-action="view"]').addEventListener("click", () => showProfile(u));
+      const disableBtn = row.querySelector('[data-action="disable"]');
+      if (disableBtn) disableBtn.addEventListener("click", () => performAction(u, "disable"));
+      const reactivateBtn = row.querySelector('[data-action="reactivate"]');
+      if (reactivateBtn) reactivateBtn.addEventListener("click", () => performAction(u, "reactivate"));
+      row.querySelector('[data-action="delete"]').addEventListener("click", () => performAction(u, "delete"));
+
+      userListEl.appendChild(row);
+    });
+  }
+
+  searchInput.addEventListener("input", renderList);
+  roleFilter.addEventListener("change", renderList);
+  dateFilter.addEventListener("change", renderList);
+
+  // -------- Voir le profil --------
+  const profileModal = document.getElementById("profile-modal");
+  function showProfile(u) {
+    document.getElementById("profile-modal-body").innerHTML = `
+      <div class="field"><div class="k">Nom</div>${escapeHtml(u.name)}</div>
+      <div class="field"><div class="k">Email</div>${escapeHtml(u.email || "—")}</div>
+      <div class="field"><div class="k">Rôle</div>${escapeHtml(u.role)}</div>
+      <div class="field"><div class="k">Statut</div>${escapeHtml(u.status)}</div>
+      <div class="field"><div class="k">Inscrit le</div>${formatDate(u.created_at)}</div>
+      <div class="field"><div class="k">ID</div>${escapeHtml(u.id)}</div>
+    `;
+    profileModal.classList.remove("hidden");
+  }
+  document.getElementById("profile-modal-close").addEventListener("click", () => profileModal.classList.add("hidden"));
+  profileModal.addEventListener("click", (e) => { if (e.target === profileModal) profileModal.classList.add("hidden"); });
+
+  // -------- Actions (désactiver / réactiver / supprimer) --------
+  async function performAction(u, action) {
+    const labels = { disable: "désactiver", reactivate: "réactiver", delete: "supprimer définitivement" };
+    if (!confirm(`Confirmer : ${labels[action]} le compte de "${u.name}" ?`)) return;
+    if (action === "delete" && !confirm("Cette action est irréversible. Vraiment supprimer ce compte ?")) return;
+
+    try {
+      const resp = await authorizedFetch("/api/admin/user-action", {
+        method: "POST",
+        body: JSON.stringify({ action, userId: u.id })
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || "Erreur");
+
+      if (action === "delete") {
+        allUsers = allUsers.filter((x) => x.id !== u.id);
+      } else {
+        u.status = action === "disable" ? "désactivé" : "actif";
+      }
+      computeStats(allUsers);
+      drawChart(allUsers, chartMode);
+      renderList();
+    } catch (err) {
+      alert("Impossible d'effectuer cette action : " + err.message);
+      console.error(err);
+    }
+  }
+
+  // -------- Chargement initial --------
+  async function init() {
+    const { data } = await supabase.auth.getSession();
+    if (!data || !data.session || !data.session.user) {
+      loadingEl.classList.add("hidden");
+      deniedEl.classList.remove("hidden");
+      deniedEl.textContent = "🔒 Connecte-toi avec un compte administrateur pour accéder à cette page.";
+      return;
+    }
+
+    accessToken = data.session.access_token;
+
+    try {
+      const resp = await authorizedFetch("/api/admin/list-users", { method: "GET" });
+      const result = await resp.json();
+
+      if (!resp.ok) {
+        loadingEl.classList.add("hidden");
+        deniedEl.classList.remove("hidden");
+        deniedEl.textContent = "🔒 " + (result.error || "Accès refusé.");
+        return;
+      }
+
+      allUsers = result.users || [];
+      loadingEl.classList.add("hidden");
+      dashboardEl.classList.remove("hidden");
+
+      computeStats(allUsers);
+      drawChart(allUsers, "day");
+      renderList();
+    } catch (err) {
+      loadingEl.classList.add("hidden");
+      deniedEl.classList.remove("hidden");
+      deniedEl.textContent = "Erreur de chargement.";
+      console.error(err);
+    }
+  }
+
+  init();
+})();
+</script>
+
+</body>
+</html>
