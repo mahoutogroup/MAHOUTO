@@ -225,6 +225,16 @@
     return div.innerHTML;
   }
 
+  // Transforme les URLs présentes dans un texte déjà échappé en liens
+  // cliquables — jamais appliqué au texte brut, pour rester sûr contre
+  // les injections.
+  function linkify(escapedText) {
+    return escapedText.replace(/(\bhttps?:\/\/[^\s<]+|\bwww\.[^\s<]+)/gi, function (match) {
+      const href = /^https?:\/\//i.test(match) ? match : "https://" + match;
+      return '<a href="' + href + '" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:underline;">' + match + '</a>';
+    });
+  }
+
   function renderMessage(msg) {
     if (hiddenMessageIds.has(msg.id)) return;
 
@@ -250,7 +260,7 @@
           mediaHtml = `<a href="${msg.attachment_url}" target="_blank" style="color:inherit;text-decoration:underline;display:block;margin-top:6px;">📄 Ouvrir le fichier</a>`;
         }
       }
-      bodyHtml = (msg.content ? escapeHtml(msg.content) : "") + mediaHtml +
+      bodyHtml = (msg.content ? linkify(escapeHtml(msg.content)) : "") + mediaHtml +
         (msg.edited_at ? '<span class="edited-tag">modifié</span>' : "");
     }
 
