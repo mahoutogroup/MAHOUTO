@@ -571,8 +571,32 @@
   });
 
   actionSheet.querySelector('[data-action="share"]').addEventListener("click", async () => {
-    const text = activeMessage ? (activeMessage.content || activeMessage.attachment_url || "") : "";
+    const msg = activeMessage;
     closeMessageActions();
+    if (!msg) return;
+
+    // Priorité : partager le vrai fichier (photo/vidéo/audio/document)
+    // si le navigateur le permet — plus utile que de partager un simple lien.
+    if (msg.attachment_url) {
+      try {
+        const resp = await fetch(msg.attachment_url);
+        const blob = await resp.blob();
+        const ext = msg.attachment_type === "image" ? "jpg"
+          : msg.attachment_type === "video" ? "mp4"
+          : msg.attachment_type === "audio" ? "webm"
+          : "pdf";
+        const file = new File([blob], "mahouto-plus." + ext, { type: blob.type });
+
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], title: "MAHOUTO+" });
+          return;
+        }
+      } catch (err) {
+        console.error("Partage du fichier impossible, repli sur le lien :", err);
+      }
+    }
+
+    const text = msg.content || msg.attachment_url || "";
     if (navigator.share) {
       try { await navigator.share({ text: text, title: "MAHOUTO+" }); } catch (err) { /* annulé par l'utilisateur */ }
     } else if (text) {
