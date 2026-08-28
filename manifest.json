@@ -39,6 +39,30 @@
     "utilities"
   ],
 
+  "share_target": {
+    "action": "/upload",
+    "method": "POST",
+    "enctype": "multipart/form-data",
+    "params": {
+      "title": "title",
+      "text": "text",
+      "url": "url",
+      "files": [
+        {
+          "name": "fichier",
+          "accept": [
+            "image/*",
+            "video/*",
+            "application/pdf",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/zip"
+          ]
+        }
+      ]
+    }
+  },
+
   "screenshots": [],
 
   "prefer_related_applications": false
