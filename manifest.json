@@ -1,13 +1,13 @@
 {
   "name": "MAHOUTO+",
-  "short_name": "MAHOUTO+",
+  "short_name": "MAHOUTO",
   "description": "MAHOUTO+ — L'Afrique qui apprend, crée et entreprend. Construire l'Afrique numérique de demain.",
   "lang": "fr",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
-  "background_color": "#000000",
+  "background_color": "#000",
   "theme_color": "#0A0A0A",
 
   "icons": [
@@ -35,16 +35,22 @@
     "education",
     "business",
     "productivity",
-    "social",
-    "utilities"
+    "social"
   ],
 
-  "screenshots": [],
+  "screenshots": [
+    {
+      "src": "assets/screenshot1.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "label": "Chat et Formations MAHOUTO+"
+    }
+  ],
 
   "prefer_related_applications": false,
 
   "share_target": {
-    "action": "/share-target",
+    "action": "/upload.html",
     "method": "POST",
     "enctype": "multipart/form-data",
     "params": {
@@ -52,7 +58,7 @@
       "text": "text",
       "files": [
         {
-          "name": "sharedFile",
+          "name": "file",
           "accept": ["image/*", "video/*", "audio/*", "application/pdf"]
         }
       ]
