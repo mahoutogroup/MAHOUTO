@@ -4,7 +4,7 @@
 // network-first pour tout le reste (données dynamiques).
 // =========================================================
 
-const CACHE_NAME = "mahoutoplus-shell-v31";
+const CACHE_NAME = "mahoutoplus-shell-v32";
 
 const APP_SHELL = [
   "./",
@@ -55,6 +55,31 @@ self.addEventListener("activate", (event) => {
 // Récupération des requêtes
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
+
+  // Réception d'un fichier partagé depuis une autre app (WhatsApp, etc.)
+  // — voir manifest.json > share_target. Le fichier est stocké
+  // temporairement via l'API Cache (seul moyen de faire transiter un
+  // blob binaire d'un Service Worker vers une page), puis on redirige
+  // vers share-target.html qui le récupère et laisse choisir où l'envoyer.
+  if (event.request.method === "POST" && url.pathname === "/share-target") {
+    event.respondWith((async () => {
+      try {
+        const formData = await event.request.formData();
+        const file = formData.get("sharedFile");
+        const cache = await caches.open("mahoutoplus-share-cache");
+        if (file) {
+          await cache.put(
+            "shared-file",
+            new Response(file, { headers: { "Content-Type": file.type || "application/octet-stream" } })
+          );
+        }
+      } catch (err) {
+        console.error("Réception du partage impossible :", err);
+      }
+      return Response.redirect("/share-target.html", 303);
+    })());
+    return;
+  }
 
   // Jamais toucher aux requêtes non-GET (POST vers /api/... par ex.)
   if (event.request.method !== "GET") return;
