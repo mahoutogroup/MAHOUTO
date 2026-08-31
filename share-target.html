@@ -19,6 +19,13 @@
   #preview-block img, #preview-block video { max-width: 100%; max-height: 240px; border-radius: 14px; }
   #preview-block audio { width: 100%; }
   #preview-block.file-icon { font-size: 48px; }
+
+  #caption-input {
+    margin: 0 20px 12px; padding: 12px; border-radius: 12px; border: 1px solid var(--border);
+    background: var(--bg-elevated); color: var(--white); font-size: 14px; resize: none;
+  }
+  #caption-input:focus { outline: 2px solid var(--gold-bright); border-color: transparent; }
+
  .section-label { font-size: 12px; text-transform: uppercase; letter-spacing:.06em; color: var(--gold); font-weight: bold; margin: 18px 20px 10px; }
  .dest-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; margin: 0 20px 8px; cursor: pointer; border-radius: 12px; background: var(--bg-elevated); }
  .dest-row.selected { outline: 2px solid var(--gold-bright); }
@@ -37,17 +44,22 @@
 
 <header>
   <h1>📤 Partager vers MAHOUTO+</h1>
-  <p>Choisis où envoyer ce fichier.</p>
+  <p>Ajoute un message et choisis la destination.</p>
 </header>
 
 <div id="loading-state" style="padding:60px 24px;text-align:center;color:var(--text-dim);">Chargement...</div>
 
 <div id="content" class="hidden">
   <div id="preview-block"></div>
+
+  <textarea id="caption-input" rows="2" placeholder="Écrire un message..."></textarea>
+
   <div class="section-label">💬 Mes salons</div>
   <div id="rooms-list"></div>
+
   <div class="section-label">💌 Mes messages privés</div>
   <div id="dms-list"></div>
+
   <div id="status-message"></div>
   <button id="send-btn" disabled>Choisis une destination</button>
 </div>
@@ -62,6 +74,7 @@
   const loadingEl = document.getElementById("loading-state");
   const contentEl = document.getElementById("content");
   const previewEl = document.getElementById("preview-block");
+  const captionEl = document.getElementById("caption-input");
   const roomsListEl = document.getElementById("rooms-list");
   const dmsListEl = document.getElementById("dms-list");
   const sendBtn = document.getElementById("send-btn");
@@ -137,7 +150,6 @@
   async function uploadAndSend() {
     if (!sharedBlob ||!selectedDestination) return;
 
-    // VALIDATION TAILLE ET TYPE
     if (sharedBlob.size > MAX_SIZE) {
       statusEl.textContent = "Erreur : Fichier trop lourd. Max 10MB";
       return;
@@ -153,6 +165,7 @@
     try {
       const { data: sessionData } = await supabase.auth.getSession();
       const accessToken = sessionData?.session?.access_token;
+      const caption = captionEl.value.trim(); // ← Récupère la légende
 
       const signResp = await fetch("/api/cloudinary-sign", { headers: accessToken? { "Authorization": "Bearer " + accessToken } : {} });
       const sign = await signResp.json();
@@ -165,7 +178,6 @@
       formData.append("signature", sign.signature);
       formData.append("folder", sign.folder);
 
-      // UPLOAD AVEC PROGRESSION
       const uploadData = await new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open("POST", sign.uploadUrl);
@@ -187,13 +199,15 @@
         const { data: profile } = await supabase.from("profiles").select("username").eq("id", currentUser.id).maybeSingle();
         const { error } = await supabase.from("messages").insert({
           room_id: selectedDestination.id, user_id: currentUser.id, username: profile?.username || "Utilisateur",
-          content: "", attachment_url: uploadData.secure_url, attachment_type: attachmentType
+          content: caption, // ← Envoie la légende
+          attachment_url: uploadData.secure_url, attachment_type: attachmentType
         });
         if (error) throw error;
         window.location.href = "chat.html?room=" + encodeURIComponent(selectedDestination.id) + "&name=" + encodeURIComponent(selectedDestination.name);
       } else {
         const { error } = await supabase.from("dm_messages").insert({
-          conversation_id: selectedDestination.id, sender_id: currentUser.id, content: "",
+          conversation_id: selectedDestination.id, sender_id: currentUser.id, 
+          content: caption, // ← Envoie la légende
           attachment_url: uploadData.secure_url, attachment_type: attachmentType
         });
         if (error) throw error;
@@ -229,6 +243,7 @@
     await loadDestinations();
     loadingEl.classList.add("hidden");
     contentEl.classList.remove("hidden");
+    captionEl.focus(); // Focus direct sur le champ texte
   })();
 })();
 </script>
