@@ -1,6 +1,6 @@
 {
   "name": "MAHOUTO+",
-  "short_name": "MAHOUTO",
+  "short_name": "MAHOUTO +",
   "description": "MAHOUTO+ – L'Afrique qui apprend, crée et entreprend.",
   "lang": "fr",
   "start_url": "/",
@@ -38,20 +38,7 @@
       "files": [
         {
           "name": "files",
-          "accept": [
-            "image/*",
-            "video/*",
-            "audio/*",
-            ".pdf",
-            ".doc",
-            ".docx",
-            ".ppt",
-            ".pptx",
-            ".xls",
-            ".xlsx",
-            ".zip",
-            ".rar"
-          ]
+          "accept": ["image/*", "video/*", "audio/*", ".pdf", ".doc", ".docx", ".zip"]
         }
       ]
     }
