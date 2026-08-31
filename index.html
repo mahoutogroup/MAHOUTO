@@ -6,7 +6,12 @@
 <title>MAHOUTO+ — Apprendre, Créer, Entreprendre</title>
 <meta name="description" content="MAHOUTO+ — Construire l'Afrique numérique de demain.">
 <meta name="theme-color" content="#0A0A0A">
-<link rel="manifest" href="manifest.json">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="MAHOUTO+">
+
+<link rel="manifest" href="/manifest.json"> <!-- ← / important -->
 <link rel="icon" href="assets/favicon.png">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <link rel="preload" as="image" href="assets/logo-mahouto-plus.png">
@@ -17,75 +22,75 @@
   /* index.html : interface uniquement. Toute logique réelle vit
      dans config.js, auth.js, theme.css, theme-toggle.js, sw.js. */
 
-  .hero { padding: 40px 20px 8px; text-align: center; }
+ .hero { padding: 40px 20px 8px; text-align: center; }
 
-  .logo-badge {
+ .logo-badge {
     width: 110px; height: 110px; margin: 0 auto 16px;
     border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
   }
 
-  .logo-badge img {
+ .logo-badge img {
     width: 100%;
     height: 100%;
     object-fit: contain;
   }
 
-  .hero h1 { font-size: 28px; letter-spacing: .01em; }
-  .hero h1 .plus { color: var(--accent-green); }
-  .hero .tagline { font-size: 14px; color: var(--text-muted); margin-top: 10px; font-weight: 600; }
-  .hero .subtagline { font-size: 12.5px; color: var(--text-dim); margin-top: 4px; }
+ .hero h1 { font-size: 28px; letter-spacing:.01em; }
+ .hero h1.plus { color: var(--accent-green); }
+ .hero.tagline { font-size: 14px; color: var(--text-muted); margin-top: 10px; font-weight: 600; }
+ .hero.subtagline { font-size: 12.5px; color: var(--text-dim); margin-top: 4px; }
 
   #auth-zone { padding: 18px 20px 6px; }
 
-  .auth-methods { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+ .auth-methods { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
-  .auth-btn {
+ .auth-btn {
     display: flex; align-items: center; justify-content: center; gap: 8px;
     padding: 13px 10px; border-radius: var(--radius-md); border: 1px solid var(--border);
     background: var(--bg-card); color: var(--white); font-size: 13.5px; font-weight: bold; cursor: pointer;
   }
-  .auth-btn.primary { background: var(--gold-bright); color: #0A0A0A; border: none; grid-column: span 2; }
-  .auth-btn:active { transform: scale(.98); }
+ .auth-btn.primary { background: var(--gold-bright); color: #0A0A0A; border: none; grid-column: span 2; }
+ .auth-btn:active { transform: scale(.98); }
 
-  .auth-note { text-align: center; font-size: 11.5px; color: var(--text-dim); margin-top: 10px; }
+ .auth-note { text-align: center; font-size: 11.5px; color: var(--text-dim); margin-top: 10px; }
 
-  .profile-summary {
+ .profile-summary {
     display: none;
     background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 18px;
   }
-  .profile-summary.visible { display: block; }
-  .auth-methods.hidden-by-auth { display: none; }
+ .profile-summary.visible { display: block; }
+ .auth-methods.hidden-by-auth { display: none; }
 
-  .profile-summary .top { display: flex; align-items: center; gap: 12px; }
+ .profile-summary.top { display: flex; align-items: center; gap: 12px; }
 
-  .profile-summary .avatar {
+ .profile-summary.avatar {
     width: 52px; height: 52px; border-radius: 50%; background: var(--gold-bright);
     display: flex; align-items: center; justify-content: center;
     font-weight: bold; color: #0A0A0A; font-size: 20px; flex: none; overflow: hidden;
   }
-  .profile-summary .avatar img { width: 100%; height: 100%; object-fit: cover; }
+ .profile-summary.avatar img { width: 100%; height: 100%; object-fit: cover; }
 
-  .profile-summary .name { font-weight: bold; font-size: 15.5px; }
-  .profile-summary .mahouto-id { font-size: 11.5px; color: var(--text-dim); margin-top: 2px; }
+ .profile-summary.name { font-weight: bold; font-size: 15.5px; }
+ .profile-summary.mahouto-id { font-size: 11.5px; color: var(--text-dim); margin-top: 2px; }
 
-  .profile-stats {
+ .profile-stats {
     display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 16px;
   }
-  .profile-stats .stat { text-align: center; background: var(--bg-elevated); border-radius: var(--radius-sm); padding: 10px 4px; }
-  .profile-stats .stat .value { font-size: 16px; font-weight: bold; color: var(--gold); }
-  .profile-stats .stat .label { font-size: 10px; color: var(--text-dim); margin-top: 2px; }
+ .profile-stats.stat { text-align: center; background: var(--bg-elevated); border-radius: var(--radius-sm); padding: 10px 4px; }
+ .profile-stats.stat.value { font-size: 16px; font-weight: bold; color: var(--gold); }
+ .profile-stats.stat.label { font-size: 10px; color: var(--text-dim); margin-top: 2px; }
 
   #auth-modal, #confirm-modal, #info-modal {
     position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.6);
     display: flex; align-items: flex-end; justify-content: center;
   }
-  #auth-modal .sheet, #confirm-modal .sheet, #info-modal .sheet {
+  #auth-modal.sheet, #confirm-modal.sheet, #info-modal.sheet {
     width: 100%; max-width: 480px; background: var(--bg-elevated);
     border-radius: 24px 24px 0 0; padding: 22px 20px 28px; max-height: 85vh; overflow-y: auto; position: relative;
     text-align: center;
   }
-  .sheet-handle { width: 40px; height: 4px; background: var(--border); border-radius: 3px; margin: 0 auto 16px; }
+ .sheet-handle { width: 40px; height: 4px; background: var(--border); border-radius: 3px; margin: 0 auto 16px; }
 
   #auth-modal h3, #confirm-modal h3, #info-modal h3 { font-size: 18px; color: var(--gold); margin-bottom: 4px; }
 
@@ -94,26 +99,26 @@
     text-align: left;
   }
 
-  .modal-text { font-size: 14.5px; color: var(--white); margin: 6px 0 20px; line-height: 1.6; }
-  .modal-actions { display: flex; gap: 10px; }
-  .modal-actions button { flex: 1; padding: 13px; border-radius: 12px; font-weight: bold; cursor: pointer; }
-  .modal-btn-primary { background: var(--gold-bright); color: #0A0A0A; border: none; }
-  .modal-btn-secondary { background: var(--bg-card); color: var(--white); border: 1px solid var(--border); }
+ .modal-text { font-size: 14.5px; color: var(--white); margin: 6px 0 20px; line-height: 1.6; }
+ .modal-actions { display: flex; gap: 10px; }
+ .modal-actions button { flex: 1; padding: 13px; border-radius: 12px; font-weight: bold; cursor: pointer; }
+ .modal-btn-primary { background: var(--gold-bright); color: #0A0A0A; border: none; }
+ .modal-btn-secondary { background: var(--bg-card); color: var(--white); border: 1px solid var(--border); }
 
-  .module-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 0 20px; }
-  .module-card { position: relative; }
-  .module-card h2 { font-size: 15.5px; display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-  .module-card p { font-size: 12px; color: var(--text-muted); line-height: 1.5; margin-bottom: 12px; min-height: 32px; }
-  .module-card .go { font-size: 12px; color: var(--gold); font-weight: bold; }
-  .module-card.disabled { opacity: .55; }
-  .module-card.disabled .go { color: var(--text-dim); }
+ .module-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 0 20px; }
+ .module-card { position: relative; }
+ .module-card h2 { font-size: 15.5px; display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+ .module-card p { font-size: 12px; color: var(--text-muted); line-height: 1.5; margin-bottom: 12px; min-height: 32px; }
+ .module-card.go { font-size: 12px; color: var(--gold); font-weight: bold; }
+ .module-card.disabled { opacity:.55; }
+ .module-card.disabled.go { color: var(--text-dim); }
 
-  .plans-row { display: flex; gap: 10px; overflow-x: auto; padding: 4px 20px 4px; }
-  .plan-chip { flex: none; background: var(--bg-card); border: 1px solid var(--border); border-radius: 999px; padding: 8px 16px; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+ .plans-row { display: flex; gap: 10px; overflow-x: auto; padding: 4px 20px 4px; }
+ .plan-chip { flex: none; background: var(--bg-card); border: 1px solid var(--border); border-radius: 999px; padding: 8px 16px; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
 
   footer { text-align: center; padding: 24px 20px 10px; color: var(--text-dim); font-size: 11px; line-height: 1.7; }
 
-  .admin-fab {
+ .admin-fab {
     position: fixed;
     top: max(14px, env(safe-area-inset-top));
     left: 16px;
@@ -131,9 +136,9 @@
     text-decoration: none;
     cursor: pointer;
   }
-  .admin-fab:active { transform: scale(.92); }
+ .admin-fab:active { transform: scale(.92); }
 
-  .hidden { display: none !important; }
+ .hidden { display: none!important; }
 
   /* =========================================================
      Splash Screen officiel MAHOUTO+
@@ -143,19 +148,19 @@
     position: fixed;
     inset: 0;
     z-index: 9999;
-    background: #000000;
+    background: #000;
     display: flex;
     align-items: center;
     justify-content: center;
     opacity: 0;
-    animation: splashFadeIn .6s ease forwards;
+    animation: splashFadeIn.6s ease forwards;
   }
 
   #splash-screen.splash-fade-out {
-    animation: splashFadeOut .6s ease forwards;
+    animation: splashFadeOut.6s ease forwards;
   }
 
-  #splash-screen .splash-glow {
+  #splash-screen.splash-glow {
     position: absolute;
     top: 50%;
     left: 50%;
@@ -189,9 +194,9 @@
   }
 
   @keyframes splashGlowPulse {
-    0%   { opacity: .5; }
-    50%  { opacity: 1; }
-    100% { opacity: .5; }
+    0% { opacity:.5; }
+    50% { opacity: 1; }
+    100% { opacity:.5; }
   }
 
   @media (min-width: 700px) {
@@ -209,7 +214,6 @@
   var splash = document.getElementById("splash-screen");
   if (!splash) return;
 
-  // Le splash ne s'affiche qu'une fois par session (premier chargement)
   if (sessionStorage.getItem("mahouto_splash_shown")) {
     splash.style.display = "none";
     return;
@@ -372,7 +376,6 @@
   <a class="nav-item" href="profil.html"><span class="icon">👤</span>Profil</a>
 </nav>
 
-<!-- Confirmation obligatoire avant tout lien externe (Majesté Presse) -->
 <div id="confirm-modal" class="hidden">
   <div class="sheet">
     <div class="sheet-handle"></div>
@@ -385,7 +388,6 @@
   </div>
 </div>
 
-<!-- Message générique pour toute méthode de connexion non configurée -->
 <div id="info-modal" class="hidden">
   <div class="sheet">
     <div class="sheet-handle"></div>
@@ -397,7 +399,6 @@
   </div>
 </div>
 
-<!-- Erreur de connexion Google (affichée uniquement en cas d'échec réel) -->
 <div id="auth-modal" class="hidden">
   <div class="sheet">
     <div class="sheet-handle"></div>
@@ -416,7 +417,6 @@
 (function () {
   "use strict";
 
-  // -------- Modale d'information générique --------
   const infoModal = document.getElementById("info-modal");
   const infoText = document.getElementById("info-text");
   function showInfo(message) {
@@ -426,7 +426,6 @@
   document.getElementById("info-close").addEventListener("click", () => infoModal.classList.add("hidden"));
   infoModal.addEventListener("click", (e) => { if (e.target === infoModal) infoModal.classList.add("hidden"); });
 
-  // -------- Modale de confirmation générique (Majesté Presse) --------
   const confirmModal = document.getElementById("confirm-modal");
   const confirmText = document.getElementById("confirm-text");
   const confirmYes = document.getElementById("confirm-yes");
@@ -449,14 +448,13 @@
   const MAJESTE_AI_URL = "https://ai.majestepresse.com/chat";
 
   document.getElementById("card-majeste-ai").addEventListener("click", () => {
-    askConfirm("Voulez-vous ouvrir MAJESTÉ AI ?", MAJESTE_AI_URL);
+    askConfirm("Voulez-vous ouvrir MAJESTÉ AI?", MAJESTE_AI_URL);
   });
 
   document.getElementById("card-majeste-presse").addEventListener("click", () => {
-    askConfirm("Voulez-vous visiter MAJESTÉ PRESSE ?", MAJESTE_PRESSE_URL);
+    askConfirm("Voulez-vous visiter MAJESTÉ PRESSE?", MAJESTE_PRESSE_URL);
   });
 
-  // -------- Authentification --------
   const authModal = document.getElementById("auth-modal");
   const authErrorEl = document.getElementById("auth-error");
   document.getElementById("auth-error-close").addEventListener("click", () => authModal.classList.add("hidden"));
@@ -468,10 +466,9 @@
     authModal.classList.remove("hidden");
   }
 
-  // Google : utilise loginGoogle(), définie dans auth.js.
   document.getElementById("btn-login-google").addEventListener("click", async () => {
     try {
-      if (typeof window.loginGoogle !== "function") {
+      if (typeof window.loginGoogle!== "function") {
         showInfo("Cette méthode de connexion n'est pas encore configurée.");
         return;
       }
@@ -482,22 +479,17 @@
     }
   });
 
-  // Téléphone : aucune fonction correspondante n'existe dans auth.js.
   document.getElementById("btn-login-phone").addEventListener("click", () => {
     showInfo("Cette méthode de connexion n'est pas encore configurée.");
   });
 
-  // Email : aucune fonction correspondante n'existe dans auth.js.
   document.getElementById("btn-login-email").addEventListener("click", () => {
     showInfo("Cette méthode de connexion n'est pas encore configurée.");
   });
 
-  // -------- Affichage de l'identité si une session existe --------
-  // "supabase" est le client créé par auth.js (déclaration top-level
-  // partagée entre les scripts classiques de cette page).
   async function refreshIdentityUI() {
     try {
-      if (typeof supabase === "undefined" || !supabase.auth || typeof supabase.auth.getUser !== "function") return;
+      if (typeof supabase === "undefined" ||!supabase.auth || typeof supabase.auth.getUser!== "function") return;
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
@@ -510,7 +502,7 @@
 
       const avatarEl = document.getElementById("profile-avatar");
       const photo = user.user_metadata && user.user_metadata.avatar_url;
-      avatarEl.innerHTML = photo ? '<img src="' + photo + '" alt="">' : name.trim()[0].toUpperCase();
+      avatarEl.innerHTML = photo? '<img src="' + photo + '" alt="">' : name.trim()[0].toUpperCase();
     } catch (err) {
       console.error("Vérification de session impossible :", err);
     }
@@ -518,11 +510,21 @@
 
   refreshIdentityUI();
 
-  if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => {
-      navigator.serviceWorker.register("sw.js").catch((err) => console.log(err));
+  // ===== ENREGISTREMENT SERVICE WORKER PWA =====
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js')
+       .then(reg => console.log('SW enregistré:', reg))
+       .catch(err => console.log('SW erreur:', err));
     });
   }
+
+  let deferredPrompt;
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    console.log('PWA prête à installer');
+  });
 })();
 </script>
 
