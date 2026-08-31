@@ -1,7 +1,7 @@
-const CACHE_NAME = "mahoutoplus-shell-v37";
+const CACHE_NAME = "mahoutoplus-shell-v38";
 
 const APP_SHELL = [
-  "./","./index.html","./upload.html","./discussions.html","./messages-prives.html",
+  "./","./index.html","./share-target.html","./discussions.html","./messages-prives.html",
   "./dm-chat.html","./chat.html","./ai.html","./school.html","./academie-majestepresse.html",
   "./profil.html","./manifest.json","./config.js","./theme.css","./theme-toggle.js",
   "./assets/icon-192.png","./assets/icon-512.png","./assets/icon-maskable-512.png"
@@ -20,31 +20,50 @@ self.addEventListener("activate", e => {
 self.addEventListener("fetch", event => {
   const url = new URL(event.request.url);
 
-  if (event.request.method === "POST" && url.pathname === "/upload.html") {
+  // RÉCEPTION PARTAGE : 1 FICHIER OU MULTI
+  if (event.request.method === "POST" && url.pathname === "/share-target.html") {
     event.respondWith((async () => {
       try {
         const formData = await event.request.formData();
-        let files = formData.getAll("files");
-        if(files.length === 0 && formData.get("file")) files = [formData.get("file")];
-        if(files.length === 0 && formData.get("files")) files = [formData.get("files")];
+        let files = [];
+
+        if(formData.getAll("files").length > 0) {
+          files = formData.getAll("files"); // Cas multi
+        } else if(formData.get("file")) {
+          files = [formData.get("file")]; // Cas 1 fichier WhatsApp
+        } else if(formData.get("files")) {
+          files = [formData.get("files")]; // Cas 1 fichier Galerie
+        }
+
+        if(files.length === 0) throw new Error("Aucun fichier reçu du système");
 
         const filesData = [];
         for(const f of files) {
           filesData.push({
-            name: f.name || "fichier", type: f.type, size: f.size,
+            name: f.name || "fichier", 
+            type: f.type || "application/octet-stream", 
+            size: f.size,
             buffer: await f.arrayBuffer()
           });
         }
+
         const cache = await caches.open("mahoutoplus-share-cache");
         await cache.put("shared-files", new Response(JSON.stringify(filesData)));
+        console.log(`${files.length} fichiers mis en cache`);
+
       } catch (err) {
+        console.error("Réception partage:", err);
         const cache = await caches.open("mahoutoplus-share-cache");
         await cache.put("shared-files", new Response(JSON.stringify({error: err.message})));
       }
-      return Response.redirect("./upload.html", 303);
+      return Response.redirect("./share-target.html", 303);
     })());
     return;
   }
+
+  // FETCH NORMAL
+  if (event.request.method !== "GET") return;
+  if (url.hostname.includes("supabase.co") || url.hostname.includes("cloudinary.com") || url.pathname.startsWith("/api/")) return fetch(event.request);
 
   event.respondWith(
     caches.match(event.request).then(cached => cached || fetch(event.request))
