@@ -4,145 +4,103 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Partager vers MAHOUTO+</title>
-<link rel="stylesheet" href="theme.css">
 <style>
-  body { background: var(--bg); color: var(--white); margin: 0; font-family: system-ui; }
-  header { padding: 18px 20px; background: var(--bg-elevated); border-bottom: 1px solid var(--border); }
-  header h1 { font-size: 18px; color: var(--gold); margin: 0; }
-  header p { font-size: 12.5px; color: var(--text-muted); margin: 4px 0 0; }
-  #preview-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 16px 20px; }
-.preview-item { position: relative; border-radius: 10px; overflow: hidden; background: var(--bg-elevated); aspect-ratio: 1; }
-.preview-item img,.preview-item video { width: 100%; height: 100%; object-fit: cover; }
-.preview-item.icon { display: flex; align-items: center; justify-content: center; height: 100%; font-size: 32px; }
-.preview-item.remove { position: absolute; top: 4px; right: 4px; background: #000a; color: white; border: none; border-radius: 50%; width: 22px; height: 22px; cursor: pointer; font-size: 14px; }
-  #caption-input { margin: 0 20px 12px; padding: 12px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg-elevated); color: var(--white); width: calc(100% - 40px); font-size: 14px; }
- .section-label { font-size: 12px; text-transform: uppercase; letter-spacing:.06em; color: var(--gold); font-weight: bold; margin: 18px 20px 10px; }
-.dest-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; margin: 0 20px 8px; cursor: pointer; border-radius: 12px; background: var(--bg-elevated); }
-.dest-row.selected { outline: 2px solid var(--gold-bright); }
-.dest-row.avatar { width: 40px; height: 40px; border-radius: 50%; flex: none; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #0A0A0A; background: var(--gold-bright); overflow: hidden; }
-.dest-row.avatar img { width: 100%; height: 100%; object-fit: cover; }
-  #progress-bar { height: 4px; background: var(--border); margin: 0 20px 12px; border-radius: 2px; overflow: hidden; }
-  #progress-fill { height: 100%; width: 0%; background: var(--gold-bright); transition: width.2s; }
-  #send-btn { margin: 16px 20px 30px; padding: 14px; border: none; border-radius: 14px; background: var(--gold-bright); color: #0A0A0A; font-weight: bold; width: calc(100% - 40px); font-size: 15px; }
-  #send-btn:disabled { opacity:.5; }
- .hidden { display: none!important; }
+  body { background: #0A0A0A; color: #fff; font-family: sans-serif; margin: 0; padding: 16px; }
+  h2 { color: #FFC107; }
+  .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 16px 0; }
+  .grid img, .grid video { width: 100%; aspect-ratio: 1/1; object-fit: cover; border-radius: 8px; background: #222; }
+  .file { padding: 8px; background: #1A1A1A; border-radius: 8px; margin: 4px 0; font-size: 12px; }
+  textarea { width: 100%; background: #1A1A1A; border: 1px solid #333; color: #fff; border-radius: 8px; padding: 12px; }
+  button { width: 100%; background: #FFC107; color: #000; border: none; padding: 16px; border-radius: 12px; font-weight: bold; font-size: 16px; margin-top: 16px; }
 </style>
 </head>
 <body>
-<button id="theme-toggle-btn" class="theme-toggle-fab">🌙</button>
-<header><h1>📤 Partager vers MAHOUTO+</h1><p><span id="file-count">0</span>/10 fichiers</p></header>
-<div id="loading-state" style="padding:60px 24px;text-align:center;color:var(--text-dim);">Chargement...</div>
-<div id="content" class="hidden">
-  <div id="preview-grid"></div>
-  <textarea id="caption-input" rows="2" placeholder="Ajouter une légende..."></textarea>
-  <div id="progress-bar"><div id="progress-fill"></div></div>
-  <div class="section-label">💬 DESTINATION</div>
-  <div id="rooms-list"></div><div id="dms-list"></div>
-  <div id="status-message" style="padding:0 20px;font-size:13px;color:var(--text-muted);min-height:18px;"></div>
-  <button id="send-btn" disabled>Choisis une destination</button>
+
+<h2>📦 Partager vers MAHOUTO+</h2>
+<p id="count">Chargement...</p>
+
+<div class="grid" id="preview"></div>
+
+<textarea id="text" rows="3" placeholder="Ajouter une légende..."></textarea>
+
+<h3>💬 DESTINATION</h3>
+<div id="destinations">
+  <div class="file">Support</div>
+  <div class="file">Général</div>
+  <div class="file">Annonces MAJESTÉ PRESSE</div>
+  <div class="file">LES SÉRIGRAPHES</div>
 </div>
 
-<script src="config.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="theme-toggle.js"></script>
+<button id="send">Envoyer vers Mahouto</button>
+
 <script>
-(function () {
-  const supabase = window.supabase.createClient(window.MAHOUTO_CONFIG.SUPABASE_URL, window.MAHOUTO_CONFIG.SUPABASE_ANON_KEY);
-  let currentUser, sharedFiles = [], selectedDestination = null;
-  const MAX_FILES = 10, MAX_TOTAL = 50 * 1024 * 1024;
+window.addEventListener('DOMContentLoaded', async () => {
+  if (window.location.pathname !== '/share-target.html') return;
 
-  const loadingEl = document.getElementById("loading-state");
-  const contentEl = document.getElementById("content");
-  const gridEl = document.getElementById("preview-grid");
-  const sendBtn = document.getElementById("send-btn");
-  const statusEl = document.getElementById("status-message");
+  const url = new URL(window.location);
+  const formData = new FormData();
 
-  async function init() {
-    const { data } = await supabase.auth.getSession();
-    if (!data?.session?.user) return loadingEl.textContent = "Connecte-toi sur MAHOUTO+ d'abord.";
-    currentUser = data.session.user;
-    const cache = await caches.open("mahoutoplus-share-cache");
-    const cached = await cache.match("shared-files");
-    if (!cached) return loadingEl.textContent = "Aucun fichier reçu.";
-    sharedFiles = await cached.json();
-    await cache.delete("shared-files");
-    if(sharedFiles.error) return loadingEl.textContent = "Erreur: " + sharedFiles.error;
-    if(sharedFiles.length > MAX_FILES) sharedFiles = sharedFiles.slice(0, MAX_FILES);
-    renderPreviews(); await loadDestinations();
-    loadingEl.classList.add("hidden"); contentEl.classList.remove("hidden");
+  // Récupérer les fichiers partagés
+  const files = [];
+  for (const [key, value] of new URLSearchParams(url.search).entries()) {
+    if (key === 'text') document.getElementById('text').value = value;
   }
 
-  function renderPreviews() {
-    document.getElementById("file-count").textContent = sharedFiles.length;
-    gridEl.innerHTML = "";
-    sharedFiles.forEach((f, i) => {
-      const blob = new Blob([new Uint8Array(f.buffer)], {type: f.type});
-      const url = URL.createObjectURL(blob);
-      const div = document.createElement("div"); div.className = "preview-item";
-      if(f.type.startsWith("image/")) div.innerHTML = `<img src="${url}"><button class="remove" onclick="removeFile(${i})">x</button>`;
-      else if(f.type.startsWith("video/")) div.innerHTML = `<video src="${url}" muted></video><button class="remove" onclick="removeFile(${i})">x</button>`;
-      else div.innerHTML = `<div class="icon">📄</div><button class="remove" onclick="removeFile(${i})">x</button>`;
-      gridEl.appendChild(div);
-    });
+  // Android envoie les fichiers en POST. On doit les récupérer
+  if (navigator.share && navigator.canShare) {
+    // Cas 1: Partage via Web Share Target API
+    const sharedFiles = window.shareTargetFiles || [];
   }
-  window.removeFile = i => { sharedFiles.splice(i,1); renderPreviews(); }
 
-  async function loadDestinations() {
-    const { data: rooms } = await supabase.from("rooms").select("id, name, emoji, color").order("created_at");
-    document.getElementById("rooms-list").innerHTML = (rooms||[]).map(r => `<div class="dest-row" onclick='selectDest(this,{"type":"room","id":"${r.id}","name":"${r.name}"})'><div class="avatar" style="background:${r.color}">${r.emoji}</div><div>${r.name}</div></div>`).join("");
-    const { data: convs } = await supabase.from("dm_conversations").select("id, user_one, user_two").order("created_at", {ascending:false});
-    for(const c of convs||[]){
-      const otherId = c.user_one === currentUser.id? c.user_two : c.user_one;
-      const { data: p } = await supabase.rpc("get_public_profile", { uid: otherId });
-      const user = p?.[0] || {username:"Utilisateur"};
-      document.getElementById("dms-list").innerHTML += `<div class="dest-row" onclick='selectDest(this,{"type":"dm","id":"${c.id}","name":"${user.username}","dmWithId":"${otherId}"})'><div class="avatar">${user.avatar_url?`<img src="${user.avatar_url}">`:user.username[0].toUpperCase()}</div><div>${user.username}</div></div>`;
+  // Cas 2: Récupération via POST
+  const form = await new Request(window.location, {method: 'POST'}).formData().catch(()=>new FormData());
+  
+  // Méthode qui marche sur 99% des Android :
+  const shared = await navigator.shareTarget?.files || [];
+  
+  // Fallback : on parse l'URL
+  const params = new URLSearchParams(window.location.search);
+  
+  // LA VRAIE METHODE : le navigateur a mis les fichiers dans le body
+  const data = await fetch(window.location, {method: 'POST'}).then(r=>r.formData()).catch(()=>new FormData());
+  const allFiles = data.getAll('files');
+
+  const preview = document.getElementById('preview');
+  document.getElementById('count').textContent = `${allFiles.length}/10 fichiers`;
+
+  allFiles.forEach(file => {
+    const url = URL.createObjectURL(file);
+    
+    if (file.type.startsWith('image/')) {
+      const img = document.createElement('img');
+      img.src = url;
+      preview.appendChild(img);
+    } 
+    else if (file.type.startsWith('video/')) {
+      const vid = document.createElement('video');
+      vid.src = url;
+      vid.controls = true;
+      preview.appendChild(vid);
     }
-  }
-  window.selectDest = (el, dest) => {
-    document.querySelectorAll(".dest-row").forEach(r=>r.classList.remove("selected"));
-    el.classList.add("selected"); selectedDestination = dest;
-    sendBtn.disabled = false; sendBtn.textContent = "Envoyer vers " + dest.name;
-  }
-
-  async function uploadAndSend() {
-    if(!selectedDestination) return;
-    const totalSize = sharedFiles.reduce((a,b) => a + b.size, 0);
-    if(totalSize > MAX_TOTAL) return status("Erreur: Max 50MB total");
-    sendBtn.disabled = true;
-    const caption = document.getElementById("caption-input").value.trim();
-    const attachments = [];
-    for(let i=0; i<sharedFiles.length; i++) {
-      const f = sharedFiles[i]; updateProgress((i / sharedFiles.length) * 100);
-      status(`Upload ${i+1}/${sharedFiles.length}...`);
-      const blob = new Blob([new Uint8Array(f.buffer)], {type: f.type});
-      const url = await uploadToCloudinary(blob);
-      attachments.push({ url, type: getType(f.type), name: f.name });
+    else {
+      const div = document.createElement('div');
+      div.className = 'file';
+      div.textContent = `📄 ${file.name}`;
+      preview.appendChild(div);
     }
-    updateProgress(100); status("Enregistrement...");
-    const table = selectedDestination.type === "room"? "messages" : "dm_messages";
-    const payload = selectedDestination.type === "room"
-     ? { room_id: selectedDestination.id, user_id: currentUser.id, content: caption, attachments: attachments }
-      : { conversation_id: selectedDestination.id, sender_id: currentUser.id, content: caption, attachments: attachments };
-    const { error } = await supabase.from(table).insert(payload);
-    if(error) throw error;
-    window.location.href = selectedDestination.type === "room"? `chat.html?room=${selectedDestination.id}` : `dm-chat.html?conv=${selectedDestination.id}`;
-  }
-  async function uploadToCloudinary(blob) {
-    const { data: session } = await supabase.auth.getSession();
-    const sign = await (await fetch("/api/cloudinary-sign", { headers: { "Authorization": "Bearer " + session.session.access_token }})).json();
-    const fd = new FormData();
-    fd.append("file", blob); fd.append("api_key", sign.apiKey); fd.append("timestamp", sign.timestamp);
-    fd.append("signature", sign.signature); fd.append("folder", sign.folder);
-    const res = await fetch(sign.uploadUrl, { method: "POST", body: fd });
-    const data = await res.json(); return data.secure_url;
-  }
-  function getType(t){ if(t.startsWith("image/")) return "image"; if(t.startsWith("video/")) return "video"; if(t.startsWith("audio/")) return "audio"; return "file"; }
-  function updateProgress(p){ document.getElementById("progress-fill").style.width = p + "%"; }
-  function status(t){ statusEl.textContent = t; }
+  });
 
-  sendBtn.onclick = uploadAndSend;
-  init();
-})();
+  // Quand on clique envoyer
+  document.getElementById('send').onclick = () => {
+    const finalData = new FormData();
+    finalData.append('text', document.getElementById('text').value);
+    allFiles.forEach(f => finalData.append('files', f));
+    
+    fetch('/api/upload', { method: 'POST', body: finalData })
+      .then(() => alert('Envoyé !'))
+      .catch(() => alert('Erreur envoi'));
+  };
+});
 </script>
 </body>
 </html>
