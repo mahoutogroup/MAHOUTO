@@ -12,43 +12,23 @@
 <style>
   html, body { background: var(--bg); color: var(--white); }
   body { display: flex; flex-direction: column; min-height: 100vh; }
-
   header { padding: 18px 20px; background: var(--bg-elevated); border-bottom: 1px solid var(--border); }
   header h1 { font-size: 18px; color: var(--gold); }
   header p { font-size: 12.5px; color: var(--text-muted); margin-top: 4px; }
-
   #preview-block { padding: 16px 20px; text-align: center; }
   #preview-block img, #preview-block video { max-width: 100%; max-height: 240px; border-radius: 14px; }
   #preview-block audio { width: 100%; }
-  #preview-block .file-icon { font-size: 48px; }
-
-  .section-label {
-    font-size: 12px; text-transform: uppercase; letter-spacing: .06em;
-    color: var(--gold); font-weight: bold; margin: 18px 20px 10px;
-  }
-
-  .dest-row {
-    display: flex; align-items: center; gap: 12px; padding: 12px 16px;
-    margin: 0 20px 8px; cursor: pointer;
-  }
-  .dest-row.selected { outline: 2px solid var(--gold-bright); }
-  .dest-row .avatar {
-    width: 40px; height: 40px; border-radius: 50%; flex: none;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 18px; font-weight: bold; color: #0A0A0A; background: var(--gold-bright); overflow: hidden;
-  }
-  .dest-row .avatar img { width: 100%; height: 100%; object-fit: cover; }
-  .dest-row .name { font-weight: bold; font-size: 14px; }
-
+  #preview-block.file-icon { font-size: 48px; }
+ .section-label { font-size: 12px; text-transform: uppercase; letter-spacing:.06em; color: var(--gold); font-weight: bold; margin: 18px 20px 10px; }
+ .dest-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; margin: 0 20px 8px; cursor: pointer; border-radius: 12px; background: var(--bg-elevated); }
+ .dest-row.selected { outline: 2px solid var(--gold-bright); }
+ .dest-row.avatar { width: 40px; height: 40px; border-radius: 50%; flex: none; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: bold; color: #0A0A0A; background: var(--gold-bright); overflow: hidden; }
+ .dest-row.avatar img { width: 100%; height: 100%; object-fit: cover; }
+ .dest-row.name { font-weight: bold; font-size: 14px; }
   #status-message { padding: 0 20px; font-size: 13px; color: var(--text-muted); min-height: 18px; }
-
-  #send-btn {
-    margin: 16px 20px 30px; padding: 14px; border: none; border-radius: 14px;
-    background: var(--gold-bright); color: #0A0A0A; font-weight: bold; font-size: 15px; cursor: pointer;
-  }
-  #send-btn:disabled { opacity: .5; cursor: not-allowed; }
-
-  .hidden { display: none !important; }
+  #send-btn { margin: 16px 20px 30px; padding: 14px; border: none; border-radius: 14px; background: var(--gold-bright); color: #0A0A0A; font-weight: bold; font-size: 15px; cursor: pointer; }
+  #send-btn:disabled { opacity:.5; cursor: not-allowed; }
+ .hidden { display: none!important; }
 </style>
 </head>
 <body>
@@ -63,19 +43,13 @@
 <div id="loading-state" style="padding:60px 24px;text-align:center;color:var(--text-dim);">Chargement...</div>
 
 <div id="content" class="hidden">
-
   <div id="preview-block"></div>
-
   <div class="section-label">💬 Mes salons</div>
   <div id="rooms-list"></div>
-
   <div class="section-label">💌 Mes messages privés</div>
   <div id="dms-list"></div>
-
   <div id="status-message"></div>
-
   <button id="send-btn" disabled>Choisis une destination</button>
-
 </div>
 
 <script src="config.js"></script>
@@ -95,7 +69,10 @@
 
   let currentUser = null;
   let sharedBlob = null;
-  let selectedDestination = null; // { type: "room"|"dm", id, name }
+  let selectedDestination = null;
+
+  const MAX_SIZE = 10 * 1024 * 1024; // 10MB
+  const ALLOWED_TYPES = ['image/', 'video/', 'audio/', 'application/pdf'];
 
   function escapeHtml(str) {
     const div = document.createElement("div");
@@ -113,15 +90,10 @@
   function renderPreview(blob) {
     const type = guessAttachmentType(blob);
     const url = URL.createObjectURL(blob);
-    if (type === "image") {
-      previewEl.innerHTML = `<img src="${url}" alt="">`;
-    } else if (type === "video") {
-      previewEl.innerHTML = `<video src="${url}" controls></video>`;
-    } else if (type === "audio") {
-      previewEl.innerHTML = `<audio src="${url}" controls></audio>`;
-    } else {
-      previewEl.innerHTML = `<div class="file-icon">📄</div><p style="color:var(--text-muted);font-size:13px;">Document à envoyer</p>`;
-    }
+    if (type === "image") previewEl.innerHTML = `<img src="${url}" alt="">`;
+    else if (type === "video") previewEl.innerHTML = `<video src="${url}" controls></video>`;
+    else if (type === "audio") previewEl.innerHTML = `<audio src="${url}" controls></audio>`;
+    else previewEl.innerHTML = `<div class="file-icon">📄</div><p style="color:var(--text-muted);font-size:13px;">Document à envoyer</p>`;
   }
 
   function selectDestination(el, destination) {
@@ -133,58 +105,56 @@
   }
 
   async function loadDestinations() {
-    // Salons (lecture publique existante — comportement identique à discussions.html)
     const { data: rooms } = await supabase.from("rooms").select("id, name, emoji, color").order("created_at", { ascending: true });
     roomsListEl.innerHTML = "";
     (rooms || []).forEach((room) => {
       const row = document.createElement("div");
-      row.className = "card dest-row";
+      row.className = "dest-row";
       row.innerHTML = `<div class="avatar" style="background:${room.color}">${room.emoji}</div><div class="name">${escapeHtml(room.name)}</div>`;
       row.addEventListener("click", () => selectDestination(row, { type: "room", id: room.id, name: room.name }));
       roomsListEl.appendChild(row);
     });
-    if (!rooms || !rooms.length) roomsListEl.innerHTML = '<div style="padding:0 20px;color:var(--text-dim);font-size:13px;">Aucun salon.</div>';
+    if (!rooms ||!rooms.length) roomsListEl.innerHTML = '<div style="padding:0 20px;color:var(--text-dim);font-size:13px;">Aucun salon.</div>';
 
-    // Conversations privées existantes
-    const { data: convs } = await supabase
-      .from("dm_conversations")
-      .select("id, user_one, user_two")
-      .order("created_at", { ascending: false });
-
+    const { data: convs } = await supabase.from("dm_conversations").select("id, user_one, user_two").order("created_at", { ascending: false });
     dmsListEl.innerHTML = "";
-    if (!convs || !convs.length) {
-      dmsListEl.innerHTML = '<div style="padding:0 20px;color:var(--text-dim);font-size:13px;">Aucune conversation privée. Ouvre Messages privés pour en démarrer une.</div>';
+    if (!convs ||!convs.length) {
+      dmsListEl.innerHTML = '<div style="padding:0 20px;color:var(--text-dim);font-size:13px;">Aucune conversation privée.</div>';
       return;
     }
-
     for (const conv of convs) {
-      const otherId = conv.user_one === currentUser.id ? conv.user_two : conv.user_one;
+      const otherId = conv.user_one === currentUser.id? conv.user_two : conv.user_one;
       const { data: profileRows } = await supabase.rpc("get_public_profile", { uid: otherId });
       const otherUser = (profileRows && profileRows[0]) || { username: "Utilisateur", avatar_url: null };
-
       const row = document.createElement("div");
-      row.className = "card dest-row";
-      row.innerHTML = `
-        <div class="avatar">${otherUser.avatar_url ? `<img src="${otherUser.avatar_url}" alt="">` : (otherUser.username || "?").trim()[0].toUpperCase()}</div>
-        <div class="name">${escapeHtml(otherUser.username)}</div>
-      `;
+      row.className = "dest-row";
+      row.innerHTML = `<div class="avatar">${otherUser.avatar_url? `<img src="${otherUser.avatar_url}" alt="">` : (otherUser.username || "?").trim()[0].toUpperCase()}</div><div class="name">${escapeHtml(otherUser.username)}</div>`;
       row.addEventListener("click", () => selectDestination(row, { type: "dm", id: conv.id, name: otherUser.username, dmWithId: otherId }));
       dmsListEl.appendChild(row);
     }
   }
 
   async function uploadAndSend() {
-    if (!sharedBlob || !selectedDestination) return;
+    if (!sharedBlob ||!selectedDestination) return;
+
+    // VALIDATION TAILLE ET TYPE
+    if (sharedBlob.size > MAX_SIZE) {
+      statusEl.textContent = "Erreur : Fichier trop lourd. Max 10MB";
+      return;
+    }
+    if (!ALLOWED_TYPES.some(t => sharedBlob.type.startsWith(t))) {
+      statusEl.textContent = "Erreur : Type de fichier non supporté";
+      return;
+    }
+
     sendBtn.disabled = true;
-    statusEl.textContent = "Envoi en cours...";
+    statusEl.textContent = "Envoi en cours... 0%";
 
     try {
       const { data: sessionData } = await supabase.auth.getSession();
-      const accessToken = sessionData && sessionData.session ? sessionData.session.access_token : null;
+      const accessToken = sessionData?.session?.access_token;
 
-      const signResp = await fetch("/api/cloudinary-sign", {
-        headers: accessToken ? { "Authorization": "Bearer " + accessToken } : {}
-      });
+      const signResp = await fetch("/api/cloudinary-sign", { headers: accessToken? { "Authorization": "Bearer " + accessToken } : {} });
       const sign = await signResp.json();
       if (!signResp.ok) throw new Error(sign.error || "Signature indisponible");
 
@@ -195,31 +165,36 @@
       formData.append("signature", sign.signature);
       formData.append("folder", sign.folder);
 
-      const uploadResp = await fetch(sign.uploadUrl, { method: "POST", body: formData });
-      const uploadData = await uploadResp.json();
-      if (!uploadResp.ok) throw new Error(uploadData.error?.message || "Envoi échoué");
+      // UPLOAD AVEC PROGRESSION
+      const uploadData = await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", sign.uploadUrl);
+        xhr.upload.onprogress = (e) => {
+          if(e.lengthComputable) {
+            const percent = Math.round((e.loaded / e.total) * 100);
+            statusEl.textContent = `Envoi en cours... ${percent}%`;
+          }
+        };
+        xhr.onload = () => resolve(JSON.parse(xhr.responseText));
+        xhr.onerror = () => reject(new Error("Upload échoué"));
+        xhr.send(formData);
+      });
+      if(!uploadData.secure_url) throw new Error(uploadData.error?.message || "Envoi échoué");
 
       const attachmentType = guessAttachmentType(sharedBlob);
 
       if (selectedDestination.type === "room") {
         const { data: profile } = await supabase.from("profiles").select("username").eq("id", currentUser.id).maybeSingle();
         const { error } = await supabase.from("messages").insert({
-          room_id: selectedDestination.id,
-          user_id: currentUser.id,
-          username: profile ? profile.username : "Utilisateur",
-          content: "",
-          attachment_url: uploadData.secure_url,
-          attachment_type: attachmentType
+          room_id: selectedDestination.id, user_id: currentUser.id, username: profile?.username || "Utilisateur",
+          content: "", attachment_url: uploadData.secure_url, attachment_type: attachmentType
         });
         if (error) throw error;
         window.location.href = "chat.html?room=" + encodeURIComponent(selectedDestination.id) + "&name=" + encodeURIComponent(selectedDestination.name);
       } else {
         const { error } = await supabase.from("dm_messages").insert({
-          conversation_id: selectedDestination.id,
-          sender_id: currentUser.id,
-          content: "",
-          attachment_url: uploadData.secure_url,
-          attachment_type: attachmentType
+          conversation_id: selectedDestination.id, sender_id: currentUser.id, content: "",
+          attachment_url: uploadData.secure_url, attachment_type: attachmentType
         });
         if (error) throw error;
         window.location.href = "dm-chat.html?conv=" + encodeURIComponent(selectedDestination.id) + "&with=" + encodeURIComponent(selectedDestination.dmWithId || "") + "&name=" + encodeURIComponent(selectedDestination.name);
@@ -235,7 +210,7 @@
 
   (async function init() {
     const { data } = await supabase.auth.getSession();
-    if (!data || !data.session || !data.session.user) {
+    if (!data?.session?.user) {
       loadingEl.textContent = "Connecte-toi sur MAHOUTO+ avant de partager un fichier.";
       return;
     }
@@ -252,12 +227,10 @@
 
     renderPreview(sharedBlob);
     await loadDestinations();
-
     loadingEl.classList.add("hidden");
     contentEl.classList.remove("hidden");
   })();
 })();
 </script>
-
 </body>
 </html>
