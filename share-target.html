@@ -5,100 +5,84 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Partager vers MAHOUTO+</title>
 <style>
-  body { background: #0A0A0A; color: #fff; font-family: sans-serif; margin: 0; padding: 16px; }
-  h2 { color: #FFC107; }
+  body { background: #0A0A0A; color: #fff; font-family: system-ui; margin: 0; padding: 16px; }
+  h2 { color: #FFC107; margin: 0 0 8px 0; }
   .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 16px 0; }
-  .grid img, .grid video { width: 100%; aspect-ratio: 1/1; object-fit: cover; border-radius: 8px; background: #222; }
-  .file { padding: 8px; background: #1A1A1A; border-radius: 8px; margin: 4px 0; font-size: 12px; }
-  textarea { width: 100%; background: #1A1A1A; border: 1px solid #333; color: #fff; border-radius: 8px; padding: 12px; }
+  .grid img { width: 100%; aspect-ratio: 1/1; object-fit: cover; border-radius: 8px; background: #222; }
+  .dest { padding: 12px; background: #1A1A1A; border-radius: 8px; margin: 8px 0; cursor: pointer; }
+  .dest.active { border: 2px solid #FFC107; }
+  textarea { width: 100%; background: #1A1A1A; border: 1px solid #333; color: #fff; border-radius: 8px; padding: 12px; box-sizing: border-box; }
   button { width: 100%; background: #FFC107; color: #000; border: none; padding: 16px; border-radius: 12px; font-weight: bold; font-size: 16px; margin-top: 16px; }
 </style>
 </head>
 <body>
 
 <h2>📦 Partager vers MAHOUTO+</h2>
-<p id="count">Chargement...</p>
+<p id="count">0/10 fichiers</p>
 
 <div class="grid" id="preview"></div>
 
-<textarea id="text" rows="3" placeholder="Ajouter une légende..."></textarea>
+<textarea id="text" rows="2" placeholder="Ajouter une légende..."></textarea>
 
 <h3>💬 DESTINATION</h3>
 <div id="destinations">
-  <div class="file">Support</div>
-  <div class="file">Général</div>
-  <div class="file">Annonces MAJESTÉ PRESSE</div>
-  <div class="file">LES SÉRIGRAPHES</div>
+  <div class="dest" data-dest="support">Support</div>
+  <div class="dest" data-dest="general">Général</div>
+  <div class="dest" data-dest="annonces">Annonces MAJESTÉ PRESSE</div>
+  <div class="dest" data-dest="serigraphes">LES SÉRIGRAPHES</div>
 </div>
 
-<button id="send">Envoyer vers Mahouto</button>
+<button id="send">Envoyer vers MAHOUTO+</button>
 
 <script>
-window.addEventListener('DOMContentLoaded', async () => {
-  if (window.location.pathname !== '/share-target.html') return;
+let selectedFiles = [];
+let selectedDest = null;
 
-  const url = new URL(window.location);
-  const formData = new FormData();
+window.addEventListener('load', async () => {
+  // Etape 1: Récupérer les fichiers envoyés par Android
+  const formData = await new Request(window.location.href, {method: 'POST'}).formData().catch(() => new FormData());
+  selectedFiles = formData.getAll('files');
 
-  // Récupérer les fichiers partagés
-  const files = [];
-  for (const [key, value] of new URLSearchParams(url.search).entries()) {
-    if (key === 'text') document.getElementById('text').value = value;
+  // Si rien en POST, on essaie l'URL
+  if(selectedFiles.length === 0) {
+    const params = new URLSearchParams(window.location.search);
+    document.getElementById('text').value = params.get('text') || '';
   }
 
-  // Android envoie les fichiers en POST. On doit les récupérer
-  if (navigator.share && navigator.canShare) {
-    // Cas 1: Partage via Web Share Target API
-    const sharedFiles = window.shareTargetFiles || [];
-  }
-
-  // Cas 2: Récupération via POST
-  const form = await new Request(window.location, {method: 'POST'}).formData().catch(()=>new FormData());
-  
-  // Méthode qui marche sur 99% des Android :
-  const shared = await navigator.shareTarget?.files || [];
-  
-  // Fallback : on parse l'URL
-  const params = new URLSearchParams(window.location.search);
-  
-  // LA VRAIE METHODE : le navigateur a mis les fichiers dans le body
-  const data = await fetch(window.location, {method: 'POST'}).then(r=>r.formData()).catch(()=>new FormData());
-  const allFiles = data.getAll('files');
-
+  // Etape 2: Afficher les miniatures + compteur
+  document.getElementById('count').textContent = `${selectedFiles.length}/10 fichiers`;
   const preview = document.getElementById('preview');
-  document.getElementById('count').textContent = `${allFiles.length}/10 fichiers`;
-
-  allFiles.forEach(file => {
-    const url = URL.createObjectURL(file);
-    
-    if (file.type.startsWith('image/')) {
+  
+  selectedFiles.forEach(file => {
+    if(file.type.startsWith('image/')){
       const img = document.createElement('img');
-      img.src = url;
+      img.src = URL.createObjectURL(file);
       preview.appendChild(img);
-    } 
-    else if (file.type.startsWith('video/')) {
-      const vid = document.createElement('video');
-      vid.src = url;
-      vid.controls = true;
-      preview.appendChild(vid);
-    }
-    else {
-      const div = document.createElement('div');
-      div.className = 'file';
-      div.textContent = `📄 ${file.name}`;
-      preview.appendChild(div);
     }
   });
 
-  // Quand on clique envoyer
-  document.getElementById('send').onclick = () => {
-    const finalData = new FormData();
-    finalData.append('text', document.getElementById('text').value);
-    allFiles.forEach(f => finalData.append('files', f));
-    
-    fetch('/api/upload', { method: 'POST', body: finalData })
-      .then(() => alert('Envoyé !'))
-      .catch(() => alert('Erreur envoi'));
+  // Etape 3: Sélection destination
+  document.querySelectorAll('.dest').forEach(el => {
+    el.onclick = () => {
+      document.querySelectorAll('.dest').forEach(d => d.classList.remove('active'));
+      el.classList.add('active');
+      selectedDest = el.dataset.dest;
+    }
+  });
+
+  // Etape 4: Envoi
+  document.getElementById('send').onclick = async () => {
+    if(!selectedDest) return alert('Choisis une destination');
+    if(selectedFiles.length === 0) return alert('Aucun fichier');
+
+    const data = new FormData();
+    data.append('destination', selectedDest);
+    data.append('text', document.getElementById('text').value);
+    selectedFiles.forEach(f => data.append('files', f));
+
+    const res = await fetch('/api/upload', { method: 'POST', body: data });
+    if(res.ok) alert('Envoyé !');
+    else alert('Erreur envoi');
   };
 });
 </script>
