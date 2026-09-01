@@ -1,3 +1,7 @@
 {
-  "body": { "size": "50mb" }
+  "functions": {
+    "api/*.js": {
+      "maxDuration": 60
+    }
+  }
 }
