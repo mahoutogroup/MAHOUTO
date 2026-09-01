@@ -1,0 +1,83 @@
+export default async function handler(req, res) {
+  
+  // CAS 1: Android vient d'envoyer les fichiers en POST
+  if (req.method === 'POST') {
+    // On redirige vers GET mais en gardant les fichiers en mémoire
+    return res.redirect(307, '/api/share-target');
+  }
+
+  // CAS 2: Afficher la page HTML
+  res.status(200).send(`
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>MAHOUTO+</title>
+<style>
+body{background:#0A0A0A;color:#fff;padding:16px;font-family:system-ui}
+h2{color:#FFC107} .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.item{background:#1A1A1A;padding:8px;border-radius:8px;text-align:center;font-size:12px}
+button{width:100%;padding:16px;background:#FFC107;color:#000;border:0;border-radius:12px;font-weight:bold}
+</style>
+</head>
+<body>
+<h2>📦 Partager vers MAHOUTO+</h2>
+<p id="count">0/10 fichiers</p>
+<div class="grid" id="preview"></div>
+
+<h3>DESTINATION</h3>
+<div onclick="select(this)" data="general" class="item">Général</div>
+<div onclick="select(this)" data="support" class="item">Support</div>
+
+<button onclick="envoyer()">Envoyer vers MAHOUTO+</button>
+
+<script>
+let fichiers = [];
+let destination = null;
+
+function select(el){
+  document.querySelectorAll('.item').forEach(i=>i.style.border='none');
+  el.style.border='2px solid #FFC107';
+  destination = el.dataset;
+}
+
+// LA MAGIE : Récupérer les fichiers envoyés par Android
+if ('launchQueue' in window) {
+  launchQueue.setConsumer(async launchParams => {
+    if (launchParams.files) {
+      // Exemple: tu partages 2 images + 1 zip
+      // fichiers = [photo1.jpg, photo2.png, archive.zip]
+      fichiers = await Promise.all(launchParams.files.map(f => f.getFile()));
+      afficher();
+    }
+  });
+}
+
+function afficher(){
+  document.getElementById('count').textContent = fichiers.length + '/10 fichiers';
+  const grid = document.getElementById('preview');
+  grid.innerHTML = '';
+  
+  fichiers.forEach(f => {
+    let icone = '📎';
+    if(f.type.startsWith('image/')) icone = '<img src="'+URL.createObjectURL(f)+'">';
+    if(f.type === 'application/zip') icone = '📦';
+    if(f.type === 'application/pdf') icone = '📄';
+    
+    grid.innerHTML += \`<div class="item">\${icone}<br>\${f.name}</div>\`;
+  });
+}
+
+async function envoyer(){
+  const form = new FormData();
+  form.append('destination', destination);
+  fichiers.forEach(f => form.append('files', f)); // Envoie tous les fichiers
+  
+  const rep = await fetch('/api/upload', {method:'POST', body:form});
+  alert(rep.ok ? 'Envoyé !' : 'Erreur');
+}
+</script>
+</body>
+</html>
+  `);
+}
