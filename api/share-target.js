@@ -1,79 +1,93 @@
+import { IncomingForm } from 'formidable';
+import fs from 'fs';
+
+export const config = {
+  api: {
+    bodyParser: false, // IMPORTANT pour recevoir les fichiers
+  },
+};
+
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.status(200).send(`<!DOCTYPE html>
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method Not Allowed' });
+  }
+
+  const form = new IncomingForm({ multiples: true, keepExtensions: true });
+
+  form.parse(req, (err, fields, files) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).send('Erreur de parsing');
+    }
+
+    const uploadedFiles = [];
+    if (files.files) {
+      const fileArray = Array.isArray(files.files) ? files.files : [files.files];
+      fileArray.forEach(file => {
+        uploadedFiles.push({
+          name: file.originalFilename,
+          size: file.size,
+          type: file.mimetype
+        });
+      });
+    }
+
+    // On renvoie la page HTML avec les fichiers dedans
+    res.setHeader('Content-Type', 'text/html; charset=utf-8');
+    res.status(200).send(`
+<!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MAHOUTO+</title>
+<title>Partager vers MAHOUTO+</title>
 <style>
-body{background:#0A0A0A;color:#fff;padding:16px;font-family:system-ui;margin:0}
-h2{color:#FFC107;margin:0 0 8px 0}
-p{color:#AAA;margin:0 0 16px 0}
-.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:16px 0}
-.item{background:#1A1A1A;padding:8px;border-radius:8px;text-align:center;font-size:12px;border:2px solid #333;cursor:pointer}
-.item.selected{border:2px solid #FFC107}
-.item img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:6px}
-.icon{font-size:28px;padding:12px 0}
-button{width:100%;padding:16px;background:#FFC107;color:#000;border:0;border-radius:12px;font-weight:bold;font-size:16px;margin-top:16px}
-textarea{width:100%;background:#1A1A1A;border:1px solid #333;color:#fff;border-radius:8px;padding:12px;box-sizing:border-box}
+body{background:#0A0A0A;color:#fff;font-family:sans-serif;padding:20px;margin:0}
+h2{color:#FFC107}
+input, .dest-btn, .send-btn{width:100%;padding:14px;margin-top:10px;border-radius:12px;border:1px solid #333;background:#1a1a1a;color:#fff;font-size:15px}
+.dest-grid{display:flex;gap:10px;margin:15px 0}
+.dest-btn{flex:1;text-align:center;cursor:pointer}
+.dest-btn.active{border-color:#FFC107;background:#332200}
+.send-btn{background:#FFC107;color:#000;border:none;font-weight:bold;cursor:pointer}
+.file-count{color:#aaa}
 </style>
 </head>
 <body>
-<h2>📦 Partager vers MAHOUTO+</h2>
-<p id="count">Chargement des fichiers...</p>
-<div class="grid" id="preview"></div>
-<textarea id="text" rows="2" placeholder="Ajouter une légende..."></textarea>
-<h3 style="margin-top:16px">DESTINATION</h3>
-<div class="grid">
-  <div onclick="selectDest(this)" data-dest="general" class="item"><div class="icon">🏠</div>Général</div>
-  <div onclick="selectDest(this)" data-dest="support" class="item"><div class="icon">🆘</div>Support</div>
-  <div onclick="selectDest(this)" data-dest="annonces" class="item"><div class="icon">📢</div>Annonces</div>
-</div>
-<button onclick="envoyer()">Envoyer vers MAHOUTO+</button>
+  <h2>📦 Partager vers MAHOUTO+</h2>
+  <p class="file-count">${uploadedFiles.length}/10 fichiers reçus</p>
+  
+  <div id="preview"></div>
+
+  <input id="caption" placeholder="Ajouter une légende...">
+  
+  <h3>DESTINATION</h3>
+  <div class="dest-grid">
+    <div class="dest-btn active" data-dest="general">🏠 Général</div>
+    <div class="dest-btn" data-dest="support">🆘 Support</div>
+    <div class="dest-btn" data-dest="annonces">📢 Annonces</div>
+  </div>
+
+  <button class="send-btn">Envoyer vers MAHOUTO+</button>
 
 <script>
-let fichiers = [];
-let destination = null;
-function selectDest(el){ 
-  document.querySelectorAll('.grid .item').forEach(i=>i.classList.remove('selected')); 
-  el.classList.add('selected'); 
-  destination = el.dataset.dest; 
-}
+  const files = ${JSON.stringify(uploadedFiles)};
+  const preview = document.getElementById('preview');
+  
+  if(files.length > 0){
+    preview.innerHTML = files.map(f => `<p>📄 ${f.name} - ${(f.size/1024).toFixed(1)} KB</p>`).join('');
+  } else {
+    preview.innerHTML = '<p style="color:red">Aucun fichier</p>';
+  }
 
-if ('launchQueue' in window) {
-  launchQueue.setConsumer(async launchParams => {
-    if (launchParams.files && launchParams.files.length > 0) {
-      fichiers = await Promise.all(launchParams.files.map(f => f.getFile()));
-      document.getElementById('count').textContent = fichiers.length + '/10 fichiers sélectionnés';
-      const grid = document.getElementById('preview'); grid.innerHTML='';
-      fichiers.forEach(f => {
-        let icone = '<div class="icon">📎</div>';
-        if(f.type.startsWith('image/')) icone = '<img src="'+URL.createObjectURL(f)+'">';
-        if(f.type === 'application/zip') icone = '<div class="icon">📦</div>';
-        if(f.type === 'application/pdf') icone = '<div class="icon">📄</div>';
-        grid.innerHTML += \`<div class="item">\${icone}<div>\${f.name.substring(0,15)}</div></div>\`;
-      });
-    } else {
-      document.getElementById('count').textContent = 'Aucun fichier reçu';
+  document.querySelectorAll('.dest-btn').forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll('.dest-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
     }
   });
-} else {
-  document.getElementById('count').textContent = 'Ouvre via Partager pour envoyer des fichiers';
-}
-
-async function envoyer(){
-  if(fichiers.length === 0) return alert('Aucun fichier');
-  if(!destination) return alert('Choisis une destination');
-  const form = new FormData();
-  form.append('destination', destination);
-  form.append('text', document.getElementById('text').value);
-  fichiers.forEach(f => form.append('files', f));
-  const rep = await fetch('/api/upload', {method:'POST', body:form});
-  alert(rep.ok ? '✅ Envoyé !' : '❌ Erreur: '+rep.status);
-  if(rep.ok) window.close();
-}
 </script>
 </body>
-</html>`);
+</html>
+    `);
+  });
 }
