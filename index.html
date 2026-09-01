@@ -5,13 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MAHOUTO+ — Apprendre, Créer, Entreprendre</title>
 <meta name="description" content="MAHOUTO+ — Construire l'Afrique numérique de demain.">
-<meta name="theme-color" content="#0A0A0A">
+<meta name="theme-color" content="#FFC107">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="MAHOUTO+">
 
-<link rel="manifest" href="/manifest.json"> <!-- ← / important -->
+<link rel="manifest" href="/manifest.json">
 <link rel="icon" href="assets/favicon.png">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <link rel="preload" as="image" href="assets/logo-mahouto-plus.png">
@@ -22,64 +22,64 @@
   /* index.html : interface uniquement. Toute logique réelle vit
      dans config.js, auth.js, theme.css, theme-toggle.js, sw.js. */
 
- .hero { padding: 40px 20px 8px; text-align: center; }
+.hero { padding: 40px 20px 8px; text-align: center; }
 
- .logo-badge {
+.logo-badge {
     width: 110px; height: 110px; margin: 0 auto 16px;
     border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
   }
 
- .logo-badge img {
+.logo-badge img {
     width: 100%;
     height: 100%;
     object-fit: contain;
   }
 
- .hero h1 { font-size: 28px; letter-spacing:.01em; }
- .hero h1.plus { color: var(--accent-green); }
- .hero.tagline { font-size: 14px; color: var(--text-muted); margin-top: 10px; font-weight: 600; }
- .hero.subtagline { font-size: 12.5px; color: var(--text-dim); margin-top: 4px; }
+.hero h1 { font-size: 28px; letter-spacing:.01em; }
+.hero h1.plus { color: var(--accent-green); }
+.hero.tagline { font-size: 14px; color: var(--text-muted); margin-top: 10px; font-weight: 600; }
+.hero.subtagline { font-size: 12.5px; color: var(--text-dim); margin-top: 4px; }
 
   #auth-zone { padding: 18px 20px 6px; }
 
- .auth-methods { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.auth-methods { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
- .auth-btn {
+.auth-btn {
     display: flex; align-items: center; justify-content: center; gap: 8px;
     padding: 13px 10px; border-radius: var(--radius-md); border: 1px solid var(--border);
     background: var(--bg-card); color: var(--white); font-size: 13.5px; font-weight: bold; cursor: pointer;
   }
- .auth-btn.primary { background: var(--gold-bright); color: #0A0A0A; border: none; grid-column: span 2; }
- .auth-btn:active { transform: scale(.98); }
+.auth-btn.primary { background: var(--gold-bright); color: #0A0A0A; border: none; grid-column: span 2; }
+.auth-btn:active { transform: scale(.98); }
 
- .auth-note { text-align: center; font-size: 11.5px; color: var(--text-dim); margin-top: 10px; }
+.auth-note { text-align: center; font-size: 11.5px; color: var(--text-dim); margin-top: 10px; }
 
- .profile-summary {
+.profile-summary {
     display: none;
     background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 18px;
   }
- .profile-summary.visible { display: block; }
- .auth-methods.hidden-by-auth { display: none; }
+.profile-summary.visible { display: block; }
+.auth-methods.hidden-by-auth { display: none; }
 
- .profile-summary.top { display: flex; align-items: center; gap: 12px; }
+.profile-summary.top { display: flex; align-items: center; gap: 12px; }
 
- .profile-summary.avatar {
+.profile-summary.avatar {
     width: 52px; height: 52px; border-radius: 50%; background: var(--gold-bright);
     display: flex; align-items: center; justify-content: center;
     font-weight: bold; color: #0A0A0A; font-size: 20px; flex: none; overflow: hidden;
   }
- .profile-summary.avatar img { width: 100%; height: 100%; object-fit: cover; }
+.profile-summary.avatar img { width: 100%; height: 100%; object-fit: cover; }
 
- .profile-summary.name { font-weight: bold; font-size: 15.5px; }
- .profile-summary.mahouto-id { font-size: 11.5px; color: var(--text-dim); margin-top: 2px; }
+.profile-summary.name { font-weight: bold; font-size: 15.5px; }
+.profile-summary.mahouto-id { font-size: 11.5px; color: var(--text-dim); margin-top: 2px; }
 
- .profile-stats {
+.profile-stats {
     display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 16px;
   }
- .profile-stats.stat { text-align: center; background: var(--bg-elevated); border-radius: var(--radius-sm); padding: 10px 4px; }
- .profile-stats.stat.value { font-size: 16px; font-weight: bold; color: var(--gold); }
- .profile-stats.stat.label { font-size: 10px; color: var(--text-dim); margin-top: 2px; }
+.profile-stats.stat { text-align: center; background: var(--bg-elevated); border-radius: var(--radius-sm); padding: 10px 4px; }
+.profile-stats.stat.value { font-size: 16px; font-weight: bold; color: var(--gold); }
+.profile-stats.stat.label { font-size: 10px; color: var(--text-dim); margin-top: 2px; }
 
   #auth-modal, #confirm-modal, #info-modal {
     position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.6);
@@ -90,7 +90,7 @@
     border-radius: 24px 24px 0 0; padding: 22px 20px 28px; max-height: 85vh; overflow-y: auto; position: relative;
     text-align: center;
   }
- .sheet-handle { width: 40px; height: 4px; background: var(--border); border-radius: 3px; margin: 0 auto 16px; }
+.sheet-handle { width: 40px; height: 4px; background: var(--border); border-radius: 3px; margin: 0 auto 16px; }
 
   #auth-modal h3, #confirm-modal h3, #info-modal h3 { font-size: 18px; color: var(--gold); margin-bottom: 4px; }
 
@@ -99,26 +99,26 @@
     text-align: left;
   }
 
- .modal-text { font-size: 14.5px; color: var(--white); margin: 6px 0 20px; line-height: 1.6; }
- .modal-actions { display: flex; gap: 10px; }
- .modal-actions button { flex: 1; padding: 13px; border-radius: 12px; font-weight: bold; cursor: pointer; }
- .modal-btn-primary { background: var(--gold-bright); color: #0A0A0A; border: none; }
- .modal-btn-secondary { background: var(--bg-card); color: var(--white); border: 1px solid var(--border); }
+.modal-text { font-size: 14.5px; color: var(--white); margin: 6px 0 20px; line-height: 1.6; }
+.modal-actions { display: flex; gap: 10px; }
+.modal-actions button { flex: 1; padding: 13px; border-radius: 12px; font-weight: bold; cursor: pointer; }
+.modal-btn-primary { background: var(--gold-bright); color: #0A0A0A; border: none; }
+.modal-btn-secondary { background: var(--bg-card); color: var(--white); border: 1px solid var(--border); }
 
- .module-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 0 20px; }
- .module-card { position: relative; }
- .module-card h2 { font-size: 15.5px; display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
- .module-card p { font-size: 12px; color: var(--text-muted); line-height: 1.5; margin-bottom: 12px; min-height: 32px; }
- .module-card.go { font-size: 12px; color: var(--gold); font-weight: bold; }
- .module-card.disabled { opacity:.55; }
- .module-card.disabled.go { color: var(--text-dim); }
+.module-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 0 20px; }
+.module-card { position: relative; }
+.module-card h2 { font-size: 15.5px; display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.module-card p { font-size: 12px; color: var(--text-muted); line-height: 1.5; margin-bottom: 12px; min-height: 32px; }
+.module-card.go { font-size: 12px; color: var(--gold); font-weight: bold; }
+.module-card.disabled { opacity:.55; }
+.module-card.disabled.go { color: var(--text-dim); }
 
- .plans-row { display: flex; gap: 10px; overflow-x: auto; padding: 4px 20px 4px; }
- .plan-chip { flex: none; background: var(--bg-card); border: 1px solid var(--border); border-radius: 999px; padding: 8px 16px; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+.plans-row { display: flex; gap: 10px; overflow-x: auto; padding: 4px 20px 4px; }
+.plan-chip { flex: none; background: var(--bg-card); border: 1px solid var(--border); border-radius: 999px; padding: 8px 16px; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
 
   footer { text-align: center; padding: 24px 20px 10px; color: var(--text-dim); font-size: 11px; line-height: 1.7; }
 
- .admin-fab {
+.admin-fab {
     position: fixed;
     top: max(14px, env(safe-area-inset-top));
     left: 16px;
@@ -136,14 +136,11 @@
     text-decoration: none;
     cursor: pointer;
   }
- .admin-fab:active { transform: scale(.92); }
+.admin-fab:active { transform: scale(.92); }
 
- .hidden { display: none!important; }
+.hidden { display: none!important; }
 
-  /* =========================================================
-     Splash Screen officiel MAHOUTO+
-     ========================================================= */
-
+  /* Splash Screen officiel MAHOUTO+ */
   #splash-screen {
     position: fixed;
     inset: 0;
@@ -155,11 +152,9 @@
     opacity: 0;
     animation: splashFadeIn.6s ease forwards;
   }
-
   #splash-screen.splash-fade-out {
     animation: splashFadeOut.6s ease forwards;
   }
-
   #splash-screen.splash-glow {
     position: absolute;
     top: 50%;
@@ -172,7 +167,6 @@
     animation: splashGlowPulse 2.5s infinite ease-in-out;
     pointer-events: none;
   }
-
   #splash-screen img {
     position: relative;
     max-width: 100%;
@@ -182,26 +176,10 @@
     object-fit: contain;
     display: block;
   }
-
-  @keyframes splashFadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-  }
-
-  @keyframes splashFadeOut {
-    from { opacity: 1; }
-    to { opacity: 0; }
-  }
-
-  @keyframes splashGlowPulse {
-    0% { opacity:.5; }
-    50% { opacity: 1; }
-    100% { opacity:.5; }
-  }
-
-  @media (min-width: 700px) {
-    #splash-screen img { max-width: 420px; }
-  }
+  @keyframes splashFadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes splashFadeOut { from { opacity: 1; } to { opacity: 0; } }
+  @keyframes splashGlowPulse { 0% { opacity:.5; } 50% { opacity: 1; } 100% { opacity:.5; } }
+  @media (min-width: 700px) { #splash-screen img { max-width: 420px; } }
 </style>
 </head>
 <body>
@@ -213,13 +191,11 @@
 (function () {
   var splash = document.getElementById("splash-screen");
   if (!splash) return;
-
   if (sessionStorage.getItem("mahouto_splash_shown")) {
     splash.style.display = "none";
     return;
   }
   sessionStorage.setItem("mahouto_splash_shown", "1");
-
   setTimeout(function () {
     splash.classList.add("splash-fade-out");
     splash.addEventListener("animationend", function () {
@@ -232,7 +208,6 @@
 <button id="theme-toggle-btn" class="theme-toggle-fab">🌙</button>
 
 <div class="page-content">
-
   <div class="hero">
     <div class="logo-badge">
       <img src="assets/logo-mahouto-plus.png" alt="MAHOUTO+" loading="eager">
@@ -243,7 +218,6 @@
   </div>
 
   <div id="auth-zone">
-
     <div id="auth-methods" class="auth-methods">
       <button class="auth-btn primary" id="btn-login-google">🔐 Continuer avec Google</button>
       <button class="auth-btn" id="btn-login-phone">📱 Téléphone</button>
@@ -267,90 +241,75 @@
         <div class="stat"><div class="value">—</div><div class="label">Pays</div></div>
       </div>
     </div>
-
   </div>
 
   <div class="section-title">🔥 Modules</div>
   <div class="module-grid">
-
     <div class="card module-card" id="card-majeste-ai" style="cursor:pointer;">
       <h2>🧠 MAJESTÉ AI</h2>
       <p>Assistant IA, prompts, analyse de documents.</p>
       <div class="go">Ouvrir →</div>
     </div>
-
     <a class="card module-card" href="discussions.html">
       <h2>💬 Messages</h2>
       <p>Discussions, groupes — en temps réel.</p>
       <div class="go">Ouvrir →</div>
     </a>
-
     <a class="card module-card" href="messages-prives.html">
       <h2>💌 Messages privés</h2>
       <p>Conversations 1-à-1, en toute confidentialité.</p>
       <div class="go">Ouvrir →</div>
     </a>
-
     <a class="card module-card" href="school.html">
       <h2>🎓 MAHOUTO School</h2>
       <p>Formations en imprimerie, design, web, IA.</p>
       <div class="go">Ouvrir →</div>
     </a>
-
     <div class="card module-card disabled">
       <h2>🏫 Institut SAYÉ LOUIS</h2>
       <p>Programme académique dédié.</p>
       <div class="go">Bientôt disponible</div>
     </div>
-
     <a class="card module-card" href="academie-majestepresse.html">
       <h2>🖨️ Académie Majesté Presse</h2>
       <p>Formations certifiantes en imprimerie et sérigraphie.</p>
       <div class="go">Ouvrir →</div>
     </a>
-
     <div class="card module-card" id="card-majeste-presse" style="cursor:pointer;">
       <h2>🖨️ Majesté Presse</h2>
       <p>L'atelier de sérigraphie et d'imprimerie.</p>
       <div class="go">Visiter le site →</div>
     </div>
-
     <div class="card module-card disabled">
       <h2>🛍️ MAHOUTO Market</h2>
       <p>Produits, services, commandes.</p>
       <div class="go">Bientôt disponible</div>
     </div>
-
     <div class="card module-card disabled">
       <h2>💳 MAHOUTO Pay</h2>
       <p>Portefeuille et paiements Mobile Money.</p>
       <div class="go">Bientôt disponible</div>
     </div>
-
     <a class="card module-card" href="profil.html">
       <h2>👤 Profil</h2>
       <p>Compte, informations personnelles.</p>
       <div class="go">Ouvrir →</div>
     </a>
-
     <div class="card module-card disabled">
       <h2>📜 Certificats</h2>
       <p>Diplômes numériques.</p>
       <div class="go">Bientôt disponible</div>
     </div>
-
     <div class="card module-card disabled">
       <h2>🔔 Notifications</h2>
       <p>Alertes et rappels.</p>
       <div class="go">Bientôt disponible</div>
     </div>
-
     <div class="card module-card disabled">
       <h2>⚙️ Paramètres</h2>
       <p>Préférences du compte et de l'application.</p>
       <div class="go">Bientôt disponible</div>
     </div>
-
   </div>
 
   <div class="section-title">⭐ Abonnements</div>
@@ -365,7 +324,6 @@
   <footer>
     © 2026 MAHOUTO+ — Tous droits réservés.
   </footer>
-
 </div>
 
 <nav class="bottom-nav">
@@ -490,7 +448,7 @@
   async function refreshIdentityUI() {
     try {
       if (typeof supabase === "undefined" ||!supabase.auth || typeof supabase.auth.getUser!== "function") return;
-      const { data: { user } } = await supabase.auth.getUser();
+      const { data: { user } = await supabase.auth.getUser();
       if (!user) return;
 
       document.getElementById("auth-methods").classList.add("hidden-by-auth");
@@ -513,9 +471,9 @@
   // ===== ENREGISTREMENT SERVICE WORKER PWA =====
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js')
-       .then(reg => console.log('SW enregistré:', reg))
-       .catch(err => console.log('SW erreur:', err));
+      navigator.serviceWorker.register('/service-worker.js')
+      .then(reg => console.log('SW enregistré:', reg.scope))
+      .catch(err => console.log('SW erreur:', err));
     });
   }
 
@@ -527,6 +485,5 @@
   });
 })();
 </script>
-
 </body>
 </html>
