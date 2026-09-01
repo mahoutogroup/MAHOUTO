@@ -1,14 +1,16 @@
 export const config = {
   api: {
-    bodyParser: false, // Important pour les fichiers
+    bodyParser: false, // Important pour recevoir les fichiers
   },
 }
 
 export default async function handler(req, res) {
-  if (req.method === 'POST') {
-    // Ici tu reçois les fichiers
-    // Exemple: les envoyer sur Cloudinary, S3, ou les sauver
-    return res.status(200).json({ success: true, message: "Fichiers reçus" });
+  if (req.method !== 'POST') {
+    return res.status(405).json({ error: 'Method not allowed' });
   }
-  res.status(405).end();
+  
+  console.log("Fichiers reçus sur /api/upload");
+  // TODO: Ici on va traiter les fichiers avec formidable ou multer
+  
+  return res.status(200).json({ success: true, message: "Fichiers reçus" });
 }
