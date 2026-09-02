@@ -1,15 +1,19 @@
-// api/share-target.js
-
 /**
  * MAHOUTO+ — Share Target API
  *
- * Fonctionnement :
- * 1. Reçoit un fichier partagé depuis Android / Galerie.
- * 2. Reçoit le salon sélectionné.
- * 3. Reçoit éventuellement une légende.
- * 4. Upload le fichier sur Cloudinary.
- * 5. Enregistre le message dans Supabase.
- * 6. Retourne les informations du message créé.
+ * Flux :
+ *
+ * Android / WhatsApp / Galerie
+ *        ↓
+ * MAHOUTO+ Share Target
+ *        ↓
+ * /api/share-target
+ *        ↓
+ * Cloudinary
+ *        ↓
+ * Supabase
+ *        ↓
+ * message dans le salon
  *
  * Variables Vercel nécessaires :
  *
@@ -23,11 +27,20 @@
  * CLOUDINARY_FOLDER
  */
 
-export const config = {
+// ============================================================
+// CONFIGURATION VERCEL
+// ============================================================
+
+module.exports.config = {
   api: {
     bodyParser: false,
   },
 };
+
+
+// ============================================================
+// CONSTANTES
+// ============================================================
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
 
@@ -40,7 +53,9 @@ function getEnv(name) {
   const value = process.env[name];
 
   if (!value) {
-    throw new Error(`Variable d'environnement manquante : ${name}`);
+    throw new Error(
+      `Variable d'environnement manquante : ${name}`
+    );
   }
 
   return value;
@@ -56,7 +71,7 @@ function json(res, status, data) {
 // HANDLER PRINCIPAL
 // ============================================================
 
-export default async function handler(req, res) {
+async function handler(req, res) {
 
   // ----------------------------------------------------------
   // CORS
@@ -79,7 +94,7 @@ export default async function handler(req, res) {
 
 
   // ----------------------------------------------------------
-  // OPTIONS
+  // OPTIONS / PREFLIGHT
   // ----------------------------------------------------------
 
   if (req.method === "OPTIONS") {
@@ -92,10 +107,13 @@ export default async function handler(req, res) {
   // ----------------------------------------------------------
 
   if (req.method !== "POST") {
+
     return json(res, 405, {
       success: false,
-      error: "Méthode non autorisée. Utilisez POST.",
+      error:
+        "Méthode non autorisée. Utilisez POST.",
     });
+
   }
 
 
@@ -105,7 +123,8 @@ export default async function handler(req, res) {
     // 1. VARIABLES D'ENVIRONNEMENT
     // ========================================================
 
-    const SUPABASE_URL = getEnv("SUPABASE_URL");
+    const SUPABASE_URL =
+      getEnv("SUPABASE_URL");
 
     const SUPABASE_SERVICE_ROLE_KEY =
       getEnv("SUPABASE_SERVICE_ROLE_KEY");
@@ -122,46 +141,67 @@ export default async function handler(req, res) {
 
 
     // ========================================================
-    // 2. LECTURE DU MULTIPART/FORM-DATA
+    // 2. VÉRIFICATION CONTENT-TYPE
     // ========================================================
 
     const contentType =
       req.headers["content-type"] || "";
 
     if (
-      !contentType.toLowerCase().includes(
-        "multipart/form-data"
-      )
+      !contentType
+        .toLowerCase()
+        .includes("multipart/form-data")
     ) {
+
       return json(res, 400, {
         success: false,
+
         error:
           "Le partage doit être envoyé en multipart/form-data.",
-        received_content_type: contentType,
+
+        received_content_type:
+          contentType,
       });
+
     }
 
 
+    // ========================================================
+    // 3. CONVERSION DU STREAM HTTP EN REQUEST NATIVE
+    // ========================================================
+
     /*
-     * Node/Vercel fournit le flux HTTP.
+     * Node.js moderne fournit Request / FormData / Blob.
      *
-     * On utilise l'API Request native de Node afin de
-     * pouvoir utiliser request.formData() sans dépendance
-     * supplémentaire.
+     * Le bodyParser Vercel est désactivé afin de conserver
+     * le flux multipart original.
      */
 
+    const host =
+      req.headers.host ||
+      "localhost";
+
+    const protocol =
+      req.headers["x-forwarded-proto"] ||
+      "https";
+
     const requestUrl =
-      `https://${req.headers.host || "localhost"}${req.url}`;
+      `${protocol}://${host}${req.url}`;
 
-    const request = new Request(requestUrl, {
-      method: "POST",
 
-      headers: req.headers,
+    const request =
+      new Request(
+        requestUrl,
+        {
+          method: "POST",
 
-      body: req,
+          headers: req.headers,
 
-      duplex: "half",
-    });
+          body: req,
+
+          duplex: "half",
+        }
+      );
 
 
     const formData =
@@ -169,13 +209,8 @@ export default async function handler(req, res) {
 
 
     // ========================================================
-    // 3. RÉCUPÉRATION DES CHAMPS
+    // 4. RÉCUPÉRATION DES INFORMATIONS
     // ========================================================
-
-    /*
-     * On accepte plusieurs noms afin de rester compatible
-     * avec différentes versions de l'interface Share Target.
-     */
 
     const roomId =
       formData.get("room_id") ||
@@ -183,15 +218,19 @@ export default async function handler(req, res) {
       formData.get("destination") ||
       formData.get("room");
 
+
     const userId =
       formData.get("user_id") ||
-      formData.get("userId");
+      formData.get("userId") ||
+      null;
+
 
     const username =
       formData.get("username") ||
       formData.get("user_name") ||
       formData.get("display_name") ||
       "Utilisateur MAHOUTO+";
+
 
     const caption =
       formData.get("caption") ||
@@ -201,66 +240,83 @@ export default async function handler(req, res) {
 
 
     // ========================================================
-    // 4. RÉCUPÉRATION DU FICHIER
+    // 5. VALIDATION DU SALON
+    // ========================================================
+
+    if (!roomId) {
+
+      return json(res, 400, {
+        success: false,
+
+        error:
+          "Aucun salon n'a été sélectionné.",
+      });
+
+    }
+
+
+    // ========================================================
+    // 6. RECHERCHE DU FICHIER
     // ========================================================
 
     let file = null;
 
-    /*
-     * Les téléphones Android peuvent envoyer le fichier
-     * sous différents noms de champ.
-     */
-
     const possibleFileFields = [
+
       "file",
+
       "files",
+
       "attachment",
+
       "media",
+
       "image",
+
       "video",
+
       "document",
+
     ];
 
 
-    for (const fieldName of possibleFileFields) {
+    for (
+      const fieldName
+      of possibleFileFields
+    ) {
 
       const value =
         formData.get(fieldName);
+
 
       if (
         value &&
         typeof value === "object" &&
         typeof value.arrayBuffer === "function"
       ) {
+
         file = value;
+
         break;
+
       }
+
     }
 
 
     // ========================================================
-    // 5. VALIDATION DU SALON
-    // ========================================================
-
-    if (!roomId) {
-      return json(res, 400, {
-        success: false,
-        error:
-          "Aucun salon n'a été sélectionné.",
-      });
-    }
-
-
-    // ========================================================
-    // 6. VALIDATION DU FICHIER
+    // 7. VALIDATION FICHIER
     // ========================================================
 
     if (!file) {
 
       return json(res, 400, {
+
         success: false,
+
         error:
           "Aucun fichier n'a été reçu.",
+
       });
 
     }
@@ -272,9 +328,12 @@ export default async function handler(req, res) {
     ) {
 
       return json(res, 400, {
+
         success: false,
+
         error:
           "Le fichier reçu est invalide.",
+
       });
 
     }
@@ -286,26 +345,36 @@ export default async function handler(req, res) {
     ) {
 
       return json(res, 413, {
+
         success: false,
+
         error:
           "Le fichier est trop volumineux.",
+
         max_size_mb: 50,
+
       });
 
     }
 
 
     // ========================================================
-    // 7. VÉRIFICATION DU SALON DANS SUPABASE
+    // 8. VÉRIFICATION DU SALON SUPABASE
     // ========================================================
 
     const roomResponse =
       await fetch(
-        `${SUPABASE_URL}/rest/v1/rooms?id=eq.${encodeURIComponent(roomId)}&select=id,name`,
+
+        `${SUPABASE_URL}/rest/v1/rooms` +
+        `?id=eq.${encodeURIComponent(roomId)}` +
+        `&select=id,name`,
+
         {
+
           method: "GET",
 
           headers: {
+
             apikey:
               SUPABASE_SERVICE_ROLE_KEY,
 
@@ -314,8 +383,11 @@ export default async function handler(req, res) {
 
             "Content-Type":
               "application/json",
+
           },
+
         }
+
       );
 
 
@@ -324,16 +396,25 @@ export default async function handler(req, res) {
       const roomError =
         await roomResponse.text();
 
+
       console.error(
         "Erreur vérification salon :",
         roomError
       );
 
+
       return json(res, 500, {
+
         success: false,
+
         error:
           "Impossible de vérifier le salon.",
+
+        details:
+          roomError,
+
       });
+
     }
 
 
@@ -347,10 +428,15 @@ export default async function handler(req, res) {
     ) {
 
       return json(res, 404, {
+
         success: false,
+
         error:
           "Le salon sélectionné n'existe pas.",
-        room_id: roomId,
+
+        room_id:
+          String(roomId),
+
       });
 
     }
@@ -361,11 +447,12 @@ export default async function handler(req, res) {
 
 
     // ========================================================
-    // 8. CONVERSION DU FICHIER
+    // 9. CONVERSION FICHIER → BUFFER
     // ========================================================
 
     const arrayBuffer =
       await file.arrayBuffer();
+
 
     const fileBuffer =
       Buffer.from(arrayBuffer);
@@ -376,22 +463,25 @@ export default async function handler(req, res) {
     ) {
 
       return json(res, 400, {
+
         success: false,
+
         error:
           "Le fichier reçu est vide.",
+
       });
 
     }
 
 
     // ========================================================
-    // 9. UPLOAD CLOUDINARY
+    // 10. UPLOAD CLOUDINARY
     // ========================================================
 
     const cloudinaryUrl =
-      `https://api.cloudinary.com/v1_1/${encodeURIComponent(
-        CLOUDINARY_CLOUD_NAME
-      )}/auto/upload`;
+      `https://api.cloudinary.com/v1_1/` +
+      `${encodeURIComponent(CLOUDINARY_CLOUD_NAME)}` +
+      `/auto/upload`;
 
 
     const cloudinaryForm =
@@ -400,65 +490,96 @@ export default async function handler(req, res) {
 
     const blob =
       new Blob(
+
         [
           fileBuffer,
         ],
+
         {
           type:
             file.type ||
             "application/octet-stream",
         }
+
       );
 
 
     cloudinaryForm.append(
+
       "file",
+
       blob,
+
       file.name ||
-        "mahouto-share-file"
+      "mahouto-share-file"
+
     );
 
 
     cloudinaryForm.append(
+
       "upload_preset",
+
       CLOUDINARY_UPLOAD_PRESET
+
     );
 
 
     cloudinaryForm.append(
+
       "folder",
+
       CLOUDINARY_FOLDER
+
     );
 
 
-    // Important :
-    // resource_type=auto permet de gérer
-    // image, vidéo, PDF et autres fichiers.
+    // Cloudinary détecte automatiquement
+    // image / vidéo / PDF / fichier.
 
     cloudinaryForm.append(
+
       "resource_type",
+
       "auto"
+
     );
 
 
     console.log(
-      "Upload Cloudinary :",
+      "MAHOUTO+ → Cloudinary",
       {
-        name: file.name,
-        type: file.type,
-        size: fileBuffer.length,
-        room_id: roomId,
+
+        name:
+          file.name,
+
+        type:
+          file.type,
+
+        size:
+          fileBuffer.length,
+
+        room_id:
+          String(roomId),
+
       }
     );
 
 
     const cloudinaryResponse =
       await fetch(
+
         cloudinaryUrl,
+
         {
+
           method: "POST",
-          body: cloudinaryForm,
+
+          body:
+            cloudinaryForm,
+
         }
+
       );
 
 
@@ -471,20 +592,32 @@ export default async function handler(req, res) {
     ) {
 
       console.error(
+
         "Cloudinary upload failed :",
+
         cloudinaryText
+
       );
 
+
       return json(res, 500, {
+
         success: false,
+
         error:
           "L'envoi du fichier vers Cloudinary a échoué.",
+
         details:
           cloudinaryText,
+
       });
 
     }
 
+
+    // ========================================================
+    // 11. LECTURE RÉPONSE CLOUDINARY
+    // ========================================================
 
     let cloudinaryData;
 
@@ -499,14 +632,21 @@ export default async function handler(req, res) {
     } catch (error) {
 
       console.error(
+
         "Réponse Cloudinary invalide :",
+
         cloudinaryText
+
       );
 
+
       return json(res, 500, {
+
         success: false,
+
         error:
           "Réponse Cloudinary invalide.",
+
       });
 
     }
@@ -514,46 +654,36 @@ export default async function handler(req, res) {
 
     const attachmentUrl =
       cloudinaryData.secure_url ||
-      cloudinaryData.url;
+      cloudinaryData.url ||
+      null;
 
 
     if (!attachmentUrl) {
 
       console.error(
+
         "Cloudinary n'a pas retourné d'URL :",
+
         cloudinaryData
+
       );
 
+
       return json(res, 500, {
+
         success: false,
+
         error:
           "Cloudinary n'a pas retourné l'URL du fichier.",
+
       });
 
     }
 
 
     // ========================================================
-    // 10. CRÉATION DU MESSAGE SUPABASE
+    // 12. CRÉATION DU MESSAGE SUPABASE
     // ========================================================
-
-    /*
-     * IMPORTANT :
-     *
-     * Votre table messages possède notamment :
-     *
-     * room_id
-     * user_id
-     * username
-     * content
-     * created_at
-     * attachment_url
-     * edited_at
-     * is_deleted
-     *
-     * On enregistre donc explicitement attachment_url.
-     */
-
 
     const messagePayload = {
 
@@ -579,12 +709,16 @@ export default async function handler(req, res) {
 
       created_at:
         new Date().toISOString(),
+
     };
 
 
     console.log(
-      "Création message MAHOUTO+ :",
+
+      "MAHOUTO+ → Supabase",
+
       {
+
         room_id:
           messagePayload.room_id,
 
@@ -599,14 +733,23 @@ export default async function handler(req, res) {
 
         attachment_url:
           messagePayload.attachment_url,
+
       }
+
     );
 
 
+    // ========================================================
+    // 13. INSERT SUPABASE
+    // ========================================================
+
     const messageResponse =
       await fetch(
+
         `${SUPABASE_URL}/rest/v1/messages`,
+
         {
+
           method: "POST",
 
           headers: {
@@ -615,20 +758,23 @@ export default async function handler(req, res) {
               SUPABASE_SERVICE_ROLE_KEY,
 
             Authorization:
-              `Bearer ${SUPABASE_SERVICE_ROLE_KEY`,
+              `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
 
             "Content-Type":
               "application/json",
 
             Prefer:
               "return=representation",
+
           },
 
           body:
             JSON.stringify(
               messagePayload
             ),
+
         }
+
       );
 
 
@@ -636,14 +782,22 @@ export default async function handler(req, res) {
       await messageResponse.text();
 
 
+    // ========================================================
+    // 14. ERREUR SUPABASE
+    // ========================================================
+
     if (
       !messageResponse.ok
     ) {
 
       console.error(
+
         "Erreur Supabase messages :",
+
         messageText
+
       );
+
 
       return json(res, 500, {
 
@@ -657,10 +811,15 @@ export default async function handler(req, res) {
 
         supabase_error:
           messageText,
+
       });
 
     }
 
+
+    // ========================================================
+    // 15. RÉCUPÉRATION DU MESSAGE CRÉÉ
+    // ========================================================
 
     let createdMessage = null;
 
@@ -672,6 +831,7 @@ export default async function handler(req, res) {
           messageText
         );
 
+
       createdMessage =
         Array.isArray(parsed)
           ? parsed[0]
@@ -679,14 +839,19 @@ export default async function handler(req, res) {
 
     } catch (error) {
 
-      createdMessage =
-        null;
+      console.warn(
+
+        "Impossible de parser la réponse Supabase :",
+
+        messageText
+
+      );
 
     }
 
 
     // ========================================================
-    // 11. RÉPONSE FINALE
+    // 16. RÉPONSE FINALE
     // ========================================================
 
     return json(res, 200, {
@@ -715,7 +880,9 @@ export default async function handler(req, res) {
           file.type || null,
 
         size:
-          file.size || fileBuffer.length,
+          typeof file.size === "number"
+            ? file.size
+            : fileBuffer.length,
 
         url:
           attachmentUrl,
@@ -735,8 +902,11 @@ export default async function handler(req, res) {
     // ========================================================
 
     console.error(
+
       "SHARE TARGET ERROR :",
+
       error
+
     );
 
 
@@ -756,3 +926,10 @@ export default async function handler(req, res) {
   }
 
 }
+
+
+// ============================================================
+// EXPORT VERCEL
+// ============================================================
+
+module.exports = handler;
