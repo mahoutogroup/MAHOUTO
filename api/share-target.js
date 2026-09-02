@@ -7,241 +7,259 @@ export const config = {
 export default async function handler(req, res) {
   let fileCount = 0;
 
-  /*
-   * ============================================================
-   * 1. RÉCEPTION DU SHARE TARGET
-   * ============================================================
-   *
-   * On ne convertit plus tout le fichier en grosse chaîne de
-   * caractères. On lit uniquement les chunks pour permettre à
-   * la requête POST d'être consommée proprement.
-   */
+  try {
+    // ============================================================
+    // 1. Lire le corps multipart/form-data sans bodyParser
+    // ============================================================
+    const chunks = [];
 
-  if (req.method === "POST") {
-    try {
-      let totalSize = 0;
-      const MAX_SAFE_SIZE = 4 * 1024 * 1024; // 4 Mo
-
-      for await (const chunk of req) {
-        totalSize += chunk.length;
-
-        /*
-         * On évite de conserver tout le fichier en mémoire.
-         * On cherche seulement les signatures filename=".
-         */
-        const text = chunk.toString("latin1");
-
-        const matches = text.match(/filename="/g);
-
-        if (matches) {
-          fileCount += matches.length;
-        }
-
-        /*
-         * On continue de consommer la requête mais on ne garde
-         * jamais les fichiers en mémoire.
-         */
-      }
-
-      /*
-       * Le navigateur peut envoyer plusieurs fichiers.
-       * Le nombre réel sera également contrôlé côté client.
-       */
-      if (fileCount > 10) {
-        fileCount = 10;
-      }
-
-      /*
-       * Information indicative uniquement.
-       * L'upload réel sera effectué dans une prochaine étape.
-       */
-      if (totalSize > MAX_SAFE_SIZE) {
-        // Ne pas provoquer d'erreur ici.
-        // La page sera quand même affichée.
-      }
-    } catch (error) {
-      console.error("Share Target reception error:", error);
+    for await (const chunk of req) {
+      chunks.push(chunk);
     }
+
+    const bodyBuffer = Buffer.concat(chunks);
+
+    // On transforme seulement en texte pour compter les fichiers.
+    // Le contenu binaire n'est PAS utilisé pour l'instant.
+    const bodyText = bodyBuffer.toString("latin1");
+
+    fileCount = (bodyText.match(/filename="/g) || []).length;
+
+    // Sécurité : maximum 10 fichiers
+    if (fileCount > 10) {
+      fileCount = 10;
+    }
+  } catch (error) {
+    console.error("Erreur lecture multipart :", error);
+    fileCount = 0;
   }
 
-  /*
-   * ============================================================
-   * 2. RÉPONSE HTML
-   * ============================================================
-   */
+  // ============================================================
+  // 2. Réponse HTML
+  // ============================================================
 
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Cache-Control", "no-store");
 
-  res.status(200).send(`
+  return res.status(200).send(`
 <!DOCTYPE html>
+
 <html lang="fr">
 
 <head>
 
-  <meta charset="UTF-8">
+<meta charset="UTF-8">
 
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0"
-  >
+<meta
+  name="viewport"
+  content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+>
 
-  <meta
-    name="theme-color"
-    content="#FFC107"
-  >
+<title>Partager vers MAHOUTO+</title>
 
-  <title>Partager vers MAHOUTO+</title>
+<script
+  src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js">
+</script>
 
-  <script
-    src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js">
-  </script>
+<style>
 
-  <style>
+* {
+  box-sizing: border-box;
+}
 
-    * {
-      box-sizing: border-box;
-    }
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-height: 100%;
+}
 
-    body {
-      background: #0A0A0A;
-      color: #FFFFFF;
-      font-family: Arial, sans-serif;
-      margin: 0;
-      padding: 20px;
-      min-height: 100vh;
-    }
+body {
+  background: #0a0a0a;
+  color: #ffffff;
+  font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    Arial,
+    sans-serif;
 
-    .container {
-      width: 100%;
-      max-width: 700px;
-      margin: 0 auto;
-    }
+  padding: 20px;
+}
 
-    h2 {
-      color: #FFC107;
-      margin-top: 10px;
-      margin-bottom: 8px;
-      font-size: 25px;
-    }
+.container {
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+}
 
-    .file-info {
-      color: #BBBBBB;
-      font-size: 15px;
-      margin-bottom: 20px;
-    }
+h2 {
+  color: #ffc107;
+  margin-top: 10px;
+  margin-bottom: 18px;
+  font-size: 28px;
+}
 
-    input {
-      width: 100%;
-      padding: 15px;
-      margin-top: 5px;
-      border-radius: 12px;
-      border: 1px solid #333333;
-      background: #181818;
-      color: #FFFFFF;
-      font-size: 16px;
-      outline: none;
-    }
+.file-count {
+  font-size: 18px;
+  color: #ffffff;
+  margin-bottom: 18px;
+}
 
-    input:focus {
-      border-color: #FFC107;
-    }
+input {
+  width: 100%;
+  padding: 15px;
 
-    h3 {
-      margin-top: 30px;
-      margin-bottom: 12px;
-      font-size: 18px;
-    }
+  margin-top: 5px;
 
-    .dest-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      width: 100%;
-      max-height: 350px;
-      overflow-y: auto;
-    }
+  border-radius: 12px;
+  border: 1px solid #333;
 
-    .dest-btn {
-      padding: 14px 10px;
-      background: #181818;
-      border: 1px solid #333333;
-      border-radius: 12px;
-      color: #FFFFFF;
-      text-align: center;
-      cursor: pointer;
-      font-size: 14px;
-      min-height: 50px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: 0.2s;
-    }
+  background: #1a1a1a;
+  color: #ffffff;
 
-    .dest-btn:active {
-      transform: scale(0.98);
-    }
+  font-size: 16px;
+  outline: none;
+}
 
-    .dest-btn.active {
-      border-color: #FFC107;
-      background: #332600;
-      color: #FFC107;
-      box-shadow: 0 0 0 1px #FFC107 inset;
-    }
+input:focus {
+  border-color: #ffc107;
+}
 
-    .loading {
-      grid-column: 1 / -1;
-      padding: 20px;
-      text-align: center;
-      color: #AAAAAA;
-    }
+input::placeholder {
+  color: #888;
+}
 
-    .empty {
-      grid-column: 1 / -1;
-      padding: 20px;
-      text-align: center;
-      color: #888888;
-      font-size: 14px;
-    }
+h3 {
+  margin-top: 28px;
+  margin-bottom: 12px;
+  font-size: 18px;
+}
 
-    .btn {
-      background: #FFC107;
-      color: #000000;
-      padding: 16px;
-      border: none;
-      border-radius: 12px;
-      width: 100%;
-      font-weight: bold;
-      margin-top: 25px;
-      font-size: 17px;
-      cursor: pointer;
-    }
+.dest-grid {
+  display: grid;
 
-    .btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
+  grid-template-columns: 1fr 1fr;
 
-    #status {
-      margin-top: 15px;
-      text-align: center;
-      min-height: 24px;
-      font-size: 14px;
-    }
+  gap: 10px;
 
-    .success {
-      color: #4CAF50;
-    }
+  margin-top: 10px;
 
-    .error {
-      color: #F44336;
-    }
+  max-height: 320px;
 
-    .warning {
-      color: #FFC107;
-    }
+  overflow-y: auto;
 
-  </style>
+  padding-right: 2px;
+}
+
+.dest-btn {
+  padding: 14px 10px;
+
+  background: #1a1a1a;
+
+  border: 1px solid #333;
+
+  border-radius: 12px;
+
+  text-align: center;
+
+  cursor: pointer;
+
+  font-size: 14px;
+
+  color: #ffffff;
+
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.15s ease;
+}
+
+.dest-btn:active {
+  transform: scale(0.98);
+}
+
+.dest-btn.active {
+  border-color: #ffc107;
+
+  background: #332200;
+
+  color: #ffc107;
+}
+
+.loading {
+  color: #999;
+
+  padding: 15px 5px;
+
+  text-align: center;
+
+  grid-column: 1 / -1;
+}
+
+.no-room {
+  color: #888;
+
+  font-size: 13px;
+
+  line-height: 1.5;
+
+  margin-top: 8px;
+
+  grid-column: 1 / -1;
+}
+
+.btn {
+  background: #ffc107;
+
+  color: #000000;
+
+  padding: 16px;
+
+  border: none;
+
+  border-radius: 12px;
+
+  width: 100%;
+
+  font-weight: 700;
+
+  margin-top: 25px;
+
+  font-size: 16px;
+
+  cursor: pointer;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+
+  cursor: not-allowed;
+}
+
+#status {
+  margin-top: 15px;
+
+  color: #4caf50;
+
+  text-align: center;
+
+  font-size: 14px;
+
+  line-height: 1.5;
+}
+
+.status-error {
+  color: #ff5252 !important;
+}
+
+.status-info {
+  color: #ffc107 !important;
+}
+
+</style>
 
 </head>
 
@@ -251,15 +269,14 @@ export default async function handler(req, res) {
 
   <h2>📦 Partager vers MAHOUTO+</h2>
 
-  <div class="file-info">
-    <span id="file-count">
-      ${fileCount}/10 fichiers reçus
-    </span>
+  <div class="file-count">
+    ${fileCount}/10 fichiers reçus
   </div>
 
   <input
     id="caption"
     type="text"
+    maxlength="500"
     placeholder="Ajouter une légende..."
     autocomplete="off"
   >
@@ -278,23 +295,21 @@ export default async function handler(req, res) {
   <button
     class="btn"
     id="send-btn"
-    disabled
+    type="button"
   >
     Envoyer vers MAHOUTO+
   </button>
 
-  <div id="status"></div>
+  <p id="status"></p>
 
 </div>
 
 
 <script>
 
-/*
- * ============================================================
- * CONFIGURATION SUPABASE
- * ============================================================
- */
+/* ============================================================
+   CONFIGURATION SUPABASE
+   ============================================================ */
 
 const SUPABASE_URL =
   "https://kbnhmddwiimkjaehiwyi.supabase.co";
@@ -303,27 +318,42 @@ const SUPABASE_ANON_KEY =
   "sb_publishable_NGzIuUtP2T-uamuMq5rdSA_RBVfNZWu";
 
 
-/*
- * Création du client Supabase
- */
+/* ============================================================
+   INITIALISATION SUPABASE
+   ============================================================ */
 
-const supabaseClient =
-  window.supabase.createClient(
-    SUPABASE_URL,
-    SUPABASE_ANON_KEY
+let supabaseClient = null;
+
+try {
+
+  if (
+    window.supabase &&
+    typeof window.supabase.createClient === "function"
+  ) {
+
+    supabaseClient =
+      window.supabase.createClient(
+        SUPABASE_URL,
+        SUPABASE_ANON_KEY
+      );
+
+  }
+
+} catch (error) {
+
+  console.error(
+    "Erreur initialisation Supabase :",
+    error
   );
 
+}
 
-/*
- * Destination sélectionnée
- */
+
+/* ============================================================
+   VARIABLES
+   ============================================================ */
 
 let selectedDest = "general";
-
-
-/*
- * Éléments HTML
- */
 
 const destList =
   document.getElementById("dest-list");
@@ -331,33 +361,48 @@ const destList =
 const sendButton =
   document.getElementById("send-btn");
 
-const status =
+const statusElement =
   document.getElementById("status");
 
-const caption =
+const captionInput =
   document.getElementById("caption");
 
 
-/*
- * ============================================================
- * AFFICHER UN MESSAGE
- * ============================================================
- */
+/* ============================================================
+   AFFICHER LE STATUT
+   ============================================================ */
 
-function showStatus(message, type = "") {
+function setStatus(message, type = "success") {
 
-  status.className = type;
+  statusElement.innerText = message;
 
-  status.textContent = message;
+  statusElement.classList.remove(
+    "status-error",
+    "status-info"
+  );
+
+  if (type === "error") {
+
+    statusElement.classList.add(
+      "status-error"
+    );
+
+  }
+
+  if (type === "info") {
+
+    statusElement.classList.add(
+      "status-info"
+    );
+
+  }
 
 }
 
 
-/*
- * ============================================================
- * AJOUTER UN SALON
- * ============================================================
- */
+/* ============================================================
+   AJOUTER UN SALON
+   ============================================================ */
 
 function addDestination(id, name) {
 
@@ -368,90 +413,50 @@ function addDestination(id, name) {
 
   button.dataset.dest = id;
 
-  button.textContent = name;
+  button.innerText = name;
 
+  button.addEventListener(
+    "click",
+    function () {
 
-  /*
-   * Sélection du salon
-   */
+      document
+        .querySelectorAll(".dest-btn")
+        .forEach(function (item) {
 
-  button.addEventListener("click", () => {
+          item.classList.remove("active");
 
-    document
-      .querySelectorAll(".dest-btn")
-      .forEach((btn) => {
-        btn.classList.remove("active");
-      });
+        });
 
-    button.classList.add("active");
+      button.classList.add("active");
 
-    selectedDest = id;
+      selectedDest = id;
 
-    sendButton.disabled = false;
+      console.log(
+        "Destination sélectionnée :",
+        selectedDest
+      );
 
-    showStatus("");
-
-  });
-
+    }
+  );
 
   destList.appendChild(button);
 
 }
 
 
-/*
- * ============================================================
- * INITIALISATION
- * ============================================================
- */
+/* ============================================================
+   INITIALISATION DES DESTINATIONS
+   ============================================================ */
 
 async function init() {
 
   try {
 
-    /*
-     * --------------------------------------------------------
-     * Vérification de la session Supabase
-     * --------------------------------------------------------
-     */
-
-    const {
-      data: sessionData,
-      error: sessionError
-    } = await supabaseClient.auth.getSession();
-
-
-    if (sessionError) {
-
-      console.error(
-        "Supabase session error:",
-        sessionError
-      );
-
-    }
-
-
-    const session =
-      sessionData?.session || null;
-
-    const user =
-      session?.user || null;
-
-
-    /*
-     * --------------------------------------------------------
-     * Nettoyage
-     * --------------------------------------------------------
-     */
-
     destList.innerHTML = "";
 
-
-    /*
-     * --------------------------------------------------------
-     * SALONS PAR DÉFAUT
-     * --------------------------------------------------------
-     */
+    /* --------------------------------------------------------
+       1. Salons par défaut
+       -------------------------------------------------------- */
 
     addDestination(
       "general",
@@ -469,147 +474,191 @@ async function init() {
     );
 
 
-    /*
-     * --------------------------------------------------------
-     * SALONS SUPABASE
-     * --------------------------------------------------------
-     */
+    /* --------------------------------------------------------
+       2. Vérifier Supabase
+       -------------------------------------------------------- */
 
-    if (user) {
+    if (!supabaseClient) {
+
+      const warning =
+        document.createElement("div");
+
+      warning.className = "no-room";
+
+      warning.innerText =
+        "Les salons personnalisés ne peuvent pas être chargés.";
+
+      destList.appendChild(warning);
+
+    } else {
+
+      /* ------------------------------------------------------
+         CORRECTION IMPORTANTE :
+         récupération correcte de l'utilisateur
+         ------------------------------------------------------ */
+
+      let user = null;
 
       try {
 
-        const {
-          data: rooms,
-          error: roomsError
-        } = await supabaseClient
-          .from("rooms")
-          .select("id, name")
-          .order("name", {
-            ascending: true
-          });
+        const result =
+          await supabaseClient.auth.getUser();
 
-
-        if (roomsError) {
-
-          console.error(
-            "Erreur chargement rooms:",
-            roomsError
-          );
-
-        } else if (
-          Array.isArray(rooms)
+        if (
+          result &&
+          result.data
         ) {
 
-          rooms.forEach((room) => {
-
-            if (!room?.id) {
-              return;
-            }
-
-            addDestination(
-              `room-${room.id}`,
-              `👥 ${room.name || "Salon"}`
-            );
-
-          });
+          user = result.data.user || null;
 
         }
 
-      } catch (error) {
+      } catch (authError) {
 
         console.error(
-          "Erreur rooms:",
-          error
+          "Erreur récupération utilisateur :",
+          authError
         );
 
       }
 
-    } else {
 
-      const message =
-        document.createElement("div");
+      /* ------------------------------------------------------
+         3. Charger les salons uniquement si connecté
+         ------------------------------------------------------ */
 
-      message.className = "empty";
+      if (user) {
 
-      message.textContent =
-        "Connecte-toi dans MAHOUTO+ pour voir tes salons.";
+        try {
 
-      destList.appendChild(message);
+          const result =
+            await supabaseClient
+              .from("rooms")
+              .select("id, name")
+              .order("name", {
+                ascending: true
+              });
+
+
+          if (
+            result &&
+            result.error
+          ) {
+
+            console.error(
+              "Erreur chargement salons :",
+              result.error
+            );
+
+          } else if (
+            result &&
+            Array.isArray(result.data)
+          ) {
+
+            result.data.forEach(
+              function (room) {
+
+                if (
+                  room &&
+                  room.id &&
+                  room.name
+                ) {
+
+                  addDestination(
+                    "room-" + room.id,
+                    "👥 " + room.name
+                  );
+
+                }
+
+              }
+            );
+
+          }
+
+        } catch (roomError) {
+
+          console.error(
+            "Erreur lecture rooms :",
+            roomError
+          );
+
+        }
+
+      } else {
+
+        const message =
+          document.createElement("div");
+
+        message.className = "no-room";
+
+        message.innerText =
+          "Connecte-toi dans MAHOUTO+ pour voir tes salons personnalisés.";
+
+        destList.appendChild(message);
+
+      }
 
     }
 
 
-    /*
-     * --------------------------------------------------------
-     * SÉLECTIONNER GÉNÉRAL PAR DÉFAUT
-     * --------------------------------------------------------
-     */
+    /* --------------------------------------------------------
+       4. Général sélectionné par défaut
+       -------------------------------------------------------- */
 
     const generalButton =
       document.querySelector(
         '[data-dest="general"]'
       );
 
+    if (generalButton) {
+
+      generalButton.classList.add("active");
+
+    }
+
+    selectedDest = "general";
+
+  } catch (error) {
+
+    console.error(
+      "Erreur initialisation partage :",
+      error
+    );
+
+    destList.innerHTML = "";
+
+    addDestination(
+      "general",
+      "🏠 Général"
+    );
+
+    addDestination(
+      "support",
+      "🆘 Support"
+    );
+
+    addDestination(
+      "annonces",
+      "📢 Annonces"
+    );
+
+    const generalButton =
+      document.querySelector(
+        '[data-dest="general"]'
+      );
 
     if (generalButton) {
 
       generalButton.classList.add("active");
 
-      selectedDest = "general";
-
-      sendButton.disabled = false;
-
     }
-
-
-    /*
-     * --------------------------------------------------------
-     * FIN CHARGEMENT
-     * --------------------------------------------------------
-     */
-
-    console.log(
-      "MAHOUTO+ Share Target initialisé"
-    );
-
-    console.log(
-      "Utilisateur:",
-      user?.id || "non connecté"
-    );
-
-    console.log(
-      "Destination:",
-      selectedDest
-    );
-
-  } catch (error) {
-
-    console.error(
-      "Erreur initialisation Share Target:",
-      error
-    );
-
-
-    destList.innerHTML = `
-      <div class="empty">
-        Impossible de charger les salons.
-        <br>
-        Vérifie ta connexion Internet.
-      </div>
-    `;
-
-    /*
-     * Général reste disponible
-     */
 
     selectedDest = "general";
 
-    sendButton.disabled = false;
-
-    showStatus(
-      "⚠️ Les salons personnalisés ne sont pas disponibles.",
-      "warning"
+    setStatus(
+      "Les salons par défaut sont disponibles.",
+      "info"
     );
 
   }
@@ -617,91 +666,89 @@ async function init() {
 }
 
 
-/*
- * ============================================================
- * ENVOI
- * ============================================================
- *
- * IMPORTANT :
- * Pour cette première version, nous ne faisons PAS encore
- * l'upload réel des fichiers.
- *
- * Nous allons ajouter l'upload direct dans l'étape suivante.
- * ============================================================
- */
+/* ============================================================
+   ENVOI
+   ============================================================ */
 
 sendButton.addEventListener(
   "click",
-  async () => {
-
-    if (!selectedDest) {
-
-      showStatus(
-        "❌ Choisis une destination.",
-        "error"
-      );
-
-      return;
-    }
-
-
-    sendButton.disabled = true;
-
-    showStatus(
-      "Envoi en préparation..."
-    );
-
+  async function () {
 
     try {
 
-      const text =
-        caption.value.trim();
+      if (!selectedDest) {
+
+        setStatus(
+          "❌ Choisis une destination.",
+          "error"
+        );
+
+        return;
+
+      }
 
 
-      /*
-       * Pour l'instant, on prépare seulement les informations.
-       */
+      sendButton.disabled = true;
+
+      setStatus(
+        "Envoi en cours..."
+      );
+
+
+      const caption =
+        captionInput.value.trim();
+
 
       console.log(
-        "Destination:",
+        "Destination :",
         selectedDest
       );
 
       console.log(
-        "Légende:",
-        text
+        "Légende :",
+        caption
+      );
+
+      console.log(
+        "Nombre de fichiers reçus :",
+        ${fileCount}
       );
 
 
-      /*
-       * Simulation temporaire.
-       *
-       * CETTE PARTIE SERA REMPLACÉE par le vrai upload
-       * Cloudinary/Supabase.
-       */
+      /* ======================================================
+         POUR L'INSTANT :
+         confirmation de fonctionnement de l'interface.
+
+         L'intégration réelle de l'upload sera ajoutée ensuite.
+         ====================================================== */
 
       await new Promise(
-        (resolve) =>
-          setTimeout(resolve, 1000)
+        function (resolve) {
+
+          setTimeout(
+            resolve,
+            1000
+          );
+
+        }
       );
 
 
-      showStatus(
-        "✅ Destination sélectionnée : " +
-        selectedDest,
-        "success"
+      setStatus(
+        "✅ Interface de partage fonctionnelle. Destination : " +
+        selectedDest
       );
 
 
     } catch (error) {
 
       console.error(
-        "Erreur envoi:",
+        "Erreur envoi :",
         error
       );
 
-      showStatus(
-        "❌ Une erreur est survenue.",
+      setStatus(
+        "❌ Une erreur est survenue pendant l'envoi.",
         "error"
       );
 
@@ -715,17 +762,16 @@ sendButton.addEventListener(
 );
 
 
-/*
- * ============================================================
- * LANCEMENT
- * ============================================================
- */
+/* ============================================================
+   LANCER L'APPLICATION
+   ============================================================ */
 
 init();
 
 </script>
 
 </body>
+
 </html>
   `);
 }
