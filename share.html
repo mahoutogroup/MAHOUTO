@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html lang="fr">
+
 <head>
+
   <meta charset="UTF-8">
 
   <meta
@@ -13,7 +15,9 @@
     content="#FFC107"
   >
 
-  <title>MAHOUTO+ — Partager dans un salon</title>
+  <title>
+    MAHOUTO+ — Partager dans un salon
+  </title>
 
   <link
     rel="manifest"
@@ -112,6 +116,10 @@
       line-height: 1.6;
     }
 
+    /* ===============================
+       FICHIER
+    =============================== */
+
     .file-card {
       margin-top: 22px;
       padding: 15px;
@@ -155,6 +163,56 @@
       font-size: 12px;
     }
 
+    /* ===============================
+       APERÇU
+    =============================== */
+
+    .preview-container {
+      width: 100%;
+      margin-top: 18px;
+      border-radius: 16px;
+      overflow: hidden;
+      background: #080808;
+      border: 1px solid #292929;
+      display: none;
+    }
+
+    .preview-container.visible {
+      display: block;
+    }
+
+    .preview-media {
+      width: 100%;
+      max-height: 340px;
+      display: block;
+      background: #050505;
+    }
+
+    #image-preview {
+      object-fit: contain;
+    }
+
+    #video-preview {
+      object-fit: contain;
+    }
+
+    #audio-preview {
+      width: 100%;
+      padding: 12px;
+    }
+
+    .preview-label {
+      padding: 10px 12px;
+      border-top: 1px solid #292929;
+      color: #888888;
+      font-size: 12px;
+      text-align: center;
+    }
+
+    /* ===============================
+       CHAMPS
+    =============================== */
+
     .field {
       margin-top: 20px;
     }
@@ -190,6 +248,10 @@
       resize: vertical;
     }
 
+    /* ===============================
+       BOUTONS
+    =============================== */
+
     .button {
       width: 100%;
       border: 0;
@@ -221,6 +283,10 @@
       border: 1px solid #363636;
     }
 
+    /* ===============================
+       STATUT
+    =============================== */
+
     .status {
       margin-top: 16px;
       padding: 12px 14px;
@@ -251,6 +317,10 @@
       color: #FFB4B4;
     }
 
+    /* ===============================
+       UTILITAIRES
+    =============================== */
+
     .hidden {
       display: none !important;
     }
@@ -260,11 +330,9 @@
       height: 42px;
       margin: 0 auto 18px;
       border-radius: 50%;
-      border:
-        4px solid #303030;
+      border: 4px solid #303030;
       border-top-color: #FFC107;
-      animation:
-        spin 0.8s linear infinite;
+      animation: spin 0.8s linear infinite;
     }
 
     @keyframes spin {
@@ -285,6 +353,10 @@
       line-height: 1.5;
     }
 
+    /* ===============================
+       PROGRESSION
+    =============================== */
+
     .progress {
       margin-top: 18px;
       height: 8px;
@@ -299,6 +371,10 @@
       background: #FFC107;
       transition: width 0.2s ease;
     }
+
+    /* ===============================
+       SUCCÈS
+    =============================== */
 
     .success-icon {
       width: 72px;
@@ -322,15 +398,17 @@
     }
 
   </style>
+
 </head>
+
 
 <body>
 
   <main class="container">
 
-    <!-- ===================================================
-         BRAND
-    ==================================================== -->
+    <!-- =================================================
+         MARQUE
+    ================================================== -->
 
     <div class="brand">
 
@@ -345,9 +423,9 @@
     </div>
 
 
-    <!-- ===================================================
-         LOADING
-    ==================================================== -->
+    <!-- =================================================
+         CHARGEMENT
+    ================================================== -->
 
     <section
       id="loading-card"
@@ -367,9 +445,9 @@
     </section>
 
 
-    <!-- ===================================================
-         LOGIN
-    ==================================================== -->
+    <!-- =================================================
+         CONNEXION
+    ================================================== -->
 
     <section
       id="login-card"
@@ -405,9 +483,9 @@
     </section>
 
 
-    <!-- ===================================================
-         SHARE
-    ==================================================== -->
+    <!-- =================================================
+         PARTAGE
+    ================================================== -->
 
     <section
       id="share-card"
@@ -429,12 +507,14 @@
         id="share-description"
         class="description"
       >
-        Choisissez le salon et ajoutez éventuellement
-        une légende.
+        Vérifiez le fichier, choisissez le salon
+        et ajoutez éventuellement une légende.
       </p>
 
 
-      <!-- FILE -->
+      <!-- ===============================================
+           INFORMATIONS FICHIER
+      ================================================ -->
 
       <div
         id="file-card"
@@ -469,7 +549,49 @@
       </div>
 
 
-      <!-- ROOM -->
+      <!-- ===============================================
+           APERÇU IMAGE / VIDÉO / AUDIO
+      ================================================ -->
+
+      <div
+        id="preview-container"
+        class="preview-container"
+      >
+
+        <img
+          id="image-preview"
+          class="preview-media hidden"
+          alt="Aperçu de l'image"
+        >
+
+        <video
+          id="video-preview"
+          class="preview-media hidden"
+          controls
+          playsinline
+          preload="metadata"
+        ></video>
+
+        <audio
+          id="audio-preview"
+          class="hidden"
+          controls
+          preload="metadata"
+        ></audio>
+
+        <div
+          id="preview-label"
+          class="preview-label"
+        >
+          Aperçu avant publication
+        </div>
+
+      </div>
+
+
+      <!-- ===============================================
+           SALON
+      ================================================ -->
 
       <div class="field">
 
@@ -490,7 +612,9 @@
       </div>
 
 
-      <!-- CAPTION -->
+      <!-- ===============================================
+           LÉGENDE
+      ================================================ -->
 
       <div class="field">
 
@@ -507,7 +631,9 @@
       </div>
 
 
-      <!-- PROGRESS -->
+      <!-- ===============================================
+           PROGRESSION
+      ================================================ -->
 
       <div
         id="progress-container"
@@ -522,7 +648,9 @@
       </div>
 
 
-      <!-- STATUS -->
+      <!-- ===============================================
+           STATUT
+      ================================================ -->
 
       <div
         id="status"
@@ -530,7 +658,9 @@
       ></div>
 
 
-      <!-- PUBLISH -->
+      <!-- ===============================================
+           PUBLICATION
+      ================================================ -->
 
       <button
         id="publish-button"
@@ -544,9 +674,9 @@
     </section>
 
 
-    <!-- ===================================================
-         SUCCESS
-    ==================================================== -->
+    <!-- =================================================
+         SUCCÈS
+    ================================================== -->
 
     <section
       id="success-card"
@@ -577,9 +707,9 @@
     </section>
 
 
-    <!-- ===================================================
-         ERROR
-    ==================================================== -->
+    <!-- =================================================
+         ERREUR
+    ================================================== -->
 
     <section
       id="error-card"
@@ -623,7 +753,7 @@
 
 
   <!-- =====================================================
-       SUPABASE
+       CONFIGURATION
   ====================================================== -->
 
   <script src="/config.js"></script>
@@ -636,7 +766,7 @@
   <script>
 
     /* =====================================================
-       VARIABLES
+       CONFIGURATION
     ====================================================== */
 
     const CONFIG =
@@ -658,6 +788,10 @@
       CONFIG.CLOUDINARY_UPLOAD_PRESET;
 
 
+    /* =====================================================
+       VARIABLES
+    ====================================================== */
+
     let supabaseClient = null;
 
     let currentUser = null;
@@ -671,6 +805,8 @@
     let selectedFile = null;
 
     let isPublishing = false;
+
+    let previewObjectUrl = null;
 
 
     /* =====================================================
@@ -720,6 +856,36 @@
     const filePreviewIcon =
       document.getElementById(
         "file-preview-icon"
+      );
+
+    const fileIcon =
+      document.getElementById(
+        "file-icon"
+      );
+
+    const previewContainer =
+      document.getElementById(
+        "preview-container"
+      );
+
+    const imagePreview =
+      document.getElementById(
+        "image-preview"
+      );
+
+    const videoPreview =
+      document.getElementById(
+        "video-preview"
+      );
+
+    const audioPreview =
+      document.getElementById(
+        "audio-preview"
+      );
+
+    const previewLabel =
+      document.getElementById(
+        "preview-label"
       );
 
     const roomSelect =
@@ -779,7 +945,7 @@
 
 
     /* =====================================================
-       UTILITAIRES
+       AFFICHAGE DES CARTES
     ====================================================== */
 
     function hideAllCards() {
@@ -871,6 +1037,10 @@
     }
 
 
+    /* =====================================================
+       STATUT
+    ====================================================== */
+
     function setStatus(
       message,
       type = "info"
@@ -893,6 +1063,10 @@
         "";
     }
 
+
+    /* =====================================================
+       TAILLE FICHIER
+    ====================================================== */
 
     function formatBytes(bytes) {
 
@@ -936,6 +1110,10 @@
     }
 
 
+    /* =====================================================
+       ICÔNE FICHIER
+    ====================================================== */
+
     function getFileIcon(
       mimeType
     ) {
@@ -945,11 +1123,13 @@
           mimeType || ""
         ).toLowerCase();
 
+
       if (
         type.startsWith("image/")
       ) {
         return "🖼️";
       }
+
 
       if (
         type.startsWith("video/")
@@ -957,17 +1137,20 @@
         return "🎬";
       }
 
+
       if (
         type.startsWith("audio/")
       ) {
         return "🎵";
       }
 
+
       if (
         type === "application/pdf"
       ) {
         return "📕";
       }
+
 
       if (
         type.includes("word") ||
@@ -976,6 +1159,7 @@
         return "📘";
       }
 
+
       if (
         type.includes("zip") ||
         type.includes("compressed")
@@ -983,9 +1167,14 @@
         return "🗜️";
       }
 
+
       return "📎";
     }
 
+
+    /* =====================================================
+       NOM DE FICHIER
+    ====================================================== */
 
     function safeFilename(
       filename,
@@ -997,14 +1186,16 @@
           filename || ""
         ).trim();
 
-      return value ||
+      return (
+        value ||
         fallback ||
-        "fichier";
+        "fichier"
+      );
     }
 
 
     /* =====================================================
-       VALIDATION CONFIG
+       CONFIGURATION
     ====================================================== */
 
     function validateShareConfig() {
@@ -1019,6 +1210,7 @@
         );
       }
 
+
       if (
         !CLOUDINARY_CLOUD_NAME
       ) {
@@ -1027,6 +1219,7 @@
           "Configuration Cloudinary manquante : CLOUDINARY_CLOUD_NAME."
         );
       }
+
 
       if (
         !CLOUDINARY_UPLOAD_PRESET
@@ -1040,7 +1233,7 @@
 
 
     /* =====================================================
-       INITIALISER SUPABASE
+       SUPABASE
     ====================================================== */
 
     function initSupabase() {
@@ -1056,6 +1249,7 @@
         );
       }
 
+
       supabaseClient =
         window.supabase.createClient(
           SUPABASE_URL,
@@ -1065,7 +1259,7 @@
 
 
     /* =====================================================
-       RÉCUPÉRER L'ID LOCAL
+       LOCAL SHARE ID
     ====================================================== */
 
     function getLocalShareId() {
@@ -1082,6 +1276,199 @@
 
 
     /* =====================================================
+       NETTOYAGE APERÇU
+    ====================================================== */
+
+    function resetPreview() {
+
+      if (previewObjectUrl) {
+
+        URL.revokeObjectURL(
+          previewObjectUrl
+        );
+
+        previewObjectUrl =
+          null;
+      }
+
+
+      previewContainer.classList.remove(
+        "visible"
+      );
+
+
+      imagePreview.classList.add(
+        "hidden"
+      );
+
+      videoPreview.classList.add(
+        "hidden"
+      );
+
+      audioPreview.classList.add(
+        "hidden"
+      );
+
+
+      imagePreview.removeAttribute(
+        "src"
+      );
+
+      videoPreview.removeAttribute(
+        "src"
+      );
+
+      audioPreview.removeAttribute(
+        "src"
+      );
+
+
+      videoPreview.load();
+
+      audioPreview.load();
+    }
+
+
+    /* =====================================================
+       APERÇU AUTOMATIQUE
+    ====================================================== */
+
+    function renderFilePreview(
+      file
+    ) {
+
+      resetPreview();
+
+
+      if (!file) {
+        return;
+      }
+
+
+      const type =
+        String(
+          file.type || ""
+        ).toLowerCase();
+
+
+      /* ===============================
+         IMAGE
+      =============================== */
+
+      if (
+        type.startsWith("image/")
+      ) {
+
+        previewObjectUrl =
+          URL.createObjectURL(
+            file
+          );
+
+
+        imagePreview.src =
+          previewObjectUrl;
+
+
+        imagePreview.classList.remove(
+          "hidden"
+        );
+
+
+        previewContainer.classList.add(
+          "visible"
+        );
+
+
+        previewLabel.textContent =
+          "Aperçu de l'image avant publication";
+
+
+        return;
+      }
+
+
+      /* ===============================
+         VIDÉO
+      =============================== */
+
+      if (
+        type.startsWith("video/")
+      ) {
+
+        previewObjectUrl =
+          URL.createObjectURL(
+            file
+          );
+
+
+        videoPreview.src =
+          previewObjectUrl;
+
+
+        videoPreview.classList.remove(
+          "hidden"
+        );
+
+
+        previewContainer.classList.add(
+          "visible"
+        );
+
+
+        previewLabel.textContent =
+          "Aperçu de la vidéo avant publication";
+
+
+        return;
+      }
+
+
+      /* ===============================
+         AUDIO
+      =============================== */
+
+      if (
+        type.startsWith("audio/")
+      ) {
+
+        previewObjectUrl =
+          URL.createObjectURL(
+            file
+          );
+
+
+        audioPreview.src =
+          previewObjectUrl;
+
+
+        audioPreview.classList.remove(
+          "hidden"
+        );
+
+
+        previewContainer.classList.add(
+          "visible"
+        );
+
+
+        previewLabel.textContent =
+          "Écouter l'audio avant publication";
+
+
+        return;
+      }
+
+
+      /*
+       * PDF, Word, ZIP, etc.
+       *
+       * Pas de prévisualisation locale
+       * ici.
+       */
+    }
+
+
+    /* =====================================================
        LIRE LE PARTAGE LOCAL
     ====================================================== */
 
@@ -1089,6 +1476,7 @@
 
       localShareId =
         getLocalShareId();
+
 
       if (!localShareId) {
 
@@ -1148,19 +1536,22 @@
           : [];
 
 
-      /*
-       * Nous prenons actuellement
-       * le premier fichier.
-       */
-
       if (!files.length) {
 
-        selectedFile = null;
+        selectedFile =
+          null;
 
       } else {
 
+        /*
+         * Pour le moment, MAHOUTO+
+         * utilise le premier fichier
+         * partagé.
+         */
+
         const fileInfo =
           files[0];
+
 
         const fileUrl =
           `/__mahouto-share-file/${encodeURIComponent(
@@ -1193,11 +1584,6 @@
           );
 
 
-        /*
-         * Certains navigateurs ne fournissent
-         * pas correctement le nom via Response.
-         */
-
         const storedFilename =
           fileResponse.headers.get(
             "X-MAHOUTO-FILENAME"
@@ -1213,8 +1599,12 @@
                 storedFilename
               );
 
-          } catch (e) {
-            // On garde le nom précédent.
+          } catch (error) {
+
+            console.warn(
+              "Nom de fichier invalide :",
+              error
+            );
           }
         }
 
@@ -1240,9 +1630,9 @@
       }
 
 
-      /*
-       * Affichage.
-       */
+      /* ===============================================
+         AFFICHAGE FICHIER
+      ================================================ */
 
       if (selectedFile) {
 
@@ -1250,33 +1640,45 @@
           "hidden"
         );
 
+
         fileName.textContent =
           selectedFile.name;
+
 
         fileSize.textContent =
           formatBytes(
             selectedFile.size
           );
 
+
         const icon =
           getFileIcon(
             selectedFile.type
           );
 
+
         filePreviewIcon.textContent =
           icon;
 
-        document.getElementById(
-          "file-icon"
-        ).textContent =
+
+        fileIcon.textContent =
           icon;
+
+
+        /*
+         * NOUVEAU :
+         * affichage de l'aperçu.
+         */
+
+        renderFilePreview(
+          selectedFile
+        );
       }
 
 
-      /*
-       * Le texte et le titre provenant
-       * de l'application source.
-       */
+      /* ===============================================
+         TEXTE WHATSAPP / GALERIE
+      ================================================ */
 
       const incomingText =
         String(
@@ -1299,7 +1701,7 @@
 
 
     /* =====================================================
-       AUTHENTIFICATION
+       SESSION
     ====================================================== */
 
     async function getSession() {
@@ -1307,6 +1709,7 @@
       if (!supabaseClient) {
         return null;
       }
+
 
       const result =
         await supabaseClient.auth.getSession();
@@ -1326,6 +1729,7 @@
       currentSession =
         result.data.session ||
         null;
+
 
       currentUser =
         currentSession
@@ -1348,6 +1752,7 @@
         googleLogin.disabled =
           true;
 
+
         googleLogin.textContent =
           "Connexion…";
 
@@ -1360,17 +1765,21 @@
 
         const result =
           await supabaseClient.auth.signInWithOAuth({
+
             provider: "google",
+
             options: {
-              redirectTo: redirectUrl
+              redirectTo:
+                redirectUrl
             }
+
           });
 
 
         if (result.error) {
-
           throw result.error;
         }
+
 
       } catch (error) {
 
@@ -1379,14 +1788,17 @@
           error
         );
 
+
         setStatus(
           error.message ||
           "Impossible de se connecter avec Google.",
           "error"
         );
 
+
         googleLogin.disabled =
           false;
+
 
         googleLogin.textContent =
           "Continuer avec Google";
@@ -1422,7 +1834,6 @@
 
 
       if (result.error) {
-
         throw result.error;
       }
 
@@ -1435,7 +1846,8 @@
           : [];
 
 
-      roomSelect.innerHTML = "";
+      roomSelect.innerHTML =
+        "";
 
 
       if (!rooms.length) {
@@ -1446,8 +1858,10 @@
           </option>
         `;
 
+
         publishButton.disabled =
           true;
+
 
         return;
       }
@@ -1458,30 +1872,39 @@
           "option"
         );
 
-      firstOption.value = "";
+
+      firstOption.value =
+        "";
+
 
       firstOption.textContent =
         "Sélectionner un salon…";
+
 
       roomSelect.appendChild(
         firstOption
       );
 
 
-      for (const room of rooms) {
+      for (
+        const room of rooms
+      ) {
 
         const option =
           document.createElement(
             "option"
           );
 
+
         option.value =
           room.id;
+
 
         option.textContent =
           `${room.emoji || "💬"} ${
             room.name || room.id
           }`;
+
 
         roomSelect.appendChild(
           option
@@ -1508,7 +1931,7 @@
 
 
     /* =====================================================
-       UPLOAD CLOUDINARY DIRECT
+       CLOUDINARY
     ====================================================== */
 
     async function uploadToCloudinary(
@@ -1532,6 +1955,7 @@
       progressContainer.classList.remove(
         "hidden"
       );
+
 
       progressBar.style.width =
         "10%";
@@ -1558,11 +1982,6 @@
         CLOUDINARY_UPLOAD_PRESET
       );
 
-
-      /*
-       * XMLHttpRequest permet de suivre
-       * la progression de l'upload.
-       */
 
       const result =
         await new Promise(
@@ -1594,6 +2013,7 @@
                       ) * 100
                     );
 
+
                   progressBar.style.width =
                     `${Math.max(
                       10,
@@ -1608,7 +2028,8 @@
 
             xhr.onload = () => {
 
-              let data = null;
+              let data =
+                null;
 
 
               try {
@@ -1639,6 +2060,7 @@
                 progressBar.style.width =
                   "100%";
 
+
                 resolve(
                   data
                 );
@@ -1650,6 +2072,7 @@
                   data.error.message
                     ? data.error.message
                     : "Échec de l'upload Cloudinary.";
+
 
                 reject(
                   new Error(
@@ -1692,7 +2115,7 @@
 
 
     /* =====================================================
-       CRÉER LE SHARE PENDING
+       SHARE PENDING
     ====================================================== */
 
     async function createPendingShare(
@@ -1712,18 +2135,22 @@
             ? selectedFile.name
             : "fichier",
 
+
         mime_type:
           selectedFile
             ? selectedFile.type
             : "application/octet-stream",
+
 
         file_size:
           selectedFile
             ? selectedFile.size
             : 0,
 
+
         attachment_url:
           cloudinaryResult.secure_url,
+
 
         title:
           shareMetadata &&
@@ -1731,8 +2158,10 @@
             ? shareMetadata.title
             : "",
 
+
         caption:
           caption.value.trim(),
+
 
         shared_url:
           shareMetadata &&
@@ -1761,7 +2190,8 @@
         );
 
 
-      let data = null;
+      let data =
+        null;
 
 
       try {
@@ -1805,7 +2235,7 @@
 
 
     /* =====================================================
-       FINALISER LE PARTAGE
+       FINALISATION
     ====================================================== */
 
     async function finalizeShare(
@@ -1855,12 +2285,14 @@
 
                 caption:
                   caption.value.trim()
+
               })
           }
         );
 
 
-      let data = null;
+      let data =
+        null;
 
 
       try {
@@ -1894,7 +2326,7 @@
 
 
     /* =====================================================
-       SUPPRIMER LE STOCKAGE LOCAL
+       SUPPRIMER STOCKAGE LOCAL
     ====================================================== */
 
     async function deleteLocalShare() {
@@ -1942,7 +2374,8 @@
 
 
           if (
-            pathname === prefixMeta ||
+            pathname ===
+              prefixMeta ||
             pathname.startsWith(
               prefixFile
             )
@@ -1965,7 +2398,7 @@
 
 
     /* =====================================================
-       PUBLICATION PRINCIPALE
+       PUBLICATION
     ====================================================== */
 
     async function publishShare() {
@@ -2012,15 +2445,16 @@
       publishButton.disabled =
         true;
 
+
       publishButton.textContent =
         "Publication…";
 
 
       try {
 
-        /*
-         * 1. Upload direct Cloudinary
-         */
+        /* ==========================================
+           1. CLOUDINARY
+        =========================================== */
 
         const cloudinaryResult =
           await uploadToCloudinary(
@@ -2028,9 +2462,9 @@
           );
 
 
-        /*
-         * 2. Création du pending
-         */
+        /* ==========================================
+           2. SHARE PENDING
+        =========================================== */
 
         const shareId =
           await createPendingShare(
@@ -2038,26 +2472,32 @@
           );
 
 
-        /*
-         * 3. Publication dans Supabase
-         */
+        /* ==========================================
+           3. SUPABASE
+        =========================================== */
 
         await finalizeShare(
           shareId
         );
 
 
-        /*
-         * 4. Nettoyage du fichier
-         *    stocké sur le téléphone
-         */
+        /* ==========================================
+           4. NETTOYAGE LOCAL
+        =========================================== */
 
         await deleteLocalShare();
 
 
-        /*
-         * 5. Succès
-         */
+        /* ==========================================
+           5. NETTOYAGE APERÇU
+        =========================================== */
+
+        resetPreview();
+
+
+        /* ==========================================
+           6. SUCCÈS
+        =========================================== */
 
         showSuccess();
 
@@ -2082,14 +2522,18 @@
         isPublishing =
           false;
 
+
         publishButton.textContent =
           "Publier dans le salon";
 
+
         updatePublishButton();
+
 
         progressContainer.classList.add(
           "hidden"
         );
+
 
         progressBar.style.width =
           "0%";
@@ -2110,37 +2554,37 @@
         );
 
 
-        /*
-         * Vérifier configuration
-         */
+        /* ==========================================
+           CONFIG
+        =========================================== */
 
         validateShareConfig();
 
 
-        /*
-         * Initialiser Supabase
-         */
+        /* ==========================================
+           SUPABASE
+        =========================================== */
 
         initSupabase();
 
 
-        /*
-         * Lire le fichier local
-         */
+        /* ==========================================
+           FICHIER LOCAL
+        =========================================== */
 
         await loadLocalShare();
 
 
-        /*
-         * Récupérer session
-         */
+        /* ==========================================
+           SESSION
+        =========================================== */
 
         await getSession();
 
 
-        /*
-         * Si pas connecté
-         */
+        /* ==========================================
+           PAS CONNECTÉ
+        =========================================== */
 
         if (!currentUser) {
 
@@ -2150,18 +2594,15 @@
         }
 
 
-        /*
-         * Charger les salons
-         */
+        /* ==========================================
+           CONNECTÉ
+        =========================================== */
 
         showShare();
 
+
         await loadRooms();
 
-
-        /*
-         * Activer bouton
-         */
 
         updatePublishButton();
 
@@ -2183,7 +2624,7 @@
 
 
     /* =====================================================
-       AUTH STATE
+       ÉCOUTEUR AUTHENTIFICATION
     ====================================================== */
 
     function setupAuthListener() {
@@ -2208,6 +2649,7 @@
           currentSession =
             session || null;
 
+
           currentUser =
             session
               ? session.user
@@ -2224,7 +2666,9 @@
 
               showShare();
 
+
               await loadRooms();
+
 
               updatePublishButton();
 
@@ -2234,6 +2678,7 @@
                 "Chargement après login :",
                 error
               );
+
 
               showError(
                 error.message ||
@@ -2338,4 +2783,5 @@
   </script>
 
 </body>
+
 </html>
