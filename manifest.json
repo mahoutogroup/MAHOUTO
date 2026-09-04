@@ -10,6 +10,7 @@
   "background_color": "#0A0A0A",
   "theme_color": "#FFC107",
   "prefer_related_applications": false,
+
   "icons": [
     {
       "src": "/assets/icon-192.png",
@@ -28,24 +29,34 @@
       "purpose": "maskable"
     }
   ],
-  "categories": ["education", "business", "productivity", "social"],
+
+  "categories": [
+    "education",
+    "business",
+    "productivity",
+    "social"
+  ],
+
   "share_target": {
     "action": "/api/share-target",
     "method": "POST",
     "enctype": "multipart/form-data",
+
     "params": {
       "title": "title",
       "text": "text",
       "url": "url",
+
       "files": [
         {
           "name": "files",
+
           "accept": [
             "image/*",
             "video/*",
             "audio/*",
-            "application/zip",
             "application/pdf",
+            "application/zip",
             "application/msword",
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             "text/*"
