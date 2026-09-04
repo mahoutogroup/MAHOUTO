@@ -1,4 +1,5 @@
-const CACHE_NAME = "mahoutoplus-shell-v41";
+const CACHE_NAME = "mahoutoplus-shell-v42";
+const SHARE_CACHE_NAME = "mahoutoplus-share-v1";
 
 const APP_SHELL = [
   "/",
@@ -21,228 +22,265 @@ const APP_SHELL = [
   "/assets/icon-maskable-512.png"
 ];
 
-/* =========================================================
+/* ---------------------------------------------------------
    INSTALLATION
-   ========================================================= */
+--------------------------------------------------------- */
 
 self.addEventListener("install", event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      return cache.addAll(APP_SHELL);
-    })
+    caches.open(CACHE_NAME)
+      .then(cache => cache.addAll(APP_SHELL))
+      .then(() => self.skipWaiting())
   );
-
-  self.skipWaiting();
 });
 
-
-/* =========================================================
+/* ---------------------------------------------------------
    ACTIVATION
-   ========================================================= */
+--------------------------------------------------------- */
 
 self.addEventListener("activate", event => {
   event.waitUntil(
     caches.keys().then(keys => {
       return Promise.all(
         keys.map(key => {
-          if (key !== CACHE_NAME) {
+          if (
+            key !== CACHE_NAME &&
+            key !== SHARE_CACHE_NAME
+          ) {
             return caches.delete(key);
           }
-
           return undefined;
         })
       );
-    })
+    }).then(() => self.clients.claim())
   );
-
-  self.clients.claim();
 });
 
+/* ---------------------------------------------------------
+   NETTOYAGE DES PARTAGES TEMPORAIRES
+--------------------------------------------------------- */
 
-/* =========================================================
-   SHARE TARGET
-   ========================================================= */
+async function cleanupOldShares() {
+  const cache = await caches.open(SHARE_CACHE_NAME);
+  const requests = await cache.keys();
 
-/*
- * Android envoie le fichier ici :
- *
- *      /share-target
- *
- * Le Service Worker intercepte cette requête POST.
- *
- * Il récupère le FormData puis le transmet à :
- *
- *      /api/share-target
- *
- * L'API s'occupe ensuite de :
- *
- *      1. récupérer le fichier
- *      2. l'envoyer vers Cloudinary
- *      3. créer share_pending
- *      4. rediriger vers /share.html?id=...
- */
+  const now = Date.now();
+  const MAX_AGE = 60 * 60 * 1000; // 1 heure
 
-async function handleShareTarget(request) {
-  try {
-    console.log("[MAHOUTO+] Share Target reçu");
+  for (const request of requests) {
+    try {
+      const response = await cache.match(request);
 
-    const formData = await request.formData();
+      if (!response) continue;
 
-    /*
-     * Vérification simple :
-     * Android devrait normalement envoyer le fichier
-     * dans le champ "files".
-     */
+      const createdAt = response.headers.get("X-MAHOUTO-CREATED-AT");
 
-    let hasFile = false;
+      if (createdAt) {
+        const age = now - Number(createdAt);
 
-    for (const [key, value] of formData.entries()) {
-      if (value instanceof File) {
-        hasFile = true;
-
-        console.log(
-          "[MAHOUTO+] Fichier reçu :",
-          key,
-          value.name,
-          value.type,
-          value.size
-        );
+        if (age > MAX_AGE) {
+          await cache.delete(request);
+        }
       }
+    } catch (error) {
+      console.warn("Nettoyage share impossible:", error);
     }
-
-    if (!hasFile) {
-      console.warn(
-        "[MAHOUTO+] Aucun fichier détecté dans le partage."
-      );
-    }
-
-    /*
-     * Transfert vers notre API Vercel.
-     *
-     * On recrée une requête multipart/form-data.
-     *
-     * IMPORTANT :
-     * Ne pas définir manuellement le header
-     * Content-Type.
-     *
-     * Le navigateur ajoutera automatiquement
-     * le boundary multipart.
-     */
-
-    const response = await fetch("/api/share-target", {
-      method: "POST",
-      body: formData,
-      credentials: "include",
-      redirect: "follow"
-    });
-
-    console.log(
-      "[MAHOUTO+] Réponse API Share Target :",
-      response.status,
-      response.url
-    );
-
-    return response;
-
-  } catch (error) {
-    console.error(
-      "[MAHOUTO+] Erreur Share Target :",
-      error
-    );
-
-    /*
-     * En cas d'erreur, on renvoie l'utilisateur
-     * vers la page de partage avec un message.
-     */
-
-    return Response.redirect(
-      "/share.html?error=share_failed",
-      303
-    );
   }
 }
 
+/* ---------------------------------------------------------
+   STOCKAGE LOCAL DU PARTAGE
+--------------------------------------------------------- */
 
-/* =========================================================
-   FETCH
-   ========================================================= */
+async function saveSharePayload(request) {
+  const formData = await request.formData();
 
-self.addEventListener("fetch", event => {
-  const request = event.request;
-  const url = new URL(request.url);
+  const title = formData.get("title") || "";
+  const text = formData.get("text") || "";
+  const sharedUrl = formData.get("url") || "";
 
+  /*
+   * Le nom "files" correspond au manifest.json :
+   *
+   * "files": [{
+   *   "name": "files",
+   *   ...
+   * }]
+   */
+
+  let files = formData.getAll("files");
+
+  /*
+   * Sécurité/fallback :
+   * certains environnements peuvent utiliser "file".
+   */
+
+  if (!files.length) {
+    const singleFile = formData.get("file");
+
+    if (singleFile instanceof File) {
+      files = [singleFile];
+    }
+  }
+
+  /*
+   * On garde uniquement les vrais fichiers.
+   */
+
+  files = files.filter(item => item instanceof File);
+
+  if (!files.length) {
+    /*
+     * Même sans fichier, on peut recevoir
+     * un texte ou un lien.
+     */
+    files = [];
+  }
+
+  const shareId = crypto.randomUUID();
+  const createdAt = Date.now();
+
+  const cache = await caches.open(SHARE_CACHE_NAME);
 
   /* -------------------------------------------------------
-     1. SHARE TARGET ANDROID
-     ------------------------------------------------------- */
+     MÉTADONNÉES
+  ------------------------------------------------------- */
+
+  const metadata = {
+    id: shareId,
+    title: title,
+    text: text,
+    url: sharedUrl,
+    createdAt: createdAt,
+    files: files.map((file, index) => ({
+      index: index,
+      name: file.name || `fichier-${index + 1}`,
+      type: file.type || "application/octet-stream",
+      size: file.size || 0
+    }))
+  };
+
+  const metadataUrl =
+    `/__mahouto-share-meta/${encodeURIComponent(shareId)}`;
+
+  await cache.put(
+    metadataUrl,
+    new Response(
+      JSON.stringify(metadata),
+      {
+        headers: {
+          "Content-Type": "application/json",
+          "X-MAHOUTO-CREATED-AT": String(createdAt)
+        }
+      }
+    )
+  );
+
+  /* -------------------------------------------------------
+     FICHIERS
+  ------------------------------------------------------- */
+
+  for (let index = 0; index < files.length; index++) {
+    const file = files[index];
+
+    const fileUrl =
+      `/__mahouto-share-file/${encodeURIComponent(shareId)}/${index}`;
+
+    await cache.put(
+      fileUrl,
+      new Response(file, {
+        headers: {
+          "Content-Type":
+            file.type || "application/octet-stream",
+
+          "X-MAHOUTO-CREATED-AT":
+            String(createdAt),
+
+          "X-MAHOUTO-FILENAME":
+            encodeURIComponent(file.name || `fichier-${index + 1}`)
+        }
+      })
+    );
+  }
+
+  /*
+   * Nettoyage des anciens partages.
+   */
+
+  await cleanupOldShares();
+
+  return shareId;
+}
+
+/* ---------------------------------------------------------
+   SHARE TARGET
+--------------------------------------------------------- */
+
+self.addEventListener("fetch", event => {
+  const url = new URL(event.request.url);
+
+  /*
+   * IMPORTANT :
+   * On intercepte UNIQUEMENT le POST du Share Target.
+   */
 
   if (
-    url.pathname === "/share-target" &&
-    request.method === "POST"
+    event.request.method === "POST" &&
+    url.pathname === "/share-target"
   ) {
     event.respondWith(
-      handleShareTarget(request)
+      (async () => {
+        try {
+          const shareId =
+            await saveSharePayload(event.request);
+
+          /*
+           * 303 = POST → GET
+           *
+           * Le fichier reste sur le téléphone.
+           * On ne l'envoie PAS à Vercel.
+           */
+
+          return Response.redirect(
+            `/share.html?local_share_id=${encodeURIComponent(shareId)}`,
+            303
+          );
+
+        } catch (error) {
+          console.error(
+            "Erreur Share Target :",
+            error
+          );
+
+          return Response.redirect(
+            "/share.html?share_error=1",
+            303
+          );
+        }
+      })()
     );
 
     return;
   }
 
-
-  /* -------------------------------------------------------
-     2. API
-     ------------------------------------------------------- */
-
   /*
-   * Les API ne doivent jamais être servies depuis
-   * le cache du Service Worker.
+   * Les API ne doivent jamais être mises en cache.
    */
 
   if (url.pathname.startsWith("/api/")) {
     return;
   }
 
+  /*
+   * Les requêtes GET normales utilisent le cache
+   * puis le réseau en secours.
+   */
 
-  /* -------------------------------------------------------
-     3. Seules les requêtes GET sont mises en cache
-     ------------------------------------------------------- */
-
-  if (request.method !== "GET") {
-    return;
+  if (event.request.method === "GET") {
+    event.respondWith(
+      caches.match(event.request).then(cached => {
+        return cached || fetch(event.request);
+      })
+    );
   }
-
-
-  /* -------------------------------------------------------
-     4. App Shell : cache-first
-     ------------------------------------------------------- */
-
-  event.respondWith(
-    caches.match(request).then(cachedResponse => {
-
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-
-      return fetch(request).then(networkResponse => {
-
-        /*
-         * On ne met en cache que les réponses valides.
-         */
-
-        if (
-          networkResponse &&
-          networkResponse.status === 200 &&
-          networkResponse.type === "basic"
-        ) {
-          const responseClone = networkResponse.clone();
-
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put(request, responseClone);
-          });
-        }
-
-        return networkResponse;
-      });
-
-    })
-  );
 });
