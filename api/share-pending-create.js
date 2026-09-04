@@ -1,10 +1,9 @@
 const crypto = require("crypto");
 
 module.exports = async function handler(req, res) {
-
-  // ====================================================
-  // METHOD
-  // ====================================================
+  // ==================================================
+  // 1. Vérification de la méthode
+  // ==================================================
 
   if (req.method !== "POST") {
     return res.status(405).json({
@@ -13,22 +12,18 @@ module.exports = async function handler(req, res) {
     });
   }
 
+  // ==================================================
+  // 2. Variables d'environnement
+  // ==================================================
 
-  // ====================================================
-  // ENV
-  // ====================================================
-
-  const SUPABASE_URL =
-    process.env.SUPABASE_URL;
-
+  const SUPABASE_URL = process.env.SUPABASE_URL;
   const SUPABASE_SERVICE_ROLE_KEY =
     process.env.SUPABASE_SERVICE_ROLE_KEY;
-
 
   if (!SUPABASE_URL) {
     return res.status(500).json({
       success: false,
-      error: "SUPABASE_URL manquant."
+      error: "Variable SUPABASE_URL manquante."
     });
   }
 
@@ -36,139 +31,122 @@ module.exports = async function handler(req, res) {
     return res.status(500).json({
       success: false,
       error:
-        "SUPABASE_SERVICE_ROLE_KEY manquant."
+        "Variable SUPABASE_SERVICE_ROLE_KEY manquante."
     });
   }
 
-
-  // ====================================================
-  // BODY
-  // ====================================================
+  // ==================================================
+  // 3. Lecture du body JSON
+  // ==================================================
 
   let body;
 
   try {
-
     body =
       typeof req.body === "string"
         ? JSON.parse(req.body)
         : req.body || {};
-
   } catch (error) {
-
     return res.status(400).json({
       success: false,
-      error: "JSON invalide."
+      error: "Le JSON envoyé est invalide."
     });
   }
 
+  // ==================================================
+  // 4. Récupération et nettoyage des données
+  // ==================================================
 
-  // ====================================================
-  // DONNÉES
-  // ====================================================
+  const filename = String(body.filename || "")
+    .trim()
+    .slice(0, 255);
 
-  const filename =
-    String(body.filename || "")
-      .trim()
-      .slice(0, 255);
+  const mimeType = String(
+    body.mime_type || "application/octet-stream"
+  )
+    .trim()
+    .slice(0, 150);
 
-  const mimeType =
-    String(
-      body.mime_type ||
-      "application/octet-stream"
-    )
-      .trim()
-      .slice(0, 150);
+  const fileSize = Number(body.file_size || 0);
 
-  const fileSize =
-    Number(body.file_size || 0);
+  const attachmentUrl = String(
+    body.attachment_url || ""
+  ).trim();
 
-  const attachmentUrl =
-    String(body.attachment_url || "")
-      .trim();
+  const caption = String(body.caption || "")
+    .trim()
+    .slice(0, 2000);
 
-  const caption =
-    String(body.caption || "")
-      .trim()
-      .slice(0, 2000);
+  const title = String(body.title || "")
+    .trim()
+    .slice(0, 500);
 
-  const title =
-    String(body.title || "")
-      .trim()
-      .slice(0, 500);
+  const sharedUrl = String(body.shared_url || "")
+    .trim()
+    .slice(0, 2000);
 
-  const sharedUrl =
-    String(body.shared_url || "")
-      .trim()
-      .slice(0, 2000);
-
-
-  // ====================================================
-  // VALIDATION
-  // ====================================================
-
-  if (!attachmentUrl && fileSize > 0) {
-
-    return res.status(400).json({
-      success: false,
-      error:
-        "URL Cloudinary manquante."
-    });
-  }
+  // ==================================================
+  // 5. Validation
+  // ==================================================
 
   if (!Number.isFinite(fileSize) || fileSize < 0) {
-
     return res.status(400).json({
       success: false,
-      error:
-        "Taille de fichier invalide."
+      error: "La taille du fichier est invalide."
     });
   }
 
+  /*
+   * Si un fichier a été envoyé, Cloudinary doit avoir
+   * fourni une URL.
+   */
+  if (fileSize > 0 && !attachmentUrl) {
+    return res.status(400).json({
+      success: false,
+      error:
+        "L'URL Cloudinary du fichier est manquante."
+    });
+  }
 
-  // ====================================================
-  // ID
-  // ====================================================
+  // ==================================================
+  // 6. Génération d'un identifiant unique
+  // ==================================================
 
-  const shareId =
-    crypto.randomUUID();
+  const shareId = crypto.randomUUID();
 
-
-  // ====================================================
-  // EXPIRATION
-  // ====================================================
+  // ==================================================
+  // 7. Expiration du partage
+  // ==================================================
   //
-  // 15 minutes pour terminer le partage.
+  // Le partage temporaire reste valide 15 minutes.
   //
 
-  const expiresAt =
-    new Date(
-      Date.now() + 15 * 60 * 1000
-    ).toISOString();
+  const expiresAt = new Date(
+    Date.now() + 15 * 60 * 1000
+  ).toISOString();
 
+  // ==================================================
+  // 8. Insertion dans Supabase
+  // ==================================================
 
-  // ====================================================
-  // INSERT SUPABASE
-  // ====================================================
+  let supabaseResponse;
 
-  const response =
-    await fetch(
+  try {
+    supabaseResponse = await fetch(
       `${SUPABASE_URL}/rest/v1/share_pending`,
       {
         method: "POST",
 
         headers: {
-          "apikey":
-            SUPABASE_SERVICE_ROLE_KEY,
+          apikey: SUPABASE_SERVICE_ROLE_KEY,
 
-          "Authorization":
+          Authorization:
             `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
 
           "Content-Type":
             "application/json",
 
-          "Prefer":
-            "return=minimal"
+          Prefer: "return=minimal"
         },
 
         body: JSON.stringify({
@@ -198,19 +176,29 @@ module.exports = async function handler(req, res) {
         })
       }
     );
+  } catch (error) {
+    console.error(
+      "Erreur réseau Supabase:",
+      error
+    );
 
+    return res.status(500).json({
+      success: false,
+      error:
+        "Impossible de contacter Supabase."
+    });
+  }
 
-  // ====================================================
-  // ERREUR SUPABASE
-  // ====================================================
+  // ==================================================
+  // 9. Gestion des erreurs Supabase
+  // ==================================================
 
-  if (!response.ok) {
-
+  if (!supabaseResponse.ok) {
     const errorText =
-      await response.text();
+      await supabaseResponse.text();
 
     console.error(
-      "Supabase share_pending error:",
+      "Erreur Supabase share_pending:",
       errorText
     );
 
@@ -218,19 +206,19 @@ module.exports = async function handler(req, res) {
       success: false,
       error:
         "Impossible de créer le partage temporaire.",
-      details:
-        errorText
+      details: errorText
     });
   }
 
-
-  // ====================================================
-  // SUCCÈS
-  // ====================================================
+  // ==================================================
+  // 10. Réponse
+  // ==================================================
 
   return res.status(201).json({
     success: true,
+
     share_id: shareId,
+
     expires_at: expiresAt
   });
 };
