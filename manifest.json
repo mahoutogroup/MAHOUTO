@@ -6,10 +6,13 @@
   "start_url": "/",
   "scope": "/",
   "id": "/",
+
   "display": "standalone",
   "orientation": "portrait-primary",
+
   "background_color": "#0A0A0A",
   "theme_color": "#FFC107",
+
   "prefer_related_applications": false,
 
   "icons": [
@@ -39,7 +42,7 @@
   ],
 
   "share_target": {
-    "action": "/share-target",
+    "action": "/api/share-target",
     "method": "POST",
     "enctype": "multipart/form-data",
 
