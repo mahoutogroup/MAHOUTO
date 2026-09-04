@@ -5,12 +5,11 @@
   "lang": "fr",
   "start_url": "/",
   "scope": "/",
+  "id": "/",
   "display": "standalone",
   "orientation": "portrait-primary",
-
   "background_color": "#0A0A0A",
   "theme_color": "#FFC107",
-
   "prefer_related_applications": false,
 
   "icons": [
