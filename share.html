@@ -1,38 +1,402 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
+  <meta
+    name="theme-color"
+    content="#0A0A0A"
+  >
+
+  <title>Partager dans un salon — MAHOUTO+</title>
+
+  <!-- =========================================================
+       CSS AUTONOME
+       ========================================================= -->
+  <style>
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      min-height: 100%;
+      font-family:
+        Arial,
+        Helvetica,
+        sans-serif;
+      background: #0A0A0A;
+      color: #F5F5F5;
+    }
+
+    body {
+      min-height: 100vh;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .share-container {
+      width: 100%;
+      max-width: 560px;
+      margin: 0 auto;
+      padding: 24px 16px 40px;
+    }
+
+    /* =========================================================
+       BRAND
+       ========================================================= */
+
+    .brand {
+      text-align: center;
+      margin-bottom: 24px;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: 1px;
+    }
+
+    .brand h1 span {
+      color: #FFC107;
+    }
+
+    .brand-subtitle {
+      margin-top: 6px;
+      color: #BDBDBD;
+      font-size: 15px;
+    }
+
+    /* =========================================================
+       CARDS
+       ========================================================= */
+
+    .card {
+      width: 100%;
+      background: #151515;
+      border: 1px solid #2B2B2B;
+      border-radius: 18px;
+      padding: 22px;
+      margin-bottom: 16px;
+      box-shadow:
+        0 10px 30px rgba(0, 0, 0, 0.35);
+    }
+
+    /* =========================================================
+       LOADING
+       ========================================================= */
+
+    .loading-content {
+      text-align: center;
+      padding: 24px 8px;
+    }
+
+    .loading-icon {
+      font-size: 44px;
+      margin-bottom: 14px;
+    }
+
+    .loading-content h2 {
+      margin: 0 0 10px;
+      font-size: 22px;
+    }
+
+    .loading-content p {
+      margin: 0;
+      color: #BDBDBD;
+      line-height: 1.5;
+    }
+
+    .loader {
+      width: 42px;
+      height: 42px;
+      margin: 18px auto 0;
+      border: 4px solid #333;
+      border-top-color: #FFC107;
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    /* =========================================================
+       FILE PREVIEW
+       ========================================================= */
+
+    .preview {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px;
+      background: #0F0F0F;
+      border: 1px solid #292929;
+      border-radius: 14px;
+      margin-bottom: 20px;
+      overflow: hidden;
+    }
+
+    .preview-icon {
+      width: 52px;
+      height: 52px;
+      flex: 0 0 52px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 12px;
+      background: #222;
+      font-size: 27px;
+    }
+
+    .file-info {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .filename {
+      font-size: 16px;
+      font-weight: 700;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .filesize {
+      margin-top: 5px;
+      color: #999;
+      font-size: 13px;
+    }
+
+    /* =========================================================
+       FORM
+       ========================================================= */
+
+    .field {
+      margin-bottom: 18px;
+    }
+
+    .field label {
+      display: block;
+      margin-bottom: 8px;
+      color: #DADADA;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    select,
+    textarea {
+      width: 100%;
+      border: 1px solid #3A3A3A;
+      border-radius: 12px;
+      background: #0E0E0E;
+      color: #FFFFFF;
+      padding: 13px 14px;
+      font-size: 15px;
+      outline: none;
+    }
+
+    select:focus,
+    textarea:focus {
+      border-color: #FFC107;
+    }
+
+    textarea {
+      min-height: 110px;
+      resize: vertical;
+      line-height: 1.45;
+    }
+
+    /* =========================================================
+       BUTTONS
+       ========================================================= */
+
+    button {
+      width: 100%;
+      border: 0;
+      border-radius: 12px;
+      padding: 14px 16px;
+      background: #FFC107;
+      color: #111111;
+      font-size: 15px;
+      font-weight: 800;
+      cursor: pointer;
+      transition:
+        opacity 0.2s ease,
+        transform 0.1s ease;
+    }
+
+    button:active {
+      transform: scale(0.98);
+    }
+
+    button:hover {
+      opacity: 0.92;
+    }
+
+    button:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .google-btn {
+      background: #FFFFFF;
+      color: #111111;
+    }
+
+    /* =========================================================
+       STATUS
+       ========================================================= */
+
+    #status {
+      min-height: 20px;
+      margin: 4px 0 14px;
+      text-align: center;
+      color: #FFC107;
+      font-size: 14px;
+    }
+
+    /* =========================================================
+       SUCCESS
+       ========================================================= */
+
+    .success {
+      text-align: center;
+      border-color: #245A36;
+    }
+
+    .success-icon {
+      font-size: 48px;
+      margin-bottom: 10px;
+    }
+
+    .success h2 {
+      margin: 0 0 10px;
+      font-size: 23px;
+    }
+
+    .success p {
+      color: #BDBDBD;
+      line-height: 1.5;
+    }
+
+    /* =========================================================
+       ERROR
+       ========================================================= */
+
+    .error {
+      border-color: #6B2929;
+    }
+
+    .error h3 {
+      margin: 0 0 10px;
+      font-size: 21px;
+    }
+
+    .error p {
+      color: #D0D0D0;
+      line-height: 1.5;
+      word-break: break-word;
+    }
+
+    /* =========================================================
+       MOBILE
+       ========================================================= */
+
+    @media (max-width: 480px) {
+
+      .share-container {
+        padding: 18px 12px 30px;
+      }
+
+      .card {
+        padding: 18px;
+        border-radius: 15px;
+      }
+
+      .brand h1 {
+        font-size: 28px;
+      }
+
+      .filename {
+        font-size: 15px;
+      }
+    }
+
+  </style>
+</head>
+
 <body>
 
   <main class="share-container">
 
+    <!-- =======================================================
+         MARQUE
+         ======================================================= -->
+
     <div class="brand">
+
       <h1>
         MAHOUTO<span>+</span>
       </h1>
 
-      <div>
+      <div class="brand-subtitle">
         Partager dans un salon
       </div>
+
     </div>
 
-    <!-- CHARGEMENT -->
+
+    <!-- =======================================================
+         CHARGEMENT
+         ======================================================= -->
+
     <section
       id="loading-box"
       class="card"
     >
-      <div style="text-align:center;padding:30px 10px;">
-        <div style="font-size:40px;margin-bottom:15px;">
+
+      <div class="loading-content">
+
+        <div class="loading-icon">
           ⏳
         </div>
 
-        <h2>
+        <h2 id="loading-title">
           Préparation du partage...
         </h2>
 
         <p id="loading-text">
           Réception du fichier en cours.
         </p>
+
+        <div
+          id="loader"
+          class="loader"
+        ></div>
+
       </div>
+
     </section>
 
-    <!-- PARTAGE -->
+
+    <!-- =======================================================
+         PARTAGE
+         ======================================================= -->
+
     <section
       id="share-card"
       class="card hidden"
@@ -47,7 +411,7 @@
           📎
         </div>
 
-        <div>
+        <div class="file-info">
 
           <div
             id="filename"
@@ -67,6 +431,9 @@
 
       </div>
 
+
+      <!-- SALON -->
+
       <div class="field">
 
         <label for="room-select">
@@ -83,6 +450,9 @@
 
       </div>
 
+
+      <!-- MESSAGE -->
+
       <div class="field">
 
         <label for="caption">
@@ -97,6 +467,9 @@
 
       </div>
 
+
+      <!-- PUBLICATION -->
+
       <button
         id="publish-btn"
         disabled
@@ -106,7 +479,11 @@
 
     </section>
 
-    <!-- CONNEXION -->
+
+    <!-- =======================================================
+         CONNEXION
+         ======================================================= -->
+
     <section
       id="login-box"
       class="card hidden"
@@ -120,18 +497,27 @@
         Connecte-toi à MAHOUTO+ pour publier ce fichier.
       </p>
 
-      <br>
-
-      <button id="login-btn">
+      <button
+        id="login-btn"
+        class="google-btn"
+      >
         Se connecter avec Google
       </button>
 
     </section>
 
-    <!-- STATUS -->
+
+    <!-- =======================================================
+         STATUS
+         ======================================================= -->
+
     <div id="status"></div>
 
-    <!-- SUCCÈS -->
+
+    <!-- =======================================================
+         SUCCÈS
+         ======================================================= -->
+
     <section
       id="success-box"
       class="card success hidden"
@@ -149,17 +535,19 @@
         Ton fichier a été publié.
       </p>
 
-      <br>
-
       <button
-        onclick="window.location.href='discussions.html'"
+        id="discussions-btn"
       >
         Voir les discussions
       </button>
 
     </section>
 
-    <!-- ERREUR -->
+
+    <!-- =======================================================
+         ERREUR
+         ======================================================= -->
+
     <section
       id="error-box"
       class="card error hidden"
@@ -169,12 +557,12 @@
         Impossible de terminer le partage
       </h3>
 
-      <p id="error-text"></p>
-
-      <br>
+      <p id="error-text">
+        Une erreur est survenue.
+      </p>
 
       <button
-        onclick="window.location.reload()"
+        id="retry-btn"
       >
         Réessayer
       </button>
@@ -183,14 +571,82 @@
 
   </main>
 
-  <script src="config.js"></script>
+
+  <!-- =========================================================
+       CONFIGURATION
+       ========================================================= -->
+
+  <script src="/config.js"></script>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
+
+  <!-- =========================================================
+       APPLICATION
+       ========================================================= -->
+
   <script>
+
+    "use strict";
+
+
+    /* =========================================================
+       CONFIGURATION SUPABASE
+       ========================================================= */
+
+    if (
+      !window.MAHOUTO_CONFIG ||
+      !window.MAHOUTO_CONFIG.SUPABASE_URL ||
+      !window.MAHOUTO_CONFIG.SUPABASE_ANON_KEY
+    ) {
+
+      document.body.innerHTML = `
+        <div style="
+          padding:30px;
+          font-family:Arial,sans-serif;
+          background:#0A0A0A;
+          color:white;
+          min-height:100vh;
+        ">
+          <h2>Erreur de configuration</h2>
+          <p>
+            La configuration Supabase de MAHOUTO+ est introuvable.
+          </p>
+        </div>
+      `;
+
+      throw new Error(
+        "Configuration Supabase manquante."
+      );
+    }
+
+
+    if (!window.supabase) {
+
+      document.body.innerHTML = `
+        <div style="
+          padding:30px;
+          font-family:Arial,sans-serif;
+          background:#0A0A0A;
+          color:white;
+          min-height:100vh;
+        ">
+          <h2>Erreur</h2>
+          <p>
+            Impossible de charger le module Supabase.
+          </p>
+        </div>
+      `;
+
+      throw new Error(
+        "Supabase JS non chargé."
+      );
+    }
+
 
     const cfg =
       window.MAHOUTO_CONFIG;
+
 
     const supabase =
       window.supabase.createClient(
@@ -198,18 +654,29 @@
         cfg.SUPABASE_ANON_KEY
       );
 
-    // =========================================================
-    // ELEMENTS
-    // =========================================================
+
+    /* =========================================================
+       ELEMENTS
+       ========================================================= */
 
     const loadingBox =
       document.getElementById(
         "loading-box"
       );
 
+    const loadingTitle =
+      document.getElementById(
+        "loading-title"
+      );
+
     const loadingText =
       document.getElementById(
         "loading-text"
+      );
+
+    const loader =
+      document.getElementById(
+        "loader"
       );
 
     const shareCard =
@@ -252,6 +719,21 @@
         "publish-btn"
       );
 
+    const loginBtn =
+      document.getElementById(
+        "login-btn"
+      );
+
+    const retryBtn =
+      document.getElementById(
+        "retry-btn"
+      );
+
+    const discussionsBtn =
+      document.getElementById(
+        "discussions-btn"
+      );
+
     const filenameEl =
       document.getElementById(
         "filename"
@@ -267,105 +749,43 @@
         "preview-icon"
       );
 
-    // =========================================================
-    // SHARE ID
-    // =========================================================
+    const errorText =
+      document.getElementById(
+        "error-text"
+      );
+
+    const successText =
+      document.getElementById(
+        "success-text"
+      );
+
+
+    /* =========================================================
+       SHARE ID
+       ========================================================= */
 
     const params =
       new URLSearchParams(
         window.location.search
       );
 
+
     const shareId =
       params.get("id");
 
+
     let currentShare = null;
+
     let currentUser = null;
 
-    // =========================================================
-    // UTILS
-    // =========================================================
+    let isPublishing = false;
 
-    function setStatus(text) {
-      statusEl.textContent =
-        text || "";
-    }
 
-    function formatSize(bytes) {
+    /* =========================================================
+       AFFICHAGE DES ÉTATS
+       ========================================================= */
 
-      if (!bytes) {
-        return "Taille inconnue";
-      }
-
-      if (bytes < 1024) {
-        return `${bytes} o`;
-      }
-
-      if (
-        bytes <
-        1024 * 1024
-      ) {
-        return (
-          (bytes / 1024)
-            .toFixed(1) +
-          " Ko"
-        );
-      }
-
-      return (
-        (bytes /
-          (1024 * 1024)
-        ).toFixed(1) +
-        " Mo"
-      );
-    }
-
-    function iconForMime(mime) {
-
-      if (
-        mime.startsWith(
-          "image/"
-        )
-      ) {
-        return "🖼️";
-      }
-
-      if (
-        mime.startsWith(
-          "video/"
-        )
-      ) {
-        return "🎥";
-      }
-
-      if (
-        mime.startsWith(
-          "audio/"
-        )
-      ) {
-        return "🎵";
-      }
-
-      if (
-        mime.includes("pdf")
-      ) {
-        return "📕";
-      }
-
-      if (
-        mime.includes("word")
-      ) {
-        return "📘";
-      }
-
-      return "📎";
-    }
-
-    // =========================================================
-    // ERROR
-    // =========================================================
-
-    function showError(message) {
+    function hideAllStates() {
 
       loadingBox.classList.add(
         "hidden"
@@ -383,31 +803,319 @@
         "hidden"
       );
 
+      errorBox.classList.add(
+        "hidden"
+      );
+
+    }
+
+
+    function showLoading(
+      title,
+      message
+    ) {
+
+      hideAllStates();
+
+      loadingTitle.textContent =
+        title ||
+        "Préparation du partage...";
+
+      loadingText.textContent =
+        message ||
+        "Chargement...";
+
+      loader.classList.remove(
+        "hidden"
+      );
+
+      loadingBox.classList.remove(
+        "hidden"
+      );
+
+      setStatus("");
+
+    }
+
+
+    function showShare() {
+
+      hideAllStates();
+
+      shareCard.classList.remove(
+        "hidden"
+      );
+
+      setStatus("");
+
+      updatePublishButton();
+
+    }
+
+
+    function showLogin() {
+
+      hideAllStates();
+
+      loginBox.classList.remove(
+        "hidden"
+      );
+
+      setStatus(
+        "Connecte-toi pour continuer."
+      );
+
+    }
+
+
+    function showSuccess(
+      message
+    ) {
+
+      hideAllStates();
+
+      successText.textContent =
+        message ||
+        "Ton fichier a été publié.";
+
+      successBox.classList.remove(
+        "hidden"
+      );
+
+      setStatus("");
+
+    }
+
+
+    function showError(
+      message
+    ) {
+
+      hideAllStates();
+
+      errorText.textContent =
+        message ||
+        "Une erreur est survenue.";
+
       errorBox.classList.remove(
         "hidden"
       );
 
-      document.getElementById(
-        "error-text"
-      ).textContent =
-        message ||
-        "Une erreur est survenue.";
+      setStatus("");
+
     }
 
-    // =========================================================
-    // LOAD SHARE
-    // =========================================================
+
+    /* =========================================================
+       STATUS
+       ========================================================= */
+
+    function setStatus(
+      text
+    ) {
+
+      statusEl.textContent =
+        text ||
+        "";
+
+    }
+
+
+    /* =========================================================
+       FORMATAGE
+       ========================================================= */
+
+    function formatSize(
+      bytes
+    ) {
+
+      const value =
+        Number(bytes);
+
+
+      if (
+        !Number.isFinite(value) ||
+        value <= 0
+      ) {
+
+        return "Taille inconnue";
+
+      }
+
+
+      if (
+        value < 1024
+      ) {
+
+        return `${value} o`;
+
+      }
+
+
+      if (
+        value < 1024 * 1024
+      ) {
+
+        return (
+          (value / 1024)
+            .toFixed(1)
+          + " Ko"
+        );
+
+      }
+
+
+      if (
+        value < 1024 * 1024 * 1024
+      ) {
+
+        return (
+          (value / (1024 * 1024))
+            .toFixed(1)
+          + " Mo"
+        );
+
+      }
+
+
+      return (
+        (value /
+          (1024 * 1024 * 1024)
+        ).toFixed(1)
+        + " Go"
+      );
+
+    }
+
+
+    function iconForMime(
+      mime
+    ) {
+
+      const type =
+        String(mime || "")
+          .toLowerCase();
+
+
+      if (
+        type.startsWith(
+          "image/"
+        )
+      ) {
+
+        return "🖼️";
+
+      }
+
+
+      if (
+        type.startsWith(
+          "video/"
+        )
+      ) {
+
+        return "🎥";
+
+      }
+
+
+      if (
+        type.startsWith(
+          "audio/"
+        )
+      ) {
+
+        return "🎵";
+
+      }
+
+
+      if (
+        type.includes(
+          "pdf"
+        )
+      ) {
+
+        return "📕";
+
+      }
+
+
+      if (
+        type.includes(
+          "word"
+        )
+      ) {
+
+        return "📘";
+
+      }
+
+
+      if (
+        type.includes(
+          "excel"
+        ) ||
+        type.includes(
+          "spreadsheet"
+        )
+      ) {
+
+        return "📗";
+
+      }
+
+
+      if (
+        type.includes(
+          "zip"
+        ) ||
+        type.includes(
+          "compressed"
+        )
+      ) {
+
+        return "🗜️";
+
+      }
+
+
+      if (
+        type.startsWith(
+          "text/"
+        )
+      ) {
+
+        return "📄";
+
+      }
+
+
+      return "📎";
+
+    }
+
+
+    /* =========================================================
+       CHARGEMENT DU PARTAGE
+       ========================================================= */
 
     async function loadShare() {
 
       if (!shareId) {
+
         throw new Error(
-          "Identifiant du partage manquant."
+          "Lien de partage invalide : identifiant manquant."
         );
+
       }
 
-      loadingText.textContent =
-        "Chargement du fichier partagé...";
+
+      showLoading(
+        "Préparation du partage...",
+        "Chargement du fichier partagé..."
+      );
+
 
       const response =
         await fetch(
@@ -415,89 +1123,135 @@
             shareId
           )}`,
           {
-            cache: "no-store"
+            method: "GET",
+            cache: "no-store",
+            headers: {
+              "Accept":
+                "application/json"
+            }
           }
         );
 
-      const data =
-        await response.json();
+
+      let data = null;
+
+
+      try {
+
+        data =
+          await response.json();
+
+      } catch (jsonError) {
+
+        throw new Error(
+          "Le serveur a retourné une réponse invalide."
+        );
+
+      }
+
 
       if (
         !response.ok ||
+        !data ||
         !data.success
       ) {
+
         throw new Error(
-          data.error ||
+          data?.error ||
           "Impossible de charger le partage."
         );
+
       }
+
+
+      if (
+        !data.share
+      ) {
+
+        throw new Error(
+          "Les informations du fichier sont introuvables."
+        );
+
+      }
+
 
       currentShare =
         data.share;
 
+
       filenameEl.textContent =
         currentShare.filename ||
         "Fichier";
+
 
       filesizeEl.textContent =
         formatSize(
           currentShare.file_size
         );
 
+
       previewIcon.textContent =
         iconForMime(
-          currentShare.mime_type ||
-          ""
+          currentShare.mime_type
         );
+
 
       captionEl.value =
         currentShare.caption ||
         "";
 
-      loadingBox.classList.add(
-        "hidden"
-      );
 
-      shareCard.classList.remove(
-        "hidden"
-      );
+      showShare();
+
     }
 
-    // =========================================================
-    // CURRENT USER
-    // =========================================================
+
+    /* =========================================================
+       UTILISATEUR CONNECTÉ
+       ========================================================= */
 
     async function getCurrentUser() {
 
-      const {
-        data,
-        error
-      } =
+      const result =
         await supabase.auth.getUser();
 
-      if (error) {
-        console.error(error);
+
+      if (
+        result.error
+      ) {
+
+        console.error(
+          "getCurrentUser:",
+          result.error
+        );
+
         return null;
+
       }
 
-      return data?.user || null;
+
+      return (
+        result.data?.user ||
+        null
+      );
+
     }
 
-    // =========================================================
-    // ROOMS
-    // =========================================================
+
+    /* =========================================================
+       CHARGEMENT DES SALONS
+       ========================================================= */
 
     async function loadRooms() {
 
-      roomSelect.innerHTML =
-        `<option value="">
-          Chargement...
-        </option>`;
+      roomSelect.innerHTML = `
+        <option value="">
+          Chargement des salons...
+        </option>
+      `;
 
-      const {
-        data: rooms,
-        error
-      } =
+
+      const result =
         await supabase
           .from("rooms")
           .select(
@@ -510,110 +1264,193 @@
             }
           );
 
+
+      const rooms =
+        result.data;
+
+      const error =
+        result.error;
+
+
       if (error) {
 
-        console.error(error);
+        console.error(
+          "loadRooms:",
+          error
+        );
 
         throw new Error(
           "Impossible de charger les salons."
         );
+
       }
 
+
       if (
-        !rooms ||
-        !rooms.length
+        !Array.isArray(rooms) ||
+        rooms.length === 0
       ) {
+
         throw new Error(
           "Aucun salon disponible."
         );
+
       }
 
-      roomSelect.innerHTML =
-        `<option value="">
+
+      roomSelect.innerHTML = `
+        <option value="">
           Choisir un salon...
-        </option>`;
+        </option>
+      `;
 
-      rooms.forEach(room => {
 
-        const option =
-          document.createElement(
-            "option"
+      rooms.forEach(
+        room => {
+
+          const option =
+            document.createElement(
+              "option"
+            );
+
+
+          option.value =
+            room.id;
+
+
+          option.textContent =
+            `${room.emoji || "💬"} ${room.name}`;
+
+
+          roomSelect.appendChild(
+            option
           );
 
-        option.value =
-          room.id;
+        }
+      );
 
-        option.textContent =
-          `${room.emoji || "💬"} ${room.name}`;
-
-        roomSelect.appendChild(
-          option
-        );
-      });
 
       updatePublishButton();
+
     }
 
-    // =========================================================
-    // BUTTON
-    // =========================================================
+
+    /* =========================================================
+       BOUTON PUBLIER
+       ========================================================= */
 
     function updatePublishButton() {
 
       publishBtn.disabled =
+        isPublishing ||
         !currentUser ||
         !currentShare ||
         !roomSelect.value;
+
     }
+
 
     roomSelect.addEventListener(
       "change",
       updatePublishButton
     );
 
-    // =========================================================
-    // PUBLISH
-    // =========================================================
 
-    publishBtn.addEventListener(
-      "click",
-      publishShare
-    );
+    /* =========================================================
+       PUBLICATION
+       ========================================================= */
 
     async function publishShare() {
 
       if (
-        !currentUser ||
-        !currentShare ||
-        !roomSelect.value
+        isPublishing
       ) {
+
         return;
+
       }
 
-      publishBtn.disabled =
+
+      if (
+        !currentUser
+      ) {
+
+        showLogin();
+
+        return;
+
+      }
+
+
+      if (
+        !currentShare
+      ) {
+
+        showError(
+          "Le fichier partagé est introuvable."
+        );
+
+        return;
+
+      }
+
+
+      if (
+        !roomSelect.value
+      ) {
+
+        setStatus(
+          "Choisis d'abord un salon."
+        );
+
+        return;
+
+      }
+
+
+      isPublishing =
         true;
+
+
+      updatePublishButton();
+
 
       setStatus(
         "Publication en cours..."
       );
 
+
       try {
 
-        const {
-          data:
-            sessionData
-        } =
+        /*
+         * Récupération de la session Supabase.
+         */
+
+        const sessionResult =
           await supabase.auth.getSession();
 
-        const session =
-          sessionData?.session;
 
-        if (!session) {
+        const session =
+          sessionResult
+            ?.data
+            ?.session;
+
+
+        if (
+          !session ||
+          !session.access_token
+        ) {
 
           throw new Error(
             "Ta session a expiré. Reconnecte-toi."
           );
+
         }
+
+
+        /*
+         * Envoi au backend.
+         */
 
         const response =
           await fetch(
@@ -625,12 +1462,16 @@
                 "Content-Type":
                   "application/json",
 
-                Authorization:
+                "Accept":
+                  "application/json",
+
+                "Authorization":
                   `Bearer ${session.access_token}`
               },
 
               body:
                 JSON.stringify({
+
                   share_id:
                     currentShare.id,
 
@@ -640,156 +1481,209 @@
                   caption:
                     captionEl.value
                       .trim()
+
                 })
+
             }
           );
 
-        const data =
-          await response.json();
+
+        let data = null;
+
+
+        try {
+
+          data =
+            await response.json();
+
+        } catch (jsonError) {
+
+          throw new Error(
+            "Le serveur a retourné une réponse invalide."
+          );
+
+        }
+
 
         if (
           !response.ok ||
+          !data ||
           !data.success
         ) {
 
           throw new Error(
-            data.error ||
+            data?.error ||
             "La publication a échoué."
           );
+
         }
 
-        shareCard.classList.add(
-          "hidden"
+
+        const roomName =
+          data.room?.name ||
+          "le salon sélectionné";
+
+
+        showSuccess(
+          `Publié dans « ${roomName} ».`
         );
 
-        loginBox.classList.add(
-          "hidden"
-        );
-
-        errorBox.classList.add(
-          "hidden"
-        );
-
-        successBox.classList.remove(
-          "hidden"
-        );
-
-        document.getElementById(
-          "success-text"
-        ).textContent =
-          `Publié dans « ${data.room.name} ».`;
-
-        setStatus("");
 
       } catch (error) {
 
-        console.error(error);
+        console.error(
+          "publishShare:",
+          error
+        );
 
-        setStatus("");
-
-        publishBtn.disabled =
-          false;
 
         showError(
-          error.message
+          error?.message ||
+          "Impossible de terminer le partage."
         );
-      }
-    }
 
-    // =========================================================
-    // GOOGLE LOGIN
-    // =========================================================
 
-    document
-      .getElementById(
-        "login-btn"
-      )
-      .addEventListener(
-        "click",
-        async () => {
+      } finally {
 
-          const {
-            error
-          } =
-            await supabase.auth
-              .signInWithOAuth({
-                provider:
-                  "google",
-
-                options: {
-                  redirectTo:
-                    window.location.href
-                }
-              });
-
-          if (error) {
-            showError(
-              error.message
-            );
-          }
-        }
-      );
-
-    // =========================================================
-    // INIT
-    // =========================================================
-
-    async function init() {
-
-      try {
-
-        if (!shareId) {
-
-          throw new Error(
-            "Lien de partage invalide."
-          );
-        }
-
-        await loadShare();
-
-        currentUser =
-          await getCurrentUser();
-
-        if (!currentUser) {
-
-          shareCard.classList.add(
-            "hidden"
-          );
-
-          loginBox.classList.remove(
-            "hidden"
-          );
-
-          setStatus(
-            "Connecte-toi pour continuer."
-          );
-
-          return;
-        }
-
-        await loadRooms();
+        isPublishing =
+          false;
 
         updatePublishButton();
 
-      } catch (error) {
-
-        console.error(error);
-
-        showError(
-          error.message
-        );
       }
+
     }
 
-    // =========================================================
-    // AUTH STATE
-    // =========================================================
+
+    publishBtn.addEventListener(
+      "click",
+      publishShare
+    );
+
+
+    /* =========================================================
+       CONNEXION GOOGLE
+       ========================================================= */
+
+    async function loginWithGoogle() {
+
+      try {
+
+        loginBtn.disabled =
+          true;
+
+
+        setStatus(
+          "Ouverture de la connexion Google..."
+        );
+
+
+        /*
+         * On conserve exactement l'URL actuelle
+         * afin de revenir sur :
+         *
+         * /share.html?id=UUID
+         */
+
+        const redirectTo =
+          window.location.href;
+
+
+        const result =
+          await supabase.auth
+            .signInWithOAuth({
+
+              provider:
+                "google",
+
+              options: {
+                redirectTo
+              }
+
+            });
+
+
+        if (
+          result.error
+        ) {
+
+          throw result.error;
+
+        }
+
+
+      } catch (error) {
+
+        console.error(
+          "loginWithGoogle:",
+          error
+        );
+
+
+        showError(
+          error?.message ||
+          "Impossible de démarrer la connexion Google."
+        );
+
+
+        loginBtn.disabled =
+          false;
+
+      }
+
+    }
+
+
+    loginBtn.addEventListener(
+      "click",
+      loginWithGoogle
+    );
+
+
+    /* =========================================================
+       BOUTON DISCUSSIONS
+       ========================================================= */
+
+    discussionsBtn.addEventListener(
+      "click",
+      () => {
+
+        window.location.href =
+          "/discussions.html";
+
+      }
+    );
+
+
+    /* =========================================================
+       BOUTON RÉESSAYER
+       ========================================================= */
+
+    retryBtn.addEventListener(
+      "click",
+      () => {
+
+        window.location.reload();
+
+      }
+    );
+
+
+    /* =========================================================
+       AUTH STATE
+       ========================================================= */
 
     supabase.auth.onAuthStateChange(
       async (
         event,
         session
       ) => {
+
+        console.log(
+          "Auth event:",
+          event
+        );
+
 
         if (
           session &&
@@ -799,29 +1693,135 @@
           currentUser =
             session.user;
 
-          loginBox.classList.add(
-            "hidden"
-          );
 
-          shareCard.classList.remove(
-            "hidden"
-          );
+          /*
+           * Si le partage est déjà chargé,
+           * on affiche directement le formulaire.
+           */
 
-          try {
+          if (
+            currentShare &&
+            !isPublishing
+          ) {
 
-            await loadRooms();
+            try {
 
-          } catch (error) {
+              await loadRooms();
 
-            showError(
-              error.message
-            );
+              showShare();
+
+            } catch (error) {
+
+              console.error(
+                "Auth/loadRooms:",
+                error
+              );
+
+              showError(
+                error?.message ||
+                "Impossible de charger les salons."
+              );
+
+            }
+
           }
 
-          updatePublishButton();
         }
+
       }
     );
+
+
+    /* =========================================================
+       INITIALISATION
+       ========================================================= */
+
+    async function init() {
+
+      try {
+
+        /*
+         * IMPORTANT :
+         * Sans ?id=UUID, cette page n'est pas
+         * un partage valide.
+         */
+
+        if (!shareId) {
+
+          showError(
+            "Lien de partage invalide. Utilise le lien généré par MAHOUTO+."
+          );
+
+          return;
+
+        }
+
+
+        /*
+         * 1. Récupérer le fichier.
+         */
+
+        await loadShare();
+
+
+        /*
+         * 2. Vérifier la session.
+         */
+
+        currentUser =
+          await getCurrentUser();
+
+
+        /*
+         * 3. Si pas connecté :
+         *    afficher UNIQUEMENT connexion.
+         */
+
+        if (!currentUser) {
+
+          showLogin();
+
+          return;
+
+        }
+
+
+        /*
+         * 4. Utilisateur connecté :
+         *    charger les salons.
+         */
+
+        await loadRooms();
+
+
+        /*
+         * 5. Afficher UNIQUEMENT
+         *    le formulaire de partage.
+         */
+
+        showShare();
+
+      } catch (error) {
+
+        console.error(
+          "init:",
+          error
+        );
+
+
+        showError(
+          error?.message ||
+          "Impossible de préparer le partage."
+        );
+
+      }
+
+    }
+
+
+    /*
+     * Lancement.
+     */
 
     init();
 
