@@ -1,4 +1,4 @@
-const CACHE_NAME = "mahoutoplus-shell-v40";
+const CACHE_NAME = "mahoutoplus-shell-v41";
 
 const APP_SHELL = [
   "/",
@@ -27,11 +27,9 @@ const APP_SHELL = [
 
 self.addEventListener("install", event => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(APP_SHELL))
-      .catch(error => {
-        console.error("Erreur installation cache :", error);
-      })
+    caches.open(CACHE_NAME).then(cache => {
+      return cache.addAll(APP_SHELL);
+    })
   );
 
   self.skipWaiting();
@@ -44,11 +42,15 @@ self.addEventListener("install", event => {
 
 self.addEventListener("activate", event => {
   event.waitUntil(
-    caches.keys().then(cacheNames => {
+    caches.keys().then(keys => {
       return Promise.all(
-        cacheNames
-          .filter(cacheName => cacheName !== CACHE_NAME)
-          .map(cacheName => caches.delete(cacheName))
+        keys.map(key => {
+          if (key !== CACHE_NAME) {
+            return caches.delete(key);
+          }
+
+          return undefined;
+        })
       );
     })
   );
@@ -59,69 +61,159 @@ self.addEventListener("activate", event => {
 
 /* =========================================================
    SHARE TARGET
-   =========================================================
-   
-   Android envoie normalement le fichier vers :
-   
-       /api/share-target
-   
-   MAIS nous interceptons cette requête ici, AVANT Vercel.
+   ========================================================= */
 
-   Le gros fichier reste donc dans le navigateur.
-   Il ne traverse plus la Serverless Function Vercel.
+/*
+ * Android envoie le fichier ici :
+ *
+ *      /share-target
+ *
+ * Le Service Worker intercepte cette requête POST.
+ *
+ * Il récupère le FormData puis le transmet à :
+ *
+ *      /api/share-target
+ *
+ * L'API s'occupe ensuite de :
+ *
+ *      1. récupérer le fichier
+ *      2. l'envoyer vers Cloudinary
+ *      3. créer share_pending
+ *      4. rediriger vers /share.html?id=...
+ */
 
-   Ensuite nous redirigeons vers :
+async function handleShareTarget(request) {
+  try {
+    console.log("[MAHOUTO+] Share Target reçu");
 
-       /share.html?id=XXXX
+    const formData = await request.formData();
 
+    /*
+     * Vérification simple :
+     * Android devrait normalement envoyer le fichier
+     * dans le champ "files".
+     */
+
+    let hasFile = false;
+
+    for (const [key, value] of formData.entries()) {
+      if (value instanceof File) {
+        hasFile = true;
+
+        console.log(
+          "[MAHOUTO+] Fichier reçu :",
+          key,
+          value.name,
+          value.type,
+          value.size
+        );
+      }
+    }
+
+    if (!hasFile) {
+      console.warn(
+        "[MAHOUTO+] Aucun fichier détecté dans le partage."
+      );
+    }
+
+    /*
+     * Transfert vers notre API Vercel.
+     *
+     * On recrée une requête multipart/form-data.
+     *
+     * IMPORTANT :
+     * Ne pas définir manuellement le header
+     * Content-Type.
+     *
+     * Le navigateur ajoutera automatiquement
+     * le boundary multipart.
+     */
+
+    const response = await fetch("/api/share-target", {
+      method: "POST",
+      body: formData,
+      credentials: "include",
+      redirect: "follow"
+    });
+
+    console.log(
+      "[MAHOUTO+] Réponse API Share Target :",
+      response.status,
+      response.url
+    );
+
+    return response;
+
+  } catch (error) {
+    console.error(
+      "[MAHOUTO+] Erreur Share Target :",
+      error
+    );
+
+    /*
+     * En cas d'erreur, on renvoie l'utilisateur
+     * vers la page de partage avec un message.
+     */
+
+    return Response.redirect(
+      "/share.html?error=share_failed",
+      303
+    );
+  }
+}
+
+
+/* =========================================================
+   FETCH
    ========================================================= */
 
 self.addEventListener("fetch", event => {
-
   const request = event.request;
+  const url = new URL(request.url);
 
-  /*
-   * -------------------------------------------------------
-   * 1. INTERCEPTION DU SHARE TARGET
-   * -------------------------------------------------------
-   */
+
+  /* -------------------------------------------------------
+     1. SHARE TARGET ANDROID
+     ------------------------------------------------------- */
 
   if (
-    request.method === "POST" &&
-    new URL(request.url).pathname === "/api/share-target"
+    url.pathname === "/share-target" &&
+    request.method === "POST"
   ) {
-    event.respondWith(handleShareTarget(request));
+    event.respondWith(
+      handleShareTarget(request)
+    );
+
     return;
   }
 
 
+  /* -------------------------------------------------------
+     2. API
+     ------------------------------------------------------- */
+
   /*
-   * -------------------------------------------------------
-   * 2. NE JAMAIS METTRE LES API EN CACHE
-   * -------------------------------------------------------
+   * Les API ne doivent jamais être servies depuis
+   * le cache du Service Worker.
    */
 
-  if (new URL(request.url).pathname.startsWith("/api/")) {
+  if (url.pathname.startsWith("/api/")) {
     return;
   }
 
 
-  /*
-   * -------------------------------------------------------
-   * 3. UNIQUEMENT LES REQUÊTES GET
-   * -------------------------------------------------------
-   */
+  /* -------------------------------------------------------
+     3. Seules les requêtes GET sont mises en cache
+     ------------------------------------------------------- */
 
   if (request.method !== "GET") {
     return;
   }
 
 
-  /*
-   * -------------------------------------------------------
-   * 4. CACHE FIRST POUR L'APPLICATION
-   * -------------------------------------------------------
-   */
+  /* -------------------------------------------------------
+     4. App Shell : cache-first
+     ------------------------------------------------------- */
 
   event.respondWith(
     caches.match(request).then(cachedResponse => {
@@ -130,465 +222,27 @@ self.addEventListener("fetch", event => {
         return cachedResponse;
       }
 
-      return fetch(request)
-        .then(networkResponse => {
+      return fetch(request).then(networkResponse => {
 
-          /*
-           * Ne mettre en cache que les réponses valides.
-           */
+        /*
+         * On ne met en cache que les réponses valides.
+         */
 
-          if (
-            networkResponse &&
-            networkResponse.status === 200 &&
-            networkResponse.type === "basic"
-          ) {
-            const responseClone = networkResponse.clone();
+        if (
+          networkResponse &&
+          networkResponse.status === 200 &&
+          networkResponse.type === "basic"
+        ) {
+          const responseClone = networkResponse.clone();
 
-            caches.open(CACHE_NAME).then(cache => {
-              cache.put(request, responseClone);
-            });
-          }
+          caches.open(CACHE_NAME).then(cache => {
+            cache.put(request, responseClone);
+          });
+        }
 
-          return networkResponse;
-        })
-        .catch(() => {
-          return caches.match("/index.html");
-        });
+        return networkResponse;
+      });
+
     })
   );
 });
-
-
-/* =========================================================
-   GESTION DU SHARE TARGET
-   ========================================================= */
-
-async function handleShareTarget(request) {
-
-  try {
-
-    /*
-     * Récupération du multipart/form-data envoyé
-     * par Android.
-     */
-
-    const formData = await request.formData();
-
-
-    /*
-     * Données textuelles éventuellement envoyées
-     * par Android.
-     */
-
-    const title =
-      getFormValue(formData, "title") || "";
-
-    const text =
-      getFormValue(formData, "text") || "";
-
-    const sharedUrl =
-      getFormValue(formData, "url") || "";
-
-
-    /*
-     * Récupération du fichier.
-     *
-     * Le manifest utilise :
-     *
-     * files: [{
-     *   name: "files",
-     *   accept: [...]
-     * }]
-     */
-
-    let file = formData.get("files");
-
-
-    /*
-     * Certaines versions Android peuvent envoyer
-     * plusieurs fichiers.
-     */
-
-    if (!file || typeof file !== "object" || !file.name) {
-
-      const possibleFiles = [];
-
-      for (const [key, value] of formData.entries()) {
-
-        if (
-          value &&
-          typeof value === "object" &&
-          typeof value.name === "string" &&
-          value.size !== undefined
-        ) {
-          possibleFiles.push(value);
-        }
-      }
-
-      if (possibleFiles.length > 0) {
-        file = possibleFiles[0];
-      }
-    }
-
-
-    /*
-     * Aucun fichier.
-     */
-
-    if (!file || typeof file !== "object" || !file.name) {
-
-      return new Response(
-        createErrorHTML(
-          "Aucun fichier n'a été reçu.",
-          "Veuillez réessayer depuis la Galerie ou WhatsApp."
-        ),
-        {
-          status: 400,
-          headers: {
-            "Content-Type": "text/html; charset=utf-8"
-          }
-        }
-      );
-    }
-
-
-    /*
-     * Création d'un identifiant unique.
-     */
-
-    const shareId = crypto.randomUUID();
-
-
-    /*
-     * Sauvegarde temporaire dans IndexedDB.
-     *
-     * IMPORTANT :
-     * Le fichier est conservé localement dans le navigateur.
-     * Il n'est PAS envoyé à Vercel.
-     */
-
-    await savePendingShare({
-      id: shareId,
-
-      file: file,
-
-      title: title,
-
-      text: text,
-
-      sharedUrl: sharedUrl,
-
-      createdAt: Date.now()
-    });
-
-
-    /*
-     * Redirection vers l'interface MAHOUTO+.
-     */
-
-    const redirectUrl =
-      `/share.html?id=${encodeURIComponent(shareId)}`;
-
-
-    return Response.redirect(
-      redirectUrl,
-      303
-    );
-
-  } catch (error) {
-
-    console.error(
-      "Erreur Share Target Service Worker :",
-      error
-    );
-
-
-    return new Response(
-      createErrorHTML(
-        "Impossible de préparer le partage.",
-        "Veuillez réessayer."
-      ),
-      {
-        status: 500,
-        headers: {
-          "Content-Type": "text/html; charset=utf-8"
-        }
-      }
-    );
-  }
-}
-
-
-/* =========================================================
-   RÉCUPÉRATION D'UNE VALEUR FORM DATA
-   ========================================================= */
-
-function getFormValue(formData, key) {
-
-  const value = formData.get(key);
-
-  if (typeof value === "string") {
-    return value.trim();
-  }
-
-  return "";
-}
-
-
-/* =========================================================
-   INDEXEDDB
-   ========================================================= */
-
-const DB_NAME = "mahoutoplus-share";
-
-const DB_VERSION = 1;
-
-const STORE_NAME = "pending";
-
-
-/*
- * Ouvre la base.
- */
-
-function openShareDB() {
-
-  return new Promise((resolve, reject) => {
-
-    const request = indexedDB.open(
-      DB_NAME,
-      DB_VERSION
-    );
-
-
-    /*
-     * Création du magasin lors de la première ouverture.
-     */
-
-    request.onupgradeneeded = event => {
-
-      const db = event.target.result;
-
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-
-        db.createObjectStore(
-          STORE_NAME,
-          {
-            keyPath: "id"
-          }
-        );
-      }
-    };
-
-
-    request.onsuccess = () => {
-
-      resolve(request.result);
-    };
-
-
-    request.onerror = () => {
-
-      reject(request.error);
-    };
-  });
-}
-
-
-/* =========================================================
-   SAUVEGARDE DU PARTAGE
-   ========================================================= */
-
-async function savePendingShare(data) {
-
-  const db = await openShareDB();
-
-
-  return new Promise((resolve, reject) => {
-
-    const transaction =
-      db.transaction(
-        STORE_NAME,
-        "readwrite"
-      );
-
-
-    const store =
-      transaction.objectStore(
-        STORE_NAME
-      );
-
-
-    store.put(data);
-
-
-    transaction.oncomplete = () => {
-
-      db.close();
-
-      resolve();
-    };
-
-
-    transaction.onerror = () => {
-
-      db.close();
-
-      reject(transaction.error);
-    };
-
-
-    transaction.onabort = () => {
-
-      db.close();
-
-      reject(
-        transaction.error ||
-        new Error(
-          "Transaction IndexedDB interrompue."
-        )
-      );
-    };
-  });
-}
-
-
-/* =========================================================
-   PAGE D'ERREUR MINIMALE
-   ========================================================= */
-
-function createErrorHTML(title, message) {
-
-  return `
-<!DOCTYPE html>
-<html lang="fr">
-<head>
-  <meta charset="UTF-8">
-
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0"
-  >
-
-  <title>MAHOUTO+ — Partage</title>
-
-  <style>
-
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      margin: 0;
-      min-height: 100vh;
-
-      display: flex;
-      align-items: center;
-      justify-content: center;
-
-      padding: 24px;
-
-      font-family:
-        Arial,
-        Helvetica,
-        sans-serif;
-
-      background: #0A0A0A;
-
-      color: #FFFFFF;
-    }
-
-    .card {
-      width: 100%;
-      max-width: 420px;
-
-      padding: 30px;
-
-      border-radius: 20px;
-
-      background: #171717;
-
-      text-align: center;
-    }
-
-    h1 {
-      margin-top: 0;
-
-      font-size: 24px;
-    }
-
-    p {
-      line-height: 1.6;
-
-      color: #CCCCCC;
-    }
-
-    .logo {
-      font-size: 42px;
-
-      margin-bottom: 15px;
-    }
-
-    button {
-      margin-top: 20px;
-
-      width: 100%;
-
-      padding: 14px;
-
-      border: 0;
-
-      border-radius: 12px;
-
-      background: #FFC107;
-
-      color: #000000;
-
-      font-weight: 700;
-
-      font-size: 16px;
-    }
-
-  </style>
-</head>
-
-<body>
-
-  <div class="card">
-
-    <div class="logo">
-      M+
-    </div>
-
-    <h1>${escapeHTML(title)}</h1>
-
-    <p>
-      ${escapeHTML(message)}
-    </p>
-
-    <button
-      onclick="location.href='/share.html'"
-    >
-      Ouvrir MAHOUTO+
-    </button>
-
-  </div>
-
-</body>
-</html>
-`;
-}
-
-
-/* =========================================================
-   PROTECTION HTML
-   ========================================================= */
-
-function escapeHTML(value) {
-
-  return String(value || "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
