@@ -1,204 +1,8 @@
-<!DOCTYPE html>
-<html lang="fr">
-
-<head>
-
-  <meta charset="UTF-8">
-
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0"
-  >
-
-  <meta
-    name="theme-color"
-    content="#0A0A0A"
-  >
-
-  <title>Partager sur MAHOUTO+</title>
-
-  <link
-    rel="manifest"
-    href="manifest.json"
-  >
-
-  <link
-    rel="stylesheet"
-    href="theme.css"
-  >
-
-  <style>
-
-    body {
-      min-height: 100vh;
-      background: var(--bg);
-      color: var(--white);
-      display: flex;
-      flex-direction: column;
-    }
-
-    .share-container {
-      width: 100%;
-      max-width: 520px;
-      margin: auto;
-      padding: 24px 18px 100px;
-    }
-
-    .brand {
-      text-align: center;
-      margin-bottom: 25px;
-    }
-
-    .brand h1 {
-      font-size: 28px;
-      color: var(--gold-bright);
-    }
-
-    .brand span {
-      color: var(--accent-green);
-    }
-
-    .card {
-      background: var(--bg-card);
-      border-radius: 20px;
-      padding: 20px;
-      margin-bottom: 18px;
-      border: 1px solid var(--border);
-    }
-
-    .preview {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      margin-bottom: 18px;
-    }
-
-    .preview-icon {
-      width: 58px;
-      height: 58px;
-      border-radius: 15px;
-      background: var(--bg-elevated);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 28px;
-      flex: none;
-    }
-
-    .filename {
-      font-weight: bold;
-      word-break: break-word;
-    }
-
-    .filesize {
-      color: var(--text-muted);
-      font-size: 13px;
-      margin-top: 4px;
-    }
-
-    label {
-      display: block;
-      margin-bottom: 8px;
-      color: var(--text-muted);
-      font-size: 14px;
-    }
-
-    select,
-    textarea {
-      width: 100%;
-      background: var(--bg-elevated);
-      color: var(--white);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 13px;
-      font-size: 15px;
-      outline: none;
-    }
-
-    textarea {
-      min-height: 100px;
-      resize: vertical;
-    }
-
-    .field {
-      margin-bottom: 18px;
-    }
-
-    #publish-btn {
-      width: 100%;
-      border: none;
-      border-radius: 15px;
-      padding: 15px;
-      background: var(--gold-bright);
-      color: #0A0A0A;
-      font-size: 16px;
-      font-weight: bold;
-      cursor: pointer;
-    }
-
-    #publish-btn:disabled {
-      opacity: .5;
-      cursor: not-allowed;
-    }
-
-    #login-box {
-      text-align: center;
-    }
-
-    #login-btn {
-      border: none;
-      border-radius: 14px;
-      padding: 13px 20px;
-      background: var(--gold-bright);
-      color: #0A0A0A;
-      font-weight: bold;
-      cursor: pointer;
-    }
-
-    #status {
-      text-align: center;
-      color: var(--text-muted);
-      min-height: 22px;
-      margin: 12px 0;
-      font-size: 14px;
-    }
-
-    .success {
-      text-align: center;
-      padding: 35px 15px;
-    }
-
-    .success-icon {
-      font-size: 55px;
-      margin-bottom: 12px;
-    }
-
-    .success h2 {
-      color: var(--accent-green);
-      margin-bottom: 8px;
-    }
-
-    .error {
-      color: #F87171;
-      text-align: center;
-      padding: 20px;
-    }
-
-    .hidden {
-      display: none !important;
-    }
-
-  </style>
-
-</head>
-
-
 <body>
 
   <main class="share-container">
 
     <div class="brand">
-
       <h1>
         MAHOUTO<span>+</span>
       </h1>
@@ -206,15 +10,33 @@
       <div>
         Partager dans un salon
       </div>
-
     </div>
 
+    <!-- CHARGEMENT -->
+    <section
+      id="loading-box"
+      class="card"
+    >
+      <div style="text-align:center;padding:30px 10px;">
+        <div style="font-size:40px;margin-bottom:15px;">
+          ⏳
+        </div>
 
-    <!-- =====================================================
-         PARTAGE
-         ===================================================== -->
+        <h2>
+          Préparation du partage...
+        </h2>
 
-    <section id="share-card" class="card hidden">
+        <p id="loading-text">
+          Réception du fichier en cours.
+        </p>
+      </div>
+    </section>
+
+    <!-- PARTAGE -->
+    <section
+      id="share-card"
+      class="card hidden"
+    >
 
       <div class="preview">
 
@@ -245,7 +67,6 @@
 
       </div>
 
-
       <div class="field">
 
         <label for="room-select">
@@ -262,7 +83,6 @@
 
       </div>
 
-
       <div class="field">
 
         <label for="caption">
@@ -277,7 +97,6 @@
 
       </div>
 
-
       <button
         id="publish-btn"
         disabled
@@ -287,11 +106,7 @@
 
     </section>
 
-
-    <!-- =====================================================
-         CONNEXION
-         ===================================================== -->
-
+    <!-- CONNEXION -->
     <section
       id="login-box"
       class="card hidden"
@@ -313,18 +128,10 @@
 
     </section>
 
-
-    <!-- =====================================================
-         STATUS
-         ===================================================== -->
-
+    <!-- STATUS -->
     <div id="status"></div>
 
-
-    <!-- =====================================================
-         SUCCÈS
-         ===================================================== -->
-
+    <!-- SUCCÈS -->
     <section
       id="success-box"
       class="card success hidden"
@@ -352,11 +159,7 @@
 
     </section>
 
-
-    <!-- =====================================================
-         ERREUR
-         ===================================================== -->
-
+    <!-- ERREUR -->
     <section
       id="error-box"
       class="card error hidden"
@@ -368,21 +171,23 @@
 
       <p id="error-text"></p>
 
+      <br>
+
+      <button
+        onclick="window.location.reload()"
+      >
+        Réessayer
+      </button>
+
     </section>
 
   </main>
-
 
   <script src="config.js"></script>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 
-
   <script>
-
-    // =======================================================
-    // CONFIG
-    // =======================================================
 
     const cfg =
       window.MAHOUTO_CONFIG;
@@ -393,10 +198,19 @@
         cfg.SUPABASE_ANON_KEY
       );
 
-
-    // =======================================================
+    // =========================================================
     // ELEMENTS
-    // =======================================================
+    // =========================================================
+
+    const loadingBox =
+      document.getElementById(
+        "loading-box"
+      );
+
+    const loadingText =
+      document.getElementById(
+        "loading-text"
+      );
 
     const shareCard =
       document.getElementById(
@@ -453,10 +267,9 @@
         "preview-icon"
       );
 
-
-    // =======================================================
+    // =========================================================
     // SHARE ID
-    // =======================================================
+    // =========================================================
 
     const params =
       new URLSearchParams(
@@ -466,23 +279,17 @@
     const shareId =
       params.get("id");
 
+    let currentShare = null;
+    let currentUser = null;
 
-    let currentShare =
-      null;
-
-    let currentUser =
-      null;
-
-
-    // =======================================================
-    // UTILITAIRES
-    // =======================================================
+    // =========================================================
+    // UTILS
+    // =========================================================
 
     function setStatus(text) {
       statusEl.textContent =
         text || "";
     }
-
 
     function formatSize(bytes) {
 
@@ -491,10 +298,13 @@
       }
 
       if (bytes < 1024) {
-        return bytes + " o";
+        return `${bytes} o`;
       }
 
-      if (bytes < 1024 * 1024) {
+      if (
+        bytes <
+        1024 * 1024
+      ) {
         return (
           (bytes / 1024)
             .toFixed(1) +
@@ -503,42 +313,159 @@
       }
 
       return (
-        (bytes / (1024 * 1024))
-          .toFixed(1) +
+        (bytes /
+          (1024 * 1024)
+        ).toFixed(1) +
         " Mo"
       );
     }
 
-
     function iconForMime(mime) {
 
       if (
-        mime.startsWith("image/")
-      ) return "🖼️";
+        mime.startsWith(
+          "image/"
+        )
+      ) {
+        return "🖼️";
+      }
 
       if (
-        mime.startsWith("video/")
-      ) return "🎥";
+        mime.startsWith(
+          "video/"
+        )
+      ) {
+        return "🎥";
+      }
 
       if (
-        mime.startsWith("audio/")
-      ) return "🎵";
+        mime.startsWith(
+          "audio/"
+        )
+      ) {
+        return "🎵";
+      }
 
       if (
         mime.includes("pdf")
-      ) return "📕";
+      ) {
+        return "📕";
+      }
 
       if (
         mime.includes("word")
-      ) return "📘";
+      ) {
+        return "📘";
+      }
 
       return "📎";
     }
 
+    // =========================================================
+    // ERROR
+    // =========================================================
 
-    // =======================================================
-    // AUTHENTIFICATION
-    // =======================================================
+    function showError(message) {
+
+      loadingBox.classList.add(
+        "hidden"
+      );
+
+      shareCard.classList.add(
+        "hidden"
+      );
+
+      loginBox.classList.add(
+        "hidden"
+      );
+
+      successBox.classList.add(
+        "hidden"
+      );
+
+      errorBox.classList.remove(
+        "hidden"
+      );
+
+      document.getElementById(
+        "error-text"
+      ).textContent =
+        message ||
+        "Une erreur est survenue.";
+    }
+
+    // =========================================================
+    // LOAD SHARE
+    // =========================================================
+
+    async function loadShare() {
+
+      if (!shareId) {
+        throw new Error(
+          "Identifiant du partage manquant."
+        );
+      }
+
+      loadingText.textContent =
+        "Chargement du fichier partagé...";
+
+      const response =
+        await fetch(
+          `/api/share-pending?id=${encodeURIComponent(
+            shareId
+          )}`,
+          {
+            cache: "no-store"
+          }
+        );
+
+      const data =
+        await response.json();
+
+      if (
+        !response.ok ||
+        !data.success
+      ) {
+        throw new Error(
+          data.error ||
+          "Impossible de charger le partage."
+        );
+      }
+
+      currentShare =
+        data.share;
+
+      filenameEl.textContent =
+        currentShare.filename ||
+        "Fichier";
+
+      filesizeEl.textContent =
+        formatSize(
+          currentShare.file_size
+        );
+
+      previewIcon.textContent =
+        iconForMime(
+          currentShare.mime_type ||
+          ""
+        );
+
+      captionEl.value =
+        currentShare.caption ||
+        "";
+
+      loadingBox.classList.add(
+        "hidden"
+      );
+
+      shareCard.classList.remove(
+        "hidden"
+      );
+    }
+
+    // =========================================================
+    // CURRENT USER
+    // =========================================================
 
     async function getCurrentUser() {
 
@@ -556,86 +483,9 @@
       return data?.user || null;
     }
 
-
-    // =======================================================
-    // CHARGER LE PARTAGE
-    // =======================================================
-
-    async function loadShare() {
-
-      if (!shareId) {
-
-        throw new Error(
-          "Identifiant du partage manquant."
-        );
-      }
-
-
-      setStatus(
-        "Chargement du fichier..."
-      );
-
-
-      const response =
-        await fetch(
-          `/api/share-pending?id=${encodeURIComponent(
-            shareId
-          )}`
-        );
-
-
-      const data =
-        await response.json();
-
-
-      if (!response.ok || !data.success) {
-
-        throw new Error(
-          data.error ||
-          "Impossible de charger le partage."
-        );
-      }
-
-
-      currentShare =
-        data.share;
-
-
-      filenameEl.textContent =
-        currentShare.filename ||
-        "Fichier";
-
-
-      filesizeEl.textContent =
-        formatSize(
-          currentShare.file_size
-        );
-
-
-      previewIcon.textContent =
-        iconForMime(
-          currentShare.mime_type ||
-          ""
-        );
-
-
-      captionEl.value =
-        currentShare.caption ||
-        "";
-
-
-      shareCard.classList.remove(
-        "hidden"
-      );
-
-
-      setStatus("");
-    }
-
-
-    // =======================================================
-    // CHARGER LES SALONS
-    // =======================================================
+    // =========================================================
+    // ROOMS
+    // =========================================================
 
     async function loadRooms() {
 
@@ -643,7 +493,6 @@
         `<option value="">
           Chargement...
         </option>`;
-
 
       const {
         data: rooms,
@@ -661,7 +510,6 @@
             }
           );
 
-
       if (error) {
 
         console.error(error);
@@ -671,52 +519,44 @@
         );
       }
 
-
       if (
         !rooms ||
         !rooms.length
       ) {
-
         throw new Error(
           "Aucun salon disponible."
         );
       }
-
 
       roomSelect.innerHTML =
         `<option value="">
           Choisir un salon...
         </option>`;
 
+      rooms.forEach(room => {
 
-      rooms.forEach(
-        room => {
-
-          const option =
-            document.createElement(
-              "option"
-            );
-
-          option.value =
-            room.id;
-
-          option.textContent =
-            `${room.emoji || "💬"} ${room.name}`;
-
-          roomSelect.appendChild(
-            option
+        const option =
+          document.createElement(
+            "option"
           );
-        }
-      );
 
+        option.value =
+          room.id;
+
+        option.textContent =
+          `${room.emoji || "💬"} ${room.name}`;
+
+        roomSelect.appendChild(
+          option
+        );
+      });
 
       updatePublishButton();
     }
 
-
-    // =======================================================
-    // BOUTON PUBLICATION
-    // =======================================================
+    // =========================================================
+    // BUTTON
+    // =========================================================
 
     function updatePublishButton() {
 
@@ -726,22 +566,19 @@
         !roomSelect.value;
     }
 
-
     roomSelect.addEventListener(
       "change",
       updatePublishButton
     );
 
-
-    // =======================================================
-    // PUBLICATION
-    // =======================================================
+    // =========================================================
+    // PUBLISH
+    // =========================================================
 
     publishBtn.addEventListener(
       "click",
       publishShare
     );
-
 
     async function publishShare() {
 
@@ -753,27 +590,23 @@
         return;
       }
 
-
       publishBtn.disabled =
         true;
-
 
       setStatus(
         "Publication en cours..."
       );
 
-
       try {
 
         const {
-          data: sessionData
+          data:
+            sessionData
         } =
           await supabase.auth.getSession();
 
-
         const session =
           sessionData?.session;
-
 
         if (!session) {
 
@@ -782,7 +615,6 @@
           );
         }
 
-
         const response =
           await fetch(
             "/api/share-finalize",
@@ -790,17 +622,15 @@
               method: "POST",
 
               headers: {
-
                 "Content-Type":
                   "application/json",
 
                 Authorization:
-                  `Bearer ${session.access_token}`,
+                  `Bearer ${session.access_token}`
               },
 
               body:
                 JSON.stringify({
-
                   share_id:
                     currentShare.id,
 
@@ -808,15 +638,14 @@
                     roomSelect.value,
 
                   caption:
-                    captionEl.value.trim(),
-                }),
+                    captionEl.value
+                      .trim()
+                })
             }
           );
 
-
         const data =
           await response.json();
-
 
         if (
           !response.ok ||
@@ -828,7 +657,6 @@
             "La publication a échoué."
           );
         }
-
 
         shareCard.classList.add(
           "hidden"
@@ -846,14 +674,12 @@
           "hidden"
         );
 
-
         document.getElementById(
           "success-text"
         ).textContent =
           `Publié dans « ${data.room.name} ».`;
 
         setStatus("");
-
 
       } catch (error) {
 
@@ -870,13 +696,14 @@
       }
     }
 
-
-    // =======================================================
+    // =========================================================
     // GOOGLE LOGIN
-    // =======================================================
+    // =========================================================
 
     document
-      .getElementById("login-btn")
+      .getElementById(
+        "login-btn"
+      )
       .addEventListener(
         "click",
         async () => {
@@ -886,21 +713,16 @@
           } =
             await supabase.auth
               .signInWithOAuth({
-
                 provider:
                   "google",
 
                 options: {
-
                   redirectTo:
-                    window.location.href,
-                },
-
+                    window.location.href
+                }
               });
 
-
           if (error) {
-
             showError(
               error.message
             );
@@ -908,36 +730,9 @@
         }
       );
 
-
-    // =======================================================
-    // ERREUR
-    // =======================================================
-
-    function showError(message) {
-
-      errorBox.classList.remove(
-        "hidden"
-      );
-
-      document.getElementById(
-        "error-text"
-      ).textContent =
-        message ||
-        "Une erreur est survenue.";
-
-      shareCard.classList.add(
-        "hidden"
-      );
-
-      loginBox.classList.add(
-        "hidden"
-      );
-    }
-
-
-    // =======================================================
-    // INITIALISATION
-    // =======================================================
+    // =========================================================
+    // INIT
+    // =========================================================
 
     async function init() {
 
@@ -950,13 +745,10 @@
           );
         }
 
-
         await loadShare();
-
 
         currentUser =
           await getCurrentUser();
-
 
         if (!currentUser) {
 
@@ -975,12 +767,9 @@
           return;
         }
 
-
         await loadRooms();
 
-
         updatePublishButton();
-
 
       } catch (error) {
 
@@ -992,10 +781,9 @@
       }
     }
 
-
-    // =======================================================
+    // =========================================================
     // AUTH STATE
-    // =======================================================
+    // =========================================================
 
     supabase.auth.onAuthStateChange(
       async (
@@ -1020,8 +808,11 @@
           );
 
           try {
+
             await loadRooms();
+
           } catch (error) {
+
             showError(
               error.message
             );
@@ -1032,11 +823,9 @@
       }
     );
 
-
     init();
 
   </script>
 
 </body>
-
 </html>
