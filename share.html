@@ -8,27 +8,37 @@
     content="width=device-width, initial-scale=1.0, viewport-fit=cover"
   >
 
-  <meta
-    name="theme-color"
-    content="#FFC107"
-  >
+  <meta name="theme-color" content="#0A0A0A">
 
-  <meta
-    name="apple-mobile-web-app-capable"
-    content="yes"
-  >
+  <title>Partager dans MAHOUTO+</title>
 
-  <title>MAHOUTO+ — Partager dans un salon</title>
+  <!-- Configuration MAHOUTO+ -->
+  <script src="/config.js"></script>
 
-  <link
-    rel="manifest"
-    href="/manifest.json"
-  >
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- PDF.js : rendu local du PDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 
   <style>
+    :root {
+      --bg: #0a0a0a;
+      --card: #151515;
+      --card-2: #1c1c1c;
+      --border: #2b2b2b;
+      --gold: #ffc107;
+      --gold-dark: #d99f00;
+      --white: #ffffff;
+      --muted: #a7a7a7;
+      --success: #22c55e;
+      --danger: #ef4444;
+      --blue: #3b82f6;
+    }
 
     * {
       box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
     }
 
     html,
@@ -36,9 +46,11 @@
       margin: 0;
       padding: 0;
       min-height: 100%;
-      background: #0A0A0A;
-      color: #FFFFFF;
+      background: var(--bg);
+      color: var(--white);
       font-family:
+        Inter,
+        system-ui,
         -apple-system,
         BlinkMacSystemFont,
         "Segoe UI",
@@ -52,84 +64,104 @@
       display: flex;
       justify-content: center;
       align-items: flex-start;
-      padding: 20px;
+      padding: 24px 14px 40px;
     }
 
-    .container {
+    .app {
       width: 100%;
       max-width: 560px;
-      padding: 10px 0 40px;
     }
 
     .brand {
       text-align: center;
-      margin-bottom: 20px;
+      margin: 8px 0 22px;
     }
 
     .brand-title {
-      margin: 0;
-      color: #FFC107;
-      font-size: 30px;
-      font-weight: 800;
-      letter-spacing: .5px;
+      font-size: 27px;
+      font-weight: 900;
+      letter-spacing: 0.5px;
+      color: var(--white);
+    }
+
+    .brand-title span {
+      color: var(--gold);
     }
 
     .brand-subtitle {
-      margin-top: 6px;
-      color: #8F8F8F;
-      font-size: 14px;
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: 13px;
     }
 
     .card {
       width: 100%;
-      background: #151515;
-      border: 1px solid #292929;
-      border-radius: 20px;
-      padding: 24px;
-      box-shadow:
-        0 20px 60px rgba(0,0,0,.45);
+      background: linear-gradient(
+        180deg,
+        rgba(28, 28, 28, 0.98),
+        rgba(17, 17, 17, 0.98)
+      );
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      padding: 20px;
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
     }
 
     .hidden {
       display: none !important;
     }
 
-    .icon {
-      width: 68px;
-      height: 68px;
-      margin: 0 auto 18px;
+    .state-icon {
+      width: 64px;
+      height: 64px;
       border-radius: 18px;
+      margin: 0 auto 16px;
       display: flex;
       align-items: center;
       justify-content: center;
-      background: #211D10;
-      border: 1px solid #4D4117;
-      font-size: 34px;
+      font-size: 30px;
+      background: rgba(255, 193, 7, 0.1);
+      border: 1px solid rgba(255, 193, 7, 0.25);
+    }
+
+    .state-icon.success {
+      background: rgba(34, 197, 94, 0.1);
+      border-color: rgba(34, 197, 94, 0.25);
+    }
+
+    .state-icon.error {
+      background: rgba(239, 68, 68, 0.1);
+      border-color: rgba(239, 68, 68, 0.25);
     }
 
     h1 {
-      margin: 0;
+      margin: 0 0 8px;
       text-align: center;
       font-size: 23px;
-      line-height: 1.3;
+      line-height: 1.25;
     }
 
     .description {
-      margin: 10px 0 0;
-      color: #A3A3A3;
+      margin: 0 auto 20px;
+      max-width: 450px;
       text-align: center;
+      color: var(--muted);
       font-size: 14px;
-      line-height: 1.6;
+      line-height: 1.55;
     }
+
+    /* -------------------------
+       LOADING
+    ------------------------- */
 
     .spinner {
       width: 42px;
       height: 42px;
-      margin: 0 auto 18px;
+      border: 4px solid rgba(255, 255, 255, 0.12);
+      border-top-color: var(--gold);
       border-radius: 50%;
-      border: 4px solid #303030;
-      border-top-color: #FFC107;
-      animation: spin .8s linear infinite;
+      margin: 4px auto 18px;
+      animation: spin 0.9s linear infinite;
     }
 
     @keyframes spin {
@@ -138,482 +170,458 @@
       }
     }
 
-    /* =====================================================
-       FICHIER
-    ===================================================== */
+    /* -------------------------
+       FILE INFO
+    ------------------------- */
 
-    .file-card {
-      margin-top: 22px;
-      padding: 15px;
-      background: #0E0E0E;
-      border: 1px solid #292929;
-      border-radius: 14px;
+    .file-info {
       display: flex;
-      gap: 13px;
       align-items: center;
+      gap: 13px;
+      background: var(--card-2);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 13px;
+      margin-bottom: 15px;
     }
 
     .file-icon {
       width: 48px;
       height: 48px;
-      flex-shrink: 0;
-      border-radius: 12px;
+      min-width: 48px;
+      border-radius: 13px;
+      background: rgba(255, 193, 7, 0.1);
+      border: 1px solid rgba(255, 193, 7, 0.2);
       display: flex;
       align-items: center;
       justify-content: center;
-      background: #202020;
       font-size: 24px;
     }
 
-    .file-info {
+    .file-details {
       min-width: 0;
       flex: 1;
     }
 
     .file-name {
-      color: #FFFFFF;
-      font-weight: 600;
       font-size: 14px;
-      overflow: hidden;
-      white-space: nowrap;
-      text-overflow: ellipsis;
+      font-weight: 700;
+      word-break: break-word;
+      line-height: 1.35;
     }
 
     .file-size {
-      margin-top: 5px;
-      color: #777777;
+      margin-top: 4px;
+      color: var(--muted);
       font-size: 12px;
     }
 
-    /* =====================================================
-       APERÇU
-    ===================================================== */
+    /* -------------------------
+       PREVIEW
+    ------------------------- */
 
     .preview-container {
-      margin-top: 18px;
       width: 100%;
+      margin: 0 0 18px;
+      border-radius: 17px;
       overflow: hidden;
-      border-radius: 16px;
       background: #080808;
-      border: 1px solid #292929;
-    }
-
-    .preview-label {
-      padding: 10px 13px;
-      background: #111111;
-      border-bottom: 1px solid #292929;
-      color: #A3A3A3;
-      font-size: 12px;
-      font-weight: 600;
-    }
-
-    .preview-content {
-      width: 100%;
+      border: 1px solid var(--border);
+      min-height: 80px;
       display: flex;
       align-items: center;
       justify-content: center;
-      background: #080808;
+      position: relative;
+    }
+
+    .preview-container.has-preview {
+      min-height: 0;
     }
 
     .preview-media {
       display: block;
       width: 100%;
-      max-width: 100%;
+      max-height: 440px;
       object-fit: contain;
+      background: #050505;
     }
 
-    #image-preview {
-      max-height: 420px;
+    .image-preview {
+      max-height: 440px;
     }
 
-    #video-preview {
-      max-height: 420px;
-      background: #000000;
+    .video-preview {
+      max-height: 440px;
     }
 
-    #audio-preview {
+    .audio-preview {
       width: calc(100% - 24px);
       margin: 12px;
     }
 
-    /* PDF */
-
-    #pdf-preview {
+    .pdf-preview-wrapper {
       width: 100%;
-      height: 520px;
-      border: 0;
-      background: #FFFFFF;
+      padding: 12px;
+      background: #222;
     }
 
-    .pdf-fallback {
-      width: 100%;
-      padding: 30px 20px;
-      text-align: center;
-      color: #A3A3A3;
-      font-size: 14px;
-      line-height: 1.6;
+    .pdf-preview-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 10px;
     }
 
-    .pdf-open-button {
-      display: inline-block;
-      margin-top: 14px;
-      padding: 11px 16px;
-      border-radius: 10px;
-      background: #222222;
-      border: 1px solid #3A3A3A;
-      color: #FFFFFF;
-      text-decoration: none;
-    }
-
-    /* =====================================================
-       FORMULAIRE
-    ===================================================== */
-
-    .field {
-      margin-top: 20px;
-    }
-
-    label {
+    #pdf-canvas {
       display: block;
-      margin-bottom: 8px;
-      color: #D4D4D4;
-      font-size: 13px;
-      font-weight: 600;
-    }
-
-    select,
-    textarea {
       width: 100%;
-      border: 1px solid #363636;
-      border-radius: 12px;
-      background: #0D0D0D;
-      color: #FFFFFF;
-      padding: 13px 14px;
-      font-family: inherit;
-      font-size: 14px;
-      outline: none;
+      height: auto;
+      margin: 0 auto;
+      background: #fff;
+      border-radius: 5px;
+      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
     }
 
-    select:focus,
-    textarea:focus {
-      border-color: #FFC107;
-    }
-
-    textarea {
-      min-height: 90px;
-      resize: vertical;
-    }
-
-    /* =====================================================
-       BOUTONS
-    ===================================================== */
-
-    .button {
+    .pdf-loading,
+    .pdf-error {
       width: 100%;
-      border: 0;
-      border-radius: 13px;
-      padding: 14px 18px;
-      margin-top: 20px;
-      background: #FFC107;
-      color: #111111;
-      font-size: 15px;
-      font-weight: 800;
-      cursor: pointer;
-    }
-
-    .button:active {
-      transform: scale(.98);
-    }
-
-    .button:disabled {
-      opacity: .45;
-      cursor: not-allowed;
-    }
-
-    .secondary-button {
-      background: #222222;
-      color: #FFFFFF;
-      border: 1px solid #363636;
-    }
-
-    /* =====================================================
-       STATUS
-    ===================================================== */
-
-    .status {
-      display: none;
-      margin-top: 16px;
-      padding: 12px 14px;
-      border-radius: 12px;
+      padding: 30px 16px;
+      text-align: center;
+      color: var(--muted);
       font-size: 13px;
       line-height: 1.5;
     }
 
-    .status.info {
-      display: block;
-      background: #151F2A;
-      border: 1px solid #263E55;
-      color: #B9D9F5;
+    .pdf-error {
+      color: #fca5a5;
     }
 
-    .status.success {
-      display: block;
-      background: #102018;
-      border: 1px solid #1F5735;
-      color: #9FE2B7;
+    /* -------------------------
+       FORM
+    ------------------------- */
+
+    .field {
+      margin-bottom: 16px;
     }
 
-    .status.error {
+    label {
       display: block;
-      background: #251515;
-      border: 1px solid #5B2929;
-      color: #FFB4B4;
+      margin-bottom: 7px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #e6e6e6;
     }
 
-    /* =====================================================
-       PROGRESSION
-    ===================================================== */
+    select,
+    textarea,
+    input {
+      width: 100%;
+      border: 1px solid var(--border);
+      background: #101010;
+      color: var(--white);
+      border-radius: 13px;
+      outline: none;
+      font: inherit;
+    }
 
-    .progress {
-      margin-top: 18px;
+    select {
+      min-height: 48px;
+      padding: 0 13px;
+    }
+
+    textarea {
+      min-height: 95px;
+      resize: vertical;
+      padding: 13px;
+      line-height: 1.5;
+    }
+
+    select:focus,
+    textarea:focus {
+      border-color: rgba(255, 193, 7, 0.65);
+      box-shadow: 0 0 0 3px rgba(255, 193, 7, 0.08);
+    }
+
+    .rooms-loading {
+      color: var(--muted);
+      font-size: 13px;
+      padding: 12px 0;
+      text-align: center;
+    }
+
+    /* -------------------------
+       BUTTONS
+    ------------------------- */
+
+    .button {
+      width: 100%;
+      min-height: 50px;
+      border: 0;
+      border-radius: 14px;
+      padding: 13px 18px;
+      font-size: 15px;
+      font-weight: 800;
+      cursor: pointer;
+      transition:
+        transform 0.12s ease,
+        opacity 0.12s ease;
+    }
+
+    .button:active {
+      transform: scale(0.98);
+    }
+
+    .button:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .button-primary {
+      background: var(--gold);
+      color: #111;
+    }
+
+    .button-primary:hover {
+      background: #ffd04a;
+    }
+
+    .button-google {
+      background: var(--white);
+      color: #111;
+    }
+
+    .button-secondary {
+      background: #242424;
+      color: var(--white);
+      border: 1px solid var(--border);
+    }
+
+    .button-success {
+      background: var(--gold);
+      color: #111;
+    }
+
+    /* -------------------------
+       PROGRESS
+    ------------------------- */
+
+    .progress-box {
+      margin-top: 15px;
+      background: #101010;
+      border: 1px solid var(--border);
+      border-radius: 13px;
+      padding: 12px;
+    }
+
+    .progress-label {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .progress-track {
+      width: 100%;
       height: 8px;
       background: #292929;
-      border-radius: 20px;
+      border-radius: 99px;
       overflow: hidden;
     }
 
     .progress-bar {
       width: 0%;
       height: 100%;
-      background: #FFC107;
-      transition: width .2s ease;
+      background: var(--gold);
+      border-radius: inherit;
+      transition: width 0.15s ease;
     }
 
-    .progress-text {
-      margin-top: 8px;
-      text-align: center;
-      color: #888888;
-      font-size: 12px;
-    }
-
-    /* =====================================================
-       SUCCÈS
-    ===================================================== */
-
-    .success-icon {
-      width: 72px;
-      height: 72px;
-      margin: 0 auto 18px;
-      border-radius: 50%;
-      background: #12301E;
-      border: 1px solid #27643D;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #65D88B;
-      font-size: 38px;
-    }
+    /* -------------------------
+       LOGIN
+    ------------------------- */
 
     .login-note {
-      margin-top: 15px;
-      color: #777777;
-      text-align: center;
-      font-size: 12px;
+      background: rgba(255, 193, 7, 0.07);
+      border: 1px solid rgba(255, 193, 7, 0.18);
+      color: #d9d9d9;
+      border-radius: 14px;
+      padding: 13px;
+      margin-bottom: 15px;
+      font-size: 13px;
       line-height: 1.5;
     }
 
-    @media (max-width: 480px) {
+    /* -------------------------
+       SUCCESS / ERROR
+    ------------------------- */
 
+    .success-message {
+      text-align: center;
+      color: #d8d8d8;
+      font-size: 14px;
+      line-height: 1.55;
+      margin-bottom: 20px;
+    }
+
+    .error-message {
+      text-align: center;
+      color: #fca5a5;
+      font-size: 14px;
+      line-height: 1.55;
+      margin-bottom: 20px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .small-note {
+      text-align: center;
+      color: #777;
+      font-size: 11px;
+      margin-top: 15px;
+      line-height: 1.45;
+    }
+
+    @media (max-width: 380px) {
       body {
-        padding: 12px;
+        padding-left: 10px;
+        padding-right: 10px;
       }
 
       .card {
-        padding: 18px;
-        border-radius: 17px;
+        padding: 16px;
+        border-radius: 18px;
       }
 
-      .brand-title {
-        font-size: 27px;
+      h1 {
+        font-size: 21px;
       }
-
-      #pdf-preview {
-        height: 450px;
-      }
-
     }
-
   </style>
 </head>
 
-
 <body>
 
-<main class="container">
+  <main class="app">
 
-  <!-- =====================================================
-       MARQUE
-  ====================================================== -->
-
-  <div class="brand">
-
-    <h2 class="brand-title">
-      MAHOUTO+
-    </h2>
-
-    <div class="brand-subtitle">
-      L'Afrique qui apprend, crée et entreprend.
-    </div>
-
-  </div>
-
-
-  <!-- =====================================================
-       LOADING
-  ====================================================== -->
-
-  <section
-    id="loading-card"
-    class="card"
-  >
-
-    <div class="spinner"></div>
-
-    <h1>
-      Préparation du partage…
-    </h1>
-
-    <p class="description">
-      Récupération du fichier depuis votre téléphone.
-    </p>
-
-  </section>
-
-
-  <!-- =====================================================
-       CONNEXION
-  ====================================================== -->
-
-  <section
-    id="login-card"
-    class="card hidden"
-  >
-
-    <div class="icon">
-      🔐
-    </div>
-
-    <h1>
-      Connexion nécessaire
-    </h1>
-
-    <p class="description">
-      Connectez-vous à MAHOUTO+ pour choisir
-      le salon dans lequel publier ce fichier.
-    </p>
-
-    <button
-      id="google-login"
-      class="button"
-      type="button"
-    >
-      Continuer avec Google
-    </button>
-
-    <p class="login-note">
-      Votre fichier reste stocké localement sur votre
-      téléphone jusqu'à sa publication.
-    </p>
-
-  </section>
-
-
-  <!-- =====================================================
-       PARTAGE
-  ====================================================== -->
-
-  <section
-    id="share-card"
-    class="card hidden"
-  >
-
-    <div
-      id="file-icon"
-      class="icon"
-    >
-      📎
-    </div>
-
-    <h1>
-      Partager dans un salon
-    </h1>
-
-    <p class="description">
-      Vérifiez le fichier, choisissez le salon
-      et ajoutez éventuellement une légende.
-    </p>
-
-
-    <!-- ===================================================
-         INFORMATIONS FICHIER
-    ==================================================== -->
-
-    <div
-      id="file-card"
-      class="file-card hidden"
-    >
-
-      <div
-        id="file-preview-icon"
-        class="file-icon"
-      >
-        📎
+    <div class="brand">
+      <div class="brand-title">
+        MAHOUTO<span>+</span>
       </div>
+
+      <div class="brand-subtitle">
+        L'Afrique qui apprend, crée et entreprend.
+      </div>
+    </div>
+
+
+    <!-- =========================================
+         LOADING
+    ========================================== -->
+
+    <section id="loading-box" class="card">
+
+      <div class="spinner"></div>
+
+      <h1>Préparation du partage…</h1>
+
+      <p class="description">
+        Réception du fichier en cours.
+      </p>
+
+    </section>
+
+
+    <!-- =========================================
+         LOGIN
+    ========================================== -->
+
+    <section id="login-box" class="card hidden">
+
+      <div class="state-icon">
+        🔐
+      </div>
+
+      <h1>Connexion nécessaire</h1>
+
+      <p class="description">
+        Connectez-vous à MAHOUTO+ pour choisir le salon
+        dans lequel publier votre fichier.
+      </p>
+
+      <div class="login-note">
+        Votre fichier reste temporairement conservé pendant
+        la préparation du partage.
+      </div>
+
+      <button
+        id="google-login"
+        class="button button-google"
+        type="button"
+      >
+        Continuer avec Google
+      </button>
+
+    </section>
+
+
+    <!-- =========================================
+         SHARE
+    ========================================== -->
+
+    <section id="share-box" class="card hidden">
+
+      <div class="state-icon">
+        📤
+      </div>
+
+      <h1>Partager dans un salon</h1>
+
+      <p class="description">
+        Vérifiez votre fichier, choisissez le salon et
+        ajoutez éventuellement une description.
+      </p>
+
+
+      <!-- FILE INFO -->
 
       <div class="file-info">
 
-        <div
-          id="file-name"
-          class="file-name"
-        >
-          Fichier
+        <div id="file-icon" class="file-icon">
+          📎
         </div>
 
-        <div
-          id="file-size"
-          class="file-size"
-        >
-          —
+        <div class="file-details">
+
+          <div id="file-name" class="file-name">
+            Fichier
+          </div>
+
+          <div id="file-size" class="file-size">
+            —
+          </div>
+
         </div>
 
       </div>
 
-    </div>
 
-
-    <!-- ===================================================
-         APERÇU
-    ==================================================== -->
-
-    <div
-      id="preview-container"
-      class="preview-container hidden"
-    >
+      <!-- PREVIEW -->
 
       <div
-        id="preview-label"
-        class="preview-label"
+        id="preview-container"
+        class="preview-container hidden"
       >
-        Aperçu
-      </div>
-
-      <div class="preview-content">
 
         <!-- IMAGE -->
 
         <img
           id="image-preview"
-          class="preview-media hidden"
+          class="preview-media image-preview hidden"
           alt="Aperçu de l'image"
         >
 
@@ -622,7 +630,7 @@
 
         <video
           id="video-preview"
-          class="preview-media hidden"
+          class="preview-media video-preview hidden"
           controls
           playsinline
           preload="metadata"
@@ -633,7 +641,7 @@
 
         <audio
           id="audio-preview"
-          class="hidden"
+          class="preview-media audio-preview hidden"
           controls
           preload="metadata"
         ></audio>
@@ -641,1766 +649,1056 @@
 
         <!-- PDF -->
 
-        <iframe
-          id="pdf-preview"
-          class="hidden"
-          title="Aperçu du PDF"
-        ></iframe>
-
-
-        <!-- PDF FALLBACK -->
-
         <div
-          id="pdf-fallback"
-          class="pdf-fallback hidden"
+          id="pdf-preview-wrapper"
+          class="pdf-preview-wrapper hidden"
         >
 
-          <div style="font-size:40px;">
-            📄
+          <div class="pdf-preview-title">
+            📄 Aperçu de la première page
           </div>
 
-          <div>
-            L'aperçu PDF n'est pas disponible
-            dans ce navigateur.
-          </div>
-
-          <a
-            id="pdf-open-button"
-            class="pdf-open-button"
-            href="#"
-            target="_blank"
-            rel="noopener"
+          <div
+            id="pdf-loading"
+            class="pdf-loading"
           >
-            Ouvrir le PDF
-          </a>
+            Préparation de l'aperçu PDF…
+          </div>
+
+          <canvas
+            id="pdf-canvas"
+            class="hidden"
+          ></canvas>
+
+          <div
+            id="pdf-error"
+            class="pdf-error hidden"
+          ></div>
 
         </div>
 
       </div>
 
-    </div>
+
+      <!-- ROOM -->
+
+      <div class="field">
+
+        <label for="room-select">
+          Choisir le salon
+        </label>
+
+        <select id="room-select">
+          <option value="">
+            Chargement des salons…
+          </option>
+        </select>
+
+      </div>
 
 
-    <!-- ===================================================
-         SALON
-    ==================================================== -->
+      <!-- CAPTION -->
 
-    <div class="field">
+      <div class="field">
 
-      <label for="room-select">
-        Choisir un salon
-      </label>
+        <label for="caption">
+          Description (facultatif)
+        </label>
 
-      <select id="room-select">
+        <textarea
+          id="caption"
+          maxlength="2000"
+          placeholder="Ajoutez une description…"
+        ></textarea>
 
-        <option value="">
-          Chargement des salons…
-        </option>
-
-      </select>
-
-    </div>
+      </div>
 
 
-    <!-- ===================================================
-         LÉGENDE
-    ==================================================== -->
+      <!-- PUBLISH -->
 
-    <div class="field">
-
-      <label for="caption">
-        Message / légende
-      </label>
-
-      <textarea
-        id="caption"
-        maxlength="2000"
-        placeholder="Ajouter un message (facultatif)…"
-      ></textarea>
-
-    </div>
+      <button
+        id="publish-button"
+        class="button button-primary"
+        type="button"
+        disabled
+      >
+        Publier dans le salon
+      </button>
 
 
-    <!-- ===================================================
-         PROGRESSION
-    ==================================================== -->
-
-    <div
-      id="progress-container"
-      class="progress hidden"
-    >
+      <!-- PROGRESS -->
 
       <div
-        id="progress-bar"
-        class="progress-bar"
-      ></div>
+        id="progress-box"
+        class="progress-box hidden"
+      >
 
-    </div>
+        <div class="progress-label">
 
-    <div
-      id="progress-text"
-      class="progress-text hidden"
-    >
-      0 %
-    </div>
+          <span id="progress-text">
+            Préparation…
+          </span>
 
+          <span id="progress-percent">
+            0%
+          </span>
 
-    <!-- ===================================================
-         MESSAGE
-    ==================================================== -->
+        </div>
 
-    <div
-      id="status"
-      class="status"
-    ></div>
+        <div class="progress-track">
 
+          <div
+            id="progress-bar"
+            class="progress-bar"
+          ></div>
 
-    <!-- ===================================================
-         PUBLIER
-    ==================================================== -->
+        </div>
 
-    <button
-      id="publish-button"
-      class="button"
-      type="button"
-    >
-      Publier dans le salon
-    </button>
-
-  </section>
+      </div>
 
 
-  <!-- =====================================================
-       SUCCÈS
-  ====================================================== -->
+      <div class="small-note">
+        Le fichier sera envoyé vers le stockage sécurisé
+        de MAHOUTO+ avant sa publication.
+      </div>
 
-  <section
-    id="success-card"
-    class="card hidden"
-  >
-
-    <div class="success-icon">
-      ✓
-    </div>
-
-    <h1>
-      Partage effectué
-    </h1>
-
-    <p
-      id="success-description"
-      class="description"
-    >
-      Votre fichier a été publié avec succès.
-    </p>
-
-    <button
-      id="success-close"
-      class="button"
-      type="button"
-    >
-      Fermer
-    </button>
-
-  </section>
+    </section>
 
 
-  <!-- =====================================================
-       ERREUR
-  ====================================================== -->
+    <!-- =========================================
+         SUCCESS
+    ========================================== -->
 
-  <section
-    id="error-card"
-    class="card hidden"
-  >
+    <section id="success-box" class="card hidden">
 
-    <div class="icon">
-      ⚠️
-    </div>
+      <div class="state-icon success">
+        ✓
+      </div>
 
-    <h1>
-      Impossible de partager
-    </h1>
+      <h1>Partage effectué</h1>
 
-    <p
-      id="error-description"
-      class="description"
-    >
-      Une erreur est survenue.
-    </p>
+      <p class="success-message">
+        Votre fichier a été publié avec succès
+        dans le salon sélectionné.
+      </p>
 
-    <button
-      id="error-retry"
-      class="button secondary-button"
-      type="button"
-    >
-      Réessayer
-    </button>
+      <button
+        id="success-open"
+        class="button button-success"
+        type="button"
+      >
+        Ouvrir MAHOUTO +
+      </button>
 
-  </section>
-
-</main>
+    </section>
 
 
-<!-- =========================================================
-     SUPABASE
-========================================================= -->
+    <!-- =========================================
+         ERROR
+    ========================================== -->
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <section id="error-box" class="card hidden">
 
-<!--
-  IMPORTANT :
-  config.js DOIT être chargé avant le script principal.
--->
-<script src="/config.js"></script>
+      <div class="state-icon error">
+        ⚠️
+      </div>
+
+      <h1>Impossible de partager</h1>
+
+      <p
+        id="error-message"
+        class="error-message"
+      >
+        Une erreur est survenue.
+      </p>
+
+      <button
+        id="error-retry"
+        class="button button-secondary"
+        type="button"
+      >
+        Réessayer
+      </button>
+
+    </section>
+
+  </main>
 
 
 <script>
 "use strict";
 
+/* =========================================================
+   CONFIGURATION
+========================================================= */
 
-/* ============================================================
-   CONFIGURATION MAHOUTO+
-   ============================================================ */
+const CONFIG = window.MAHOUTO_CONFIG || null;
 
-const CONFIG =
-  window.MAHOUTO_CONFIG || null;
-
-
-/*
-  Vérification de la configuration.
-
-  Ton config.js actuel utilise :
-
-  window.MAHOUTO_CONFIG.SUPABASE_URL
-  window.MAHOUTO_CONFIG.SUPABASE_ANON_KEY
-  window.MAHOUTO_CONFIG.CLOUDINARY_CLOUD_NAME
-  window.MAHOUTO_CONFIG.CLOUDINARY_UPLOAD_PRESET
-*/
-
-
-if (!CONFIG) {
-
-  console.error(
-    "❌ MAHOUTO_CONFIG est introuvable."
-  );
-
-}
-
-
-/* ============================================================
-   SUPABASE
-   ============================================================ */
-
-let supabaseClient = null;
-
-
-try {
-
-  const supabaseUrl =
-    CONFIG &&
-    CONFIG.SUPABASE_URL;
-
-  const supabaseAnonKey =
-    CONFIG &&
-    CONFIG.SUPABASE_ANON_KEY;
-
-
-  if (
-    typeof window.supabase !== "undefined" &&
-    supabaseUrl &&
-    supabaseAnonKey
-  ) {
-
-    supabaseClient =
-      window.supabase.createClient(
-        supabaseUrl,
-        supabaseAnonKey
-      );
-
-
-    console.log(
-      "✅ Supabase initialisé."
-    );
-
-  } else {
-
-    console.error(
-      "❌ Configuration Supabase introuvable."
-    );
-
-  }
-
-} catch (error) {
-
-  console.error(
-    "❌ Erreur Supabase:",
-    error
-  );
-
-}
-
-
-/* ============================================================
-   CLOUDINARY
-   ============================================================ */
-
-const CLOUDINARY_CLOUD_NAME =
-  CONFIG &&
-  CONFIG.CLOUDINARY_CLOUD_NAME;
-
-
-const CLOUDINARY_UPLOAD_PRESET =
-  CONFIG &&
-  CONFIG.CLOUDINARY_UPLOAD_PRESET;
-
-
-const CLOUDINARY_UPLOAD_URL =
-  CLOUDINARY_CLOUD_NAME
-    ? (
-        "https://api.cloudinary.com/v1_1/" +
-        CLOUDINARY_CLOUD_NAME +
-        "/auto/upload"
-      )
-    : null;
-
+let supabase = null;
 
 if (
-  CLOUDINARY_CLOUD_NAME &&
-  CLOUDINARY_UPLOAD_PRESET
+  CONFIG &&
+  CONFIG.SUPABASE_URL &&
+  CONFIG.SUPABASE_ANON_KEY &&
+  window.supabase
 ) {
-
-  console.log(
-    "✅ Cloudinary configuré."
+  supabase = window.supabase.createClient(
+    CONFIG.SUPABASE_URL,
+    CONFIG.SUPABASE_ANON_KEY
   );
-
-} else {
-
-  console.error(
-    "❌ Configuration Cloudinary introuvable."
-  );
-
 }
 
 
-/* ============================================================
+/* =========================================================
+   PDF.JS
+========================================================= */
+
+if (window.pdfjsLib) {
+  window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+}
+
+
+/* =========================================================
    DOM
-   ============================================================ */
+========================================================= */
 
-const loadingCard =
-  document.getElementById(
-    "loading-card"
-  );
+const loadingBox =
+  document.getElementById("loading-box");
 
-const loginCard =
-  document.getElementById(
-    "login-card"
-  );
+const loginBox =
+  document.getElementById("login-box");
 
-const shareCard =
-  document.getElementById(
-    "share-card"
-  );
+const shareBox =
+  document.getElementById("share-box");
 
-const successCard =
-  document.getElementById(
-    "success-card"
-  );
+const successBox =
+  document.getElementById("success-box");
 
-const errorCard =
-  document.getElementById(
-    "error-card"
-  );
+const errorBox =
+  document.getElementById("error-box");
 
-const errorDescription =
-  document.getElementById(
-    "error-description"
-  );
-
-const successDescription =
-  document.getElementById(
-    "success-description"
-  );
+const errorMessage =
+  document.getElementById("error-message");
 
 const googleLogin =
-  document.getElementById(
-    "google-login"
-  );
+  document.getElementById("google-login");
 
 const roomSelect =
-  document.getElementById(
-    "room-select"
-  );
+  document.getElementById("room-select");
 
 const captionInput =
-  document.getElementById(
-    "caption"
-  );
+  document.getElementById("caption");
 
 const publishButton =
-  document.getElementById(
-    "publish-button"
-  );
+  document.getElementById("publish-button");
 
-const successClose =
-  document.getElementById(
-    "success-close"
-  );
-
-const errorRetry =
-  document.getElementById(
-    "error-retry"
-  );
-
-const fileCard =
-  document.getElementById(
-    "file-card"
-  );
-
-const fileNameElement =
-  document.getElementById(
-    "file-name"
-  );
-
-const fileSizeElement =
-  document.getElementById(
-    "file-size"
-  );
-
-const fileIcon =
-  document.getElementById(
-    "file-icon"
-  );
-
-const filePreviewIcon =
-  document.getElementById(
-    "file-preview-icon"
-  );
-
-const previewContainer =
-  document.getElementById(
-    "preview-container"
-  );
-
-const previewLabel =
-  document.getElementById(
-    "preview-label"
-  );
-
-const imagePreview =
-  document.getElementById(
-    "image-preview"
-  );
-
-const videoPreview =
-  document.getElementById(
-    "video-preview"
-  );
-
-const audioPreview =
-  document.getElementById(
-    "audio-preview"
-  );
-
-const pdfPreview =
-  document.getElementById(
-    "pdf-preview"
-  );
-
-const pdfFallback =
-  document.getElementById(
-    "pdf-fallback"
-  );
-
-const pdfOpenButton =
-  document.getElementById(
-    "pdf-open-button"
-  );
-
-const progressContainer =
-  document.getElementById(
-    "progress-container"
-  );
+const progressBox =
+  document.getElementById("progress-box");
 
 const progressBar =
-  document.getElementById(
-    "progress-bar"
-  );
+  document.getElementById("progress-bar");
 
 const progressText =
-  document.getElementById(
-    "progress-text"
-  );
+  document.getElementById("progress-text");
 
-const statusElement =
-  document.getElementById(
-    "status"
-  );
+const progressPercent =
+  document.getElementById("progress-percent");
+
+const fileName =
+  document.getElementById("file-name");
+
+const fileSize =
+  document.getElementById("file-size");
+
+const fileIcon =
+  document.getElementById("file-icon");
+
+const previewContainer =
+  document.getElementById("preview-container");
+
+const imagePreview =
+  document.getElementById("image-preview");
+
+const videoPreview =
+  document.getElementById("video-preview");
+
+const audioPreview =
+  document.getElementById("audio-preview");
+
+const pdfPreviewWrapper =
+  document.getElementById("pdf-preview-wrapper");
+
+const pdfCanvas =
+  document.getElementById("pdf-canvas");
+
+const pdfLoading =
+  document.getElementById("pdf-loading");
+
+const pdfError =
+  document.getElementById("pdf-error");
+
+const successOpen =
+  document.getElementById("success-open");
+
+const errorRetry =
+  document.getElementById("error-retry");
 
 
-/* ============================================================
-   ÉTAT
-   ============================================================ */
+/* =========================================================
+   VARIABLES
+========================================================= */
 
 let localShareId = null;
-
 let selectedFile = null;
-
 let previewObjectUrl = null;
+let currentSession = null;
+let roomsLoaded = false;
 
-let published = false;
 
-
-/* ============================================================
-   AFFICHAGE
-   ============================================================ */
-
-function showOnly(element) {
-
-  [
-    loadingCard,
-    loginCard,
-    shareCard,
-    successCard,
-    errorCard
-  ].forEach(card => {
-
-    if (card) {
-      card.classList.add(
-        "hidden"
-      );
-    }
-
-  });
-
-
-  if (element) {
-
-    element.classList.remove(
-      "hidden"
-    );
-
-  }
-
-}
-
-
-function showLoading() {
-
-  showOnly(
-    loadingCard
-  );
-
-}
-
-
-function showLogin() {
-
-  showOnly(
-    loginCard
-  );
-
-}
-
-
-function showShare() {
-
-  showOnly(
-    shareCard
-  );
-
-}
-
-
-function showSuccess(message) {
-
-  successDescription.textContent =
-    message ||
-    "Votre fichier a été publié avec succès.";
-
-  showOnly(
-    successCard
-  );
-
-}
-
-
-function showError(message) {
-
-  errorDescription.textContent =
-    message ||
-    "Une erreur est survenue.";
-
-  showOnly(
-    errorCard
-  );
-
-}
-
-
-/* ============================================================
-   STATUS
-   ============================================================ */
-
-function setStatus(
-  message,
-  type = "info"
-) {
-
-  statusElement.textContent =
-    message || "";
-
-  statusElement.className =
-    "status " + type;
-
-}
-
-
-function clearStatus() {
-
-  statusElement.textContent =
-    "";
-
-  statusElement.className =
-    "status";
-
-}
-
-
-/* ============================================================
-   TAILLE FICHIER
-   ============================================================ */
-
-function formatFileSize(bytes) {
-
-  if (
-    !Number.isFinite(bytes)
-  ) {
-
-    return "—";
-
-  }
-
-
-  if (
-    bytes < 1024
-  ) {
-
-    return (
-      bytes +
-      " o"
-    );
-
-  }
-
-
-  if (
-    bytes < 1024 * 1024
-  ) {
-
-    return (
-      (bytes / 1024)
-        .toFixed(1) +
-      " Ko"
-    );
-
-  }
-
-
-  if (
-    bytes < 1024 * 1024 * 1024
-  ) {
-
-    return (
-      (bytes /
-        (1024 * 1024)
-      ).toFixed(1) +
-      " Mo"
-    );
-
-  }
-
-
-  return (
-    (
-      bytes /
-      (1024 * 1024 * 1024)
-    ).toFixed(2) +
-    " Go"
-  );
-
-}
-
-
-/* ============================================================
-   ICÔNE FICHIER
-   ============================================================ */
-
-function getFileIcon(
-  mimeType,
-  filename = ""
-) {
-
-  const type =
-    (
-      mimeType ||
-      ""
-    ).toLowerCase();
-
-
-  const name =
-    (
-      filename ||
-      ""
-    ).toLowerCase();
-
-
-  if (
-    type.startsWith(
-      "image/"
-    )
-  ) {
-
-    return "🖼️";
-
-  }
-
-
-  if (
-    type.startsWith(
-      "video/"
-    )
-  ) {
-
-    return "🎥";
-
-  }
-
-
-  if (
-    type.startsWith(
-      "audio/"
-    )
-  ) {
-
-    return "🎵";
-
-  }
-
-
-  if (
-    type ===
-      "application/pdf" ||
-    name.endsWith(
-      ".pdf"
-    )
-  ) {
-
-    return "📄";
-
-  }
-
-
-  if (
-    type.includes(
-      "word"
-    ) ||
-    name.endsWith(
-      ".doc"
-    ) ||
-    name.endsWith(
-      ".docx"
-    )
-  ) {
-
-    return "📝";
-
-  }
-
-
-  if (
-    type.includes(
-      "zip"
-    ) ||
-    name.endsWith(
-      ".zip"
-    )
-  ) {
-
-    return "📦";
-
-  }
-
-
-  return "📎";
-
-}
-
-
-/* ============================================================
-   PDF ?
-   ============================================================ */
-
-function isPdf(file) {
-
-  if (!file) {
-    return false;
-  }
-
-
-  const type =
-    (
-      file.type ||
-      ""
-    ).toLowerCase();
-
-
-  const name =
-    (
-      file.name ||
-      ""
-    ).toLowerCase();
-
-
-  return (
-    type ===
-      "application/pdf" ||
-    name.endsWith(
-      ".pdf"
-    )
-  );
-
-}
-
-
-/* ============================================================
-   CACHE SHARE
-   ============================================================ */
+/* =========================================================
+   CACHE STORAGE
+========================================================= */
 
 const SHARE_CACHE_NAME =
   "mahoutoplus-share-v1";
 
+function metadataUrl(id) {
+  return `/__mahouto-share-meta/${encodeURIComponent(id)}`;
+}
 
-const SHARE_META_PREFIX =
-  "/__mahouto-share-meta/";
-
-
-const SHARE_FILE_PREFIX =
-  "/__mahouto-share-file/";
-
-
-async function getShareCache() {
-
-  return await caches.open(
-    SHARE_CACHE_NAME
-  );
-
+function fileUrl(id, index) {
+  return `/__mahouto-share-file/${encodeURIComponent(id)}/${index}`;
 }
 
 
-/* ============================================================
-   MÉTADONNÉES LOCALES
-   ============================================================ */
+/* =========================================================
+   UI STATES
+========================================================= */
 
-async function readLocalMetadata(
-  id
-) {
+function hideAllStates() {
+  loadingBox.classList.add("hidden");
+  loginBox.classList.add("hidden");
+  shareBox.classList.add("hidden");
+  successBox.classList.add("hidden");
+  errorBox.classList.add("hidden");
+}
 
-  const cache =
-    await getShareCache();
+function showLoading() {
+  hideAllStates();
+  loadingBox.classList.remove("hidden");
+}
+
+function showLogin() {
+  hideAllStates();
+  loginBox.classList.remove("hidden");
+}
+
+function showShare() {
+  hideAllStates();
+  shareBox.classList.remove("hidden");
+}
+
+function showSuccess() {
+  hideAllStates();
+  successBox.classList.remove("hidden");
+}
+
+function showError(message) {
+  hideAllStates();
+
+  errorMessage.textContent =
+    message || "Une erreur est survenue.";
+
+  errorBox.classList.remove("hidden");
+}
 
 
-  const request =
-    new Request(
-      SHARE_META_PREFIX +
-      id
-    );
+/* =========================================================
+   ERROR HELPER
+========================================================= */
 
-
-  const response =
-    await cache.match(
-      request
-    );
-
-
-  if (!response) {
-
-    return null;
-
+function readableError(error) {
+  if (!error) {
+    return "Une erreur inconnue est survenue.";
   }
 
+  if (typeof error === "string") {
+    return error;
+  }
+
+  if (error.message) {
+    return error.message;
+  }
 
   try {
-
-    return await response.json();
-
-  } catch (error) {
-
-    console.error(
-      "Metadata invalide:",
-      error
-    );
-
-    return null;
-
+    return JSON.stringify(error);
+  } catch {
+    return "Une erreur est survenue.";
   }
-
 }
 
 
-/* ============================================================
-   FICHIER LOCAL
-   ============================================================ */
+/* =========================================================
+   FILE SIZE
+========================================================= */
 
-async function readLocalFile(
-  id,
-  index = 0
-) {
+function formatFileSize(bytes) {
+  if (!Number.isFinite(bytes) || bytes < 0) {
+    return "Taille inconnue";
+  }
 
-  const cache =
-    await getShareCache();
+  if (bytes < 1024) {
+    return `${bytes} octets`;
+  }
+
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} Ko`;
+  }
+
+  if (bytes < 1024 * 1024 * 1024) {
+    return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
+  }
+
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} Go`;
+}
 
 
-  const request =
-    new Request(
-      SHARE_FILE_PREFIX +
-      id +
-      "/" +
-      index
+/* =========================================================
+   FILE ICON
+========================================================= */
+
+function getFileIcon(file) {
+  if (!file) {
+    return "📎";
+  }
+
+  const type =
+    String(file.type || "").toLowerCase();
+
+  const name =
+    String(file.name || "").toLowerCase();
+
+  if (type.startsWith("image/")) {
+    return "🖼️";
+  }
+
+  if (type.startsWith("video/")) {
+    return "🎬";
+  }
+
+  if (
+    type.startsWith("audio/") ||
+    name.endsWith(".opus") ||
+    name.endsWith(".mp3") ||
+    name.endsWith(".wav") ||
+    name.endsWith(".m4a") ||
+    name.endsWith(".ogg")
+  ) {
+    return "🎵";
+  }
+
+  if (
+    type === "application/pdf" ||
+    name.endsWith(".pdf")
+  ) {
+    return "📄";
+  }
+
+  if (
+    name.endsWith(".doc") ||
+    name.endsWith(".docx")
+  ) {
+    return "📝";
+  }
+
+  if (
+    name.endsWith(".zip") ||
+    name.endsWith(".rar") ||
+    name.endsWith(".7z")
+  ) {
+    return "🗜️";
+  }
+
+  return "📎";
+}
+
+
+/* =========================================================
+   RESET PREVIEW
+========================================================= */
+
+function resetPreview() {
+
+  if (previewObjectUrl) {
+    URL.revokeObjectURL(previewObjectUrl);
+    previewObjectUrl = null;
+  }
+
+  imagePreview.classList.add("hidden");
+  videoPreview.classList.add("hidden");
+  audioPreview.classList.add("hidden");
+  pdfPreviewWrapper.classList.add("hidden");
+
+  imagePreview.removeAttribute("src");
+  videoPreview.removeAttribute("src");
+  audioPreview.removeAttribute("src");
+
+  pdfCanvas.classList.add("hidden");
+
+  pdfLoading.classList.remove("hidden");
+  pdfLoading.textContent =
+    "Préparation de l'aperçu PDF…";
+
+  pdfError.classList.add("hidden");
+  pdfError.textContent = "";
+
+  previewContainer.classList.add("hidden");
+  previewContainer.classList.remove("has-preview");
+}
+
+
+/* =========================================================
+   PDF PREVIEW
+========================================================= */
+
+async function renderPdfPreview(file) {
+
+  if (!file) {
+    return;
+  }
+
+  previewContainer.classList.remove("hidden");
+  previewContainer.classList.add("has-preview");
+
+  pdfPreviewWrapper.classList.remove("hidden");
+
+  pdfLoading.classList.remove("hidden");
+  pdfLoading.textContent =
+    "Préparation de l'aperçu PDF…";
+
+  pdfError.classList.add("hidden");
+  pdfCanvas.classList.add("hidden");
+
+  if (!window.pdfjsLib) {
+    throw new Error(
+      "Le moteur d'aperçu PDF n'est pas disponible."
+    );
+  }
+
+  const data =
+    await file.arrayBuffer();
+
+  const loadingTask =
+    window.pdfjsLib.getDocument({
+      data: new Uint8Array(data)
+    });
+
+  const pdf =
+    await loadingTask.promise;
+
+  const page =
+    await pdf.getPage(1);
+
+  const baseViewport =
+    page.getViewport({
+      scale: 1
+    });
+
+  const availableWidth =
+    Math.max(
+      280,
+      Math.min(
+        520,
+        previewContainer.clientWidth - 24
+      )
     );
 
+  let scale =
+    availableWidth / baseViewport.width;
+
+  scale =
+    Math.min(
+      Math.max(scale, 0.5),
+      1.5
+    );
+
+  const viewport =
+    page.getViewport({
+      scale
+    });
+
+  pdfCanvas.width =
+    Math.ceil(viewport.width);
+
+  pdfCanvas.height =
+    Math.ceil(viewport.height);
+
+  const context =
+    pdfCanvas.getContext("2d", {
+      alpha: false
+    });
+
+  if (!context) {
+    throw new Error(
+      "Impossible de préparer le rendu du PDF."
+    );
+  }
+
+  await page.render({
+    canvasContext: context,
+    viewport
+  }).promise;
+
+  pdfLoading.classList.add("hidden");
+  pdfCanvas.classList.remove("hidden");
+}
+
+
+/* =========================================================
+   FILE PREVIEW
+========================================================= */
+
+async function renderFilePreview(file) {
+
+  resetPreview();
+
+  if (!file) {
+    return;
+  }
+
+  const type =
+    String(file.type || "").toLowerCase();
+
+  const name =
+    String(file.name || "").toLowerCase();
+
+  /* IMAGE */
+
+  if (type.startsWith("image/")) {
+
+    previewObjectUrl =
+      URL.createObjectURL(file);
+
+    imagePreview.src =
+      previewObjectUrl;
+
+    imagePreview.classList.remove("hidden");
+
+    previewContainer.classList.remove("hidden");
+    previewContainer.classList.add("has-preview");
+
+    return;
+  }
+
+
+  /* VIDEO */
+
+  if (type.startsWith("video/")) {
+
+    previewObjectUrl =
+      URL.createObjectURL(file);
+
+    videoPreview.src =
+      previewObjectUrl;
+
+    videoPreview.classList.remove("hidden");
+
+    previewContainer.classList.remove("hidden");
+    previewContainer.classList.add("has-preview");
+
+    return;
+  }
+
+
+  /* AUDIO */
+
+  if (
+    type.startsWith("audio/") ||
+    name.endsWith(".opus") ||
+    name.endsWith(".mp3") ||
+    name.endsWith(".wav") ||
+    name.endsWith(".m4a") ||
+    name.endsWith(".ogg")
+  ) {
+
+    previewObjectUrl =
+      URL.createObjectURL(file);
+
+    audioPreview.src =
+      previewObjectUrl;
+
+    audioPreview.classList.remove("hidden");
+
+    previewContainer.classList.remove("hidden");
+    previewContainer.classList.add("has-preview");
+
+    return;
+  }
+
+
+  /* PDF */
+
+  if (
+    type === "application/pdf" ||
+    name.endsWith(".pdf")
+  ) {
+
+    try {
+
+      await renderPdfPreview(file);
+
+    } catch (error) {
+
+      console.error(
+        "Erreur aperçu PDF:",
+        error
+      );
+
+      pdfLoading.classList.add("hidden");
+
+      pdfError.textContent =
+        "L'aperçu de la première page n'a pas pu être généré. Le PDF pourra néanmoins être publié.";
+
+      pdfError.classList.remove("hidden");
+
+    }
+
+    return;
+  }
+
+
+  /* AUTRES FICHIERS */
+
+  previewContainer.classList.add("hidden");
+}
+
+
+/* =========================================================
+   READ LOCAL SHARE METADATA
+========================================================= */
+
+async function readShareMetadata(id) {
+
+  const cache =
+    await caches.open(SHARE_CACHE_NAME);
 
   const response =
     await cache.match(
-      request
+      metadataUrl(id)
     );
 
-
   if (!response) {
-
-    return null;
-
+    throw new Error(
+      "Les informations du partage sont introuvables."
+    );
   }
 
+  return await response.json();
+}
+
+
+/* =========================================================
+   READ LOCAL FILE
+========================================================= */
+
+async function readShareFile(id, index, metadata) {
+
+  const cache =
+    await caches.open(SHARE_CACHE_NAME);
+
+  const response =
+    await cache.match(
+      fileUrl(id, index)
+    );
+
+  if (!response) {
+    throw new Error(
+      "Le fichier partagé est introuvable dans le stockage temporaire."
+    );
+  }
 
   const blob =
     await response.blob();
 
-
-  const metadata =
-    await readLocalMetadata(
-      id
-    );
-
-
-  let fileMetadata = null;
-
-
-  if (
-    metadata &&
-    Array.isArray(
-      metadata.files
-    )
-  ) {
-
-    fileMetadata =
-      metadata.files[index] ||
-      null;
-
-  }
-
-
   const filename =
-    (
-      fileMetadata &&
-      fileMetadata.name
-    ) ||
-    (
-      metadata &&
-      metadata.filename
-    ) ||
+    metadata?.files?.[index]?.name ||
+    metadata?.filename ||
     "fichier";
 
-
   const mimeType =
-    (
-      fileMetadata &&
-      fileMetadata.type
-    ) ||
-    (
-      metadata &&
-      metadata.mime_type
-    ) ||
+    metadata?.files?.[index]?.type ||
+    metadata?.mime_type ||
     blob.type ||
     "application/octet-stream";
-
 
   return new File(
     [blob],
     filename,
     {
       type: mimeType,
-      lastModified:
-        Date.now()
+      lastModified: Date.now()
     }
   );
-
 }
 
 
-/* ============================================================
-   NETTOYAGE APERÇU
-   ============================================================ */
-
-function resetPreview() {
-
-  if (
-    previewObjectUrl
-  ) {
-
-    try {
-
-      URL.revokeObjectURL(
-        previewObjectUrl
-      );
-
-    } catch (error) {
-
-      console.warn(
-        error
-      );
-
-    }
-
-    previewObjectUrl =
-      null;
-
-  }
-
-
-  imagePreview.src =
-    "";
-
-  videoPreview.pause();
-
-  videoPreview.removeAttribute(
-    "src"
-  );
-
-  videoPreview.load();
-
-
-  audioPreview.pause();
-
-  audioPreview.removeAttribute(
-    "src"
-  );
-
-  audioPreview.load();
-
-
-  pdfPreview.removeAttribute(
-    "src"
-  );
-
-
-  pdfOpenButton.href =
-    "#";
-
-
-  imagePreview.classList.add(
-    "hidden"
-  );
-
-  videoPreview.classList.add(
-    "hidden"
-  );
-
-  audioPreview.classList.add(
-    "hidden"
-  );
-
-  pdfPreview.classList.add(
-    "hidden"
-  );
-
-  pdfFallback.classList.add(
-    "hidden"
-  );
-
-  previewContainer.classList.add(
-    "hidden"
-  );
-
-}
-
-
-/* ============================================================
-   APERÇU IMAGE
-   ============================================================ */
-
-function renderImagePreview(
-  file
-) {
-
-  previewObjectUrl =
-    URL.createObjectURL(
-      file
-    );
-
-
-  imagePreview.src =
-    previewObjectUrl;
-
-
-  imagePreview.classList.remove(
-    "hidden"
-  );
-
-
-  previewLabel.textContent =
-    "Aperçu de l'image";
-
-
-  previewContainer.classList.remove(
-    "hidden"
-  );
-
-}
-
-
-/* ============================================================
-   APERÇU VIDÉO
-   ============================================================ */
-
-function renderVideoPreview(
-  file
-) {
-
-  previewObjectUrl =
-    URL.createObjectURL(
-      file
-    );
-
-
-  videoPreview.src =
-    previewObjectUrl;
-
-
-  videoPreview.classList.remove(
-    "hidden"
-  );
-
-
-  previewLabel.textContent =
-    "Aperçu de la vidéo";
-
-
-  previewContainer.classList.remove(
-    "hidden"
-  );
-
-}
-
-
-/* ============================================================
-   APERÇU AUDIO
-   ============================================================ */
-
-function renderAudioPreview(
-  file
-) {
-
-  previewObjectUrl =
-    URL.createObjectURL(
-      file
-    );
-
-
-  audioPreview.src =
-    previewObjectUrl;
-
-
-  audioPreview.classList.remove(
-    "hidden"
-  );
-
-
-  previewLabel.textContent =
-    "Aperçu audio";
-
-
-  previewContainer.classList.remove(
-    "hidden"
-  );
-
-}
-
-
-/* ============================================================
-   APERÇU PDF
-   ============================================================ */
-
-function renderPdfPreview(
-  file
-) {
-
-  previewObjectUrl =
-    URL.createObjectURL(
-      file
-    );
-
-
-  /*
-    Le PDF est affiché depuis le Blob
-    local du téléphone.
-
-    Il n'est PAS encore envoyé
-    à Cloudinary.
-  */
-
-  pdfPreview.src =
-    previewObjectUrl;
-
-
-  pdfOpenButton.href =
-    previewObjectUrl;
-
-
-  pdfPreview.classList.remove(
-    "hidden"
-  );
-
-
-  pdfFallback.classList.add(
-    "hidden"
-  );
-
-
-  previewLabel.textContent =
-    "Aperçu du PDF";
-
-
-  previewContainer.classList.remove(
-    "hidden"
-  );
-
-}
-
-
-/* ============================================================
-   APERÇU GÉNÉRAL
-   ============================================================ */
-
-function renderFilePreview(
-  file
-) {
-
-  resetPreview();
-
-
-  if (!file) {
-
-    return;
-
-  }
-
-
-  const type =
-    (
-      file.type ||
-      ""
-    ).toLowerCase();
-
-
-  if (
-    type.startsWith(
-      "image/"
-    )
-  ) {
-
-    renderImagePreview(
-      file
-    );
-
-    return;
-
-  }
-
-
-  if (
-    type.startsWith(
-      "video/"
-    )
-  ) {
-
-    renderVideoPreview(
-      file
-    );
-
-    return;
-
-  }
-
-
-  if (
-    type.startsWith(
-      "audio/"
-    )
-  ) {
-
-    renderAudioPreview(
-      file
-    );
-
-    return;
-
-  }
-
-
-  if (
-    isPdf(file)
-  ) {
-
-    renderPdfPreview(
-      file
-    );
-
-    return;
-
-  }
-
-}
-
-
-/* ============================================================
-   INFORMATIONS FICHIER
-   ============================================================ */
-
-function updateFileInformation(
-  file
-) {
-
-  if (!file) {
-
-    return;
-
-  }
-
-
-  const icon =
-    getFileIcon(
-      file.type,
-      file.name
-    );
-
-
-  fileIcon.textContent =
-    icon;
-
-
-  filePreviewIcon.textContent =
-    icon;
-
-
-  fileNameElement.textContent =
-    file.name ||
-    "Fichier";
-
-
-  fileSizeElement.textContent =
-    formatFileSize(
-      file.size
-    );
-
-
-  fileCard.classList.remove(
-    "hidden"
-  );
-
-}
-
-
-/* ============================================================
-   CHARGER LE PARTAGE LOCAL
-   ============================================================ */
+/* =========================================================
+   LOAD LOCAL SHARE
+========================================================= */
 
 async function loadLocalShare() {
 
-  const params =
-    new URLSearchParams(
-      window.location.search
-    );
-
-
-  localShareId =
-    params.get(
-      "local_share_id"
-    );
-
-
   if (!localShareId) {
 
-    throw new Error(
-      "Lien de partage invalide. Aucun identifiant local n'a été fourni."
+    showError(
+      "Lien de partage invalide. Aucun fichier partagé n'a été trouvé."
     );
 
+    return false;
   }
-
 
   const metadata =
-    await readLocalMetadata(
-      localShareId
-    );
-
+    await readShareMetadata(localShareId);
 
   if (!metadata) {
-
     throw new Error(
-      "Le partage local est introuvable ou a expiré."
+      "Les informations du partage sont indisponibles."
     );
-
   }
 
+  const files =
+    Array.isArray(metadata.files)
+      ? metadata.files
+      : [];
+
+  if (files.length === 0) {
+    throw new Error(
+      "Aucun fichier n'a été reçu."
+    );
+  }
 
   selectedFile =
-    await readLocalFile(
+    await readShareFile(
       localShareId,
-      0
+      0,
+      metadata
     );
 
+  fileName.textContent =
+    selectedFile.name || "Fichier";
 
-  if (!selectedFile) {
-
-    throw new Error(
-      "Impossible de récupérer le fichier partagé depuis votre téléphone."
+  fileSize.textContent =
+    formatFileSize(
+      selectedFile.size
     );
 
-  }
+  fileIcon.textContent =
+    getFileIcon(selectedFile);
 
-
-  updateFileInformation(
-    selectedFile
-  );
-
-
-  renderFilePreview(
-    selectedFile
-  );
-
-
-  /*
-    Récupérer éventuellement
-    le texte partagé.
-  */
-
-  const initialCaption =
+  captionInput.value =
     metadata.caption ||
     metadata.text ||
     "";
 
+  await renderFilePreview(
+    selectedFile
+  );
 
-  if (initialCaption) {
-
-    captionInput.value =
-      initialCaption
-        .slice(
-          0,
-          2000
-        );
-
-  }
-
+  return true;
 }
 
 
-/* ============================================================
-   SESSION
-   ============================================================ */
+/* =========================================================
+   GET SESSION
+========================================================= */
 
-async function getSession() {
+async function getCurrentSession() {
 
-  if (!supabaseClient) {
-
+  if (!supabase) {
     return null;
-
   }
-
 
   const {
     data,
     error
-  } =
-    await supabaseClient
-      .auth
-      .getSession();
-
+  } = await supabase.auth.getSession();
 
   if (error) {
-
     console.error(
       "Erreur session:",
       error
     );
 
     return null;
-
   }
 
+  currentSession =
+    data?.session || null;
 
-  return (
-    data &&
-    data.session
-  ) ||
-  null;
-
+  return currentSession;
 }
 
 
-/* ============================================================
-   CHARGER LES SALONS
-   ============================================================ */
+/* =========================================================
+   LOAD ROOMS
+========================================================= */
 
 async function loadRooms() {
 
-  if (!supabaseClient) {
-
+  if (!supabase) {
     throw new Error(
       "Configuration Supabase indisponible."
     );
-
   }
 
-
   roomSelect.innerHTML =
-    `
-      <option value="">
-        Chargement des salons…
-      </option>
-    `;
+    `<option value="">Chargement des salons…</option>`;
 
+  roomSelect.disabled = true;
 
   const {
     data,
     error
-  } =
-    await supabaseClient
-      .from("rooms")
-      .select(
-        "id,name,emoji"
-      )
-      .order(
-        "name",
-        {
-          ascending: true
-        }
-      );
-
+  } = await supabase
+    .from("rooms")
+    .select("id,name,emoji")
+    .order("name", {
+      ascending: true
+    });
 
   if (error) {
-
-    console.error(
-      "Erreur salons:",
-      error
-    );
-
     throw new Error(
-      "Impossible de charger les salons."
+      "Impossible de charger les salons : " +
+      error.message
     );
-
   }
 
+  roomSelect.innerHTML = "";
 
-  roomSelect.innerHTML =
-    `
-      <option value="">
-        Sélectionner un salon…
-      </option>
-    `;
-
-
-  if (
-    !data ||
-    data.length === 0
-  ) {
+  if (!data || data.length === 0) {
 
     roomSelect.innerHTML =
-      `
-        <option value="">
-          Aucun salon disponible
-        </option>
-      `;
+      `<option value="">Aucun salon disponible</option>`;
+
+    roomSelect.disabled = true;
+
+    roomsLoaded = false;
+
+    updatePublishButton();
 
     return;
-
   }
 
+  const firstOption =
+    document.createElement("option");
 
-  data.forEach(
-    room => {
+  firstOption.value = "";
+  firstOption.textContent =
+    "Choisir un salon…";
 
-      const option =
-        document.createElement(
-          "option"
-        );
-
-
-      option.value =
-        room.id;
-
-
-      option.textContent =
-        (
-          room.emoji
-            ? room.emoji + " "
-            : ""
-        ) +
-        room.name;
-
-
-      roomSelect.appendChild(
-        option
-      );
-
-    }
+  roomSelect.appendChild(
+    firstOption
   );
 
+  for (const room of data) {
+
+    const option =
+      document.createElement("option");
+
+    option.value =
+      room.id;
+
+    option.textContent =
+      `${room.emoji || "💬"} ${room.name}`;
+
+    roomSelect.appendChild(
+      option
+    );
+  }
+
+  roomSelect.disabled = false;
+
+  roomsLoaded = true;
+
+  updatePublishButton();
 }
 
 
-/* ============================================================
-   GOOGLE LOGIN
-   ============================================================ */
+/* =========================================================
+   UPDATE PUBLISH BUTTON
+========================================================= */
 
-async function loginWithGoogle() {
+function updatePublishButton() {
 
-  if (!supabaseClient) {
+  const valid =
+    !!currentSession &&
+    !!selectedFile &&
+    !!roomSelect.value &&
+    roomsLoaded;
 
-    showError(
-      "Configuration Supabase indisponible. Vérifiez que config.js est correctement chargé."
-    );
-
-    return;
-
-  }
-
-
-  if (!localShareId) {
-
-    showError(
-      "Le partage local est introuvable."
-    );
-
-    return;
-
-  }
-
-
-  try {
-
-    googleLogin.disabled =
-      true;
-
-
-    googleLogin.textContent =
-      "Connexion…";
-
-
-    const redirectUrl =
-      window.location.origin +
-      window.location.pathname +
-      "?local_share_id=" +
-      encodeURIComponent(
-        localShareId
-      );
-
-
-    console.log(
-      "🔐 Redirection Google:",
-      redirectUrl
-    );
-
-
-    const {
-      error
-    } =
-      await supabaseClient
-        .auth
-        .signInWithOAuth({
-
-          provider:
-            "google",
-
-          options: {
-            redirectTo:
-              redirectUrl
-          }
-
-        });
-
-
-    if (error) {
-
-      throw error;
-
-    }
-
-  } catch (error) {
-
-    console.error(
-      "Erreur Google:",
-      error
-    );
-
-
-    googleLogin.disabled =
-      false;
-
-
-    googleLogin.textContent =
-      "Continuer avec Google";
-
-
-    showError(
-      error.message ||
-      "Impossible de lancer la connexion Google."
-    );
-
-  }
-
+  publishButton.disabled =
+    !valid;
 }
 
 
-/* ============================================================
-   UPLOAD CLOUDINARY
-   ============================================================ */
+/* =========================================================
+   PROGRESS
+========================================================= */
 
-function uploadToCloudinary(
-  file,
-  onProgress
+function setProgress(
+  percent,
+  text
 ) {
 
+  const safePercent =
+    Math.max(
+      0,
+      Math.min(
+        100,
+        Number(percent) || 0
+      )
+    );
+
+  progressBar.style.width =
+    `${safePercent}%`;
+
+  progressPercent.textContent =
+    `${Math.round(safePercent)}%`;
+
+  progressText.textContent =
+    text || "Traitement…";
+}
+
+
+/* =========================================================
+   CLOUDINARY UPLOAD
+========================================================= */
+
+function uploadToCloudinary(file) {
+
   return new Promise(
-    (
-      resolve,
-      reject
-    ) => {
+    (resolve, reject) => {
 
-      if (!file) {
-
+      if (!CONFIG) {
         reject(
           new Error(
-            "Aucun fichier à envoyer."
+            "Configuration MAHOUTO indisponible."
           )
         );
 
         return;
-
       }
 
+      const cloudName =
+        CONFIG.CLOUDINARY_CLOUD_NAME;
+
+      const uploadPreset =
+        CONFIG.CLOUDINARY_UPLOAD_PRESET;
 
       if (
-        !CLOUDINARY_UPLOAD_URL
+        !cloudName ||
+        !uploadPreset
       ) {
 
         reject(
@@ -2410,153 +1708,95 @@ function uploadToCloudinary(
         );
 
         return;
-
       }
-
-
-      if (
-        !CLOUDINARY_UPLOAD_PRESET
-      ) {
-
-        reject(
-          new Error(
-            "Preset Cloudinary indisponible."
-          )
-        );
-
-        return;
-
-      }
-
 
       const formData =
         new FormData();
-
 
       formData.append(
         "file",
         file
       );
 
-
       formData.append(
         "upload_preset",
-        CLOUDINARY_UPLOAD_PRESET
+        uploadPreset
       );
 
+      const resourceType =
+        file.type === "application/pdf" ||
+        file.type.startsWith("text/") ||
+        file.type.includes("word") ||
+        file.type.includes("zip")
+          ? "auto"
+          : "auto";
 
       const xhr =
         new XMLHttpRequest();
 
-
       xhr.open(
         "POST",
-        CLOUDINARY_UPLOAD_URL
+        `https://api.cloudinary.com/v1_1/${encodeURIComponent(
+          cloudName
+        )}/${resourceType}/upload`
       );
-
 
       xhr.upload.onprogress =
         event => {
 
-          if (
-            event.lengthComputable &&
-            typeof onProgress ===
-              "function"
-          ) {
-
-            const percent =
-              Math.round(
-                (
-                  event.loaded /
-                  event.total
-                ) *
-                100
-              );
-
-
-            onProgress(
-              percent
-            );
-
+          if (!event.lengthComputable) {
+            return;
           }
 
-        };
+          const percent =
+            (event.loaded / event.total) * 70;
 
+          setProgress(
+            percent,
+            "Envoi du fichier…"
+          );
+        };
 
       xhr.onload =
         () => {
 
-          if (
-            xhr.status >= 200 &&
-            xhr.status < 300
-          ) {
-
-            try {
-
-              const result =
-                JSON.parse(
-                  xhr.responseText
-                );
-
-
-              resolve(
-                result
-              );
-
-
-            } catch (error) {
-
-              reject(
-                new Error(
-                  "Réponse Cloudinary invalide."
-                )
-              );
-
-            }
-
-
-            return;
-
-          }
-
-
-          let message =
-            "Échec de l'envoi vers Cloudinary.";
-
+          let response = null;
 
           try {
-
-            const result =
+            response =
               JSON.parse(
                 xhr.responseText
               );
-
-
-            if (
-              result.error &&
-              result.error.message
-            ) {
-
-              message =
-                result.error.message;
-
-            }
-
-          } catch (error) {
-
-            // Réponse non JSON.
-
+          } catch {
+            response = null;
           }
 
+          if (
+            xhr.status >= 200 &&
+            xhr.status < 300 &&
+            response &&
+            response.secure_url
+          ) {
+
+            setProgress(
+              72,
+              "Fichier envoyé…"
+            );
+
+            resolve(response);
+
+            return;
+          }
+
+          const message =
+            response?.error?.message ||
+            response?.message ||
+            `Erreur Cloudinary (${xhr.status}).`;
 
           reject(
-            new Error(
-              message
-            )
+            new Error(message)
           );
-
         };
-
 
       xhr.onerror =
         () => {
@@ -2566,287 +1806,239 @@ function uploadToCloudinary(
               "Erreur réseau pendant l'envoi du fichier."
             )
           );
-
         };
-
 
       xhr.onabort =
         () => {
 
           reject(
             new Error(
-              "Envoi annulé."
+              "L'envoi du fichier a été interrompu."
             )
           );
-
         };
-
 
       xhr.send(
         formData
       );
-
     }
   );
-
 }
 
 
-/* ============================================================
-   CRÉER SHARE_PENDING
-   ============================================================ */
+/* =========================================================
+   CREATE PENDING SHARE
+========================================================= */
 
 async function createPendingShare(
-  cloudinaryResult
+  uploadResponse
 ) {
 
-  const attachmentUrl =
-    cloudinaryResult.secure_url ||
-    cloudinaryResult.url;
-
-
-  if (!attachmentUrl) {
-
+  if (!uploadResponse?.secure_url) {
     throw new Error(
-      "Cloudinary n'a pas retourné d'URL."
+      "URL Cloudinary manquante."
     );
-
   }
 
+  setProgress(
+    78,
+    "Préparation de la publication…"
+  );
 
   const response =
     await fetch(
       "/api/share-pending-create",
       {
-
-        method:
-          "POST",
+        method: "POST",
 
         headers: {
           "Content-Type":
             "application/json"
         },
 
-        body:
-          JSON.stringify({
+        body: JSON.stringify({
+          filename:
+            selectedFile.name,
 
-            filename:
-              selectedFile.name,
+          mime_type:
+            selectedFile.type ||
+            "application/octet-stream",
 
-            mime_type:
-              selectedFile.type ||
-              "application/octet-stream",
+          file_size:
+            selectedFile.size,
 
-            file_size:
-              selectedFile.size,
+          attachment_url:
+            uploadResponse.secure_url,
 
-            attachment_url:
-              attachmentUrl,
+          title:
+            selectedFile.name,
 
-            title:
-              selectedFile.name,
+          caption:
+            captionInput.value.trim(),
 
-            caption:
-              captionInput.value
-                .trim()
-                .slice(
-                  0,
-                  2000
-                ),
-
-            shared_url:
-              window.location.href
-
-          })
-
+          shared_url:
+            uploadResponse.secure_url
+        })
       }
     );
 
-
-  let result;
-
+  let data = null;
 
   try {
-
-    result =
+    data =
       await response.json();
-
-  } catch (error) {
-
+  } catch {
     throw new Error(
-      "Réponse invalide du serveur."
+      "Réponse invalide du serveur lors de la préparation."
     );
-
   }
-
 
   if (
     !response.ok ||
-    !result ||
-    !result.success
+    !data?.success ||
+    !data?.share_id
   ) {
 
     throw new Error(
-      (
-        result &&
-        result.error
-      ) ||
+      data?.error ||
+      data?.message ||
       "Impossible de créer le partage temporaire."
     );
-
   }
 
-
-  return result;
-
+  return data;
 }
 
 
-/* ============================================================
-   FINALISER LE PARTAGE
-   ============================================================ */
+/* =========================================================
+   FINALIZE SHARE
+========================================================= */
 
 async function finalizeShare(
-  shareId,
-  roomId,
-  caption
+  shareId
 ) {
 
-  const session =
-    await getSession();
-
-
-  if (!session) {
+  if (!currentSession?.access_token) {
 
     throw new Error(
-      "Votre session a expiré. Veuillez vous reconnecter."
+      "Votre session de connexion a expiré. Veuillez vous reconnecter."
     );
-
   }
 
+  setProgress(
+    86,
+    "Publication dans le salon…"
+  );
 
   const response =
     await fetch(
       "/api/share-finalize",
       {
-
-        method:
-          "POST",
+        method: "POST",
 
         headers: {
-
           "Content-Type":
             "application/json",
 
           "Authorization":
-            "Bearer " +
-            session.access_token
-
+            `Bearer ${currentSession.access_token}`
         },
 
-        body:
-          JSON.stringify({
+        body: JSON.stringify({
+          share_id:
+            shareId,
 
-            share_id:
-              shareId,
+          room_id:
+            roomSelect.value,
 
-            room_id:
-              roomId,
-
-            caption:
-              caption
-
-          })
-
+          caption:
+            captionInput.value.trim()
+        })
       }
     );
 
-
-  let result;
-
+  let data = null;
 
   try {
-
-    result =
+    data =
       await response.json();
-
-  } catch (error) {
-
+  } catch {
     throw new Error(
-      "Réponse invalide du serveur."
+      "Réponse invalide du serveur lors de la publication."
     );
-
   }
-
 
   if (
     !response.ok ||
-    !result ||
-    !result.success
+    !data?.success
   ) {
 
     throw new Error(
-      (
-        result &&
-        result.error
-      ) ||
+      data?.error ||
+      data?.message ||
       "Impossible de publier le fichier."
     );
-
   }
 
-
-  return result;
-
+  return data;
 }
 
 
-/* ============================================================
-   SUPPRIMER LE PARTAGE LOCAL
-   ============================================================ */
+/* =========================================================
+   DELETE LOCAL SHARE
+========================================================= */
 
 async function deleteLocalShare() {
 
   if (!localShareId) {
-
     return;
-
   }
-
 
   try {
 
     const cache =
-      await getShareCache();
+      await caches.open(
+        SHARE_CACHE_NAME
+      );
 
+    const metadata =
+      await cache.match(
+        metadataUrl(localShareId)
+      );
 
-    /*
-      Métadonnées.
-    */
+    if (metadata) {
+
+      let data = null;
+
+      try {
+        data =
+          await metadata.json();
+      } catch {
+        data = null;
+      }
+
+      const files =
+        Array.isArray(data?.files)
+          ? data.files
+          : [];
+
+      for (
+        let index = 0;
+        index < files.length;
+        index++
+      ) {
+
+        await cache.delete(
+          fileUrl(
+            localShareId,
+            index
+          )
+        );
+      }
+    }
 
     await cache.delete(
-      new Request(
-        SHARE_META_PREFIX +
-        localShareId
-      )
-    );
-
-
-    /*
-      Premier fichier.
-    */
-
-    await cache.delete(
-      new Request(
-        SHARE_FILE_PREFIX +
-        localShareId +
-        "/0"
-      )
-    );
-
-
-    console.log(
-      "🧹 Partage local supprimé."
+      metadataUrl(localShareId)
     );
 
   } catch (error) {
@@ -2855,410 +2047,396 @@ async function deleteLocalShare() {
       "Nettoyage local impossible:",
       error
     );
-
   }
-
 }
 
 
-/* ============================================================
-   PROGRESSION
-   ============================================================ */
-
-function showProgress() {
-
-  progressContainer.classList.remove(
-    "hidden"
-  );
-
-  progressText.classList.remove(
-    "hidden"
-  );
-
-}
-
-
-function updateProgress(
-  percent
-) {
-
-  const value =
-    Math.max(
-      0,
-      Math.min(
-        100,
-        Number(percent) || 0
-      )
-    );
-
-
-  progressBar.style.width =
-    value + "%";
-
-
-  progressText.textContent =
-    Math.round(
-      value
-    ) +
-    " %";
-
-}
-
-
-/* ============================================================
-   PUBLICATION
-   ============================================================ */
+/* =========================================================
+   PUBLISH SHARE
+========================================================= */
 
 async function publishShare() {
 
-  if (published) {
-
-    return;
-
-  }
-
-
-  clearStatus();
-
-
-  const roomId =
-    roomSelect.value;
-
-
-  if (!roomId) {
-
-    setStatus(
-      "Veuillez choisir un salon.",
-      "error"
-    );
-
-    roomSelect.focus();
-
-    return;
-
-  }
-
-
   if (!selectedFile) {
-
-    setStatus(
-      "Aucun fichier n'est disponible.",
-      "error"
+    showError(
+      "Aucun fichier n'a été sélectionné."
     );
 
     return;
-
   }
 
+  if (!roomSelect.value) {
+    showError(
+      "Veuillez choisir un salon."
+    );
+
+    return;
+  }
+
+  if (!currentSession) {
+    showLogin();
+
+    return;
+  }
+
+  publishButton.disabled =
+    true;
+
+  roomSelect.disabled =
+    true;
+
+  captionInput.disabled =
+    true;
+
+  progressBox.classList.remove(
+    "hidden"
+  );
+
+  setProgress(
+    0,
+    "Préparation…"
+  );
 
   try {
 
-    publishButton.disabled =
-      true;
+    /* 1 — Cloudinary */
 
-
-    roomSelect.disabled =
-      true;
-
-
-    captionInput.disabled =
-      true;
-
-
-    showProgress();
-
-    updateProgress(
-      0
-    );
-
-
-    /* ------------------------------------------------------
-       1. CLOUDINARY
-    ------------------------------------------------------ */
-
-    setStatus(
-      "Envoi du fichier en cours…",
-      "info"
-    );
-
-
-    const cloudinaryResult =
+    const uploadResponse =
       await uploadToCloudinary(
-        selectedFile,
-        percent => {
-
-          /*
-            Cloudinary :
-            0 → 80 %
-          */
-
-          updateProgress(
-            percent * 0.8
-          );
-
-        }
+        selectedFile
       );
 
 
-    updateProgress(
-      80
-    );
-
-
-    /* ------------------------------------------------------
-       2. SHARE PENDING
-    ------------------------------------------------------ */
-
-    setStatus(
-      "Préparation de la publication…",
-      "info"
-    );
-
+    /* 2 — Temporary share */
 
     const pending =
       await createPendingShare(
-        cloudinaryResult
+        uploadResponse
       );
 
 
-    if (
-      !pending ||
-      !pending.share_id
-    ) {
-
-      throw new Error(
-        "Identifiant de partage temporaire manquant."
-      );
-
-    }
-
-
-    updateProgress(
-      90
-    );
-
-
-    /* ------------------------------------------------------
-       3. FINALIZE
-    ------------------------------------------------------ */
-
-    setStatus(
-      "Publication dans le salon…",
-      "info"
-    );
-
+    /* 3 — Final publication */
 
     await finalizeShare(
-
-      pending.share_id,
-
-      roomId,
-
-      captionInput.value
-        .trim()
-        .slice(
-          0,
-          2000
-        )
-
+      pending.share_id
     );
 
 
-    updateProgress(
-      100
+    /* 4 — Finish */
+
+    setProgress(
+      100,
+      "Partage effectué !"
     );
 
 
-    /* ------------------------------------------------------
-       4. NETTOYAGE
-    ------------------------------------------------------ */
+    /* 5 — Remove local temporary file */
 
     await deleteLocalShare();
 
 
-    published =
-      true;
+    /* 6 — Success */
 
-
-    /* ------------------------------------------------------
-       5. SUCCÈS
-    ------------------------------------------------------ */
-
-    showSuccess(
-      "Votre fichier a été publié avec succès dans le salon sélectionné."
+    setTimeout(
+      () => {
+        showSuccess();
+      },
+      300
     );
-
 
   } catch (error) {
 
     console.error(
-      "❌ Erreur publication:",
+      "Erreur publication:",
       error
     );
 
+    progressBox.classList.add(
+      "hidden"
+    );
 
     publishButton.disabled =
       false;
 
-
     roomSelect.disabled =
       false;
-
 
     captionInput.disabled =
       false;
 
+    updatePublishButton();
 
-    setStatus(
-      error &&
-      error.message
-        ? error.message
-        : "Une erreur est survenue pendant la publication.",
-      "error"
+    showError(
+      readableError(error)
     );
-
   }
-
 }
 
 
-/* ============================================================
-   INITIALISATION
-   ============================================================ */
+/* =========================================================
+   GOOGLE LOGIN
+========================================================= */
+
+async function loginWithGoogle() {
+
+  if (!supabase) {
+
+    showError(
+      "Configuration Supabase indisponible."
+    );
+
+    return;
+  }
+
+  googleLogin.disabled =
+    true;
+
+  googleLogin.textContent =
+    "Connexion…";
+
+  try {
+
+    const redirectUrl =
+      window.location.origin +
+      "/share.html" +
+      "?local_share_id=" +
+      encodeURIComponent(
+        localShareId
+      );
+
+    const {
+      error
+    } =
+      await supabase.auth.signInWithOAuth({
+        provider: "google",
+
+        options: {
+          redirectTo:
+            redirectUrl
+        }
+      });
+
+    if (error) {
+      throw error;
+    }
+
+  } catch (error) {
+
+    console.error(
+      "Google login error:",
+      error
+    );
+
+    googleLogin.disabled =
+      false;
+
+    googleLogin.textContent =
+      "Continuer avec Google";
+
+    showError(
+      readableError(error)
+    );
+  }
+}
+
+
+/* =========================================================
+   AUTH STATE
+========================================================= */
+
+function setupAuthListener() {
+
+  if (!supabase) {
+    return;
+  }
+
+  supabase.auth.onAuthStateChange(
+    async (
+      event,
+      session
+    ) => {
+
+      console.log(
+        "Auth event:",
+        event
+      );
+
+      currentSession =
+        session || null;
+
+      if (
+        currentSession &&
+        localShareId
+      ) {
+
+        try {
+
+          showShare();
+
+          await loadRooms();
+
+        } catch (error) {
+
+          console.error(
+            "Erreur chargement salons:",
+            error
+          );
+
+          showError(
+            readableError(error)
+          );
+        }
+
+        return;
+      }
+
+      if (
+        !currentSession &&
+        event === "SIGNED_OUT"
+      ) {
+
+        showLogin();
+      }
+    }
+  );
+}
+
+
+/* =========================================================
+   INIT
+========================================================= */
 
 async function init() {
 
   showLoading();
 
+  const params =
+    new URLSearchParams(
+      window.location.search
+    );
+
+  localShareId =
+    params.get(
+      "local_share_id"
+    );
+
+
+  /* Configuration */
+
+  if (!CONFIG) {
+
+    showError(
+      "Configuration MAHOUTO indisponible."
+    );
+
+    return;
+  }
+
+
+  if (!supabase) {
+
+    showError(
+      "Configuration Supabase indisponible."
+    );
+
+    return;
+  }
+
+
+  /* Load local file */
 
   try {
 
-    /*
-      1. Charger le fichier local.
-    */
-
     await loadLocalShare();
-
-
-    /*
-      2. Vérifier la session.
-    */
-
-    const session =
-      await getSession();
-
-
-    if (!session) {
-
-      showLogin();
-
-      return;
-
-    }
-
-
-    /*
-      3. Utilisateur connecté :
-         charger les salons.
-    */
-
-    await loadRooms();
-
-
-    /*
-      4. Afficher l'écran.
-    */
-
-    showShare();
-
 
   } catch (error) {
 
     console.error(
-      "❌ Initialisation:",
+      "Erreur chargement partage:",
       error
     );
 
-
     showError(
-      error &&
-      error.message
-        ? error.message
-        : "Impossible de préparer le partage."
+      readableError(error)
     );
 
+    return;
   }
 
-}
 
+  /* Session */
 
-/* ============================================================
-   AUTH STATE CHANGE
-   ============================================================ */
+  try {
 
-if (supabaseClient) {
+    currentSession =
+      await getCurrentSession();
 
-  supabaseClient
-    .auth
-    .onAuthStateChange(
-      async (
-        event,
-        session
-      ) => {
+  } catch (error) {
 
-        console.log(
-          "Auth event:",
-          event
-        );
-
-
-        if (
-          session &&
-          (
-            event ===
-              "SIGNED_IN" ||
-            event ===
-              "INITIAL_SESSION" ||
-            event ===
-              "TOKEN_REFRESHED"
-          )
-        ) {
-
-          try {
-
-            await loadRooms();
-
-            showShare();
-
-          } catch (error) {
-
-            console.error(
-              error
-            );
-
-            showError(
-              "Impossible de charger les salons."
-            );
-
-          }
-
-        }
-
-      }
+    console.error(
+      "Erreur récupération session:",
+      error
     );
 
+    currentSession = null;
+  }
+
+
+  /* Auth listener */
+
+  setupAuthListener();
+
+
+  /* User connected */
+
+  if (currentSession) {
+
+    try {
+
+      showShare();
+
+      await loadRooms();
+
+    } catch (error) {
+
+      console.error(
+        "Erreur salons:",
+        error
+      );
+
+      showError(
+        readableError(error)
+      );
+    }
+
+    return;
+  }
+
+
+  /* User not connected */
+
+  showLogin();
 }
 
 
-/* ============================================================
-   ÉVÉNEMENTS
-   ============================================================ */
+/* =========================================================
+   EVENTS
+========================================================= */
 
 googleLogin.addEventListener(
   "click",
   loginWithGoogle
 );
 
+roomSelect.addEventListener(
+  "change",
+  updatePublishButton
+);
+
+captionInput.addEventListener(
+  "input",
+  updatePublishButton
+);
 
 publishButton.addEventListener(
   "click",
@@ -3266,32 +2444,75 @@ publishButton.addEventListener(
 );
 
 
-successClose.addEventListener(
+/* =========================================================
+   SUCCESS BUTTON
+========================================================= */
+
+successOpen.addEventListener(
   "click",
   () => {
 
     window.location.href =
-      "/";
-
+      window.location.origin + "/";
   }
 );
 
+
+/* =========================================================
+   ERROR RETRY
+========================================================= */
 
 errorRetry.addEventListener(
   "click",
   () => {
 
     window.location.reload();
-
   }
 );
 
 
-/* ============================================================
-   LANCEMENT
-   ============================================================ */
+/* =========================================================
+   PAGE LOAD
+========================================================= */
 
-init();
+window.addEventListener(
+  "load",
+  () => {
+
+    init().catch(
+      error => {
+
+        console.error(
+          "Erreur initialisation:",
+          error
+        );
+
+        showError(
+          readableError(error)
+        );
+      }
+    );
+  }
+);
+
+
+/* =========================================================
+   CLEANUP
+========================================================= */
+
+window.addEventListener(
+  "beforeunload",
+  () => {
+
+    if (previewObjectUrl) {
+      URL.revokeObjectURL(
+        previewObjectUrl
+      );
+
+      previewObjectUrl = null;
+    }
+  }
+);
 
 </script>
 
