@@ -1,23 +1,23 @@
 /**
- * MAHOUTO+ — Android Web Share Target
+ * MAHOUTO+ — Web Share Target
  *
  * Flux :
  *
- * WhatsApp / Galerie
- *       ↓
+ * Android / WhatsApp / Galerie
+ *          ↓
  * POST /api/share-target
- *       ↓
- * Upload Cloudinary
- *       ↓
- * Création d'un partage temporaire Supabase
- *       ↓
- * Redirect /share.html?id=...
- *       ↓
- * L'utilisateur choisit le salon
- *       ↓
- * POST /api/share-finalize
- *       ↓
- * Création du message
+ *          ↓
+ * Cloudinary
+ *          ↓
+ * share_pending
+ *          ↓
+ * /share.html?id=UUID
+ *          ↓
+ * choix du salon
+ *          ↓
+ * /api/share-finalize
+ *          ↓
+ * messages
  */
 
 module.exports.config = {
@@ -27,6 +27,7 @@ module.exports.config = {
 };
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
+const PENDING_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 
 function getEnv(name) {
   const value = process.env[name];
@@ -40,38 +41,62 @@ function getEnv(name) {
   return value;
 }
 
-function json(res, status, data) {
+function sendJson(res, status, data) {
   return res.status(status).json(data);
 }
 
+function cleanString(value, maxLength = 2000) {
+  return String(value || "")
+    .trim()
+    .slice(0, maxLength);
+}
+
+function getFileFromFormData(formData) {
+  const possibleFields = [
+    "file",
+    "files",
+    "attachment",
+    "media",
+    "image",
+    "video",
+    "document",
+  ];
+
+  for (const field of possibleFields) {
+    const value = formData.get(field);
+
+    if (
+      value &&
+      typeof value === "object" &&
+      typeof value.arrayBuffer === "function"
+    ) {
+      return value;
+    }
+  }
+
+  return null;
+}
+
 async function handler(req, res) {
+  // ============================================================
+  // METHOD
+  // ============================================================
 
   if (req.method === "OPTIONS") {
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader(
-      "Access-Control-Allow-Methods",
-      "POST, OPTIONS"
-    );
-    res.setHeader(
-      "Access-Control-Allow-Headers",
-      "Content-Type, Authorization"
-    );
-
     return res.status(204).end();
   }
 
   if (req.method !== "POST") {
-    return json(res, 405, {
+    return sendJson(res, 405, {
       success: false,
       error: "Méthode non autorisée. Utilisez POST.",
     });
   }
 
   try {
-
-    // =========================================================
-    // 1. ENVIRONNEMENT
-    // =========================================================
+    // ============================================================
+    // ENVIRONMENT
+    // ============================================================
 
     const SUPABASE_URL =
       getEnv("SUPABASE_URL");
@@ -87,12 +112,11 @@ async function handler(req, res) {
 
     const CLOUDINARY_FOLDER =
       process.env.CLOUDINARY_FOLDER ||
-      "mahoutoplus/share-target";
+      "mahoutoplus/messages";
 
-
-    // =========================================================
-    // 2. CONTENT TYPE
-    // =========================================================
+    // ============================================================
+    // CONTENT TYPE
+    // ============================================================
 
     const contentType =
       req.headers["content-type"] || "";
@@ -102,19 +126,16 @@ async function handler(req, res) {
         .toLowerCase()
         .includes("multipart/form-data")
     ) {
-      return json(res, 400, {
+      return sendJson(res, 400, {
         success: false,
         error:
           "Le partage doit être envoyé en multipart/form-data.",
-        received_content_type:
-          contentType,
       });
     }
 
-
-    // =========================================================
-    // 3. REQUEST NATIVE
-    // =========================================================
+    // ============================================================
+    // REQUEST NATIVE
+    // ============================================================
 
     const host =
       req.headers.host || "localhost";
@@ -126,79 +147,48 @@ async function handler(req, res) {
       `${protocol}://${host}${req.url}`;
 
     const request =
-      new Request(
-        requestUrl,
-        {
-          method: "POST",
-          headers: req.headers,
-          body: req,
-          duplex: "half",
-        }
-      );
+      new Request(requestUrl, {
+        method: "POST",
+        headers: req.headers,
+        body: req,
+        duplex: "half",
+      });
 
     const formData =
       await request.formData();
 
+    // ============================================================
+    // SHARE INFORMATION
+    // ============================================================
 
-    // =========================================================
-    // 4. RÉCUPÉRATION DU PARTAGE
-    // =========================================================
+    const title = cleanString(
+      formData.get("title"),
+      300
+    );
 
     const caption =
-      formData.get("caption") ||
-      formData.get("text") ||
-      formData.get("content") ||
-      "";
-
-    const title =
-      formData.get("title") ||
-      "";
+      cleanString(
+        formData.get("caption") ||
+        formData.get("text") ||
+        formData.get("content"),
+        2000
+      );
 
     const sharedUrl =
-      formData.get("url") ||
-      "";
+      cleanString(
+        formData.get("url"),
+        2000
+      );
 
+    // ============================================================
+    // FILE
+    // ============================================================
 
-    // =========================================================
-    // 5. RECHERCHE DU FICHIER
-    // =========================================================
-
-    const possibleFileFields = [
-      "file",
-      "files",
-      "attachment",
-      "media",
-      "image",
-      "video",
-      "document",
-    ];
-
-    let file = null;
-
-    for (
-      const fieldName of possibleFileFields
-    ) {
-
-      const value =
-        formData.get(fieldName);
-
-      if (
-        value &&
-        typeof value === "object" &&
-        typeof value.arrayBuffer === "function"
-      ) {
-        file = value;
-        break;
-      }
-    }
-
-
-    // =========================================================
-    // 6. VALIDATION FICHIER
-    // =========================================================
+    const file =
+      getFileFromFormData(formData);
 
     if (!file) {
-      return json(res, 400, {
+      return sendJson(res, 400, {
         success: false,
         error:
           "Aucun fichier n'a été reçu.",
@@ -209,7 +199,7 @@ async function handler(req, res) {
       typeof file.size === "number" &&
       file.size > MAX_FILE_SIZE
     ) {
-      return json(res, 413, {
+      return sendJson(res, 413, {
         success: false,
         error:
           "Le fichier est trop volumineux.",
@@ -217,10 +207,9 @@ async function handler(req, res) {
       });
     }
 
-
-    // =========================================================
-    // 7. BUFFER
-    // =========================================================
+    // ============================================================
+    // FILE BUFFER
+    // ============================================================
 
     const arrayBuffer =
       await file.arrayBuffer();
@@ -229,17 +218,16 @@ async function handler(req, res) {
       Buffer.from(arrayBuffer);
 
     if (!fileBuffer.length) {
-      return json(res, 400, {
+      return sendJson(res, 400, {
         success: false,
         error:
           "Le fichier reçu est vide.",
       });
     }
 
-
-    // =========================================================
-    // 8. CLOUDINARY
-    // =========================================================
+    // ============================================================
+    // CLOUDINARY
+    // ============================================================
 
     const cloudinaryUrl =
       `https://api.cloudinary.com/v1_1/` +
@@ -281,6 +269,14 @@ async function handler(req, res) {
       "auto"
     );
 
+    console.log(
+      "MAHOUTO+ Share Target → Cloudinary",
+      {
+        filename: file.name,
+        mime_type: file.type,
+        size: fileBuffer.length,
+      }
+    );
 
     const cloudinaryResponse =
       await fetch(
@@ -295,13 +291,12 @@ async function handler(req, res) {
       await cloudinaryResponse.text();
 
     if (!cloudinaryResponse.ok) {
-
       console.error(
         "Cloudinary error:",
         cloudinaryText
       );
 
-      return json(res, 500, {
+      return sendJson(res, 500, {
         success: false,
         error:
           "L'envoi du fichier vers Cloudinary a échoué.",
@@ -310,29 +305,20 @@ async function handler(req, res) {
       });
     }
 
-
-    // =========================================================
-    // 9. RÉPONSE CLOUDINARY
-    // =========================================================
-
     let cloudinaryData;
 
     try {
-
       cloudinaryData =
         JSON.parse(
           cloudinaryText
         );
-
-    } catch (error) {
-
-      return json(res, 500, {
+    } catch {
+      return sendJson(res, 500, {
         success: false,
         error:
           "Réponse Cloudinary invalide.",
       });
     }
-
 
     const attachmentUrl =
       cloudinaryData.secure_url ||
@@ -340,55 +326,76 @@ async function handler(req, res) {
       null;
 
     if (!attachmentUrl) {
-
-      return json(res, 500, {
+      return sendJson(res, 500, {
         success: false,
         error:
           "Cloudinary n'a pas retourné l'URL du fichier.",
       });
     }
 
+    // ============================================================
+    // CREATE TEMPORARY SHARE
+    // ============================================================
 
-    // =========================================================
-    // 10. CRÉATION DU PARTAGE TEMPORAIRE
-    // =========================================================
+    const shareId =
+      crypto.randomUUID();
+
+    const now =
+      new Date();
+
+    const expiresAt =
+      new Date(
+        now.getTime() +
+        PENDING_DURATION_MS
+      );
 
     const pendingPayload = {
+      id: shareId,
 
       filename:
-        file.name ||
-        "fichier",
+        cleanString(
+          file.name ||
+          "Fichier partagé",
+          500
+        ),
 
       mime_type:
-        file.type ||
-        "application/octet-stream",
+        cleanString(
+          file.type ||
+          "application/octet-stream",
+          200
+        ),
 
       file_size:
-        typeof file.size === "number"
-          ? file.size
-          : fileBuffer.length,
+        fileBuffer.length,
 
       attachment_url:
         attachmentUrl,
 
       caption:
-        String(caption || "").slice(0, 2000),
+        caption,
 
       title:
-        String(title || "").slice(0, 500),
+        title,
 
       shared_url:
-        String(sharedUrl || "").slice(0, 2000),
+        sharedUrl,
 
       expires_at:
-        new Date(
-          Date.now() + 15 * 60 * 1000
-        ).toISOString(),
+        expiresAt.toISOString(),
 
       created_at:
-        new Date().toISOString(),
+        now.toISOString(),
     };
 
+    console.log(
+      "MAHOUTO+ → share_pending",
+      {
+        id: shareId,
+        filename: pendingPayload.filename,
+        size: pendingPayload.file_size,
+      }
+    );
 
     const pendingResponse =
       await fetch(
@@ -397,7 +404,6 @@ async function handler(req, res) {
           method: "POST",
 
           headers: {
-
             apikey:
               SUPABASE_SERVICE_ROLE_KEY,
 
@@ -418,19 +424,16 @@ async function handler(req, res) {
         }
       );
 
-
     const pendingText =
       await pendingResponse.text();
 
-
     if (!pendingResponse.ok) {
-
       console.error(
-        "Supabase share_pending error:",
+        "share_pending INSERT error:",
         pendingText
       );
 
-      return json(res, 500, {
+      return sendJson(res, 500, {
         success: false,
         error:
           "Le partage temporaire n'a pas pu être créé.",
@@ -439,76 +442,50 @@ async function handler(req, res) {
       });
     }
 
+    // ============================================================
+    // REDIRECT TO SHARE UI
+    // ============================================================
 
-    let pendingRows;
-
-    try {
-
-      pendingRows =
-        JSON.parse(
-          pendingText
-        );
-
-    } catch (error) {
-
-      return json(res, 500, {
-        success: false,
-        error:
-          "Réponse Supabase invalide.",
-      });
-    }
-
-
-    const pending =
-      Array.isArray(pendingRows)
-        ? pendingRows[0]
-        : pendingRows;
-
-
-    if (
-      !pending ||
-      !pending.id
-    ) {
-
-      return json(res, 500, {
-        success: false,
-        error:
-          "Le partage temporaire ne possède aucun identifiant.",
-      });
-    }
-
-
-    // =========================================================
-    // 11. REDIRECTION VERS L'ÉCRAN DE PARTAGE
-    // =========================================================
+    const origin =
+      `${protocol}://${host}`;
 
     const sharePage =
-      `/share.html?id=${encodeURIComponent(
-        pending.id
-      )}`;
+      `${origin}/share.html?id=` +
+      encodeURIComponent(shareId);
+
+    console.log(
+      "MAHOUTO+ Share Target →",
+      sharePage
+    );
+
+    /*
+     * 303 See Other :
+     * le navigateur Android quitte le POST
+     * et ouvre share.html en GET.
+     */
 
     res.setHeader(
       "Location",
       sharePage
     );
 
+    res.setHeader(
+      "Cache-Control",
+      "no-store, no-cache, must-revalidate"
+    );
+
     return res.status(303).end();
 
-
   } catch (error) {
-
     console.error(
       "SHARE TARGET ERROR:",
       error
     );
 
-    return json(res, 500, {
-
+    return sendJson(res, 500, {
       success: false,
-
       error:
         "Erreur interne lors du partage.",
-
       details:
         error?.message ||
         String(error),
