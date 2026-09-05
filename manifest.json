@@ -1,53 +1,35 @@
 {
   "name": "MAHOUTO+",
-  "short_name": "MAHOUTO +",
+  "short_name": "MAHOUTO+",
   "description": "MAHOUTO+ – L'Afrique qui apprend, crée et entreprend.",
-  "lang": "fr",
   "start_url": "/",
-  "scope": "/",
-  "id": "/",
   "display": "standalone",
-  "orientation": "portrait-primary",
   "background_color": "#0A0A0A",
   "theme_color": "#FFC107",
-  "prefer_related_applications": false,
 
   "icons": [
     {
       "src": "/assets/icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
       "src": "/assets/icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
-    },
-    {
-      "src": "/assets/icon-maskable-512.png",
-      "sizes": "512x512",
       "type": "image/png",
-      "purpose": "maskable"
+      "purpose": "any maskable"
     }
-  ],
-
-  "categories": [
-    "education",
-    "business",
-    "productivity",
-    "social"
   ],
 
   "share_target": {
     "action": "/share-target",
     "method": "POST",
     "enctype": "multipart/form-data",
-
     "params": {
       "title": "title",
       "text": "text",
       "url": "url",
-
       "files": [
         {
           "name": "files",
