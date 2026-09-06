@@ -41,6 +41,23 @@
 .hero.tagline { font-size: 14px; color: var(--text-muted); margin-top: 10px; font-weight: 600; }
 .hero.subtagline { font-size: 12.5px; color: var(--text-dim); margin-top: 4px; }
 
+.pwa-install-banner {
+    margin: 0 20px 14px;
+    padding: 14px 16px;
+    border-radius: var(--radius-lg);
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+.pwa-install-banner.hidden { display: none; }
+.pwa-install-text { display: flex; flex-direction: column; gap: 2px; }
+.pwa-install-text strong { font-size: 14px; color: var(--white); }
+.pwa-install-text span { font-size: 11.5px; color: var(--text-dim); }
+.pwa-install-banner .auth-btn { white-space: nowrap; padding: 10px 14px; }
+
   #auth-zone { padding: 18px 20px 6px; }
 
 .auth-methods { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
@@ -215,6 +232,14 @@
     <h1>MAHOUTO<span class="plus">+</span></h1>
     <p class="tagline">Apprendre • Créer • Entreprendre</p>
     <p class="subtagline">Construire l'Afrique numérique de demain.</p>
+  </div>
+
+  <div id="pwa-install-banner" class="pwa-install-banner hidden">
+    <div class="pwa-install-text">
+      <strong>Installer MAHOUTO+</strong>
+      <span>Accès rapide depuis ton écran d'accueil, même hors ligne.</span>
+    </div>
+    <button id="btn-pwa-install" class="auth-btn primary">📲 Installer</button>
   </div>
 
   <div id="auth-zone">
@@ -471,17 +496,45 @@
   // ===== ENREGISTREMENT SERVICE WORKER PWA =====
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/service-worker.js')
+      navigator.serviceWorker.register('/sw.js')
       .then(reg => console.log('SW enregistré:', reg.scope))
       .catch(err => console.log('SW erreur:', err));
     });
   }
 
+  // ===== BANNIÈRE D'INSTALLATION PWA =====
+  const installBanner = document.getElementById('pwa-install-banner');
+  const installBtn = document.getElementById('btn-pwa-install');
   let deferredPrompt;
+
+  // Si l'app tourne déjà en mode installé (standalone), on ne montre jamais la bannière.
+  const isStandalone =
+    window.matchMedia('(display-mode: standalone)').matches ||
+    window.navigator.standalone === true;
+
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     deferredPrompt = e;
+    if (!isStandalone && installBanner) {
+      installBanner.classList.remove('hidden');
+    }
     console.log('PWA prête à installer');
+  });
+
+  if (installBtn) {
+    installBtn.addEventListener('click', async () => {
+      if (!deferredPrompt) return;
+      installBanner.classList.add('hidden');
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      console.log('Choix installation :', outcome);
+      deferredPrompt = null;
+    });
+  }
+
+  window.addEventListener('appinstalled', () => {
+    if (installBanner) installBanner.classList.add('hidden');
+    console.log('MAHOUTO+ installée ✅');
   });
 })();
 </script>
