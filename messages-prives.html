@@ -369,13 +369,9 @@
     await loadConversations();
   })();
 
-  if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => {
-      navigator.serviceWorker.register("sw.js").catch((err) => console.log(err));
-    });
-  }
 })();
 </script>
+<script src="pwa-install.js"></script>
 
 </body>
 </html>

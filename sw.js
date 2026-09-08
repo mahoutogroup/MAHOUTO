@@ -1,4 +1,4 @@
-const CACHE_NAME = "mahoutoplus-shell-v44";
+const CACHE_NAME = "mahoutoplus-shell-v46";
 const SHARE_CACHE_NAME = "mahoutoplus-share-v1";
 
 const APP_SHELL = [
@@ -17,6 +17,7 @@ const APP_SHELL = [
   "/config.js",
   "/theme.css",
   "/theme-toggle.js",
+  "/pwa-install.js",
   "/assets/icon-192.png",
   "/assets/icon-512.png",
   "/assets/icon-maskable-512.png"
@@ -272,14 +273,40 @@ self.addEventListener("fetch", event => {
   }
 
   /*
-   * Les requêtes GET normales utilisent le cache
-   * puis le réseau en secours.
+   * Stale-while-revalidate :
+   * on sert immédiatement la version en cache si elle existe
+   * (rapide, fonctionne hors ligne), ET on relance en parallèle
+   * une requête réseau pour mettre à jour le cache en vue
+   * de la prochaine visite. Plus besoin de changer CACHE_NAME
+   * à chaque contenu modifié — seuls les fichiers de l'App Shell
+   * eux-mêmes (structure/icônes) nécessitent encore un bump.
    */
 
   if (event.request.method === "GET") {
     event.respondWith(
-      caches.match(event.request).then(cached => {
-        return cached || fetch(event.request);
+      caches.open(CACHE_NAME).then(async (cache) => {
+        const cached = await cache.match(event.request);
+
+        const networkUpdate = fetch(event.request)
+          .then((response) => {
+            if (response && response.ok) {
+              cache.put(event.request, response.clone());
+            }
+            return response;
+          })
+          .catch(() => null);
+
+        if (cached) {
+          // On répond tout de suite avec le cache, et on laisse
+          // la mise à jour se terminer en arrière-plan.
+          event.waitUntil(networkUpdate);
+          return cached;
+        }
+
+        // Rien en cache (première visite, ou fichier non listé
+        // dans l'App Shell) : on attend le réseau.
+        const networkResponse = await networkUpdate;
+        return networkResponse || Response.error();
       })
     );
   }
