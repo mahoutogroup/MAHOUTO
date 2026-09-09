@@ -18,7 +18,7 @@
     content="yes"
   >
 
-  <title>MAHOUTO+ — Partager dans un salon</title>
+  <title>MAHOUTO+ — Partager</title>
 
   <link
     rel="manifest"
@@ -186,6 +186,47 @@
     }
 
     /* =====================================================
+       VIGNETTES MULTI-FICHIERS
+    ===================================================== */
+
+    .thumbs-strip {
+      margin-top: 14px;
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+
+    .thumb {
+      flex: 0 0 auto;
+      width: 56px;
+      height: 56px;
+      border-radius: 10px;
+      border: 2px solid #292929;
+      background-color: #202020;
+      background-size: cover;
+      background-position: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      cursor: pointer;
+      overflow: hidden;
+    }
+
+    .thumb.active {
+      border-color: #FFC107;
+    }
+
+    .active-file-label {
+      margin-top: 10px;
+      text-align: center;
+      color: #A3A3A3;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    /* =====================================================
        APERÇU
     ===================================================== */
 
@@ -271,6 +312,31 @@
 
     .field {
       margin-top: 20px;
+    }
+
+    .dest-toggle {
+      display: flex;
+      gap: 8px;
+      margin-top: 20px;
+    }
+
+    .dest-btn {
+      flex: 1;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid #363636;
+      background: #0D0D0D;
+      color: #A3A3A3;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      text-align: center;
+    }
+
+    .dest-btn.active {
+      border-color: #FFC107;
+      background: #211D10;
+      color: #FFC107;
     }
 
     label {
@@ -545,11 +611,11 @@
     </div>
 
     <h1>
-      Partager dans un salon
+      Partager vers MAHOUTO+
     </h1>
 
     <p class="description">
-      Vérifiez le fichier, choisissez le salon
+      Choisissez où publier ce contenu
       et ajoutez éventuellement une légende.
     </p>
 
@@ -589,6 +655,16 @@
       </div>
 
     </div>
+
+    <div
+      id="thumbs-strip"
+      class="thumbs-strip hidden"
+    ></div>
+
+    <div
+      id="active-file-label"
+      class="active-file-label hidden"
+    ></div>
 
 
     <!-- ===================================================
@@ -682,10 +758,27 @@
 
 
     <!-- ===================================================
+         DESTINATION
+    ==================================================== -->
+
+    <div class="dest-toggle">
+
+      <button type="button" id="dest-btn-room" class="dest-btn active">
+        💬 Salon
+      </button>
+
+      <button type="button" id="dest-btn-dm" class="dest-btn">
+        ✉️ Discussion privée
+      </button>
+
+    </div>
+
+
+    <!-- ===================================================
          SALON
     ==================================================== -->
 
-    <div class="field">
+    <div class="field" id="room-field">
 
       <label for="room-select">
         Choisir un salon
@@ -695,6 +788,27 @@
 
         <option value="">
           Chargement des salons…
+        </option>
+
+      </select>
+
+    </div>
+
+
+    <!-- ===================================================
+         DISCUSSION PRIVÉE
+    ==================================================== -->
+
+    <div class="field hidden" id="conv-field">
+
+      <label for="conv-select">
+        Choisir une conversation
+      </label>
+
+      <select id="conv-select">
+
+        <option value="">
+          Chargement des conversations…
         </option>
 
       </select>
@@ -764,7 +878,7 @@
       class="button"
       type="button"
     >
-      Publier dans le salon
+      Publier
     </button>
 
   </section>
@@ -1137,6 +1251,27 @@ const statusElement =
     "status"
   );
 
+const thumbsStrip =
+  document.getElementById("thumbs-strip");
+
+const activeFileLabel =
+  document.getElementById("active-file-label");
+
+const destBtnRoom =
+  document.getElementById("dest-btn-room");
+
+const destBtnDm =
+  document.getElementById("dest-btn-dm");
+
+const roomField =
+  document.getElementById("room-field");
+
+const convField =
+  document.getElementById("conv-field");
+
+const convSelect =
+  document.getElementById("conv-select");
+
 
 /* ============================================================
    ÉTAT
@@ -1144,7 +1279,11 @@ const statusElement =
 
 let localShareId = null;
 
-let selectedFile = null;
+let sharedFiles = [];
+
+let activeFileIndex = 0;
+
+let currentDestination = "room"; // "room" | "dm"
 
 let previewObjectUrl = null;
 
@@ -2062,31 +2201,50 @@ async function loadLocalShare() {
 
   }
 
+  /*
+    Charger TOUS les fichiers du partage (pas seulement
+    le premier) : la liste des fichiers vient des métadonnées
+    enregistrées par le service worker (sw.js).
+  */
 
-  selectedFile =
-    await readLocalFile(
-      localShareId,
-      0
-    );
+  const fileCount =
+    (metadata.files && Array.isArray(metadata.files))
+      ? metadata.files.length
+      : 1;
 
+  sharedFiles = [];
 
-  if (!selectedFile) {
+  for (let i = 0; i < fileCount; i++) {
+    const file = await readLocalFile(localShareId, i);
+    if (file) {
+      sharedFiles.push(file);
+    }
+  }
+
+  if (!sharedFiles.length) {
 
     throw new Error(
-      "Impossible de récupérer le fichier partagé depuis votre téléphone."
+      "Impossible de récupérer le(s) fichier(s) partagé(s) depuis votre téléphone."
     );
 
   }
 
+  activeFileIndex = 0;
 
-  updateFileInformation(
-    selectedFile
-  );
+  // Informations agrégées (icône + résumé "N fichiers")
+  updateFileInformation(sharedFiles[0]);
 
+  if (sharedFiles.length > 1) {
+    const totalSize = sharedFiles.reduce((sum, f) => sum + (f.size || 0), 0);
+    fileNameElement.textContent = sharedFiles.length + " fichiers sélectionnés";
+    fileSizeElement.textContent = formatFileSize(totalSize) + " au total";
+    fileIcon.textContent = "🗂️";
+    filePreviewIcon.textContent = "🗂️";
+  }
 
-  renderFilePreview(
-    selectedFile
-  );
+  renderThumbnails();
+
+  selectActiveFile(0);
 
 
   /*
@@ -2108,6 +2266,161 @@ async function loadLocalShare() {
           0,
           2000
         );
+
+  }
+
+}
+
+
+/* ============================================================
+   VIGNETTES MULTI-FICHIERS
+   ============================================================ */
+
+function renderThumbnails() {
+
+  thumbsStrip.innerHTML = "";
+
+  if (sharedFiles.length <= 1) {
+    thumbsStrip.classList.add("hidden");
+    activeFileLabel.classList.add("hidden");
+    return;
+  }
+
+  thumbsStrip.classList.remove("hidden");
+  activeFileLabel.classList.remove("hidden");
+
+  sharedFiles.forEach((file, index) => {
+    const thumb = document.createElement("div");
+    thumb.className = "thumb" + (index === activeFileIndex ? " active" : "");
+    thumb.dataset.index = String(index);
+
+    const type = (file.type || "").toLowerCase();
+
+    if (type.startsWith("image/")) {
+      const url = URL.createObjectURL(file);
+      thumb.style.backgroundImage = "url('" + url + "')";
+    } else {
+      thumb.textContent = getFileIcon(file.type, file.name);
+    }
+
+    thumb.addEventListener("click", () => selectActiveFile(index));
+
+    thumbsStrip.appendChild(thumb);
+  });
+
+}
+
+function selectActiveFile(index) {
+
+  if (!sharedFiles[index]) {
+    return;
+  }
+
+  activeFileIndex = index;
+
+  const file = sharedFiles[index];
+
+  renderFilePreview(file);
+
+  if (sharedFiles.length > 1) {
+
+    activeFileLabel.textContent =
+      "Fichier " + (index + 1) + "/" + sharedFiles.length +
+      " — " + (file.name || "fichier") +
+      " (" + formatFileSize(file.size) + ")";
+
+    thumbsStrip.querySelectorAll(".thumb").forEach((el, i) => {
+      el.classList.toggle("active", i === index);
+    });
+
+  }
+
+}
+
+
+/* ============================================================
+   TYPE DE PIÈCE JOINTE (pour discussions privées)
+   ============================================================ */
+
+function mimeToAttachmentType(mime) {
+
+  const type = (mime || "").toLowerCase();
+
+  if (type.startsWith("image/")) return "image";
+  if (type.startsWith("video/")) return "video";
+  if (type.startsWith("audio/")) return "audio";
+
+  return "raw";
+
+}
+
+
+/* ============================================================
+   CHARGER LES CONVERSATIONS PRIVÉES
+   ============================================================ */
+
+async function loadConversations() {
+
+  if (!supabaseClient) {
+    throw new Error("Configuration Supabase indisponible.");
+  }
+
+  convSelect.innerHTML =
+    '<option value="">Chargement des conversations…</option>';
+
+  const session = await getSession();
+
+  if (!session) {
+    convSelect.innerHTML =
+      '<option value="">Connectez-vous pour voir vos conversations</option>';
+    return;
+  }
+
+  const currentUserId = session.user.id;
+
+  const { data: convs, error } = await supabaseClient
+    .from("dm_conversations")
+    .select("id, user_one, user_two")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("Erreur conversations:", error);
+    convSelect.innerHTML =
+      '<option value="">Impossible de charger les conversations</option>';
+    return;
+  }
+
+  if (!convs || !convs.length) {
+    convSelect.innerHTML =
+      '<option value="">Aucune conversation privée pour le moment</option>';
+    return;
+  }
+
+  convSelect.innerHTML =
+    '<option value="">Sélectionner une conversation…</option>';
+
+  for (const conv of convs) {
+
+    const otherId =
+      conv.user_one === currentUserId ? conv.user_two : conv.user_one;
+
+    let label = "Utilisateur";
+
+    try {
+      const { data: profileRows } = await supabaseClient
+        .rpc("get_public_profile", { uid: otherId });
+
+      if (profileRows && profileRows[0] && profileRows[0].username) {
+        label = profileRows[0].username;
+      }
+    } catch (e) {
+      console.warn("Profil introuvable pour", otherId, e);
+    }
+
+    const option = document.createElement("option");
+    option.value = conv.id;
+    option.textContent = "✉️ " + label;
+    convSelect.appendChild(option);
 
   }
 
@@ -2597,7 +2910,9 @@ function uploadToCloudinary(
    ============================================================ */
 
 async function createPendingShare(
-  cloudinaryResult
+  file,
+  cloudinaryResult,
+  caption
 ) {
 
   const attachmentUrl =
@@ -2631,23 +2946,23 @@ async function createPendingShare(
           JSON.stringify({
 
             filename:
-              selectedFile.name,
+              file.name,
 
             mime_type:
-              selectedFile.type ||
+              file.type ||
               "application/octet-stream",
 
             file_size:
-              selectedFile.size,
+              file.size,
 
             attachment_url:
               attachmentUrl,
 
             title:
-              selectedFile.name,
+              file.name,
 
             caption:
-              captionInput.value
+              (caption || "")
                 .trim()
                 .slice(
                   0,
@@ -2833,20 +3148,28 @@ async function deleteLocalShare() {
 
 
     /*
-      Premier fichier.
+      TOUS les fichiers du partage
+      (pas seulement le premier).
     */
 
-    await cache.delete(
-      new Request(
-        SHARE_FILE_PREFIX +
-        localShareId +
-        "/0"
-      )
-    );
+    const total =
+      sharedFiles.length || 1;
+
+    for (let i = 0; i < total; i++) {
+
+      await cache.delete(
+        new Request(
+          SHARE_FILE_PREFIX +
+          localShareId +
+          "/" + i
+        )
+      );
+
+    }
 
 
     console.log(
-      "🧹 Partage local supprimé."
+      "🧹 Partage local supprimé (" + total + " fichier(s))."
     );
 
   } catch (error) {
@@ -2856,6 +3179,43 @@ async function deleteLocalShare() {
       error
     );
 
+  }
+
+}
+
+
+/* ============================================================
+   PUBLIER UN FICHIER DANS UNE DISCUSSION PRIVÉE
+   ============================================================ */
+
+async function publishFileToConversation(convId, file, cloudinaryResult, content) {
+
+  const session = await getSession();
+
+  if (!session) {
+    throw new Error("Votre session a expiré. Veuillez vous reconnecter.");
+  }
+
+  const attachmentUrl =
+    cloudinaryResult.secure_url || cloudinaryResult.url;
+
+  if (!attachmentUrl) {
+    throw new Error("Cloudinary n'a pas retourné d'URL.");
+  }
+
+  const { error } = await supabaseClient
+    .from("dm_messages")
+    .insert({
+      conversation_id: convId,
+      sender_id: session.user.id,
+      content: content || "",
+      attachment_url: attachmentUrl,
+      attachment_type: mimeToAttachmentType(file.type)
+    });
+
+  if (error) {
+    console.error("Erreur envoi DM:", error);
+    throw new Error("Impossible d'envoyer ce fichier dans la conversation.");
   }
 
 }
@@ -2912,206 +3272,126 @@ function updateProgress(
 async function publishShare() {
 
   if (published) {
-
     return;
-
   }
-
 
   clearStatus();
 
+  const destination = currentDestination;
 
-  const roomId =
-    roomSelect.value;
+  const roomId = roomSelect.value;
+  const convId = convSelect.value;
 
-
-  if (!roomId) {
-
-    setStatus(
-      "Veuillez choisir un salon.",
-      "error"
-    );
-
+  if (destination === "room" && !roomId) {
+    setStatus("Veuillez choisir un salon.", "error");
     roomSelect.focus();
-
     return;
-
   }
 
-
-  if (!selectedFile) {
-
-    setStatus(
-      "Aucun fichier n'est disponible.",
-      "error"
-    );
-
+  if (destination === "dm" && !convId) {
+    setStatus("Veuillez choisir une conversation.", "error");
+    convSelect.focus();
     return;
-
   }
 
+  if (!sharedFiles.length) {
+    setStatus("Aucun fichier n'est disponible.", "error");
+    return;
+  }
 
   try {
 
-    publishButton.disabled =
-      true;
-
-
-    roomSelect.disabled =
-      true;
-
-
-    captionInput.disabled =
-      true;
-
+    publishButton.disabled = true;
+    roomSelect.disabled = true;
+    convSelect.disabled = true;
+    destBtnRoom.disabled = true;
+    destBtnDm.disabled = true;
+    captionInput.disabled = true;
 
     showProgress();
+    updateProgress(0);
 
-    updateProgress(
-      0
-    );
+    const caption =
+      captionInput.value.trim().slice(0, 2000);
 
+    const total = sharedFiles.length;
 
-    /* ------------------------------------------------------
-       1. CLOUDINARY
-    ------------------------------------------------------ */
+    for (let i = 0; i < total; i++) {
 
-    setStatus(
-      "Envoi du fichier en cours…",
-      "info"
-    );
+      const file = sharedFiles[i];
 
+      // La légende n'accompagne que le premier fichier envoyé.
+      const messageContent = (i === 0) ? caption : "";
 
-    const cloudinaryResult =
-      await uploadToCloudinary(
-        selectedFile,
+      setStatus(
+        "Envoi du fichier " + (i + 1) + "/" + total + "…",
+        "info"
+      );
+
+      const cloudinaryResult = await uploadToCloudinary(
+        file,
         percent => {
-
-          /*
-            Cloudinary :
-            0 → 80 %
-          */
-
-          updateProgress(
-            percent * 0.8
-          );
-
+          // Chaque fichier occupe 1/total de la barre de progression.
+          const base = (i / total) * 100;
+          const slice = (percent / 100) * (100 / total);
+          updateProgress(base + slice);
         }
       );
 
+      if (destination === "room") {
 
-    updateProgress(
-      80
-    );
+        setStatus(
+          "Publication " + (i + 1) + "/" + total + " dans le salon…",
+          "info"
+        );
 
+        const pending = await createPendingShare(file, cloudinaryResult, messageContent);
 
-    /* ------------------------------------------------------
-       2. SHARE PENDING
-    ------------------------------------------------------ */
+        if (!pending || !pending.share_id) {
+          throw new Error("Identifiant de partage temporaire manquant.");
+        }
 
-    setStatus(
-      "Préparation de la publication…",
-      "info"
-    );
+        await finalizeShare(pending.share_id, roomId, messageContent);
 
+      } else {
 
-    const pending =
-      await createPendingShare(
-        cloudinaryResult
-      );
+        setStatus(
+          "Envoi " + (i + 1) + "/" + total + " dans la conversation…",
+          "info"
+        );
 
+        await publishFileToConversation(convId, file, cloudinaryResult, messageContent);
 
-    if (
-      !pending ||
-      !pending.share_id
-    ) {
+      }
 
-      throw new Error(
-        "Identifiant de partage temporaire manquant."
-      );
+      updateProgress(((i + 1) / total) * 100);
 
     }
 
-
-    updateProgress(
-      90
-    );
-
-
-    /* ------------------------------------------------------
-       3. FINALIZE
-    ------------------------------------------------------ */
-
-    setStatus(
-      "Publication dans le salon…",
-      "info"
-    );
-
-
-    await finalizeShare(
-
-      pending.share_id,
-
-      roomId,
-
-      captionInput.value
-        .trim()
-        .slice(
-          0,
-          2000
-        )
-
-    );
-
-
-    updateProgress(
-      100
-    );
-
-
-    /* ------------------------------------------------------
-       4. NETTOYAGE
-    ------------------------------------------------------ */
-
     await deleteLocalShare();
 
+    published = true;
 
-    published =
-      true;
+    const successMessage =
+      total > 1
+        ? "Vos " + total + " fichiers ont été publiés avec succès."
+        : "Votre fichier a été publié avec succès.";
 
-
-    /* ------------------------------------------------------
-       5. SUCCÈS
-    ------------------------------------------------------ */
-
-    showSuccess(
-      "Votre fichier a été publié avec succès dans le salon sélectionné."
-    );
-
+    showSuccess(successMessage);
 
   } catch (error) {
 
-    console.error(
-      "❌ Erreur publication:",
-      error
-    );
+    console.error("❌ Erreur publication:", error);
 
-
-    publishButton.disabled =
-      false;
-
-
-    roomSelect.disabled =
-      false;
-
-
-    captionInput.disabled =
-      false;
-
+    publishButton.disabled = false;
+    roomSelect.disabled = false;
+    convSelect.disabled = false;
+    destBtnRoom.disabled = false;
+    destBtnDm.disabled = false;
+    captionInput.disabled = false;
 
     setStatus(
-      error &&
-      error.message
+      error && error.message
         ? error.message
         : "Une erreur est survenue pendant la publication.",
       "error"
@@ -3264,6 +3544,34 @@ publishButton.addEventListener(
   "click",
   publishShare
 );
+
+
+let conversationsLoaded = false;
+
+destBtnRoom.addEventListener("click", () => {
+  currentDestination = "room";
+  destBtnRoom.classList.add("active");
+  destBtnDm.classList.remove("active");
+  roomField.classList.remove("hidden");
+  convField.classList.add("hidden");
+});
+
+destBtnDm.addEventListener("click", async () => {
+  currentDestination = "dm";
+  destBtnDm.classList.add("active");
+  destBtnRoom.classList.remove("active");
+  convField.classList.remove("hidden");
+  roomField.classList.add("hidden");
+
+  if (!conversationsLoaded) {
+    conversationsLoaded = true;
+    try {
+      await loadConversations();
+    } catch (error) {
+      console.error("Erreur chargement conversations:", error);
+    }
+  }
+});
 
 
 successClose.addEventListener(
