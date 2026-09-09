@@ -1,6 +1,6 @@
-const crypto = require("crypto");
+import crypto from "crypto";
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   // ==================================================
   // 1. Vérification de la méthode
   // ==================================================

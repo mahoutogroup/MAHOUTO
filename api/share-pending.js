@@ -153,4 +153,4 @@ async function handler(req, res) {
   }
 }
 
-module.exports = handler;
+export default handler;
