@@ -192,17 +192,22 @@
     btn.textContent = "Redirection...";
 
     try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData && sessionData.session ? sessionData.session.access_token : null;
+      if (!accessToken) {
+        alert("Ta session a expiré. Reconnecte-toi puis réessaie.");
+        btn.disabled = false;
+        btn.textContent = "Acheter";
+        return;
+      }
+
       const resp = await fetch("/api/fedapay-checkout", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          courseId: course.id,
-          courseName: course.name,
-          amount: course.amount,
-          userId: currentUser.id,
-          customerFirstname: currentUsername,
-          customerEmail: currentUser.email || null
-        })
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + accessToken
+        },
+        body: JSON.stringify({ courseId: course.id })
       });
 
       const data = await resp.json();
