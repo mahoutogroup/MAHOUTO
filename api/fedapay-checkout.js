@@ -1,48 +1,149 @@
 // =========================================================
-// /api/fedapay-checkout.js
-// Crée une transaction FedaPay et renvoie l'URL de paiement.
+// /api/fedapay-checkout.js — Version sécurisée (production)
+//
+// PRINCIPE CENTRAL : le navigateur ne décide plus RIEN de financier.
+// Il envoie uniquement { courseId }. Le serveur :
+//   - authentifie l'appelant via son jeton Supabase (Authorization: Bearer)
+//   - récupère la formation réelle dans "formations" (nom, prix, dispo)
+//   - calcule le montant officiel lui-même
+//   - crée la transaction FedaPay avec CE montant, jamais celui du client
 //
 // Variables d'environnement Vercel attendues :
-//   FEDAPAY_SECRET_KEY   (clé secrète FedaPay)
-//   FEDAPAY_ENV          ("sandbox" ou "live", défaut : "sandbox")
-//   PUBLIC_SITE_URL      (ex: https://mahoutoplus.vercel.app) — pour le retour après paiement
+//   FEDAPAY_SECRET_KEY
+//   FEDAPAY_ENVIRONMENT ("sandbox" ou "live", défaut "sandbox")
+//   SUPABASE_URL
+//   SUPABASE_ANON_KEY            (pour authentifier le jeton de l'appelant)
+//   SUPABASE_SERVICE_ROLE_KEY    (pour lire "formations" / écrire "purchases")
+//   PUBLIC_SITE_URL              (ex: https://mahouto.com — recommandé ;
+//                                 à défaut, req.headers.host est utilisé,
+//                                 ce qui reste fiable sur Vercel mais est
+//                                 moins explicite)
 // =========================================================
 
+import { createClient } from "@supabase/supabase-js";
+
 export default async function handler(req, res) {
+  res.setHeader("Cache-Control", "no-store");
+
   if (req.method !== "POST") {
+    res.setHeader("Allow", "POST");
     return res.status(405).json({ error: "Méthode non autorisée" });
   }
 
   try {
-    const { courseId, courseName, amount, customerEmail, customerFirstname, userId } = req.body;
+    // -----------------------------------------------------
+    // 1. Le navigateur ne fournit QUE courseId — tout le reste
+    //    (montant, nom, identité) est ignoré même si envoyé.
+    // -----------------------------------------------------
+    const { courseId } = req.body || {};
 
-    if (!courseId || !courseName || !amount) {
-      return res.status(400).json({ error: "courseId, courseName et amount sont requis" });
+    if (!courseId || typeof courseId !== "string" || courseId.length > 200) {
+      return res.status(400).json({ error: "Identifiant de formation invalide." });
     }
 
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const anonKey = process.env.SUPABASE_ANON_KEY;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     const secretKey = process.env.FEDAPAY_SECRET_KEY;
-    if (!secretKey) {
-      return res.status(500).json({ error: "FEDAPAY_SECRET_KEY manquant dans les variables d'environnement Vercel" });
+
+    if (!supabaseUrl || !anonKey || !serviceKey) {
+      console.error("Configuration Supabase manquante sur Vercel.");
+      return res.status(500).json({ error: "Configuration serveur incomplète." });
     }
+    if (!secretKey) {
+      console.error("FEDAPAY_SECRET_KEY manquant sur Vercel.");
+      return res.status(500).json({ error: "Configuration de paiement incomplète." });
+    }
+
+    // -----------------------------------------------------
+    // 2. Authentification obligatoire — jamais de userId client
+    // -----------------------------------------------------
+    const authHeader = req.headers.authorization || "";
+    const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+    if (!token) {
+      return res.status(401).json({ error: "Authentification requise." });
+    }
+
+    const supabaseAuth = createClient(supabaseUrl, anonKey);
+    const { data: userData, error: userError } = await supabaseAuth.auth.getUser(token);
+    if (userError || !userData || !userData.user) {
+      return res.status(401).json({ error: "Session invalide ou expirée." });
+    }
+    const authenticatedUser = userData.user;
+
+    const supabaseAdmin = createClient(supabaseUrl, serviceKey);
+
+    // -----------------------------------------------------
+    // 3. Récupérer la formation réelle — le prix et le nom ne
+    //    viennent QUE d'ici, jamais du navigateur.
+    // -----------------------------------------------------
+    const { data: formation, error: formationError } = await supabaseAdmin
+      .from("formations")
+      .select("*")
+      .eq("id", courseId)
+      .maybeSingle();
+
+    if (formationError) {
+      console.error("Erreur lecture formation :", formationError);
+      return res.status(500).json({ error: "Impossible de vérifier cette formation." });
+    }
+    if (!formation) {
+      return res.status(404).json({ error: "Formation introuvable." });
+    }
+    if (Object.prototype.hasOwnProperty.call(formation, "disponible") && formation.disponible === false) {
+      return res.status(404).json({ error: "Cette formation n'est plus disponible." });
+    }
+
+    const officialAmount = Math.round(Number(formation.promotion ?? formation.prix));
+    if (!Number.isFinite(officialAmount) || officialAmount <= 0) {
+      console.error("Prix invalide pour la formation :", courseId, formation.promotion, formation.prix);
+      return res.status(500).json({ error: "Le prix de cette formation est invalide." });
+    }
+
+    const courseName = formation.nom || "Formation MAHOUTO";
+
+    // -----------------------------------------------------
+    // 4. Empêcher un paiement inutile si déjà acheté (défense
+    //    en profondeur ; school.html le fait déjà côté affichage)
+    // -----------------------------------------------------
+    const { data: existingPurchase } = await supabaseAdmin
+      .from("purchases")
+      .select("id")
+      .eq("user_id", authenticatedUser.id)
+      .eq("course_id", courseId)
+      .eq("status", "paid")
+      .maybeSingle();
+
+    if (existingPurchase) {
+      return res.status(409).json({ error: "Vous possédez déjà cette formation." });
+    }
+
+    // -----------------------------------------------------
+    // 5. Identité du client FedaPay — depuis Supabase, jamais
+    //    depuis un champ libre envoyé par le navigateur.
+    // -----------------------------------------------------
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("username")
+      .eq("id", authenticatedUser.id)
+      .maybeSingle();
+
+    const customerFirstname = (profile && profile.username) || "Client";
+    const customerEmail = authenticatedUser.email || null;
+
+    const customerPayload = customerEmail
+      ? { firstname: customerFirstname, lastname: customerFirstname, email: customerEmail }
+      : undefined;
 
     const env = (process.env.FEDAPAY_ENVIRONMENT || process.env.FEDAPAY_ENV) === "live" ? "live" : "sandbox";
     const baseUrl = env === "live" ? "https://api.fedapay.com/v1" : "https://sandbox-api.fedapay.com/v1";
     const siteUrl = process.env.PUBLIC_SITE_URL || `https://${req.headers.host}`;
 
-    // FedaPay exige un email valide pour créer/associer un client à la
-    // transaction (sinon la création de transaction est rejetée). Le
-    // paramètre "customer" étant optionnel côté FedaPay, on ne l'inclut
-    // que si on dispose réellement d'un email — sinon on omet
-    // complètement ce champ plutôt que d'envoyer un objet incomplet.
-    const customerPayload = customerEmail
-      ? {
-          firstname: customerFirstname || "Client",
-          lastname: customerFirstname || "Client",
-          email: customerEmail
-        }
-      : undefined;
-
-    // 1. Créer la transaction
+    // -----------------------------------------------------
+    // 6. Créer la transaction — montant officiel uniquement.
+    //    Les champs sont à la RACINE de la requête (format réel
+    //    de l'API REST FedaPay, sans wrapper "transaction").
+    // -----------------------------------------------------
     const createResp = await fetch(`${baseUrl}/transactions`, {
       method: "POST",
       headers: {
@@ -51,7 +152,7 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         description: `MAHOUTO School — ${courseName}`,
-        amount: Math.round(Number(amount)),
+        amount: officialAmount,
         currency: { iso: "XOF" },
         callback_url: `${siteUrl}/school.html?payment=return&course=${encodeURIComponent(courseId)}`,
         ...(customerPayload ? { customer: customerPayload } : {})
@@ -61,18 +162,18 @@ export default async function handler(req, res) {
     const createData = await createResp.json();
     if (!createResp.ok) {
       console.error("Erreur création transaction FedaPay :", createData);
-      const detail = createData && (createData.message || (createData.errors && JSON.stringify(createData.errors)));
-      return res.status(502).json({
-        error: "Impossible de créer la transaction FedaPay" + (detail ? " : " + detail : "")
-      });
+      return res.status(502).json({ error: "Impossible de créer le paiement." });
     }
 
-    const transactionId = createData.id || (createData.transaction && createData.transaction.id) || (createData["v1/transaction"] && createData["v1/transaction"].id);
+    const transactionId = createData.id || (createData.transaction && createData.transaction.id);
     if (!transactionId) {
-      return res.status(502).json({ error: "Réponse FedaPay inattendue" });
+      console.error("Réponse FedaPay inattendue (création) :", createData);
+      return res.status(502).json({ error: "Impossible de créer le paiement." });
     }
 
-    // 2. Générer le token/lien de paiement
+    // -----------------------------------------------------
+    // 7. Générer le lien de paiement
+    // -----------------------------------------------------
     const tokenResp = await fetch(`${baseUrl}/transactions/${transactionId}/token`, {
       method: "POST",
       headers: {
@@ -84,31 +185,45 @@ export default async function handler(req, res) {
     const tokenData = await tokenResp.json();
     if (!tokenResp.ok) {
       console.error("Erreur génération token FedaPay :", tokenData);
-      return res.status(502).json({ error: "Impossible de générer le lien de paiement" });
+      return res.status(502).json({ error: "Impossible de générer le lien de paiement." });
     }
 
     const checkoutUrl = tokenData.url || (tokenData.token && tokenData.token.url);
     if (!checkoutUrl) {
-      return res.status(502).json({ error: "URL de paiement introuvable dans la réponse FedaPay" });
+      console.error("URL de paiement absente de la réponse FedaPay :", tokenData);
+      return res.status(502).json({ error: "Impossible de générer le lien de paiement." });
     }
 
-    // 3. Enregistrer l'achat en attente dans Supabase (si les clés serveur sont configurées)
-    if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY && userId) {
-      const { createClient } = await import("@supabase/supabase-js");
-      const supabaseAdmin = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
-      await supabaseAdmin.from("purchases").insert({
-        user_id: userId,
-        course_id: courseId,
-        course_name: courseName,
-        amount: Math.round(Number(amount)),
-        fedapay_transaction_id: transactionId,
-        status: "pending"
-      });
+    // -----------------------------------------------------
+    // 8. Enregistrer l'achat en attente — données serveur
+    //    uniquement. Si cette écriture échoue, la transaction
+    //    FedaPay existe déjà côté FedaPay mais resterait
+    //    "orpheline" (le webhook ne la retrouverait jamais,
+    //    donc l'achat ne pourrait jamais être crédité) : on
+    //    refuse alors d'envoyer l'utilisateur payer plutôt que
+    //    de promettre un achat qu'on ne pourra pas confirmer.
+    // -----------------------------------------------------
+    const { error: insertError } = await supabaseAdmin.from("purchases").insert({
+      user_id: authenticatedUser.id,
+      course_id: courseId,
+      course_name: courseName,
+      amount: officialAmount,
+      fedapay_transaction_id: String(transactionId),
+      status: "pending"
+    });
+
+    if (insertError) {
+      console.error(
+        "ÉCHEC enregistrement purchases — transaction FedaPay orpheline :",
+        transactionId, insertError
+      );
+      return res.status(500).json({ error: "Impossible d'enregistrer l'achat. Réessayez dans un instant." });
     }
 
     return res.status(200).json({ checkoutUrl, transactionId });
+
   } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: "Erreur serveur lors de la création du paiement" });
+    console.error("Erreur serveur fedapay-checkout :", err);
+    return res.status(500).json({ error: "Erreur serveur lors de la création du paiement." });
   }
 }
