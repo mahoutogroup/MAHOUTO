@@ -3210,7 +3210,8 @@ async function publishFileToConversation(convId, file, cloudinaryResult, content
       sender_id: session.user.id,
       content: content || "",
       attachment_url: attachmentUrl,
-      attachment_type: mimeToAttachmentType(file.type)
+      attachment_type: mimeToAttachmentType(file.type),
+      attachment_name: file.name || null
     });
 
   if (error) {
