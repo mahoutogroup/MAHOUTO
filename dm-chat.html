@@ -246,12 +246,24 @@
     });
   }
 
+  // Nettoie un nom de fichier pour l'utiliser dans une URL de
+  // transformation Cloudinary : les points, parenthèses, virgules...
+  // ont un sens technique pour Cloudinary et cassent l'URL, même
+  // une fois encodés. On retire aussi l'extension : Cloudinary
+  // l'ajoute automatiquement lui-même au moment du téléchargement.
+  function sanitizeForCloudinaryAttachment(filename) {
+    const withoutExt = filename.replace(/\.[^./\\]+$/, "");
+    const safe = withoutExt.replace(/[^a-zA-Z0-9 _-]/g, "_").trim();
+    return safe || "fichier";
+  }
+
   // Construit une URL Cloudinary qui force le téléchargement avec le
   // vrai nom d'origine (fl_attachment), plutôt que l'identifiant
   // aléatoire généré par Cloudinary lors de l'envoi.
   function attachmentDownloadUrl(url, filename) {
     if (!url || !url.includes("/upload/") || !filename) return url;
-    return url.replace("/upload/", "/upload/fl_attachment:" + encodeURIComponent(filename) + "/");
+    const safeName = sanitizeForCloudinaryAttachment(filename);
+    return url.replace("/upload/", "/upload/fl_attachment:" + encodeURIComponent(safeName) + "/");
   }
 
   function renderMessage(msg) {
