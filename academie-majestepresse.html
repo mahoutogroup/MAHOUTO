@@ -203,7 +203,8 @@
           courseName: course.name,
           amount: course.amount,
           userId: currentUser.id,
-          customerFirstname: currentUsername
+          customerFirstname: currentUsername,
+          customerEmail: currentUser.email || null
         })
       });
 
