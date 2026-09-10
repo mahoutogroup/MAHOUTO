@@ -225,6 +225,17 @@
     return div.innerHTML;
   }
 
+  // Détecte si une URL de pièce jointe pointe vers un PDF.
+  function isPdfUrl(url) {
+    return /\.pdf(\?|$)/i.test(url || "");
+  }
+
+  // Construit l'URL Cloudinary de la miniature de la 1ère page d'un PDF.
+  function pdfThumbnailUrl(url) {
+    if (!url || !url.includes("/upload/")) return null;
+    return url.replace("/upload/", "/upload/pg_1,f_jpg,w_500,c_limit,q_auto/");
+  }
+
   // Transforme les URLs présentes dans un texte déjà échappé en liens
   // cliquables — jamais appliqué au texte brut, pour rester sûr contre
   // les injections.
@@ -233,6 +244,14 @@
       const href = /^https?:\/\//i.test(match) ? match : "https://" + match;
       return '<a href="' + href + '" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:underline;">' + match + '</a>';
     });
+  }
+
+  // Construit une URL Cloudinary qui force le téléchargement avec le
+  // vrai nom d'origine (fl_attachment), plutôt que l'identifiant
+  // aléatoire généré par Cloudinary lors de l'envoi.
+  function attachmentDownloadUrl(url, filename) {
+    if (!url || !url.includes("/upload/") || !filename) return url;
+    return url.replace("/upload/", "/upload/fl_attachment:" + encodeURIComponent(filename) + "/");
   }
 
   function renderMessage(msg) {
@@ -256,8 +275,17 @@
           mediaHtml = `<video src="${msg.attachment_url}" controls style="max-width:100%;border-radius:12px;margin-top:6px;display:block;"></video>`;
         } else if (msg.attachment_type === "audio") {
           mediaHtml = `<audio src="${msg.attachment_url}" controls></audio>`;
+        } else if (isPdfUrl(msg.attachment_url)) {
+          const thumb = pdfThumbnailUrl(msg.attachment_url);
+          mediaHtml = `<a href="${msg.attachment_url}" target="_blank" style="display:block;margin-top:6px;position:relative;border-radius:12px;overflow:hidden;max-width:240px;">` +
+            `<img src="${thumb}" style="width:100%;display:block;background:#1a1a1a;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">` +
+            `<div style="display:none;align-items:center;gap:6px;padding:14px;background:#1a1a1a;color:inherit;">📄 Ouvrir le PDF</div>` +
+            `<div style="position:absolute;bottom:6px;left:6px;background:rgba(0,0,0,0.75);color:#fff;font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;">PDF</div>` +
+            `</a>`;
         } else {
-          mediaHtml = `<a href="${msg.attachment_url}" target="_blank" style="color:inherit;text-decoration:underline;display:block;margin-top:6px;">📄 Ouvrir le fichier</a>`;
+          const downloadUrl = attachmentDownloadUrl(msg.attachment_url, msg.attachment_name);
+          const label = msg.attachment_name ? "📄 " + escapeHtml(msg.attachment_name) : "📄 Ouvrir le fichier";
+          mediaHtml = `<a href="${downloadUrl}" target="_blank" style="color:inherit;text-decoration:underline;display:block;margin-top:6px;">${label}</a>`;
         }
       }
       bodyHtml = (msg.content ? linkify(escapeHtml(msg.content)) : "") + mediaHtml +
@@ -449,7 +477,8 @@
         sender_id: currentUser.id,
         content: "",
         attachment_url: uploadData.secure_url,
-        attachment_type: attachmentType
+        attachment_type: attachmentType,
+        attachment_name: file.name || null
       });
 
       if (error) throw error;
@@ -600,7 +629,8 @@
           : msg.attachment_type === "video" ? "mp4"
           : msg.attachment_type === "audio" ? "webm"
           : "pdf";
-        const file = new File([blob], "mahouto-plus." + ext, { type: blob.type });
+        const filename = msg.attachment_name || ("mahouto-plus." + ext);
+        const file = new File([blob], filename, { type: blob.type });
 
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
           await navigator.share({ files: [file], title: "MAHOUTO+" });
