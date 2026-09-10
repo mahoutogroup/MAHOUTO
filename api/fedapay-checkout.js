@@ -29,6 +29,19 @@ export default async function handler(req, res) {
     const baseUrl = env === "live" ? "https://api.fedapay.com/v1" : "https://sandbox-api.fedapay.com/v1";
     const siteUrl = process.env.PUBLIC_SITE_URL || `https://${req.headers.host}`;
 
+    // FedaPay exige un email valide pour créer/associer un client à la
+    // transaction (sinon la création de transaction est rejetée). Le
+    // paramètre "customer" étant optionnel côté FedaPay, on ne l'inclut
+    // que si on dispose réellement d'un email — sinon on omet
+    // complètement ce champ plutôt que d'envoyer un objet incomplet.
+    const customerPayload = customerEmail
+      ? {
+          firstname: customerFirstname || "Client",
+          lastname: customerFirstname || "Client",
+          email: customerEmail
+        }
+      : undefined;
+
     // 1. Créer la transaction
     const createResp = await fetch(`${baseUrl}/transactions`, {
       method: "POST",
@@ -42,10 +55,7 @@ export default async function handler(req, res) {
           amount: Math.round(Number(amount)),
           currency: { iso: "XOF" },
           callback_url: `${siteUrl}/school.html?payment=return&course=${encodeURIComponent(courseId)}`,
-          customer: {
-            firstname: customerFirstname || "Client",
-            email: customerEmail || undefined
-          }
+          ...(customerPayload ? { customer: customerPayload } : {})
         }
       })
     });
@@ -53,7 +63,10 @@ export default async function handler(req, res) {
     const createData = await createResp.json();
     if (!createResp.ok) {
       console.error("Erreur création transaction FedaPay :", createData);
-      return res.status(502).json({ error: "Impossible de créer la transaction FedaPay" });
+      const detail = createData && (createData.message || (createData.errors && JSON.stringify(createData.errors)));
+      return res.status(502).json({
+        error: "Impossible de créer la transaction FedaPay" + (detail ? " : " + detail : "")
+      });
     }
 
     const transactionId = createData.transaction && createData.transaction.id || createData["v1/transaction"] && createData["v1/transaction"].id;
