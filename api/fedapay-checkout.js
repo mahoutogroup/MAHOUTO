@@ -50,13 +50,11 @@ export default async function handler(req, res) {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        transaction: {
-          description: `MAHOUTO School — ${courseName}`,
-          amount: Math.round(Number(amount)),
-          currency: { iso: "XOF" },
-          callback_url: `${siteUrl}/school.html?payment=return&course=${encodeURIComponent(courseId)}`,
-          ...(customerPayload ? { customer: customerPayload } : {})
-        }
+        description: `MAHOUTO School — ${courseName}`,
+        amount: Math.round(Number(amount)),
+        currency: { iso: "XOF" },
+        callback_url: `${siteUrl}/school.html?payment=return&course=${encodeURIComponent(courseId)}`,
+        ...(customerPayload ? { customer: customerPayload } : {})
       })
     });
 
@@ -69,7 +67,7 @@ export default async function handler(req, res) {
       });
     }
 
-    const transactionId = createData.transaction && createData.transaction.id || createData["v1/transaction"] && createData["v1/transaction"].id;
+    const transactionId = createData.id || (createData.transaction && createData.transaction.id) || (createData["v1/transaction"] && createData["v1/transaction"].id);
     if (!transactionId) {
       return res.status(502).json({ error: "Réponse FedaPay inattendue" });
     }
