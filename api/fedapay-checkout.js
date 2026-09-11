@@ -165,33 +165,46 @@ export default async function handler(req, res) {
       return res.status(502).json({ error: "Impossible de créer le paiement." });
     }
 
-    const transactionId = createData.id || (createData.transaction && createData.transaction.id);
+    // La forme réelle observée de la réponse FedaPay imbrique les données
+    // sous la clé "v1/transaction" (confirmé par les logs de production).
+    // On reste tolérant à d'autres formes possibles selon les comptes/versions.
+    const txObj = createData["v1/transaction"] || createData.transaction || createData;
+    const transactionId = txObj && txObj.id;
     if (!transactionId) {
       console.error("Réponse FedaPay inattendue (création) :", createData);
       return res.status(502).json({ error: "Impossible de créer le paiement." });
     }
 
     // -----------------------------------------------------
-    // 7. Générer le lien de paiement
+    // 7. Récupérer le lien de paiement — déjà présent dans la
+    //    réponse de création (payment_url). On ne rappelle
+    //    l'étape séparée de génération de token qu'en secours,
+    //    si jamais ce champ venait à manquer.
     // -----------------------------------------------------
-    const tokenResp = await fetch(`${baseUrl}/transactions/${transactionId}/token`, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${secretKey}`,
-        "Content-Type": "application/json"
-      }
-    });
+    let checkoutUrl = txObj && txObj.payment_url;
 
-    const tokenData = await tokenResp.json();
-    if (!tokenResp.ok) {
-      console.error("Erreur génération token FedaPay :", tokenData);
-      return res.status(502).json({ error: "Impossible de générer le lien de paiement." });
-    }
-
-    const checkoutUrl = tokenData.url || (tokenData.token && tokenData.token.url);
     if (!checkoutUrl) {
-      console.error("URL de paiement absente de la réponse FedaPay :", tokenData);
-      return res.status(502).json({ error: "Impossible de générer le lien de paiement." });
+      const tokenResp = await fetch(`${baseUrl}/transactions/${transactionId}/token`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${secretKey}`,
+          "Content-Type": "application/json"
+        }
+      });
+
+      const tokenData = await tokenResp.json();
+      if (!tokenResp.ok) {
+        console.error("Erreur génération token FedaPay :", tokenData);
+        return res.status(502).json({ error: "Impossible de générer le lien de paiement." });
+      }
+
+      const tokenObj = tokenData["v1/token"] || tokenData.token || tokenData;
+      checkoutUrl = tokenData.url || (tokenObj && tokenObj.url);
+
+      if (!checkoutUrl) {
+        console.error("URL de paiement absente de la réponse FedaPay :", tokenData);
+        return res.status(502).json({ error: "Impossible de générer le lien de paiement." });
+      }
     }
 
     // -----------------------------------------------------
