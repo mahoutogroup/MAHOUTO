@@ -150,3 +150,50 @@ create policy "Mise a jour suivi lecture" on public.read_state
 
 -- Realtime sur les messages (pour l'affichage instantané)
 alter publication supabase_realtime add table public.messages;
+
+-- =========================================================
+-- v5 — CORRECTIF SÉCURITÉ : auto-élévation du rôle profiles
+--
+-- PROBLÈME : la policy "Mise a jour profil personnel" (ci-dessus)
+-- autorise un utilisateur à modifier N'IMPORTE QUELLE colonne de sa
+-- propre ligne, y compris "role" — la RLS de Postgres protège des
+-- LIGNES, pas des COLONNES. N'importe quel compte authentifié (même
+-- une session anonyme via signInAnonymously) pouvait donc s'attribuer
+-- lui-même le rôle "founder"/"super_admin"/"admin" avec :
+--   supabase.from("profiles").update({ role: "founder" }).eq("id", monId)
+--
+-- CORRECTIF : un trigger BEFORE UPDATE bloque tout changement de la
+-- colonne "role" tant que l'appel ne vient pas de la clé service_role
+-- (auth.role() = 'service_role' — utilisée uniquement par les
+-- fonctions serverless /api/*.js, jamais exposée au navigateur).
+--
+-- N'affecte PAS :
+--   - la création/mise à jour de profil (ensureProfile, upsert sur
+--     id/username) : ces upserts n'envoient jamais "role", donc
+--     new.role reste égal à old.role et le trigger laisse passer ;
+--   - la mise à jour de l'avatar (profil.html) : ne touche pas "role" ;
+--   - toute future route admin serveur qui changerait un rôle via
+--     service_role (le trigger l'autorise explicitement).
+-- =========================================================
+
+create or replace function public.prevent_profile_role_change()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+begin
+  if new.role is distinct from old.role then
+    if auth.role() is distinct from 'service_role' then
+      raise exception
+        'Modification du rôle interdite : cette opération doit passer par une route serveur autorisée.';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_prevent_profile_role_change on public.profiles;
+create trigger trg_prevent_profile_role_change
+  before update on public.profiles
+  for each row execute function public.prevent_profile_role_change();
