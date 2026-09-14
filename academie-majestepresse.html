@@ -14,7 +14,8 @@
 <style>
   header { padding: 20px; background: var(--bg-elevated); border-bottom: 1px solid var(--border); }
   header h1 { font-size: 20px; color: var(--gold); }
-  header p { font-size: 12.5px; color: var(--text-muted); margin-top: 6px; }
+  header p.tagline { font-size: 12.5px; color: var(--text-muted); margin-top: 6px; }
+  header p.slogan { font-size: 11.5px; color: var(--gold); margin-top: 4px; font-weight: 600; letter-spacing: .03em; }
   header .external-link { font-size: 11.5px; color: var(--text-dim); margin-top: 8px; display: block; }
   header .external-link a { color: var(--gold); }
 
@@ -29,35 +30,70 @@
   #payment-banner.paid { background: rgba(34,197,94,.12); color: var(--accent-green); }
   #payment-banner.failed { background: rgba(239,68,68,.12); color: #F87171; }
 
-  .course-list { padding: 16px 20px; display: flex; flex-direction: column; gap: 14px; }
-  .course-card { display: flex; align-items: center; gap: 14px; }
-
-  .course-card .emoji {
-    width: 50px; height: 50px; border-radius: 14px;
-    background: rgba(212,175,55,.12);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 22px; flex: none;
+  .filters-bar { padding: 16px 20px 0; display: flex; flex-direction: column; gap: 10px; }
+  .search-input {
+    width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border);
+    background: var(--bg-card); color: var(--white); font-size: 14px;
+  }
+  .filter-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
+  .filter-row select {
+    flex: none; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--bg-card); color: var(--text-muted); font-size: 12.5px;
   }
 
-  .course-card .info { flex: 1; }
-  .course-card h3 { font-size: 15.5px; margin-bottom: 4px; }
-  .course-card p { font-size: 12px; color: var(--text-muted); }
-  .course-card .price { font-size: 12.5px; color: var(--gold); font-weight: bold; margin-top: 4px; }
+  .course-list { padding: 16px 20px; display: grid; grid-template-columns: 1fr; gap: 16px; }
 
+  .course-card {
+    border-radius: 18px; overflow: hidden; background: var(--bg-card); border: 1px solid var(--border);
+    display: flex; flex-direction: column; box-shadow: 0 4px 18px rgba(0,0,0,.18);
+    transition: transform .15s ease, box-shadow .15s ease;
+  }
+  .course-card:active { transform: scale(.98); }
+  @media (hover: hover) {
+    .course-card:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(0,0,0,.28); border-color: var(--gold); }
+  }
+
+  .course-cover {
+    width: 100%; aspect-ratio: 16/9; object-fit: cover;
+    background: linear-gradient(135deg, rgba(212,175,55,.25), rgba(0,0,0,.4));
+    display: flex; align-items: center; justify-content: center; font-size: 44px;
+  }
+
+  .course-body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 8px; }
+
+  .course-badge {
+    align-self: flex-start; font-size: 10.5px; font-weight: 700; color: #0A0A0A;
+    background: var(--gold-bright); padding: 3px 10px; border-radius: 999px;
+    text-transform: uppercase; letter-spacing: .03em;
+  }
+
+  .course-card h3 { font-size: 16.5px; margin-top: 2px; }
+  .course-card .desc { font-size: 12.5px; color: var(--text-muted); line-height: 1.5; }
+
+  .course-meta { display: flex; gap: 12px; flex-wrap: wrap; font-size: 11.5px; color: var(--text-dim); }
+  .course-meta span { display: flex; align-items: center; gap: 4px; }
+
+  .course-availability { font-size: 11px; font-weight: 700; color: var(--accent-green); display: flex; align-items: center; gap: 5px; }
+  .course-availability .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent-green); }
+
+  .course-price-row { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; }
+  .course-card .price { font-size: 15px; color: var(--gold); font-weight: bold; }
+  .course-card .price .old { text-decoration: line-through; color: var(--text-dim); font-weight: normal; font-size: 12px; margin-right: 6px; }
+
+  .course-actions { display: flex; gap: 8px; margin-top: 6px; }
+  .view-btn {
+    flex: 1; text-align: center; font-size: 12.5px; font-weight: bold;
+    background: var(--bg); color: var(--text-muted); border: 1px solid var(--border);
+    border-radius: 10px; padding: 10px; text-decoration: none;
+  }
   .buy-btn {
-    font-size: 12.5px;
-    font-weight: bold;
-    background: var(--gold-bright);
-    color: #0A0A0A;
-    border: none;
-    border-radius: 10px;
-    padding: 8px 14px;
-    white-space: nowrap;
-    cursor: pointer;
+    flex: 1; font-size: 12.5px; font-weight: bold; background: var(--gold-bright);
+    color: #0A0A0A; border: none; border-radius: 10px; padding: 10px; white-space: nowrap; cursor: pointer;
   }
-
   .buy-btn.owned { background: rgba(34,197,94,.18); color: var(--accent-green); }
   .buy-btn:disabled { opacity: .6; cursor: wait; }
+
+  .empty-state { padding: 30px 20px; text-align: center; color: var(--text-dim); font-size: 13px; }
 </style>
 </head>
 <body>
@@ -68,11 +104,32 @@
 
   <header>
     <h1>🖨️ Académie Majesté Presse</h1>
-    <p>Formations certifiantes en imprimerie et sérigraphie, propulsées par MAHOUTO+.</p>
+    <p class="tagline">Formations certifiantes en imprimerie et sérigraphie, propulsées par MAHOUTO+.</p>
+    <p class="slogan">Apprendre • Créer • Gagner</p>
     <span class="external-link">Vitrine complète : <a href="https://academie.majestepresse.com" target="_blank" rel="noopener">academie.majestepresse.com</a></span>
   </header>
 
   <div id="payment-banner" class="hidden"></div>
+
+  <div class="filters-bar">
+    <input type="search" id="search-input" class="search-input" placeholder="🔍 Rechercher une formation...">
+    <div class="filter-row">
+      <select id="filter-domaine">
+        <option value="">Tous les domaines</option>
+      </select>
+      <select id="filter-niveau">
+        <option value="">Tous niveaux</option>
+        <option value="Débutant">Débutant</option>
+        <option value="Intermédiaire">Intermédiaire</option>
+        <option value="Avancé">Avancé</option>
+      </select>
+      <select id="filter-tri">
+        <option value="nom">Trier : nom</option>
+        <option value="prix-asc">Prix croissant</option>
+        <option value="prix-desc">Prix décroissant</option>
+      </select>
+    </div>
+  </div>
 
   <div class="course-list" id="course-list"></div>
 
@@ -120,43 +177,126 @@
       name: f.nom,
       emoji: f.emoji,
       desc: f.description,
+      image: f.image_url || null,
+      domaine: f.domaine || null,
+      niveau: f.niveau || null,
+      duree: f.duree || null,
       amount: f.promotion ?? f.prix,
       originalAmount: f.promotion ? f.prix : null
     }));
+
+    const domaineSelect = document.getElementById("filter-domaine");
+    const domaines = Array.from(new Set(COURSES.map((c) => c.domaine).filter(Boolean)));
+    domaines.forEach((d) => {
+      const opt = document.createElement("option");
+      opt.value = d;
+      opt.textContent = d;
+      domaineSelect.appendChild(opt);
+    });
   }
 
   const listEl = document.getElementById("course-list");
   const bannerEl = document.getElementById("payment-banner");
+  const searchInput = document.getElementById("search-input");
+  const filterDomaine = document.getElementById("filter-domaine");
+  const filterNiveau = document.getElementById("filter-niveau");
+  const filterTri = document.getElementById("filter-tri");
+
   let currentUser = null;
   let currentUsername = null;
   let ownedCourseIds = new Set();
 
   function money(xof) { return xof.toLocaleString("fr-FR") + " FCFA"; }
 
+  function optimizedImageUrl(url, width) {
+    if (!url || !url.includes("/upload/")) return url;
+    return url.replace("/upload/", `/upload/f_auto,q_auto,w_${width},c_limit/`);
+  }
+
+  // Vérifie qu'une image de couverture est bien une URL Cloudinary HTTPS
+  // légitime avant de l'insérer dans le DOM (même contrôle que pour les
+  // pièces jointes de messages — voir chat.html/dm-chat.html).
+  function isSafeImageUrl(url) {
+    if (typeof url !== "string" || !url) return false;
+    let parsed;
+    try { parsed = new URL(url, window.location.origin); } catch (_) { return false; }
+    if (parsed.protocol !== "https:" || parsed.hostname !== "res.cloudinary.com") return false;
+    const cloudName = cfg && cfg.CLOUDINARY_CLOUD_NAME;
+    return !cloudName || parsed.pathname.startsWith("/" + cloudName + "/");
+  }
+
+  function getFilteredCourses() {
+    const q = searchInput.value.trim().toLowerCase();
+    const domaine = filterDomaine.value;
+    const niveau = filterNiveau.value;
+    const tri = filterTri.value;
+
+    let list = COURSES.filter((c) => {
+      if (q && !(c.name.toLowerCase().includes(q) || (c.desc || "").toLowerCase().includes(q))) return false;
+      if (domaine && c.domaine !== domaine) return false;
+      if (niveau && c.niveau !== niveau) return false;
+      return true;
+    });
+
+    if (tri === "prix-asc") list = list.slice().sort((a, b) => a.amount - b.amount);
+    else if (tri === "prix-desc") list = list.slice().sort((a, b) => b.amount - a.amount);
+    else list = list.slice().sort((a, b) => a.name.localeCompare(b.name, "fr"));
+
+    return list;
+  }
+
   function renderCourses() {
+    const filtered = getFilteredCourses();
     listEl.innerHTML = "";
-    COURSES.forEach((course) => {
+
+    if (!filtered.length) {
+      listEl.innerHTML = '<div class="empty-state">Aucune formation ne correspond à ta recherche.</div>';
+      return;
+    }
+
+    filtered.forEach((course) => {
       const owned = ownedCourseIds.has(course.id);
-      const row = document.createElement("div");
-      row.className = "card course-card";
-      row.innerHTML = `
-        <div class="emoji">${course.emoji}</div>
-        <div class="info">
-          <h3>${course.name}</h3>
-          <p>${course.desc}</p>
-          <div class="price">${course.originalAmount ? `<span style="text-decoration:line-through;color:var(--text-dim);margin-right:6px;">${money(course.originalAmount)}</span>` : ""}${money(course.amount)}</div>
+      const card = document.createElement("div");
+      card.className = "course-card";
+      const safeImage = course.image && isSafeImageUrl(course.image) ? course.image : null;
+      card.innerHTML = `
+        ${safeImage
+          ? `<img class="course-cover" src="${escapeHtml(optimizedImageUrl(safeImage, 700))}" alt="${escapeHtml(course.name)}" loading="lazy">`
+          : `<div class="course-cover">${escapeHtml(course.emoji || "📘")}</div>`}
+        <div class="course-body">
+          ${course.domaine ? `<span class="course-badge">${escapeHtml(course.domaine)}</span>` : ""}
+          <h3>${escapeHtml(course.name)}</h3>
+          <p class="desc">${escapeHtml(course.desc || "")}</p>
+          <div class="course-meta">
+            ${course.duree ? `<span>⏱️ ${escapeHtml(course.duree)}</span>` : ""}
+            ${course.niveau ? `<span>📶 ${escapeHtml(course.niveau)}</span>` : ""}
+          </div>
+          <div class="course-availability"><span class="dot"></span>Disponible</div>
+          <div class="course-price-row">
+            <div class="price">
+              ${course.originalAmount ? `<span class="old">${money(course.originalAmount)}</span>` : ""}${money(course.amount)}
+            </div>
+          </div>
+          <div class="course-actions">
+            <a class="view-btn" href="formation-detail.html?course=${encodeURIComponent(course.id)}">Voir la formation</a>
+            <button class="buy-btn ${owned ? "owned" : ""}" data-id="${course.id}">
+              ${owned ? "✓ Acquis" : "S'inscrire"}
+            </button>
+          </div>
         </div>
-        <button class="buy-btn ${owned ? "owned" : ""}" data-id="${course.id}">
-          ${owned ? "✓ Acquis" : "Acheter"}
-        </button>
       `;
-      listEl.appendChild(row);
+      listEl.appendChild(card);
     });
 
     listEl.querySelectorAll(".buy-btn").forEach((btn) => {
       btn.addEventListener("click", () => buyCourse(btn.dataset.id, btn));
     });
   }
+
+  [searchInput, filterDomaine, filterNiveau, filterTri].forEach((el) => {
+    el.addEventListener("input", renderCourses);
+    el.addEventListener("change", renderCourses);
+  });
 
   async function ensureLoggedIn() {
     const { data } = await supabase.auth.getSession();
@@ -181,12 +321,8 @@
   }
 
   async function buyCourse(courseId, btn) {
-    const course = COURSES.find((c) => c.id === courseId);
-    if (!course) return;
-
-    const loggedIn = await ensureLoggedIn();
-    if (!loggedIn) {
-      alert("Connecte-toi d'abord (Google, depuis l'accueil, ou un pseudo depuis Messages), puis reviens ici.");
+    if (!(await ensureLoggedIn())) {
+      alert("Connecte-toi d'abord pour acheter une formation.");
       window.location.href = "index.html";
       return;
     }
@@ -200,7 +336,7 @@
       if (!accessToken) {
         alert("Ta session a expiré. Reconnecte-toi puis réessaie.");
         btn.disabled = false;
-        btn.textContent = "Acheter";
+        btn.textContent = "S'inscrire";
         return;
       }
 
@@ -210,18 +346,21 @@
           "Content-Type": "application/json",
           "Authorization": "Bearer " + accessToken
         },
-        body: JSON.stringify({ courseId: course.id })
+        body: JSON.stringify({ courseId })
       });
 
       const data = await resp.json();
-      if (!resp.ok) throw new Error(data.error || "Erreur de paiement");
+
+      if (!resp.ok || !data.checkoutUrl) {
+        throw new Error(data.error || "Réponse de paiement invalide.");
+      }
 
       window.location.href = data.checkoutUrl;
     } catch (err) {
-      alert("Paiement indisponible : " + err.message);
       console.error(err);
+      alert("Paiement indisponible : " + err.message);
       btn.disabled = false;
-      btn.textContent = "Acheter";
+      btn.textContent = "S'inscrire";
     }
   }
 
