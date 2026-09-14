@@ -314,3 +314,97 @@ alter table public.purchases add column if not exists product_type text not null
 
 drop policy if exists "Allow public read dm_conversations" on public.dm_conversations;
 drop policy if exists "Creation salon" on public.rooms;
+
+-- =========================================================
+-- v8 — COURS VIDÉO PAYANTS (MAHOUTO School)
+--
+-- Aucune table équivalente n'existait avant cet ajout (vérifié par
+-- grep exhaustif du dépôt : aucune référence à formation_modules,
+-- formation_lessons, course_progress, video_url ailleurs que dans du
+-- texte libre ou du CSS sans rapport). Purement additif : ne touche
+-- à AUCUNE colonne ni ligne de formations/purchases/digital_products.
+--
+-- Modèle de sécurité (RLS ne protège qu'au niveau LIGNE, jamais au
+-- niveau colonne) :
+--   - formation_modules / formation_lessons : métadonnées SANS
+--     lien vidéo/PDF réel (titre, ordre, type, is_preview). Lecture
+--     publique OK — ce ne sont que des titres de curriculum, jamais
+--     le contenu payant lui-même.
+--   - formation_lesson_media : contient les VRAIS chemins/URLs vidéo
+--     et PDF. AUCUNE policy SELECT pour anon/authenticated — lisible
+--     uniquement par service_role, donc uniquement via une route API
+--     serveur qui vérifie d'abord l'achat (ou is_preview=true).
+--     Sépare la ligne pour ne pas dépendre d'une sécurité "par
+--     colonne" que Postgres RLS ne fournit pas.
+--   - course_progress : écriture directe autorisée depuis le
+--     navigateur, mais strictement limitée à auth.uid() = user_id.
+-- =========================================================
+
+create table if not exists public.formation_modules (
+  id bigint generated always as identity primary key,
+  formation_id text not null references public.formations(id) on delete cascade,
+  titre text not null,
+  ordre integer not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.formation_lessons (
+  id bigint generated always as identity primary key,
+  module_id bigint not null references public.formation_modules(id) on delete cascade,
+  titre text not null,
+  type text not null default 'video', -- 'video' | 'pdf' | 'text'
+  ordre integer not null default 0,
+  is_preview boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+-- Contenu réel (jamais exposé directement via RLS à anon/authenticated).
+create table if not exists public.formation_lesson_media (
+  lesson_id bigint primary key references public.formation_lessons(id) on delete cascade,
+  video_public_id text,   -- identifiant Cloudinary (resource_type: video)
+  video_url text,         -- URL Cloudinary résolue (mêmes contrôles d'origine que image_url)
+  pdf_path text,          -- chemin dans le bucket Storage privé "formation-media"
+  duree_secondes integer,
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.course_progress (
+  user_id uuid not null references auth.users(id) on delete cascade,
+  lesson_id bigint not null references public.formation_lessons(id) on delete cascade,
+  completed boolean not null default false,
+  updated_at timestamptz not null default now(),
+  primary key (user_id, lesson_id)
+);
+
+alter table public.formation_modules enable row level security;
+alter table public.formation_lessons enable row level security;
+alter table public.formation_lesson_media enable row level security;
+alter table public.course_progress enable row level security;
+
+-- Curriculum (titres/ordre/type) public en lecture : aucune information
+-- payante n'y figure. Écriture réservée à service_role (api/admin/*).
+drop policy if exists "Lecture publique modules" on public.formation_modules;
+create policy "Lecture publique modules" on public.formation_modules
+  for select using (true);
+
+drop policy if exists "Lecture publique leçons" on public.formation_lessons;
+create policy "Lecture publique leçons" on public.formation_lessons
+  for select using (true);
+
+-- formation_lesson_media : AUCUNE policy select/insert/update/delete
+-- pour anon/authenticated -> accessible uniquement via service_role,
+-- donc uniquement depuis api/formation-content.js après vérification
+-- d'achat côté serveur (ou is_preview=true sur la leçon associée).
+
+-- course_progress : chacun ne voit / n'écrit que sa propre progression.
+drop policy if exists "Progression : lecture propre" on public.course_progress;
+create policy "Progression : lecture propre" on public.course_progress
+  for select using (auth.uid() = user_id);
+
+drop policy if exists "Progression : écriture propre" on public.course_progress;
+create policy "Progression : écriture propre" on public.course_progress
+  for insert with check (auth.uid() = user_id);
+
+drop policy if exists "Progression : mise à jour propre" on public.course_progress;
+create policy "Progression : mise à jour propre" on public.course_progress
+  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
