@@ -25,14 +25,22 @@
   }
 
   .formation-row {
-    display: flex; flex-direction: column; gap: 8px;
+    display: flex; flex-direction: column; gap: 10px;
     margin-bottom: 12px; padding: 14px;
   }
 
   .formation-row .top-line {
     display: flex; align-items: center; gap: 10px;
   }
-  .formation-row .emoji { font-size: 20px; }
+  .formation-row .thumb {
+    width: 44px; height: 44px; border-radius: 10px; object-fit: cover;
+    flex: none; background: var(--bg); border: 1px solid var(--border);
+  }
+  .formation-row .emoji {
+    width: 44px; height: 44px; border-radius: 10px; flex: none;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; background: rgba(212,175,55,.12);
+  }
   .formation-row .nom { font-weight: bold; font-size: 14.5px; flex: 1; }
 
   .formation-row .fields {
@@ -41,17 +49,19 @@
   .formation-row label {
     font-size: 10.5px; color: var(--text-dim); display: block; margin-bottom: 3px;
   }
-  .formation-row input[type="number"], .formation-row input[type="text"] {
+  .formation-row input[type="number"], .formation-row input[type="text"],
+  .formation-row textarea, .formation-row select {
     width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border);
-    background: var(--bg); color: var(--white); font-size: 13.5px;
+    background: var(--bg); color: var(--white); font-size: 13.5px; font-family: inherit;
   }
+  .formation-row textarea { resize: vertical; min-height: 44px; }
 
   .formation-row .toggle-row {
     display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-muted);
   }
 
   .formation-row .actions {
-    display: flex; gap: 8px; margin-top: 4px;
+    display: flex; gap: 8px; margin-top: 4px; flex-wrap: wrap;
   }
   .formation-row .save-btn {
     flex: 1; font-size: 12.5px; font-weight: bold; background: var(--gold-bright);
@@ -63,6 +73,15 @@
     background: rgba(239,68,68,.15); color: #F87171; border: none; border-radius: 8px;
     padding: 9px 14px; font-size: 12.5px; font-weight: bold; cursor: pointer;
   }
+  .formation-row .details-btn {
+    background: var(--bg-card); color: var(--text-muted); border: 1px solid var(--border);
+    border-radius: 8px; padding: 9px 14px; font-size: 12.5px; font-weight: bold; cursor: pointer;
+  }
+  .formation-row .details-panel {
+    display: none; flex-direction: column; gap: 8px; margin-top: 4px;
+    padding-top: 10px; border-top: 1px dashed var(--border);
+  }
+  .formation-row .details-panel.open { display: flex; }
 
   #new-formation-form {
     margin: 20px 20px 40px; padding: 16px; display: flex; flex-direction: column; gap: 10px;
@@ -75,11 +94,31 @@
   }
   #new-formation-form textarea { resize: vertical; min-height: 50px; }
   #new-formation-form .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  #new-formation-form button {
+  #new-formation-form button[type="submit"] {
     margin-top: 6px; background: var(--gold-bright); color: #0A0A0A; border: none;
     border-radius: 10px; padding: 12px; font-weight: bold; font-size: 14px; cursor: pointer;
   }
   #new-formation-status { font-size: 12px; color: var(--accent-green); min-height: 16px; }
+
+  /* ===== Upload d'image de couverture ===== */
+  .image-upload-box {
+    border: 1.5px dashed var(--border); border-radius: 14px; padding: 14px;
+    display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center;
+  }
+  .image-upload-box .preview {
+    width: 100%; max-width: 320px; aspect-ratio: 16/9; border-radius: 12px;
+    background: var(--bg); object-fit: cover; display: none;
+  }
+  .image-upload-box .preview.visible { display: block; }
+  .image-upload-box .placeholder { font-size: 12.5px; color: var(--text-dim); }
+  .image-upload-box .btn-row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  .image-upload-box button {
+    font-size: 12px; font-weight: bold; border: none; border-radius: 8px;
+    padding: 8px 14px; cursor: pointer;
+  }
+  .image-upload-box .pick-btn { background: var(--gold-bright); color: #0A0A0A; }
+  .image-upload-box .remove-btn { background: rgba(239,68,68,.15); color: #F87171; }
+  .image-upload-box .upload-status { font-size: 11.5px; color: var(--text-dim); }
 </style>
 </head>
 <body>
@@ -90,7 +129,7 @@
 
   <header>
     <h1>⚙️ Administration — Formations</h1>
-    <p>Modifie les prix, promotions et disponibilités sans toucher au code.</p>
+    <p>Gère le catalogue : prix, promotions, disponibilité, et fiche complète de chaque formation.</p>
   </header>
 
   <div style="display:flex;gap:10px;padding:14px 20px 0;">
@@ -105,6 +144,7 @@
 
   <form id="new-formation-form" class="card hidden">
     <h3>➕ Ajouter une formation</h3>
+
     <div>
       <label>Académie / plateforme</label>
       <select id="nf-provider">
@@ -112,14 +152,70 @@
         <option value="academie_majestepresse">Académie Majesté Presse</option>
       </select>
     </div>
+
     <div>
       <label>Nom de la formation</label>
       <input type="text" id="nf-nom" placeholder="Ex : Photographie produit" required>
     </div>
+
     <div>
-      <label>Description courte</label>
+      <label>Description courte (affichée sur la carte du catalogue)</label>
       <textarea id="nf-description" placeholder="Ex : Prise de vue et retouche pour la vente en ligne."></textarea>
     </div>
+
+    <div>
+      <label>Description complète (page détail)</label>
+      <textarea id="nf-description-longue" placeholder="Présentation détaillée de la formation..."></textarea>
+    </div>
+
+    <div class="row-2">
+      <div>
+        <label>Domaine / catégorie</label>
+        <input type="text" id="nf-domaine" list="domaine-options" placeholder="Ex : Développement Web">
+        <datalist id="domaine-options">
+          <option value="Fabrication des Cahiers Cartonnés et Livres">
+          <option value="Impression sur T-shirts, Casquettes et Tissus">
+          <option value="Création de Sites Web et Applications">
+          <option value="Informatique et Création d'Affiches">
+        </datalist>
+      </div>
+      <div>
+        <label>Niveau</label>
+        <select id="nf-niveau">
+          <option value="">—</option>
+          <option value="Débutant">Débutant</option>
+          <option value="Intermédiaire">Intermédiaire</option>
+          <option value="Avancé">Avancé</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="row-2">
+      <div>
+        <label>Durée</label>
+        <input type="text" id="nf-duree" placeholder="Ex : 6 semaines">
+      </div>
+      <div>
+        <label>Formateur</label>
+        <input type="text" id="nf-formateur" placeholder="Ex : MAJESTÉ PRESSE">
+      </div>
+    </div>
+
+    <div>
+      <label>Objectifs de la formation (une ligne = un objectif)</label>
+      <textarea id="nf-objectifs" placeholder="Ex : Créer un site vitrine responsive&#10;Publier un site en ligne"></textarea>
+    </div>
+
+    <div>
+      <label>Compétences acquises (une ligne = une compétence)</label>
+      <textarea id="nf-competences" placeholder="Ex : HTML/CSS&#10;Bases de JavaScript"></textarea>
+    </div>
+
+    <div>
+      <label>Programme / modules (une ligne = un module)</label>
+      <textarea id="nf-programme" placeholder="Ex : Module 1 — Les bases du web&#10;Module 2 — Mise en page avec CSS"></textarea>
+    </div>
+
     <div class="row-2">
       <div>
         <label>Emoji</label>
@@ -130,6 +226,21 @@
         <input type="number" id="nf-prix" min="0" required>
       </div>
     </div>
+
+    <div>
+      <label>Image de couverture</label>
+      <div class="image-upload-box" id="nf-image-box">
+        <img id="nf-image-preview" class="preview" alt="Aperçu de l'image de couverture">
+        <div id="nf-image-placeholder" class="placeholder">Aucune image sélectionnée</div>
+        <div class="btn-row">
+          <button type="button" class="pick-btn" id="nf-image-pick">📷 Choisir une image</button>
+          <button type="button" class="remove-btn hidden" id="nf-image-remove">🗑️ Supprimer</button>
+        </div>
+        <div class="upload-status" id="nf-image-status"></div>
+        <input type="file" id="nf-image-input" accept="image/*" class="hidden">
+      </div>
+    </div>
+
     <button type="submit">Créer la formation</button>
     <div id="new-formation-status"></div>
   </form>
@@ -152,6 +263,14 @@
     academie_majestepresse: "Académie Majesté Presse"
   };
 
+  // -------------------------------------------------------
+  // SÉCURITÉ : toute écriture (create/update/delete) passe par
+  // /api/admin/formations, qui revérifie le rôle côté serveur avec
+  // service_role. Ce fichier ne fait plus jamais
+  // supabase.from("formations").insert/update/delete() directement —
+  // voir l'historique du dépôt : c'était la faille qui permettait à
+  // n'importe quel compte authentifié de modifier le catalogue.
+  // -------------------------------------------------------
   let accessToken = null;
 
   async function authorizedFetch(url, options) {
@@ -163,7 +282,130 @@
     return fetch(url, options);
   }
 
+  function escapeHtmlLocal(str) {
+    const div = document.createElement("div");
+    div.textContent = str == null ? "" : String(str);
+    return div.innerHTML;
+  }
+
   function money(xof) { return xof.toLocaleString("fr-FR") + " FCFA"; }
+
+  function optimizedImageUrl(url, width) {
+    if (!url || !url.includes("/upload/")) return url;
+    return url.replace("/upload/", `/upload/f_auto,q_auto,w_${width},c_limit/`);
+  }
+
+  // Vérifie qu'une image de couverture est bien une URL Cloudinary HTTPS
+  // légitime avant de l'insérer dans le DOM — même contrôle que côté
+  // serveur (api/admin/formations.js) et que sur school.html/
+  // formation-detail.html. Défense en profondeur : même une image déjà
+  // enregistrée par une ancienne version du code est revérifiée ici.
+  function isSafeImageUrl(url) {
+    if (typeof url !== "string" || !url) return false;
+    let parsed;
+    try { parsed = new URL(url, window.location.origin); } catch (_) { return false; }
+    if (parsed.protocol !== "https:" || parsed.hostname !== "res.cloudinary.com") return false;
+    const cloudName = cfg && cfg.CLOUDINARY_CLOUD_NAME;
+    return !cloudName || parsed.pathname.startsWith("/" + cloudName + "/");
+  }
+
+  // ===========================================================
+  // UPLOAD D'IMAGE VERS CLOUDINARY (signature côté serveur, upload
+  // direct depuis le navigateur — même mécanisme que le chat).
+  // Inchangé : ce flux était déjà sécurisé sur main.
+  // ===========================================================
+  async function uploadImage(file, statusEl) {
+    statusEl.textContent = "Envoi de l'image...";
+
+    const signResp = await fetch("../api/cloudinary-sign", {
+      headers: accessToken ? { "Authorization": "Bearer " + accessToken } : {}
+    });
+    const sign = await signResp.json();
+    if (!signResp.ok) throw new Error(sign.error || "Signature indisponible");
+
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("api_key", sign.apiKey);
+    formData.append("timestamp", sign.timestamp);
+    formData.append("signature", sign.signature);
+    formData.append("folder", sign.folder);
+
+    const uploadResp = await fetch(sign.uploadUrl, { method: "POST", body: formData });
+    const uploadData = await uploadResp.json();
+    if (!uploadResp.ok) throw new Error((uploadData.error && uploadData.error.message) || "Envoi échoué");
+
+    statusEl.textContent = "";
+    return uploadData.secure_url;
+  }
+
+  // Câble un widget d'upload d'image (bouton + aperçu + suppression)
+  // sur un jeu d'éléments donné. Retourne un objet { getUrl, setUrl }.
+  function wireImageUpload(box) {
+    const preview = box.querySelector(".preview");
+    const placeholder = box.querySelector(".placeholder");
+    const pickBtn = box.querySelector(".pick-btn");
+    const removeBtn = box.querySelector(".remove-btn");
+    const status = box.querySelector(".upload-status");
+    const input = box.querySelector("input[type=file]");
+
+    let currentUrl = "";
+
+    function setUrl(url) {
+      currentUrl = (url && isSafeImageUrl(url)) ? url : "";
+      if (currentUrl) {
+        preview.src = optimizedImageUrl(currentUrl, 500);
+        preview.classList.add("visible");
+        placeholder.classList.add("hidden");
+        removeBtn.classList.remove("hidden");
+        pickBtn.textContent = "📷 Remplacer l'image";
+      } else {
+        preview.classList.remove("visible");
+        preview.src = "";
+        placeholder.classList.remove("hidden");
+        removeBtn.classList.add("hidden");
+        pickBtn.textContent = "📷 Choisir une image";
+      }
+    }
+
+    pickBtn.addEventListener("click", () => input.click());
+
+    removeBtn.addEventListener("click", () => {
+      setUrl("");
+      input.value = "";
+    });
+
+    input.addEventListener("change", async () => {
+      const file = input.files[0];
+      input.value = "";
+      if (!file) return;
+
+      pickBtn.disabled = true;
+      removeBtn.disabled = true;
+
+      try {
+        const url = await uploadImage(file, status);
+        setUrl(url);
+      } catch (err) {
+        console.error(err);
+        status.textContent = "Erreur : " + err.message;
+      } finally {
+        pickBtn.disabled = false;
+        removeBtn.disabled = false;
+      }
+    });
+
+    return { getUrl: () => currentUrl, setUrl };
+  }
+
+  const newFormationImage = wireImageUpload(document.getElementById("nf-image-box"));
+
+  // Convertit un textarea "une ligne = un élément" en texte propre.
+  // Les colonnes objectifs/competences/programme sont de simples
+  // colonnes texte : le découpage en liste à puces se fait uniquement
+  // à l'affichage, côté formation-detail.html.
+  function cleanMultiline(text) {
+    return (text || "").trim();
+  }
 
   function renderFormations(formations) {
     containerEl.innerHTML = "";
@@ -176,24 +418,27 @@
     Object.keys(byProvider).forEach((provider) => {
       const group = document.createElement("div");
       group.className = "provider-group";
-      group.innerHTML = `<div class="provider-title">${PROVIDER_LABELS[provider] || provider}</div>`;
+      group.innerHTML = `<div class="provider-title">${escapeHtmlLocal(PROVIDER_LABELS[provider] || provider)}</div>`;
 
       byProvider[provider].forEach((f) => {
         const row = document.createElement("div");
         row.className = "card formation-row";
+        const safeThumb = f.image_url && isSafeImageUrl(f.image_url) ? f.image_url : null;
         row.innerHTML = `
           <div class="top-line">
-            <span class="emoji">${f.emoji}</span>
-            <span class="nom">${f.nom}</span>
+            ${safeThumb
+              ? `<img class="thumb" src="${escapeHtmlLocal(optimizedImageUrl(safeThumb, 150))}" alt="">`
+              : `<span class="emoji">${escapeHtmlLocal(f.emoji || "📘")}</span>`}
+            <span class="nom">${escapeHtmlLocal(f.nom)}</span>
           </div>
           <div class="fields">
             <div>
               <label>Prix (FCFA)</label>
-              <input type="number" class="f-prix" value="${f.prix}" min="0">
+              <input type="number" class="f-prix" value="${escapeHtmlLocal(f.prix)}" min="0">
             </div>
             <div>
               <label>Promotion (FCFA, optionnel)</label>
-              <input type="number" class="f-promo" value="${f.promotion ?? ""}" min="0" placeholder="Aucune">
+              <input type="number" class="f-promo" value="${escapeHtmlLocal(f.promotion ?? "")}" min="0" placeholder="Aucune">
             </div>
           </div>
           <label class="toggle-row">
@@ -202,30 +447,98 @@
           </label>
           <div class="actions">
             <button class="save-btn">Enregistrer</button>
+            <button type="button" class="details-btn">✏️ Fiche complète</button>
             <button type="button" class="delete-btn">🗑️</button>
             <span class="save-status hidden">✓ Enregistré</span>
           </div>
+
+          <div class="details-panel">
+            <div>
+              <label>Description courte</label>
+              <textarea class="f-description">${escapeHtmlLocal(f.description || "")}</textarea>
+            </div>
+            <div>
+              <label>Description complète</label>
+              <textarea class="f-description-longue">${escapeHtmlLocal(f.description_longue || "")}</textarea>
+            </div>
+            <div class="fields">
+              <div>
+                <label>Domaine</label>
+                <input type="text" class="f-domaine" value="${escapeHtmlLocal(f.domaine || "")}">
+              </div>
+              <div>
+                <label>Niveau</label>
+                <input type="text" class="f-niveau" value="${escapeHtmlLocal(f.niveau || "")}">
+              </div>
+            </div>
+            <div class="fields">
+              <div>
+                <label>Durée</label>
+                <input type="text" class="f-duree" value="${escapeHtmlLocal(f.duree || "")}">
+              </div>
+              <div>
+                <label>Formateur</label>
+                <input type="text" class="f-formateur" value="${escapeHtmlLocal(f.formateur || "")}">
+              </div>
+            </div>
+            <div>
+              <label>Objectifs (une ligne = un objectif)</label>
+              <textarea class="f-objectifs">${escapeHtmlLocal(f.objectifs || "")}</textarea>
+            </div>
+            <div>
+              <label>Compétences acquises (une ligne = une compétence)</label>
+              <textarea class="f-competences">${escapeHtmlLocal(f.competences || "")}</textarea>
+            </div>
+            <div>
+              <label>Programme / modules (une ligne = un module)</label>
+              <textarea class="f-programme">${escapeHtmlLocal(f.programme || "")}</textarea>
+            </div>
+            <div>
+              <label>Image de couverture</label>
+              <div class="image-upload-box f-image-box">
+                <img class="preview" alt="Aperçu de l'image de couverture">
+                <div class="placeholder">Aucune image sélectionnée</div>
+                <div class="btn-row">
+                  <button type="button" class="pick-btn">📷 Choisir une image</button>
+                  <button type="button" class="remove-btn hidden">🗑️ Supprimer</button>
+                </div>
+                <div class="upload-status"></div>
+                <input type="file" accept="image/*" class="hidden">
+              </div>
+            </div>
+            <button type="button" class="save-btn f-save-details">Enregistrer la fiche complète</button>
+            <span class="save-status f-details-status hidden">✓ Enregistré</span>
+          </div>
         `;
 
-        const saveBtn = row.querySelector(".save-btn");
+        const saveBtn = row.querySelector(".save-btn:not(.f-save-details)");
         const deleteBtn = row.querySelector(".delete-btn");
-        const statusEl = row.querySelector(".save-status");
+        const statusEl = row.querySelector(".save-status:not(.f-details-status)");
+        const detailsBtn = row.querySelector(".details-btn");
+        const detailsPanel = row.querySelector(".details-panel");
+
+        const rowImage = wireImageUpload(row.querySelector(".f-image-box"));
+        rowImage.setUrl(f.image_url || "");
+
+        detailsBtn.addEventListener("click", () => {
+          detailsPanel.classList.toggle("open");
+        });
 
         deleteBtn.addEventListener("click", async () => {
           if (!confirm(`Supprimer définitivement "${f.nom}" ?`)) return;
           deleteBtn.disabled = true;
 
           try {
-            const resp = await authorizedFetch("/api/admin/formations", {
+            const resp = await authorizedFetch("../api/admin/formations", {
               method: "POST",
               body: JSON.stringify({ action: "delete", id: f.id })
             });
             const result = await resp.json();
             if (!resp.ok) throw new Error(result.error || "Erreur");
             row.remove();
-          } catch (error) {
-            console.error(error);
-            alert("Impossible de supprimer : " + error.message);
+          } catch (err) {
+            console.error(err);
+            alert("Impossible de supprimer : " + err.message);
             deleteBtn.disabled = false;
           }
         });
@@ -240,7 +553,7 @@
           const disponible = row.querySelector(".f-dispo").checked;
 
           try {
-            const resp = await authorizedFetch("/api/admin/formations", {
+            const resp = await authorizedFetch("../api/admin/formations", {
               method: "POST",
               body: JSON.stringify({ action: "update", id: f.id, prix, promotion, disponible })
             });
@@ -248,11 +561,75 @@
             if (!resp.ok) throw new Error(result.error || "Erreur");
             statusEl.classList.remove("hidden");
             setTimeout(() => statusEl.classList.add("hidden"), 2000);
-          } catch (error) {
-            console.error(error);
-            alert("Impossible d'enregistrer : " + error.message);
+          } catch (err) {
+            console.error(err);
+            alert("Impossible d'enregistrer : " + err.message);
           } finally {
             saveBtn.disabled = false;
+          }
+        });
+
+        const saveDetailsBtn = row.querySelector(".f-save-details");
+        const detailsStatus = row.querySelector(".f-details-status");
+
+        saveDetailsBtn.addEventListener("click", async () => {
+          saveDetailsBtn.disabled = true;
+          detailsStatus.classList.add("hidden");
+
+          const payload = {
+            action: "update",
+            id: f.id,
+            description: row.querySelector(".f-description").value.trim(),
+            description_longue: row.querySelector(".f-description-longue").value.trim(),
+            domaine: row.querySelector(".f-domaine").value.trim() || null,
+            niveau: row.querySelector(".f-niveau").value.trim() || null,
+            duree: row.querySelector(".f-duree").value.trim() || null,
+            formateur: row.querySelector(".f-formateur").value.trim() || null,
+            objectifs: cleanMultiline(row.querySelector(".f-objectifs").value),
+            competences: cleanMultiline(row.querySelector(".f-competences").value),
+            programme: cleanMultiline(row.querySelector(".f-programme").value),
+            image_url: rowImage.getUrl() || null
+          };
+
+          try {
+            const resp = await authorizedFetch("../api/admin/formations", {
+              method: "POST",
+              body: JSON.stringify(payload)
+            });
+            const result = await resp.json();
+            if (!resp.ok) throw new Error(result.error || "Erreur");
+
+            f.image_url = payload.image_url;
+            f.description = payload.description;
+            f.description_longue = payload.description_longue;
+            f.domaine = payload.domaine;
+            f.niveau = payload.niveau;
+            f.duree = payload.duree;
+            f.formateur = payload.formateur;
+            f.objectifs = payload.objectifs;
+            f.competences = payload.competences;
+            f.programme = payload.programme;
+
+            const thumbEl = row.querySelector(".thumb, .emoji");
+            if (payload.image_url && isSafeImageUrl(payload.image_url)) {
+              const img = document.createElement("img");
+              img.className = "thumb";
+              img.src = optimizedImageUrl(payload.image_url, 150);
+              thumbEl.replaceWith(img);
+            } else if (!payload.image_url && thumbEl.classList.contains("thumb")) {
+              const span = document.createElement("span");
+              span.className = "emoji";
+              span.textContent = f.emoji || "📘";
+              thumbEl.replaceWith(span);
+            }
+
+            detailsStatus.classList.remove("hidden");
+            setTimeout(() => detailsStatus.classList.add("hidden"), 2000);
+          } catch (err) {
+            console.error(err);
+            alert("Impossible d'enregistrer la fiche : " + err.message);
+          } finally {
+            saveDetailsBtn.disabled = false;
           }
         });
 
@@ -264,12 +641,12 @@
   }
 
   async function loadFormations() {
-    const resp = await authorizedFetch("/api/admin/formations", { method: "GET" });
+    const resp = await authorizedFetch("../api/admin/formations", { method: "GET" });
     const result = await resp.json();
 
     if (!resp.ok) {
       containerEl.innerHTML = '<div style="padding:20px;color:var(--text-dim);">' +
-        (result.error || "Erreur de chargement des formations.") + '</div>';
+        escapeHtmlLocal(result.error || "Erreur de chargement des formations.") + '</div>';
       return;
     }
 
@@ -290,7 +667,7 @@
 
     // Le rôle est revérifié côté serveur par /api/admin/formations —
     // ce premier appel sert aussi de contrôle d'accès à la page.
-    const resp = await authorizedFetch("/api/admin/formations", { method: "GET" });
+    const resp = await authorizedFetch("../api/admin/formations", { method: "GET" });
     const result = await resp.json();
 
     if (!resp.ok) {
@@ -312,8 +689,17 @@
     const provider = document.getElementById("nf-provider").value;
     const nom = document.getElementById("nf-nom").value.trim();
     const description = document.getElementById("nf-description").value.trim();
+    const descriptionLongue = document.getElementById("nf-description-longue").value.trim();
+    const domaine = document.getElementById("nf-domaine").value.trim() || null;
+    const niveau = document.getElementById("nf-niveau").value.trim() || null;
+    const duree = document.getElementById("nf-duree").value.trim() || null;
+    const formateur = document.getElementById("nf-formateur").value.trim() || null;
+    const objectifs = cleanMultiline(document.getElementById("nf-objectifs").value);
+    const competences = cleanMultiline(document.getElementById("nf-competences").value);
+    const programme = cleanMultiline(document.getElementById("nf-programme").value);
     const emoji = document.getElementById("nf-emoji").value.trim() || "📘";
     const prix = parseInt(document.getElementById("nf-prix").value, 10);
+    const imageUrl = newFormationImage.getUrl() || null;
     const statusEl = document.getElementById("new-formation-status");
 
     if (!nom || !prix) return;
@@ -321,12 +707,19 @@
     statusEl.style.color = "";
     statusEl.textContent = "Création en cours...";
 
-    // L'identifiant (slug) est désormais généré côté serveur par
-    // /api/admin/formations, qui valide aussi provider/nom/prix.
+    // L'identifiant (slug) est généré côté serveur par
+    // /api/admin/formations, qui valide aussi tous les autres champs.
     try {
-      const resp = await authorizedFetch("/api/admin/formations", {
+      const resp = await authorizedFetch("../api/admin/formations", {
         method: "POST",
-        body: JSON.stringify({ action: "create", provider, nom, description, emoji, prix })
+        body: JSON.stringify({
+          action: "create",
+          provider, nom, description, prix, emoji,
+          description_longue: descriptionLongue || null,
+          domaine, niveau, duree, formateur,
+          objectifs, competences, programme,
+          image_url: imageUrl
+        })
       });
       const result = await resp.json();
       if (!resp.ok) throw new Error(result.error || "Erreur");
@@ -334,11 +727,12 @@
       statusEl.textContent = "✓ Formation créée.";
       document.getElementById("new-formation-form").reset();
       document.getElementById("nf-emoji").value = "📘";
+      newFormationImage.setUrl("");
       await loadFormations();
-    } catch (error) {
-      console.error(error);
+    } catch (err) {
+      console.error(err);
       statusEl.style.color = "#F87171";
-      statusEl.textContent = "Erreur : " + error.message;
+      statusEl.textContent = "Erreur : " + err.message;
     }
   });
 

@@ -213,12 +213,20 @@ create trigger trg_prevent_profile_role_change
 --   - déclaration explicite de la table si elle n'existe pas déjà
 --     (si elle existe déjà en production avec d'autres colonnes,
 --     ce create table est un no-op — ne touche à aucune donnée) ;
+--   - colonnes éditoriales ajoutées avec "add column if not exists" :
+--     purement additif, jamais destructeur, no-op si déjà présentes —
+--     ces colonnes existent déjà en production (catalogue enrichi :
+--     image de couverture, fiche détaillée, objectifs/compétences/
+--     programme) mais n'avaient jamais été versionnées ici ;
 --   - RLS activée : lecture publique (le catalogue doit rester
 --     visible sans connexion, comme le fait déjà school.html) ;
 --   - AUCUNE policy d'insertion/mise à jour/suppression : par défaut
 --     Postgres refuse alors ces opérations à "anon"/"authenticated" —
---     seule la clé service_role (utilisée uniquement par la nouvelle
---     route /api/admin/formations.js) peut désormais écrire.
+--     seule la clé service_role (utilisée uniquement par la route
+--     /api/admin/formations.js) peut désormais écrire.
+--
+-- IMPORTANT : cette section ne fait AUCUN drop column / drop table /
+-- truncate. Aucune colonne existante n'est supprimée ni modifiée.
 -- =========================================================
 
 create table if not exists public.formations (
@@ -233,6 +241,21 @@ create table if not exists public.formations (
   created_at timestamptz not null default now()
 );
 
+-- Colonnes éditoriales (fiche complète, catalogue enrichi) — ajoutées
+-- sur main (admin/formations.html, school.html, formation-detail.html,
+-- academie-majestepresse.html) directement en base, jamais versionnées
+-- jusqu'ici. Ajout purement additif, compatible avec les données déjà
+-- en production.
+alter table public.formations add column if not exists image_url text;
+alter table public.formations add column if not exists description_longue text;
+alter table public.formations add column if not exists domaine text;
+alter table public.formations add column if not exists duree text;
+alter table public.formations add column if not exists niveau text;
+alter table public.formations add column if not exists formateur text;
+alter table public.formations add column if not exists objectifs text;
+alter table public.formations add column if not exists competences text;
+alter table public.formations add column if not exists programme text;
+
 alter table public.formations enable row level security;
 
 drop policy if exists "Lecture formations" on public.formations;
@@ -240,6 +263,26 @@ create policy "Lecture formations" on public.formations
   for select using (true);
 
 -- Aucune policy insert/update/delete : réservé à service_role.
+
+-- -------------------------------------------------------
+-- Produits numériques (digital_products) et purchases.product_type
+-- -------------------------------------------------------
+-- Ces éléments existent déjà en production (utilisés par
+-- api/fedapay-checkout.js et api/digital-products-download.js) mais
+-- n'ont jamais été versionnés dans ce fichier. On documente leur
+-- usage connu ici SANS créer/modifier digital_products (sa structure
+-- complète — contraintes, colonnes exactes au-delà de celles lues par
+-- le code — n'est pas confirmée depuis ce dépôt ; inventer un
+-- "create table" ici risquerait de diverger de la vraie table).
+--
+-- Colonnes de digital_products lues par le code existant :
+--   id, nom, prix, promotion, disponible,
+--   file_path, file_name, mime_type
+-- (bucket Storage privé associé : "digital-products")
+--
+-- purchases.product_type ('formation' | 'digital_product') : ajout
+-- additif avec valeur par défaut, ne touche à aucune ligne existante.
+alter table public.purchases add column if not exists product_type text not null default 'formation';
 
 -- =========================================================
 -- v7 — CORRECTIF SÉCURITÉ : lecture publique de dm_conversations

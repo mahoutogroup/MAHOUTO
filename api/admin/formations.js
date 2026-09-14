@@ -12,6 +12,15 @@
 // - Le prix et la promotion sont toujours validés côté serveur
 //   (entiers, 0 à 1 000 000 XOF) : le navigateur ne peut jamais
 //   imposer un prix arbitraire pour une formation.
+// - image_url est valable UNIQUEMENT si elle pointe vers le compte
+//   Cloudinary attendu (https://res.cloudinary.com/<cloud>/...) —
+//   empêche qu'un javascript:/data: URI ou un domaine arbitraire
+//   soit stocké puis rendu tel quel par school.html/formation-detail.html.
+// - Les champs texte (domaine, niveau, durée, formateur, objectifs,
+//   compétences, programme, description longue) sont bornés en
+//   longueur ; l'échappement HTML au moment de l'affichage reste la
+//   responsabilité du frontend (déjà en place), cette validation
+//   serveur est une défense supplémentaire, pas un remplacement.
 //
 // Remplace les écritures directes que admin/formations.html faisait
 // auparavant sur Supabase avec la clé anonyme (voir historique du
@@ -21,6 +30,8 @@
 //   SUPABASE_URL
 //   SUPABASE_ANON_KEY
 //   SUPABASE_SERVICE_ROLE_KEY
+//   CLOUDINARY_CLOUD_NAME   (déjà utilisée par api/cloudinary-sign.js —
+//                            sert ici uniquement à valider image_url)
 // =========================================================
 
 import { createClient } from "@supabase/supabase-js";
@@ -38,6 +49,51 @@ function validatePrice(value, fieldName, required) {
     throw new Error(`${fieldName} invalide (entier entre 0 et ${MAX_PRICE}).`);
   }
   return num;
+}
+
+// Champ texte optionnel simple (domaine, niveau, durée, formateur...).
+// "" / null / undefined -> null (permet d'effacer un champ existant).
+function validateOptionalText(value, fieldName, maxLength) {
+  if (value === undefined) return undefined; // absent du body : ne pas toucher au champ
+  if (value === null || value === "") return null;
+  const text = String(value).trim();
+  if (!text) return null;
+  if (text.length > maxLength) {
+    throw new Error(`${fieldName} trop long (maximum ${maxLength} caractères).`);
+  }
+  return text;
+}
+
+// Zone de texte multi-lignes (objectifs/compétences/programme) : même
+// validation qu'un champ texte, juste une limite plus généreuse.
+function validateMultiline(value, fieldName, maxLength) {
+  return validateOptionalText(value, fieldName, maxLength);
+}
+
+// N'accepte une image de couverture QUE si elle vient du compte
+// Cloudinary configuré pour ce projet — jamais un javascript:/data:
+// URI, jamais un domaine arbitraire.
+function validateImageUrl(value) {
+  if (value === undefined) return undefined; // absent du body : ne pas toucher au champ
+  if (value === null || value === "") return null;
+
+  let parsed;
+  try {
+    parsed = new URL(String(value));
+  } catch (_) {
+    throw new Error("URL d'image invalide.");
+  }
+
+  if (parsed.protocol !== "https:" || parsed.hostname !== "res.cloudinary.com") {
+    throw new Error("L'image de couverture doit provenir de Cloudinary (https://res.cloudinary.com/...).");
+  }
+
+  const expectedCloudName = process.env.CLOUDINARY_CLOUD_NAME;
+  if (expectedCloudName && !parsed.pathname.startsWith("/" + expectedCloudName + "/")) {
+    throw new Error("L'image ne provient pas du compte Cloudinary attendu.");
+  }
+
+  return parsed.toString();
 }
 
 export default async function handler(req, res) {
@@ -119,16 +175,57 @@ export default async function handler(req, res) {
   }
 
   try {
-    // -------- 5) Mise à jour (prix, promotion, disponibilité) --------
+    // -------- 5) Mise à jour --------
+    // Deux usages depuis le frontend : mise à jour rapide (prix/promo/
+    // disponibilité) et "fiche complète" (tous les champs éditoriaux).
+    // Chaque champ n'est inclus dans updatePayload que s'il est présent
+    // dans le body — un update partiel n'écrase jamais les champs non
+    // envoyés.
     if (action === "update") {
       if (!id || typeof id !== "string") {
         return res.status(400).json({ error: "Identifiant de formation manquant." });
       }
 
       const updatePayload = {};
+
       if (body.prix !== undefined) updatePayload.prix = validatePrice(body.prix, "Le prix", true);
       if (body.promotion !== undefined) updatePayload.promotion = validatePrice(body.promotion, "La promotion", false);
       if (body.disponible !== undefined) updatePayload.disponible = Boolean(body.disponible);
+
+      if (body.description !== undefined) {
+        updatePayload.description = String(body.description || "").trim().slice(0, 2000);
+      }
+
+      const descriptionLongue = validateOptionalText(body.description_longue, "La description complète", 10000);
+      if (descriptionLongue !== undefined) updatePayload.description_longue = descriptionLongue;
+
+      const domaine = validateOptionalText(body.domaine, "Le domaine", 200);
+      if (domaine !== undefined) updatePayload.domaine = domaine;
+
+      const niveau = validateOptionalText(body.niveau, "Le niveau", 100);
+      if (niveau !== undefined) updatePayload.niveau = niveau;
+
+      const duree = validateOptionalText(body.duree, "La durée", 100);
+      if (duree !== undefined) updatePayload.duree = duree;
+
+      const formateur = validateOptionalText(body.formateur, "Le formateur", 200);
+      if (formateur !== undefined) updatePayload.formateur = formateur;
+
+      const objectifs = validateMultiline(body.objectifs, "Les objectifs", 5000);
+      if (objectifs !== undefined) updatePayload.objectifs = objectifs;
+
+      const competences = validateMultiline(body.competences, "Les compétences", 5000);
+      if (competences !== undefined) updatePayload.competences = competences;
+
+      const programme = validateMultiline(body.programme, "Le programme", 5000);
+      if (programme !== undefined) updatePayload.programme = programme;
+
+      const imageUrl = validateImageUrl(body.image_url);
+      if (imageUrl !== undefined) updatePayload.image_url = imageUrl;
+
+      if (body.emoji !== undefined) {
+        updatePayload.emoji = String(body.emoji || "📘").trim().slice(0, 8) || "📘";
+      }
 
       if (!Object.keys(updatePayload).length) {
         return res.status(400).json({ error: "Aucune donnée à mettre à jour." });
@@ -149,6 +246,16 @@ export default async function handler(req, res) {
     const emoji = String(body.emoji || "📘").trim().slice(0, 8) || "📘";
     const prix = validatePrice(body.prix, "Le prix", true);
 
+    const descriptionLongue = validateOptionalText(body.description_longue, "La description complète", 10000);
+    const domaine = validateOptionalText(body.domaine, "Le domaine", 200);
+    const niveau = validateOptionalText(body.niveau, "Le niveau", 100);
+    const duree = validateOptionalText(body.duree, "La durée", 100);
+    const formateur = validateOptionalText(body.formateur, "Le formateur", 200);
+    const objectifs = validateMultiline(body.objectifs, "Les objectifs", 5000);
+    const competences = validateMultiline(body.competences, "Les compétences", 5000);
+    const programme = validateMultiline(body.programme, "Le programme", 5000);
+    const imageUrl = validateImageUrl(body.image_url);
+
     if (!ALLOWED_PROVIDERS.includes(provider)) {
       return res.status(400).json({ error: "Plateforme (provider) invalide." });
     }
@@ -163,7 +270,16 @@ export default async function handler(req, res) {
     const newId = prefix + slug + "-" + Date.now().toString(36);
 
     const { error } = await supabaseAdmin.from("formations").insert({
-      id: newId, provider, nom, description, emoji, prix, disponible: true
+      id: newId, provider, nom, description, emoji, prix, disponible: true,
+      description_longue: descriptionLongue ?? null,
+      domaine: domaine ?? null,
+      niveau: niveau ?? null,
+      duree: duree ?? null,
+      formateur: formateur ?? null,
+      objectifs: objectifs ?? null,
+      competences: competences ?? null,
+      programme: programme ?? null,
+      image_url: imageUrl ?? null
     });
 
     if (error) {
