@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cours — MAHOUTO+</title>
+<meta name="theme-color" content="#0A0A0A">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="assets/favicon.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="stylesheet" href="theme.css">
+<script src="theme-toggle.js"></script>
+<style>
+  #loading-state, #error-state {
+    text-align: center; color: var(--text-dim); padding: 80px 24px; font-size: 14px;
+  }
+
+  .player-header {
+    padding: 16px 20px; background: var(--bg-elevated); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .player-header a.back { font-size: 18px; color: var(--text-muted); text-decoration: none; flex: none; }
+  .player-header .titre { font-size: 15px; font-weight: bold; flex: 1; }
+
+  .video-stage {
+    background: #000; display: flex; align-items: center; justify-content: center;
+    aspect-ratio: 16/9; width: 100%;
+  }
+  .video-stage video { width: 100%; height: 100%; }
+  .pdf-stage, .empty-stage {
+    aspect-ratio: 16/9; width: 100%; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 14px; background: var(--bg-card);
+    color: var(--text-muted); font-size: 13.5px; text-align: center; padding: 20px;
+  }
+  .pdf-stage a {
+    background: var(--gold-bright); color: #0A0A0A; font-weight: bold; font-size: 13.5px;
+    padding: 10px 18px; border-radius: 10px; text-decoration: none;
+  }
+
+  .lesson-actions {
+    display: flex; gap: 10px; padding: 14px 20px; flex-wrap: wrap;
+  }
+  .lesson-actions button {
+    font-size: 12.5px; font-weight: bold; border: none; border-radius: 10px;
+    padding: 10px 16px; cursor: pointer;
+  }
+  .lesson-actions .complete-btn { background: rgba(34,197,94,.15); color: var(--accent-green); }
+  .lesson-actions .complete-btn.done { background: var(--accent-green); color: #0A0A0A; }
+  .lesson-actions .nav-btn { background: var(--bg-card); color: var(--text-muted); border: 1px solid var(--border); }
+  .lesson-actions .nav-btn:disabled { opacity: .4; cursor: default; }
+
+  .curriculum-sidebar { padding: 4px 20px 60px; display: flex; flex-direction: column; gap: 14px; }
+  .sidebar-module-title {
+    font-size: 12px; font-weight: bold; color: var(--text-muted); text-transform: uppercase;
+    letter-spacing: .04em; margin-top: 10px;
+  }
+  .sidebar-lesson {
+    display: flex; align-items: center; gap: 10px; padding: 11px 12px;
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px;
+    font-size: 13px; cursor: pointer;
+  }
+  .sidebar-lesson.active { border-color: var(--gold); background: rgba(212,175,55,.08); }
+  .sidebar-lesson.locked { opacity: .5; cursor: not-allowed; }
+  .sidebar-lesson .icon { flex: none; font-size: 15px; }
+  .sidebar-lesson .title { flex: 1; }
+  .sidebar-lesson .check { flex: none; color: var(--accent-green); font-size: 14px; }
+</style>
+</head>
+<body>
+
+<button id="theme-toggle-btn" class="theme-toggle-fab">🌙</button>
+
+<div class="page-content">
+  <div id="loading-state">Chargement du cours...</div>
+  <div id="error-state" class="hidden" style="text-align:center;color:var(--text-dim);padding:80px 24px;font-size:14px;"></div>
+  <div id="player-content" class="hidden"></div>
+</div>
+
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+(function () {
+  const cfg = window.MAHOUTO_CONFIG;
+  const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+
+  const loadingEl = document.getElementById("loading-state");
+  const errorEl = document.getElementById("error-state");
+  const contentEl = document.getElementById("player-content");
+
+  let accessToken = null;
+  let currentUser = null;
+  let formationId = null;
+  let allLessons = []; // ordre d'affichage à plat, pour prev/next
+  let progressByLessonId = {};
+  let hasAccess = false;
+  let activeLessonId = null;
+
+  function isSafeCloudinaryUrl(value) {
+    if (typeof value !== "string" || !value) return false;
+    let parsed;
+    try { parsed = new URL(value); } catch (_) { return false; }
+    if (parsed.protocol !== "https:" || parsed.hostname !== "res.cloudinary.com") return false;
+    const cloudName = cfg && cfg.CLOUDINARY_CLOUD_NAME;
+    return !cloudName || parsed.pathname.startsWith("/" + cloudName + "/");
+  }
+
+  async function authedFetch(url, payload) {
+    const headers = { "Content-Type": "application/json" };
+    if (accessToken) headers["Authorization"] = "Bearer " + accessToken;
+    const resp = await fetch(url, { method: "POST", headers, body: JSON.stringify(payload) });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || "Erreur");
+    return data;
+  }
+
+  function iconFor(lesson) {
+    if (lesson.type === "pdf") return "📄";
+    if (lesson.type === "text") return "📝";
+    return "🎬";
+  }
+
+  function renderSidebar(modules, lessonsByModule) {
+    const sidebar = document.getElementById("curriculum-sidebar");
+    sidebar.innerHTML = "";
+
+    modules.forEach((mod) => {
+      const lessons = lessonsByModule[mod.id] || [];
+      if (!lessons.length) return;
+
+      const titleEl = document.createElement("div");
+      titleEl.className = "sidebar-module-title";
+      titleEl.textContent = mod.titre;
+      sidebar.appendChild(titleEl);
+
+      lessons.forEach((lesson) => {
+        const unlocked = hasAccess || lesson.is_preview;
+        const row = document.createElement("div");
+        row.className = "sidebar-lesson" + (unlocked ? "" : " locked") + (lesson.id === activeLessonId ? " active" : "");
+        const done = progressByLessonId[lesson.id];
+        row.innerHTML = `
+          <span class="icon">${unlocked ? iconFor(lesson) : "🔒"}</span>
+          <span class="title"></span>
+          ${done ? '<span class="check">✓</span>' : ""}
+        `;
+        row.querySelector(".title").textContent = lesson.titre;
+        if (unlocked) {
+          row.addEventListener("click", () => selectLesson(lesson.id));
+        }
+        sidebar.appendChild(row);
+      });
+    });
+  }
+
+  async function markComplete(lessonId, completed) {
+    if (!currentUser) return;
+    const { error } = await supabase
+      .from("course_progress")
+      .upsert({ user_id: currentUser.id, lesson_id: lessonId, completed, updated_at: new Date().toISOString() }, { onConflict: "user_id,lesson_id" });
+    if (error) {
+      console.error("Erreur enregistrement progression :", error);
+      return;
+    }
+    progressByLessonId[lessonId] = completed;
+  }
+
+  async function selectLesson(lessonId) {
+    activeLessonId = lessonId;
+    const lesson = allLessons.find((l) => l.id === lessonId);
+    if (!lesson) return;
+
+    const stageWrap = document.getElementById("stage-wrap");
+    stageWrap.innerHTML = '<div class="empty-stage">Chargement de la leçon...</div>';
+
+    document.getElementById("player-lesson-title").textContent = lesson.titre;
+    highlightActiveSidebarRow();
+
+    try {
+      const data = await authedFetch("/api/formation-content", { action: "lesson", lessonId });
+
+      if (data.type === "video" && data.videoUrl && isSafeCloudinaryUrl(data.videoUrl)) {
+        const stage = document.createElement("div");
+        stage.className = "video-stage";
+        const video = document.createElement("video");
+        video.controls = true;
+        video.src = data.videoUrl;
+        video.addEventListener("ended", async () => {
+          await markComplete(lessonId, true);
+          buildSidebarSnapshot();
+          updateCompleteButton();
+        });
+        stage.appendChild(video);
+        stageWrap.innerHTML = "";
+        stageWrap.appendChild(stage);
+      } else if (data.type === "pdf" && data.pdfUrl) {
+        stageWrap.innerHTML = `
+          <div class="pdf-stage">
+            <span>📄 Document de la leçon</span>
+            <a href="${escapeHtml(data.pdfUrl)}" target="_blank" rel="noopener noreferrer">Ouvrir le document</a>
+          </div>
+        `;
+      } else {
+        stageWrap.innerHTML = '<div class="empty-stage">Aucun contenu disponible pour cette leçon.</div>';
+      }
+    } catch (err) {
+      console.error(err);
+      stageWrap.innerHTML = '<div class="empty-stage">' + (err.message || "Impossible de charger cette leçon.") + '</div>';
+    }
+
+    updateNavButtons();
+    updateCompleteButton();
+  }
+
+  function highlightActiveSidebarRow() {
+    buildSidebarSnapshot();
+  }
+
+  function updateNavButtons() {
+    const idx = allLessons.findIndex((l) => l.id === activeLessonId);
+    const prevBtn = document.getElementById("prev-lesson-btn");
+    const nextBtn = document.getElementById("next-lesson-btn");
+    prevBtn.disabled = idx <= 0;
+    nextBtn.disabled = idx === -1 || idx >= allLessons.length - 1;
+  }
+
+  function updateCompleteButton() {
+    const btn = document.getElementById("complete-lesson-btn");
+    const done = Boolean(progressByLessonId[activeLessonId]);
+    btn.textContent = done ? "✓ Terminé" : "Marquer comme terminé";
+    btn.classList.toggle("done", done);
+  }
+
+  function wireNav() {
+    document.getElementById("prev-lesson-btn").addEventListener("click", () => {
+      const idx = allLessons.findIndex((l) => l.id === activeLessonId);
+      if (idx > 0) selectLesson(allLessons[idx - 1].id);
+    });
+    document.getElementById("next-lesson-btn").addEventListener("click", () => {
+      const idx = allLessons.findIndex((l) => l.id === activeLessonId);
+      if (idx >= 0 && idx < allLessons.length - 1) selectLesson(allLessons[idx + 1].id);
+    });
+    document.getElementById("complete-lesson-btn").addEventListener("click", async () => {
+      const done = !progressByLessonId[activeLessonId];
+      await markComplete(activeLessonId, done);
+      updateCompleteButton();
+      buildSidebarSnapshot();
+    });
+  }
+
+  let lastModules = [];
+  let lastLessonsByModule = {};
+  function buildSidebarSnapshot() {
+    renderSidebar(lastModules, lastLessonsByModule);
+  }
+
+  async function init() {
+    const params = new URLSearchParams(window.location.search);
+    formationId = params.get("course");
+
+    if (!formationId) {
+      loadingEl.classList.add("hidden");
+      errorEl.classList.remove("hidden");
+      errorEl.textContent = "Formation introuvable.";
+      return;
+    }
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData || !sessionData.session || !sessionData.session.user) {
+      loadingEl.classList.add("hidden");
+      errorEl.classList.remove("hidden");
+      errorEl.textContent = "Connecte-toi pour accéder à ce cours.";
+      return;
+    }
+    currentUser = sessionData.session.user;
+    accessToken = sessionData.session.access_token;
+
+    const { data: formation } = await supabase
+      .from("formations")
+      .select("id, nom, emoji")
+      .eq("id", formationId)
+      .maybeSingle();
+
+    if (!formation) {
+      loadingEl.classList.add("hidden");
+      errorEl.classList.remove("hidden");
+      errorEl.textContent = "Formation introuvable.";
+      return;
+    }
+
+    let curriculum;
+    try {
+      curriculum = await authedFetch("/api/formation-content", { action: "curriculum", formationId });
+    } catch (err) {
+      loadingEl.classList.add("hidden");
+      errorEl.classList.remove("hidden");
+      errorEl.textContent = "Impossible de charger ce cours : " + err.message;
+      return;
+    }
+
+    hasAccess = Boolean(curriculum.hasAccess);
+    if (!hasAccess && !(curriculum.lessons || []).some((l) => l.is_preview)) {
+      loadingEl.classList.add("hidden");
+      errorEl.classList.remove("hidden");
+      errorEl.innerHTML = "Tu dois acheter cette formation pour y accéder. " +
+        '<a href="formation-detail.html?course=' + encodeURIComponent(formationId) + '" style="color:var(--gold);">Voir la fiche</a>';
+      return;
+    }
+
+    (curriculum.progress || []).forEach((p) => { progressByLessonId[p.lesson_id] = p.completed; });
+
+    const lessonsByModule = {};
+    (curriculum.lessons || []).forEach((l) => {
+      if (!lessonsByModule[l.module_id]) lessonsByModule[l.module_id] = [];
+      lessonsByModule[l.module_id].push(l);
+      allLessons.push(l);
+    });
+
+    lastModules = curriculum.modules || [];
+    lastLessonsByModule = lessonsByModule;
+
+    contentEl.innerHTML = `
+      <div class="player-header">
+        <a class="back" href="formation-detail.html?course=${encodeURIComponent(formationId)}">←</a>
+        <div class="titre"></div>
+      </div>
+      <div id="stage-wrap"></div>
+      <div class="lesson-actions">
+        <button type="button" class="nav-btn" id="prev-lesson-btn">◀ Précédent</button>
+        <button type="button" class="complete-btn" id="complete-lesson-btn">Marquer comme terminé</button>
+        <button type="button" class="nav-btn" id="next-lesson-btn">Suivant ▶</button>
+      </div>
+      <div id="curriculum-sidebar" class="curriculum-sidebar"></div>
+    `;
+    contentEl.querySelector(".titre").id = "player-lesson-title";
+
+    loadingEl.classList.add("hidden");
+    contentEl.classList.remove("hidden");
+
+    wireNav();
+    renderSidebar(lastModules, lastLessonsByModule);
+
+    const firstUnlocked = allLessons.find((l) => hasAccess || l.is_preview);
+    if (firstUnlocked) {
+      await selectLesson(firstUnlocked.id);
+    } else {
+      document.getElementById("stage-wrap").innerHTML = '<div class="empty-stage">Aucune leçon disponible.</div>';
+    }
+  }
+
+  init();
+})();
+</script>
+<script src="pwa-install.js"></script>
+
+</body>
+</html>

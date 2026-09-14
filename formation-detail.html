@@ -59,6 +59,24 @@
   }
   .formateur-card .name { font-size: 13.5px; font-weight: bold; }
 
+  .curriculum-list { display: flex; flex-direction: column; gap: 10px; }
+  .curriculum-module .curriculum-module-title {
+    font-size: 12.5px; font-weight: bold; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px;
+  }
+  .curriculum-lesson {
+    display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px;
+    font-size: 13px; margin-bottom: 6px;
+  }
+  .curriculum-lesson .lesson-icon { flex: none; font-size: 15px; }
+  .curriculum-lesson .lesson-title { flex: 1; }
+  .curriculum-lesson .lesson-tag {
+    font-size: 10.5px; font-weight: bold; color: var(--gold); flex: none;
+  }
+  .curriculum-lesson.locked { color: var(--text-dim); }
+  .curriculum-lesson.locked .lesson-title { color: var(--text-dim); }
+
   .sticky-buy {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
     padding: 14px 20px calc(14px + env(safe-area-inset-bottom));
@@ -129,6 +147,69 @@
       return true;
     }
     return false;
+  }
+
+  // Charge le programme réel (modules/leçons vidéo) via l'API serveur,
+  // qui détermine elle-même l'accès (achat vérifié / aperçu gratuit) —
+  // jamais de confiance dans une valeur calculée côté client.
+  async function loadCurriculum(courseId) {
+    try {
+      const headers = { "Content-Type": "application/json" };
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData && sessionData.session ? sessionData.session.access_token : null;
+      if (accessToken) headers["Authorization"] = "Bearer " + accessToken;
+
+      const resp = await fetch("/api/formation-content", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ action: "curriculum", formationId: courseId })
+      });
+      if (!resp.ok) return null;
+      return await resp.json();
+    } catch (err) {
+      console.error("Erreur chargement programme :", err);
+      return null;
+    }
+  }
+
+  function renderCurriculumSection(curriculum, courseId) {
+    if (!curriculum || !curriculum.modules || !curriculum.modules.length) return "";
+
+    const lessonsByModule = {};
+    (curriculum.lessons || []).forEach((l) => {
+      if (!lessonsByModule[l.module_id]) lessonsByModule[l.module_id] = [];
+      lessonsByModule[l.module_id].push(l);
+    });
+
+    const typeIcon = { video: "🎬", pdf: "📄", text: "📝" };
+
+    const modulesHtml = curriculum.modules.map((mod) => {
+      const lessons = lessonsByModule[mod.id] || [];
+      if (!lessons.length) return "";
+      const lessonsHtml = lessons.map((l) => {
+        const unlocked = curriculum.hasAccess || l.is_preview;
+        return `
+          <div class="curriculum-lesson ${unlocked ? "" : "locked"}">
+            <span class="lesson-icon">${unlocked ? (typeIcon[l.type] || "▶️") : "🔒"}</span>
+            <span class="lesson-title">${escapeHtml(l.titre)}</span>
+            ${l.is_preview ? `<span class="lesson-tag">Aperçu gratuit</span>` : ""}
+          </div>
+        `;
+      }).join("");
+      return `
+        <div class="curriculum-module">
+          <div class="curriculum-module-title">${escapeHtml(mod.titre)}</div>
+          ${lessonsHtml}
+        </div>
+      `;
+    }).join("");
+
+    return `
+      <div class="section-block">
+        <h2>🎬 Contenu du cours</h2>
+        <div class="curriculum-list">${modulesHtml}</div>
+      </div>
+    `;
   }
 
   async function checkOwned(courseId) {
@@ -211,6 +292,7 @@
     formation = data;
     await ensureLoggedIn();
     const owned = await checkOwned(courseId);
+    const curriculum = await loadCurriculum(courseId);
 
     const amount = formation.promotion ?? formation.prix;
     const originalAmount = formation.promotion ? formation.prix : null;
@@ -268,6 +350,8 @@
           <ul>${listItems(formation.programme)}</ul>
         </div>` : ""}
 
+        ${renderCurriculumSection(curriculum, courseId)}
+
         ${formation.formateur ? `
         <div class="section-block">
           <h2>👤 Formateur</h2>
@@ -287,12 +371,16 @@
     sticky.innerHTML = `
       <div class="sticky-price">${money(amount)}</div>
       <button id="sticky-buy-btn" class="${owned ? "owned" : ""}" ${!formation.disponible && !owned ? "disabled" : ""}>
-        ${owned ? "✓ Formation acquise" : (formation.disponible ? "S'inscrire maintenant" : "Indisponible")}
+        ${owned ? "▶ Accéder au cours" : (formation.disponible ? "S'inscrire maintenant" : "Indisponible")}
       </button>
     `;
     document.body.appendChild(sticky);
 
-    if (!owned && formation.disponible) {
+    if (owned) {
+      document.getElementById("sticky-buy-btn").addEventListener("click", () => {
+        window.location.href = "course-player.html?course=" + encodeURIComponent(courseId);
+      });
+    } else if (formation.disponible) {
       document.getElementById("sticky-buy-btn").addEventListener("click", (e) => buy(courseId, e.target));
     }
   }
