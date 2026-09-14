@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mes achats — MAHOUTO+</title>
+<meta name="theme-color" content="#0A0A0A">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="assets/favicon.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="stylesheet" href="theme.css">
+<script src="theme-toggle.js"></script>
+<style>
+  header { padding: 20px; background: var(--bg-elevated); border-bottom: 1px solid var(--border); }
+  header h1 { font-size: 20px; color: var(--gold); }
+  header p { font-size: 12.5px; color: var(--text-muted); margin-top: 6px; }
+
+  #login-state, #empty-state, #loading-state { text-align: center; color: var(--text-dim); padding: 60px 24px; font-size: 14px; }
+  #login-state a { color: var(--gold); font-weight: bold; }
+
+  .section-label { padding: 18px 20px 4px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--gold); font-weight: bold; }
+
+  .purchase-row { display: flex; align-items: center; gap: 12px; margin: 10px 20px; padding: 12px 14px; }
+  .purchase-row .thumb { width: 48px; height: 48px; border-radius: 10px; object-fit: cover; flex: none; background: var(--bg); border: 1px solid var(--border); }
+  .purchase-row .emoji { width: 48px; height: 48px; border-radius: 10px; flex: none; display: flex; align-items: center; justify-content: center; font-size: 20px; background: rgba(212,175,55,.12); }
+  .purchase-row .info { flex: 1; min-width: 0; }
+  .purchase-row .nom { font-size: 13.5px; font-weight: bold; }
+  .purchase-row .meta { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+  .purchase-row .status-pending { font-size: 10.5px; color: var(--gold); font-weight: 700; }
+  .purchase-row button, .purchase-row a.access-btn {
+    flex: none; font-size: 12px; font-weight: bold; background: var(--gold-bright); color: #0A0A0A;
+    border: none; border-radius: 8px; padding: 9px 12px; cursor: pointer; text-decoration: none; white-space: nowrap;
+  }
+  .purchase-row button:disabled { opacity: .6; cursor: wait; }
+</style>
+</head>
+<body>
+
+<button id="theme-toggle-btn" class="theme-toggle-fab">🌙</button>
+
+<div class="page-content">
+
+  <header>
+    <h1>📚 Ma bibliothèque</h1>
+    <p>Toutes tes formations et tous tes produits numériques achetés.</p>
+  </header>
+
+  <div id="login-state" class="hidden">Connecte-toi pour voir tes achats. <br><a href="index.html">Retour à l'accueil</a></div>
+  <div id="loading-state">Chargement de tes achats...</div>
+  <div id="empty-state" class="hidden">Tu n'as encore rien acheté. Découvre le <a href="school.html" style="color:var(--gold);">catalogue de formations</a> ou la <a href="produits.html" style="color:var(--gold);">boutique</a>.</div>
+
+  <div id="content"></div>
+
+</div>
+
+<nav class="bottom-nav">
+  <a class="nav-item" href="index.html"><span class="icon">🏠</span>Accueil</a>
+  <a class="nav-item" href="discussions.html"><span class="icon">💬</span>Messages</a>
+  <a class="nav-item" href="https://ai.majestepresse.com/chat" target="_blank" rel="noopener"><span class="icon">🧠</span>MAHOUTO AI</a>
+  <a class="nav-item" href="school.html"><span class="icon">🎓</span>School</a>
+  <a class="nav-item" href="profil.html"><span class="icon">👤</span>Profil</a>
+</nav>
+
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+(function () {
+  const cfg = window.MAHOUTO_CONFIG;
+  const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+
+  const TYPE_EMOJI = { pdf: "📕", ebook: "📚", video: "🎬", audio: "🎧", zip: "📦", template: "🎨", document: "📄", other: "📁" };
+  const ACCESS_LABEL = { video: "▶️ Regarder", audio: "▶️ Écouter" };
+
+  function money(xof) { return Number(xof).toLocaleString("fr-FR") + " FCFA"; }
+  function formatDate(iso) {
+    return new Date(iso).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+  }
+  function optimizedImageUrl(url, width) {
+    if (!url || !url.includes("/upload/")) return url;
+    return url.replace("/upload/", `/upload/f_auto,q_auto,w_${width},c_limit/`);
+  }
+
+  // Vérifie qu'une image de couverture est bien une URL Cloudinary HTTPS
+  // légitime avant de l'insérer dans le DOM.
+  function isSafeImageUrl(url) {
+    if (typeof url !== "string" || !url) return false;
+    let parsed;
+    try { parsed = new URL(url, window.location.origin); } catch (_) { return false; }
+    if (parsed.protocol !== "https:" || parsed.hostname !== "res.cloudinary.com") return false;
+    const cloudName = cfg && cfg.CLOUDINARY_CLOUD_NAME;
+    return !cloudName || parsed.pathname.startsWith("/" + cloudName + "/");
+  }
+
+  const loadingEl = document.getElementById("loading-state");
+  const loginEl = document.getElementById("login-state");
+  const emptyEl = document.getElementById("empty-state");
+  const contentEl = document.getElementById("content");
+
+  async function accessDigitalProduct(productId, btn) {
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = "Préparation...";
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData && sessionData.session ? sessionData.session.access_token : null;
+      const resp = await fetch("/api/digital-products-download", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + accessToken },
+        body: JSON.stringify({ productId })
+      });
+      const data = await resp.json();
+      if (!resp.ok || !data.url) throw new Error(data.error || "Lien indisponible.");
+      window.location.href = data.url;
+    } catch (err) {
+      alert("Accès impossible : " + err.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalText;
+    }
+  }
+
+  function renderFormationRow(purchase, formation) {
+    const row = document.createElement("div");
+    row.className = "card purchase-row";
+    const safeImage = formation && formation.image_url && isSafeImageUrl(formation.image_url) ? formation.image_url : null;
+    row.innerHTML = `
+      ${safeImage
+        ? `<img class="thumb" src="${escapeHtml(optimizedImageUrl(safeImage, 150))}" alt="">`
+        : `<span class="emoji">${escapeHtml((formation && formation.emoji) || "🎓")}</span>`}
+      <div class="info">
+        <div class="nom">${escapeHtml(purchase.course_name)}</div>
+        <div class="meta">${money(purchase.amount)} · Acheté le ${formatDate(purchase.created_at)}</div>
+      </div>
+      ${purchase.status === "paid"
+        ? `<a class="access-btn" href="course-player.html?course=${encodeURIComponent(purchase.course_id)}">Ouvrir</a>`
+        : `<span class="status-pending">⏳ En attente</span>`}
+    `;
+    return row;
+  }
+
+  function renderProductRow(purchase, product) {
+    const row = document.createElement("div");
+    row.className = "card purchase-row";
+    const safeImage = product && product.image_url && isSafeImageUrl(product.image_url) ? product.image_url : null;
+    row.innerHTML = `
+      ${safeImage
+        ? `<img class="thumb" src="${escapeHtml(optimizedImageUrl(safeImage, 150))}" alt="">`
+        : `<span class="emoji">${TYPE_EMOJI[(product && product.type) || "other"]}</span>`}
+      <div class="info">
+        <div class="nom">${escapeHtml(purchase.course_name)}</div>
+        <div class="meta">${money(purchase.amount)} · Acheté le ${formatDate(purchase.created_at)}</div>
+      </div>
+    `;
+
+    if (purchase.status === "paid") {
+      const btn = document.createElement("button");
+      btn.textContent = (product && ACCESS_LABEL[product.type]) || "📥 Télécharger";
+      btn.addEventListener("click", () => accessDigitalProduct(purchase.course_id, btn));
+      row.appendChild(btn);
+    } else {
+      const span = document.createElement("span");
+      span.className = "status-pending";
+      span.textContent = "⏳ En attente";
+      row.appendChild(span);
+    }
+
+    return row;
+  }
+
+  async function init() {
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData || !sessionData.session || !sessionData.session.user) {
+      loadingEl.classList.add("hidden");
+      loginEl.classList.remove("hidden");
+      return;
+    }
+    const userId = sessionData.session.user.id;
+
+    const { data: purchases, error } = await supabase
+      .from("purchases")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
+
+    loadingEl.classList.add("hidden");
+
+    if (error || !purchases || !purchases.length) {
+      emptyEl.classList.remove("hidden");
+      return;
+    }
+
+    const formationPurchases = purchases.filter((p) => p.product_type === "formation");
+    const productPurchases = purchases.filter((p) => p.product_type === "digital_product");
+
+    if (formationPurchases.length) {
+      const [{ data: formations }] = await Promise.all([
+        supabase.from("formations").select("id, emoji, image_url").in("id", formationPurchases.map((p) => p.course_id))
+      ]);
+      const formationsById = {};
+      (formations || []).forEach((f) => { formationsById[f.id] = f; });
+
+      const label = document.createElement("div");
+      label.className = "section-label";
+      label.textContent = "🎓 Mes formations";
+      contentEl.appendChild(label);
+
+      formationPurchases.forEach((p) => {
+        contentEl.appendChild(renderFormationRow(p, formationsById[p.course_id]));
+      });
+    }
+
+    if (productPurchases.length) {
+      const { data: products } = await supabase
+        .from("digital_products").select("id, type, image_url").in("id", productPurchases.map((p) => p.course_id));
+      const productsById = {};
+      (products || []).forEach((pr) => { productsById[pr.id] = pr; });
+
+      const label = document.createElement("div");
+      label.className = "section-label";
+      label.textContent = "🛍️ Mes produits numériques";
+      contentEl.appendChild(label);
+
+      productPurchases.forEach((p) => {
+        contentEl.appendChild(renderProductRow(p, productsById[p.course_id]));
+      });
+    }
+  }
+
+  init();
+})();
+</script>
+<script src="pwa-install.js"></script>
+
+</body>
+</html>

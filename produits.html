@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Boutique — MAHOUTO+</title>
+<meta name="theme-color" content="#0A0A0A">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="assets/favicon.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="stylesheet" href="theme.css">
+<script src="theme-toggle.js"></script>
+<style>
+  header { padding: 20px; background: var(--bg-elevated); border-bottom: 1px solid var(--border); }
+  header h1 { font-size: 20px; color: var(--gold); }
+  header p.tagline { font-size: 12.5px; color: var(--text-muted); margin-top: 6px; }
+  header p.slogan { font-size: 11.5px; color: var(--gold); margin-top: 4px; font-weight: 600; letter-spacing: .03em; }
+
+  #payment-banner { margin: 14px 20px 0; padding: 12px 16px; border-radius: 14px; font-size: 13px; text-align: center; }
+  #payment-banner.pending { background: rgba(212,175,55,.12); color: var(--gold); }
+  #payment-banner.paid { background: rgba(34,197,94,.12); color: var(--accent-green); }
+  #payment-banner.failed { background: rgba(239,68,68,.12); color: #F87171; }
+
+  .filters-bar { padding: 16px 20px 0; display: flex; flex-direction: column; gap: 10px; }
+  .search-input { width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg-card); color: var(--white); font-size: 14px; }
+  .filter-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
+  .filter-row select { flex: none; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-muted); font-size: 12.5px; }
+
+  .product-list { padding: 16px 20px; display: grid; grid-template-columns: 1fr; gap: 16px; }
+
+  .product-card { border-radius: 18px; overflow: hidden; background: var(--bg-card); border: 1px solid var(--border); display: flex; flex-direction: column; box-shadow: 0 4px 18px rgba(0,0,0,.18); transition: transform .15s ease, box-shadow .15s ease; }
+  .product-card:active { transform: scale(.98); }
+  @media (hover: hover) { .product-card:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(0,0,0,.28); border-color: var(--gold); } }
+
+  .product-cover { width: 100%; aspect-ratio: 16/9; object-fit: cover; background: linear-gradient(135deg, rgba(212,175,55,.25), rgba(0,0,0,.4)); display: flex; align-items: center; justify-content: center; font-size: 44px; }
+
+  .product-body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 8px; }
+  .product-badge { align-self: flex-start; font-size: 10.5px; font-weight: 700; color: #0A0A0A; background: var(--gold-bright); padding: 3px 10px; border-radius: 999px; text-transform: uppercase; letter-spacing: .03em; }
+  .product-card h3 { font-size: 16.5px; margin-top: 2px; }
+  .product-card .desc { font-size: 12.5px; color: var(--text-muted); line-height: 1.5; }
+
+  .product-price-row { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; }
+  .product-card .price { font-size: 15px; color: var(--gold); font-weight: bold; }
+  .product-card .price .old { text-decoration: line-through; color: var(--text-dim); font-weight: normal; font-size: 12px; margin-right: 6px; }
+
+  .product-actions { display: flex; gap: 8px; margin-top: 6px; }
+  .view-btn { flex: 1; text-align: center; font-size: 12.5px; font-weight: bold; background: var(--bg); color: var(--text-muted); border: 1px solid var(--border); border-radius: 10px; padding: 10px; text-decoration: none; }
+  .buy-btn { flex: 1; font-size: 12.5px; font-weight: bold; background: var(--gold-bright); color: #0A0A0A; border: none; border-radius: 10px; padding: 10px; white-space: nowrap; cursor: pointer; }
+  .buy-btn.owned { background: rgba(34,197,94,.18); color: var(--accent-green); }
+  .buy-btn:disabled { opacity: .6; cursor: wait; }
+
+  .empty-state { padding: 30px 20px; text-align: center; color: var(--text-dim); font-size: 13px; }
+</style>
+</head>
+<body>
+
+<button id="theme-toggle-btn" class="theme-toggle-fab">🌙</button>
+
+<div class="page-content">
+
+  <header>
+    <h1>🛍️ Boutique MAHOUTO+</h1>
+    <p class="tagline">PDF, ebooks, vidéos, templates et fichiers numériques prêts à l'emploi.</p>
+    <p class="slogan">Apprendre • Créer • Gagner</p>
+  </header>
+
+  <div id="payment-banner" class="hidden"></div>
+
+  <div class="filters-bar">
+    <input type="search" id="search-input" class="search-input" placeholder="🔍 Rechercher un produit...">
+    <div class="filter-row">
+      <select id="filter-type">
+        <option value="">Tous les types</option>
+        <option value="pdf">📕 PDF</option>
+        <option value="ebook">📚 Ebook</option>
+        <option value="video">🎬 Vidéo</option>
+        <option value="audio">🎧 Audio</option>
+        <option value="zip">📦 ZIP</option>
+        <option value="template">🎨 Template</option>
+        <option value="document">📄 Document</option>
+        <option value="other">📁 Autre</option>
+      </select>
+      <select id="filter-tri">
+        <option value="recent">Trier : nouveautés</option>
+        <option value="prix-asc">Prix croissant</option>
+        <option value="prix-desc">Prix décroissant</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="product-list" id="product-list"></div>
+
+</div>
+
+<nav class="bottom-nav">
+  <a class="nav-item" href="index.html"><span class="icon">🏠</span>Accueil</a>
+  <a class="nav-item" href="discussions.html"><span class="icon">💬</span>Messages</a>
+  <a class="nav-item" href="https://ai.majestepresse.com/chat" target="_blank" rel="noopener"><span class="icon">🧠</span>MAHOUTO AI</a>
+  <a class="nav-item" href="school.html"><span class="icon">🎓</span>School</a>
+  <a class="nav-item" href="profil.html"><span class="icon">👤</span>Profil</a>
+</nav>
+
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+(function () {
+  const cfg = window.MAHOUTO_CONFIG;
+  const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+
+  const TYPE_LABELS = { pdf: "PDF", ebook: "EBOOK", video: "VIDÉO", audio: "AUDIO", zip: "ZIP", template: "TEMPLATE", document: "DOCUMENT", other: "AUTRE" };
+  const TYPE_EMOJI = { pdf: "📕", ebook: "📚", video: "🎬", audio: "🎧", zip: "📦", template: "🎨", document: "📄", other: "📁" };
+
+  let PRODUCTS = [];
+
+  function money(xof) { return xof.toLocaleString("fr-FR") + " FCFA"; }
+  function optimizedImageUrl(url, width) {
+    if (!url || !url.includes("/upload/")) return url;
+    return url.replace("/upload/", `/upload/f_auto,q_auto,w_${width},c_limit/`);
+  }
+
+  // Vérifie qu'une image de couverture est bien une URL Cloudinary HTTPS
+  // légitime avant de l'insérer dans le DOM — même contrôle que sur
+  // school.html/formation-detail.html.
+  function isSafeImageUrl(url) {
+    if (typeof url !== "string" || !url) return false;
+    let parsed;
+    try { parsed = new URL(url, window.location.origin); } catch (_) { return false; }
+    if (parsed.protocol !== "https:" || parsed.hostname !== "res.cloudinary.com") return false;
+    const cloudName = cfg && cfg.CLOUDINARY_CLOUD_NAME;
+    return !cloudName || parsed.pathname.startsWith("/" + cloudName + "/");
+  }
+
+  async function loadCatalog() {
+    const { data, error } = await supabase
+      .from("digital_products")
+      .select("*")
+      .eq("disponible", true)
+      .order("created_at", { ascending: false });
+
+    if (error) { console.error(error); PRODUCTS = []; return; }
+
+    PRODUCTS = (data || []).map((p) => ({
+      id: p.id, name: p.nom, type: p.type, desc: p.description,
+      image: p.image_url && isSafeImageUrl(p.image_url) ? p.image_url : null,
+      amount: p.promotion ?? p.prix,
+      originalAmount: p.promotion ? p.prix : null,
+      createdAt: p.created_at
+    }));
+  }
+
+  const listEl = document.getElementById("product-list");
+  const bannerEl = document.getElementById("payment-banner");
+  const searchInput = document.getElementById("search-input");
+  const filterType = document.getElementById("filter-type");
+  const filterTri = document.getElementById("filter-tri");
+
+  let currentUser = null;
+  let ownedProductIds = new Set();
+
+  function getFiltered() {
+    const q = searchInput.value.trim().toLowerCase();
+    const type = filterType.value;
+    const tri = filterTri.value;
+
+    let list = PRODUCTS.filter((p) => {
+      if (q && !(p.name.toLowerCase().includes(q) || (p.desc || "").toLowerCase().includes(q))) return false;
+      if (type && p.type !== type) return false;
+      return true;
+    });
+
+    if (tri === "prix-asc") list = list.slice().sort((a, b) => a.amount - b.amount);
+    else if (tri === "prix-desc") list = list.slice().sort((a, b) => b.amount - a.amount);
+    else list = list.slice().sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    return list;
+  }
+
+  function render() {
+    const filtered = getFiltered();
+    listEl.innerHTML = "";
+
+    if (!filtered.length) {
+      listEl.innerHTML = '<div class="empty-state">Aucun produit ne correspond à ta recherche.</div>';
+      return;
+    }
+
+    filtered.forEach((p) => {
+      const owned = ownedProductIds.has(p.id);
+      const card = document.createElement("div");
+      card.className = "product-card";
+      card.innerHTML = `
+        ${p.image
+          ? `<img class="product-cover" src="${escapeHtml(optimizedImageUrl(p.image, 700))}" alt="${escapeHtml(p.name)}" loading="lazy">`
+          : `<div class="product-cover">${TYPE_EMOJI[p.type] || "📁"}</div>`}
+        <div class="product-body">
+          <span class="product-badge">${TYPE_LABELS[p.type] || escapeHtml(p.type)}</span>
+          <h3>${escapeHtml(p.name)}</h3>
+          <p class="desc">${escapeHtml(p.desc || "")}</p>
+          <div class="product-price-row">
+            <div class="price">${p.originalAmount ? `<span class="old">${money(p.originalAmount)}</span>` : ""}${money(p.amount)}</div>
+          </div>
+          <div class="product-actions">
+            <a class="view-btn" href="produit-detail.html?id=${encodeURIComponent(p.id)}">Voir le produit</a>
+            <button class="buy-btn ${owned ? "owned" : ""}" data-id="${escapeHtml(p.id)}">${owned ? "✓ Acquis" : "Acheter"}</button>
+          </div>
+        </div>
+      `;
+      listEl.appendChild(card);
+    });
+
+    listEl.querySelectorAll(".buy-btn").forEach((btn) => {
+      btn.addEventListener("click", () => buyProduct(btn.dataset.id, btn));
+    });
+  }
+
+  [searchInput, filterType, filterTri].forEach((el) => {
+    el.addEventListener("input", render);
+    el.addEventListener("change", render);
+  });
+
+  async function ensureLoggedIn() {
+    const { data } = await supabase.auth.getSession();
+    if (data && data.session && data.session.user) { currentUser = data.session.user; return true; }
+    return false;
+  }
+
+  async function loadOwned() {
+    if (!currentUser) return;
+    const { data } = await supabase
+      .from("purchases").select("course_id").eq("user_id", currentUser.id)
+      .eq("product_type", "digital_product").eq("status", "paid");
+    ownedProductIds = new Set((data || []).map((p) => p.course_id));
+  }
+
+  async function buyProduct(productId, btn) {
+    if (!(await ensureLoggedIn())) {
+      alert("Connecte-toi d'abord pour acheter ce produit.");
+      window.location.href = "index.html";
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = "Redirection...";
+
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData && sessionData.session ? sessionData.session.access_token : null;
+      if (!accessToken) throw new Error("Session expirée, reconnecte-toi.");
+
+      const resp = await fetch("/api/fedapay-checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + accessToken },
+        body: JSON.stringify({ courseId: productId, productType: "digital_product" })
+      });
+
+      const data = await resp.json();
+      if (!resp.ok || !data.checkoutUrl) throw new Error(data.error || "Réponse de paiement invalide.");
+
+      window.location.href = data.checkoutUrl;
+    } catch (err) {
+      console.error(err);
+      alert("Paiement indisponible : " + err.message);
+      btn.disabled = false;
+      btn.textContent = "Acheter";
+    }
+  }
+
+  async function checkReturnFromPayment() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("payment") !== "return") return;
+
+    const productId = params.get("course");
+    bannerEl.classList.remove("hidden");
+    bannerEl.className = "pending";
+    bannerEl.textContent = "⏳ Vérification du paiement en cours...";
+
+    let attempts = 0;
+    const poll = setInterval(async () => {
+      attempts++;
+      const { data } = await supabase
+        .from("purchases").select("status")
+        .eq("user_id", currentUser.id).eq("course_id", productId).eq("product_type", "digital_product")
+        .order("created_at", { ascending: false }).limit(1).maybeSingle();
+
+      if (data && data.status === "paid") {
+        clearInterval(poll);
+        bannerEl.className = "paid";
+        bannerEl.textContent = "✅ Paiement confirmé ! Retrouve ton achat dans \"Mes achats\".";
+        await loadOwned();
+        render();
+      } else if (data && data.status === "failed") {
+        clearInterval(poll);
+        bannerEl.className = "failed";
+        bannerEl.textContent = "❌ Le paiement a échoué ou a été annulé.";
+      } else if (attempts > 8) {
+        clearInterval(poll);
+        bannerEl.className = "pending";
+        bannerEl.textContent = "⏳ Paiement en attente de confirmation. Reviens dans un instant.";
+      }
+    }, 2000);
+  }
+
+  (async function init() {
+    await loadCatalog();
+    render();
+    await ensureLoggedIn();
+    await loadOwned();
+    render();
+    await checkReturnFromPayment();
+  })();
+
+})();
+</script>
+<script src="pwa-install.js"></script>
+
+</body>
+</html>
