@@ -240,3 +240,34 @@ create policy "Lecture formations" on public.formations
   for select using (true);
 
 -- Aucune policy insert/update/delete : réservé à service_role.
+
+-- =========================================================
+-- v7 — CORRECTIF SÉCURITÉ : lecture publique de dm_conversations
+--
+-- CONSTAT (vérifié directement via pg_policies en production le
+-- 2026-09-14, PAS une supposition) : la plupart des policies RLS sur
+-- messages/rooms/dm_messages/dm_read_state/hidden_messages/
+-- dm_hidden_messages sont déjà correctement restreintes au
+-- propriétaire ou aux participants — bien mieux que ne le laissait
+-- supposer ce fichier, resté en retard sur la production.
+--
+-- UNE exception réelle : dm_conversations avait DEUX policies SELECT
+-- permissives, combinées en OR par Postgres :
+--   "Allow public read dm_conversations"  -> qual = true
+--   "dm_conversations_participants_only"  -> qual = (auth.uid() = user_one OR auth.uid() = user_two)
+-- La première rendait la seconde totalement inutile : n'importe quel
+-- utilisateur authentifié pouvait lister TOUTES les conversations
+-- privées du système (qui parle à qui). Les messages eux-mêmes
+-- (dm_messages) restaient protégés — seule cette métadonnée fuitait.
+--
+-- CORRECTIF : suppression de la policy permissive. La policy stricte
+-- "dm_conversations_participants_only" suffit et reste en place.
+--
+-- Nettoyage secondaire (faible sévérité) : "Creation salon" sur rooms
+-- permettait d'insérer un salon sans que created_by corresponde à
+-- l'auteur réel (elle coexistait avec rooms_insert_own, qui fait ce
+-- contrôle correctement et couvre déjà l'usage réel du code).
+-- =========================================================
+
+drop policy if exists "Allow public read dm_conversations" on public.dm_conversations;
+drop policy if exists "Creation salon" on public.rooms;
