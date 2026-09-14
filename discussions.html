@@ -496,7 +496,7 @@
       const row = document.createElement("div");
       row.className = "room-row";
       row.innerHTML = `
-        <div class="avatar" style="background:${room.color}">${room.emoji}</div>
+        <div class="avatar" style="background:${escapeHtml(room.color)}">${escapeHtml(room.emoji)}</div>
         <div class="room-info">
           <div class="top-line">
             <span class="name">${escapeHtml(room.name)}</span>

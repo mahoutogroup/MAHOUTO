@@ -96,7 +96,8 @@ if (window.__MAHOUTO_AUTH_LOADED__) {
             // Mettre à jour le profil dans index.html
             if(typeof refreshIdentityUI === 'function') {
                 const avatarEl = document.getElementById("profile-avatar");
-                if(avatarEl) avatarEl.innerHTML = userPhoto? `<img src="${userPhoto}" alt="">` : userName.trim()[0].toUpperCase();
+                const safePhoto = userPhoto && /^https:\/\//i.test(userPhoto) ? userPhoto : null;
+                if(avatarEl) avatarEl.innerHTML = safePhoto ? `<img src="${escapeHtml(safePhoto)}" alt="">` : userName.trim()[0].toUpperCase();
                 document.getElementById("profile-name").textContent = userName;
                 document.getElementById("auth-methods").classList.add("hidden-by-auth");
                 document.getElementById("auth-guest-note").classList.add("hidden");

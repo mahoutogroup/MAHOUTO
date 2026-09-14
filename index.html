@@ -460,7 +460,8 @@
 
       const avatarEl = document.getElementById("profile-avatar");
       const photo = user.user_metadata && user.user_metadata.avatar_url;
-      avatarEl.innerHTML = photo? '<img src="' + photo + '" alt="">' : name.trim()[0].toUpperCase();
+      const safePhoto = photo && /^https:\/\//i.test(photo) ? photo : null;
+      avatarEl.innerHTML = safePhoto ? '<img src="' + escapeHtml(safePhoto) + '" alt="">' : name.trim()[0].toUpperCase();
     } catch (err) {
       console.error("Vérification de session impossible :", err);
     }
