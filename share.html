@@ -1057,44 +1057,19 @@ try {
 
 /* ============================================================
    CLOUDINARY
+   ============================================================
+   L'envoi de fichier passe désormais par un upload SIGNÉ
+   (/api/cloudinary-sign, même route que chat.html/dm-chat.html/
+   profil.html) plutôt que par le preset non signé "mahouto_share".
+   Un preset non signé n'exige aucune authentification MAHOUTO+ :
+   son seul secret (le nom du preset) est public, embarqué dans
+   config.js — n'importe qui pouvait donc uploader un fichier
+   arbitraire sur le compte Cloudinary de production sans jamais
+   ouvrir l'app. La signature (cloud name, clé API, URL d'upload)
+   vient maintenant entièrement de la réponse de /api/cloudinary-sign,
+   qui exige un jeton Supabase valide — voir getCloudinarySignature()
+   et uploadToCloudinary() plus bas.
    ============================================================ */
-
-const CLOUDINARY_CLOUD_NAME =
-  CONFIG &&
-  CONFIG.CLOUDINARY_CLOUD_NAME;
-
-
-const CLOUDINARY_UPLOAD_PRESET =
-  CONFIG &&
-  CONFIG.CLOUDINARY_UPLOAD_PRESET;
-
-
-const CLOUDINARY_UPLOAD_URL =
-  CLOUDINARY_CLOUD_NAME
-    ? (
-        "https://api.cloudinary.com/v1_1/" +
-        CLOUDINARY_CLOUD_NAME +
-        "/auto/upload"
-      )
-    : null;
-
-
-if (
-  CLOUDINARY_CLOUD_NAME &&
-  CLOUDINARY_UPLOAD_PRESET
-) {
-
-  console.log(
-    "✅ Cloudinary configuré."
-  );
-
-} else {
-
-  console.error(
-    "❌ Configuration Cloudinary introuvable."
-  );
-
-}
 
 
 /* ============================================================
@@ -2685,11 +2660,55 @@ async function loginWithGoogle() {
 
 
 /* ============================================================
-   UPLOAD CLOUDINARY
+   SIGNATURE CLOUDINARY
+   ============================================================
+   Demande une signature d'upload au serveur (/api/cloudinary-sign).
+   Exige une session Supabase valide — c'est exactement ce qui
+   manquait au preset non signé remplacé ici : sans jeton valide,
+   aucune signature n'est délivrée, donc aucun upload possible.
+   ============================================================ */
+
+async function getCloudinarySignature() {
+
+  const session = await getSession();
+
+  if (!session) {
+    throw new Error(
+      "Votre session a expiré. Veuillez vous reconnecter."
+    );
+  }
+
+  const response = await fetch("/api/cloudinary-sign", {
+    headers: {
+      "Authorization": "Bearer " + session.access_token
+    }
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(
+      data.error || "Signature Cloudinary indisponible."
+    );
+  }
+
+  return data;
+}
+
+
+/* ============================================================
+   UPLOAD CLOUDINARY (signé)
+   ============================================================
+   Prend en paramètre la signature obtenue via
+   getCloudinarySignature() juste avant chaque envoi — un
+   XMLHttpRequest est conservé (plutôt que fetch) uniquement pour
+   conserver la barre de progression (xhr.upload.onprogress),
+   fonctionnalité existante à ne pas casser.
    ============================================================ */
 
 function uploadToCloudinary(
   file,
+  signature,
   onProgress
 ) {
 
@@ -2713,27 +2732,13 @@ function uploadToCloudinary(
 
 
       if (
-        !CLOUDINARY_UPLOAD_URL
+        !signature ||
+        !signature.uploadUrl
       ) {
 
         reject(
           new Error(
-            "Configuration Cloudinary indisponible."
-          )
-        );
-
-        return;
-
-      }
-
-
-      if (
-        !CLOUDINARY_UPLOAD_PRESET
-      ) {
-
-        reject(
-          new Error(
-            "Preset Cloudinary indisponible."
+            "Signature Cloudinary indisponible."
           )
         );
 
@@ -2753,8 +2758,26 @@ function uploadToCloudinary(
 
 
       formData.append(
-        "upload_preset",
-        CLOUDINARY_UPLOAD_PRESET
+        "api_key",
+        signature.apiKey
+      );
+
+
+      formData.append(
+        "timestamp",
+        signature.timestamp
+      );
+
+
+      formData.append(
+        "signature",
+        signature.signature
+      );
+
+
+      formData.append(
+        "folder",
+        signature.folder
       );
 
 
@@ -2764,7 +2787,7 @@ function uploadToCloudinary(
 
       xhr.open(
         "POST",
-        CLOUDINARY_UPLOAD_URL
+        signature.uploadUrl
       );
 
 
@@ -3329,8 +3352,14 @@ async function publishShare() {
         "info"
       );
 
+      // Une signature par fichier : simple, et évite toute question
+      // de fenêtre de validité du timestamp signé sur un lot de
+      // plusieurs fichiers envoyés les uns après les autres.
+      const signature = await getCloudinarySignature();
+
       const cloudinaryResult = await uploadToCloudinary(
         file,
+        signature,
         percent => {
           // Chaque fichier occupe 1/total de la barre de progression.
           const base = (i / total) * 100;
