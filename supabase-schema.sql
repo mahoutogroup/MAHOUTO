@@ -408,3 +408,102 @@ create policy "Progression : écriture propre" on public.course_progress
 drop policy if exists "Progression : mise à jour propre" on public.course_progress;
 create policy "Progression : mise à jour propre" on public.course_progress
   for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- =========================================================
+-- v9 — RENFORCEMENT RLS : course_progress lié à l'achat réel
+--
+-- Constat (audit du 2026-09-14, avant application de la migration
+-- v8) : les policies INSERT/UPDATE de v8 sur course_progress ne
+-- vérifient que auth.uid() = user_id — un utilisateur connecté peut
+-- donc enregistrer une progression "completed" sur une leçon
+-- appartenant à une formation qu'il n'a jamais achetée. Aucune
+-- fuite de contenu n'en résulte aujourd'hui (l'accès vidéo/PDF est
+-- revérifié indépendamment par api/formation-content.js contre
+-- purchases), mais cette table ne doit pas être un vecteur de
+-- fraude si elle sert un jour à générer un certificat ou une
+-- statistique de complétion.
+--
+-- Portée de ce correctif : REMPLACE uniquement les deux policies
+-- d'écriture (insert/update) de course_progress par une version qui
+-- exige, pour chaque ligne, l'une des deux conditions :
+--   1. la leçon visée a is_preview = true, OU
+--   2. l'utilisateur possède un achat payé (purchases.status='paid',
+--      product_type='formation') pour la formation propriétaire
+--      réelle de cette leçon.
+--
+-- Ne touche à AUCUNE donnée existante, AUCUNE autre table, AUCUN
+-- média/vidéo, AUCUN webhook FedaPay. Ne modifie pas la policy
+-- SELECT de course_progress (déjà strictement self-only depuis v8).
+-- Rejouable : DROP POLICY IF EXISTS avant chaque CREATE POLICY.
+-- =========================================================
+
+drop policy if exists "Progression : écriture propre" on public.course_progress;
+create policy "Progression : écriture propre" on public.course_progress
+  for insert with check (
+    auth.uid() = user_id
+    and exists (
+      select 1
+      from public.formation_lessons fl
+      join public.formation_modules fm on fm.id = fl.module_id
+      where fl.id = lesson_id
+        and (
+          fl.is_preview
+          or exists (
+            select 1
+            from public.purchases p
+            where p.user_id = auth.uid()
+              and p.course_id = fm.formation_id
+              and p.product_type = 'formation'
+              and p.status = 'paid'
+          )
+        )
+    )
+  );
+
+drop policy if exists "Progression : mise à jour propre" on public.course_progress;
+create policy "Progression : mise à jour propre" on public.course_progress
+  for update using (
+    auth.uid() = user_id
+    and exists (
+      select 1
+      from public.formation_lessons fl
+      join public.formation_modules fm on fm.id = fl.module_id
+      where fl.id = lesson_id
+        and (
+          fl.is_preview
+          or exists (
+            select 1
+            from public.purchases p
+            where p.user_id = auth.uid()
+              and p.course_id = fm.formation_id
+              and p.product_type = 'formation'
+              and p.status = 'paid'
+          )
+        )
+    )
+  )
+  with check (
+    auth.uid() = user_id
+    and exists (
+      select 1
+      from public.formation_lessons fl
+      join public.formation_modules fm on fm.id = fl.module_id
+      where fl.id = lesson_id
+        and (
+          fl.is_preview
+          or exists (
+            select 1
+            from public.purchases p
+            where p.user_id = auth.uid()
+              and p.course_id = fm.formation_id
+              and p.product_type = 'formation'
+              and p.status = 'paid'
+          )
+        )
+    )
+  );
+
+-- La policy SELECT ("Progression : lecture propre", auth.uid() =
+-- user_id) n'est volontairement pas modifiée : elle ne pose aucun
+-- problème d'intégrité — un utilisateur ne lit que ses propres
+-- lignes, achetées ou non.
