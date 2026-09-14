@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Formation — MAHOUTO+</title>
+<meta name="theme-color" content="#0A0A0A">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="assets/favicon.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="stylesheet" href="theme.css">
+<script src="theme-toggle.js"></script>
+<style>
+  #loading-state, #error-state {
+    text-align: center; color: var(--text-dim); padding: 80px 24px; font-size: 14px;
+  }
+
+  .cover {
+    width: 100%; aspect-ratio: 16/9; object-fit: cover;
+    background: linear-gradient(135deg, rgba(212,175,55,.25), rgba(0,0,0,.4));
+    display: flex; align-items: center; justify-content: center; font-size: 60px;
+  }
+
+  .detail-body { padding: 18px 20px 110px; display: flex; flex-direction: column; gap: 14px; }
+
+  .badge {
+    align-self: flex-start; font-size: 11px; font-weight: 700; color: #0A0A0A;
+    background: var(--gold-bright); padding: 4px 12px; border-radius: 999px;
+    text-transform: uppercase; letter-spacing: .03em;
+  }
+
+  .detail-body h1 { font-size: 22px; line-height: 1.3; }
+
+  .meta-row { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12.5px; color: var(--text-muted); }
+  .meta-row span { display: flex; align-items: center; gap: 5px; }
+
+  .price-block { display: flex; align-items: baseline; gap: 8px; margin-top: 2px; }
+  .price-block .old { text-decoration: line-through; color: var(--text-dim); font-size: 14px; }
+  .price-block .now { font-size: 24px; font-weight: bold; color: var(--gold); }
+
+  .availability { font-size: 12px; font-weight: 700; color: var(--accent-green); display: flex; align-items: center; gap: 6px; }
+  .availability .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent-green); }
+  .availability.unavailable { color: #F87171; }
+  .availability.unavailable .dot { background: #F87171; }
+
+  .section-block { display: flex; flex-direction: column; gap: 8px; }
+  .section-block h2 { font-size: 14.5px; color: var(--gold); }
+  .section-block p { font-size: 13.5px; color: var(--text-muted); line-height: 1.7; }
+  .section-block ul { padding-left: 20px; display: flex; flex-direction: column; gap: 6px; }
+  .section-block li { font-size: 13.5px; color: var(--text-muted); line-height: 1.5; }
+
+  .formateur-card {
+    display: flex; align-items: center; gap: 10px; padding: 12px 14px;
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px;
+  }
+  .formateur-card .avatar {
+    width: 38px; height: 38px; border-radius: 50%; background: rgba(212,175,55,.15);
+    display: flex; align-items: center; justify-content: center; font-size: 16px; flex: none;
+  }
+  .formateur-card .name { font-size: 13.5px; font-weight: bold; }
+
+  .sticky-buy {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
+    padding: 14px 20px calc(14px + env(safe-area-inset-bottom));
+    background: var(--bg-elevated); border-top: 1px solid var(--border);
+    display: flex; gap: 12px; align-items: center;
+  }
+  .sticky-buy .sticky-price { font-size: 15px; font-weight: bold; color: var(--gold); flex: none; }
+  .sticky-buy button {
+    flex: 1; font-size: 14.5px; font-weight: bold; background: var(--gold-bright);
+    color: #0A0A0A; border: none; border-radius: 12px; padding: 14px; cursor: pointer;
+  }
+  .sticky-buy button.owned { background: rgba(34,197,94,.18); color: var(--accent-green); }
+  .sticky-buy button:disabled { opacity: .6; cursor: wait; }
+</style>
+</head>
+<body>
+
+<button id="theme-toggle-btn" class="theme-toggle-fab">🌙</button>
+
+<div class="page-content">
+  <div id="loading-state">Chargement de la formation...</div>
+  <div id="error-state" class="hidden">Formation introuvable.</div>
+  <div id="detail-content" class="hidden"></div>
+</div>
+
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+(function () {
+  const cfg = window.MAHOUTO_CONFIG;
+  const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+
+  const loadingEl = document.getElementById("loading-state");
+  const errorEl = document.getElementById("error-state");
+  const contentEl = document.getElementById("detail-content");
+
+  function money(xof) { return Number(xof).toLocaleString("fr-FR") + " FCFA"; }
+
+  function optimizedImageUrl(url, width) {
+    if (!url || !url.includes("/upload/")) return url;
+    return url.replace("/upload/", `/upload/f_auto,q_auto,w_${width},c_limit/`);
+  }
+
+  function listItems(value) {
+    const lines = (value || "").split("\n").map((l) => l.trim()).filter(Boolean);
+    return lines.map((item) => `<li>${item}</li>`).join("");
+  }
+
+  let currentUser = null;
+  let formation = null;
+
+  async function ensureLoggedIn() {
+    const { data } = await supabase.auth.getSession();
+    if (data && data.session && data.session.user) {
+      currentUser = data.session.user;
+      return true;
+    }
+    return false;
+  }
+
+  async function checkOwned(courseId) {
+    if (!currentUser) return false;
+    const { data } = await supabase
+      .from("purchases")
+      .select("id")
+      .eq("user_id", currentUser.id)
+      .eq("course_id", courseId)
+      .eq("status", "paid")
+      .maybeSingle();
+    return !!data;
+  }
+
+  async function buy(courseId, btn) {
+    if (!(await ensureLoggedIn())) {
+      alert("Connecte-toi d'abord pour t'inscrire à cette formation.");
+      window.location.href = "index.html";
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = "Redirection...";
+
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData && sessionData.session ? sessionData.session.access_token : null;
+      if (!accessToken) {
+        alert("Ta session a expiré. Reconnecte-toi puis réessaie.");
+        btn.disabled = false;
+        btn.textContent = "S'inscrire maintenant";
+        return;
+      }
+
+      const resp = await fetch("/api/fedapay-checkout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + accessToken
+        },
+        body: JSON.stringify({ courseId })
+      });
+
+      const data = await resp.json();
+      if (!resp.ok || !data.checkoutUrl) {
+        throw new Error(data.error || "Réponse de paiement invalide.");
+      }
+
+      window.location.href = data.checkoutUrl;
+    } catch (err) {
+      console.error(err);
+      alert("Paiement indisponible : " + err.message);
+      btn.disabled = false;
+      btn.textContent = "S'inscrire maintenant";
+    }
+  }
+
+  async function init() {
+    const params = new URLSearchParams(window.location.search);
+    const courseId = params.get("course");
+
+    if (!courseId) {
+      loadingEl.classList.add("hidden");
+      errorEl.classList.remove("hidden");
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("formations")
+      .select("*")
+      .eq("id", courseId)
+      .maybeSingle();
+
+    if (error || !data) {
+      loadingEl.classList.add("hidden");
+      errorEl.classList.remove("hidden");
+      return;
+    }
+
+    formation = data;
+    await ensureLoggedIn();
+    const owned = await checkOwned(courseId);
+
+    const amount = formation.promotion ?? formation.prix;
+    const originalAmount = formation.promotion ? formation.prix : null;
+    const backHref = formation.provider === "academie_majestepresse" ? "academie-majestepresse.html" : "school.html";
+
+    contentEl.innerHTML = `
+      <div style="padding:14px 20px 0;">
+        <a href="${backHref}" style="font-size:12.5px;color:var(--text-muted);text-decoration:none;">← Retour au catalogue</a>
+      </div>
+
+      ${formation.image_url
+        ? `<img class="cover" src="${optimizedImageUrl(formation.image_url, 1000)}" alt="${formation.nom}">`
+        : `<div class="cover">${formation.emoji || "📘"}</div>`}
+
+      <div class="detail-body">
+        ${formation.domaine ? `<span class="badge">${formation.domaine}</span>` : ""}
+        <h1>${formation.nom}</h1>
+
+        <div class="meta-row">
+          ${formation.duree ? `<span>⏱️ ${formation.duree}</span>` : ""}
+          ${formation.niveau ? `<span>📶 ${formation.niveau}</span>` : ""}
+        </div>
+
+        <div class="availability ${formation.disponible ? "" : "unavailable"}">
+          <span class="dot"></span>${formation.disponible ? "Disponible" : "Non disponible actuellement"}
+        </div>
+
+        <div class="price-block">
+          ${originalAmount ? `<span class="old">${money(originalAmount)}</span>` : ""}
+          <span class="now">${money(amount)}</span>
+        </div>
+
+        <div class="section-block">
+          <h2>📝 Description</h2>
+          <p>${(formation.description_longue || formation.description || "").replace(/\n/g, "<br>")}</p>
+        </div>
+
+        ${formation.objectifs && formation.objectifs.length ? `
+        <div class="section-block">
+          <h2>🎯 Objectifs</h2>
+          <ul>${listItems(formation.objectifs)}</ul>
+        </div>` : ""}
+
+        ${formation.competences && formation.competences.length ? `
+        <div class="section-block">
+          <h2>💪 Compétences acquises</h2>
+          <ul>${listItems(formation.competences)}</ul>
+        </div>` : ""}
+
+        ${formation.programme && formation.programme.length ? `
+        <div class="section-block">
+          <h2>📚 Programme</h2>
+          <ul>${listItems(formation.programme)}</ul>
+        </div>` : ""}
+
+        ${formation.formateur ? `
+        <div class="section-block">
+          <h2>👤 Formateur</h2>
+          <div class="formateur-card">
+            <div class="avatar">👤</div>
+            <div class="name">${formation.formateur}</div>
+          </div>
+        </div>` : ""}
+      </div>
+    `;
+
+    loadingEl.classList.add("hidden");
+    contentEl.classList.remove("hidden");
+
+    const sticky = document.createElement("div");
+    sticky.className = "sticky-buy";
+    sticky.innerHTML = `
+      <div class="sticky-price">${money(amount)}</div>
+      <button id="sticky-buy-btn" class="${owned ? "owned" : ""}" ${!formation.disponible && !owned ? "disabled" : ""}>
+        ${owned ? "✓ Formation acquise" : (formation.disponible ? "S'inscrire maintenant" : "Indisponible")}
+      </button>
+    `;
+    document.body.appendChild(sticky);
+
+    if (!owned && formation.disponible) {
+      document.getElementById("sticky-buy-btn").addEventListener("click", (e) => buy(courseId, e.target));
+    }
+  }
+
+  init();
+})();
+</script>
+<script src="pwa-install.js"></script>
+
+</body>
+</html>
