@@ -1,4 +1,4 @@
-const CACHE_NAME = "mahoutoplus-shell-v56";
+const CACHE_NAME = "mahoutoplus-shell-v57";
 const SHARE_CACHE_NAME = "mahoutoplus-share-v1";
 
 const APP_SHELL = [
@@ -11,6 +11,9 @@ const APP_SHELL = [
   "/ai.html",
   "/school.html",
   "/formation-detail.html",
+  "/produits.html",
+  "/produit-detail.html",
+  "/mes-achats.html",
   "/academie-majestepresse.html",
   "/profil.html",
   "/share.html",
