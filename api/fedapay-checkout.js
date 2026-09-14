@@ -1,23 +1,28 @@
 // =========================================================
 // /api/fedapay-checkout.js — Version sécurisée (production)
 //
-// PRINCIPE CENTRAL : le navigateur ne décide plus RIEN de financier.
-// Il envoie uniquement { courseId }. Le serveur :
+// Gère à la fois les FORMATIONS et les PRODUITS NUMÉRIQUES,
+// avec exactement la même logique de sécurité : le navigateur
+// n'envoie que { courseId, productType? }. Le serveur :
 //   - authentifie l'appelant via son jeton Supabase (Authorization: Bearer)
-//   - récupère la formation réelle dans "formations" (nom, prix, dispo)
+//   - récupère le vrai article (formations OU digital_products)
 //   - calcule le montant officiel lui-même
 //   - crée la transaction FedaPay avec CE montant, jamais celui du client
+//
+// productType vaut "formation" (défaut, rétrocompatible avec
+// l'existant) ou "digital_product". Toute la partie FedaPay
+// (création de transaction, lecture de la réponse, génération
+// du lien de paiement) est strictement identique dans les deux
+// cas — seule la table lue pour trouver l'article change.
 //
 // Variables d'environnement Vercel attendues :
 //   FEDAPAY_SECRET_KEY
 //   FEDAPAY_ENVIRONMENT ("sandbox" ou "live", défaut "sandbox")
 //   SUPABASE_URL
 //   SUPABASE_ANON_KEY            (pour authentifier le jeton de l'appelant)
-//   SUPABASE_SERVICE_ROLE_KEY    (pour lire "formations" / écrire "purchases")
+//   SUPABASE_SERVICE_ROLE_KEY    (pour lire les tables / écrire "purchases")
 //   PUBLIC_SITE_URL              (ex: https://mahouto.com — recommandé ;
-//                                 à défaut, req.headers.host est utilisé,
-//                                 ce qui reste fiable sur Vercel mais est
-//                                 moins explicite)
+//                                 à défaut, req.headers.host est utilisé)
 // =========================================================
 
 import { createClient } from "@supabase/supabase-js";
@@ -32,13 +37,15 @@ export default async function handler(req, res) {
 
   try {
     // -----------------------------------------------------
-    // 1. Le navigateur ne fournit QUE courseId — tout le reste
-    //    (montant, nom, identité) est ignoré même si envoyé.
+    // 1. Le navigateur ne fournit QUE courseId (+ productType
+    //    facultatif) — tout le reste (montant, nom, identité)
+    //    est ignoré même si envoyé.
     // -----------------------------------------------------
-    const { courseId } = req.body || {};
+    const { courseId, productType: rawProductType } = req.body || {};
+    const productType = rawProductType === "digital_product" ? "digital_product" : "formation";
 
     if (!courseId || typeof courseId !== "string" || courseId.length > 200) {
-      return res.status(400).json({ error: "Identifiant de formation invalide." });
+      return res.status(400).json({ error: "Identifiant d'article invalide." });
     }
 
     const supabaseUrl = process.env.SUPABASE_URL;
@@ -74,48 +81,52 @@ export default async function handler(req, res) {
     const supabaseAdmin = createClient(supabaseUrl, serviceKey);
 
     // -----------------------------------------------------
-    // 3. Récupérer la formation réelle — le prix et le nom ne
-    //    viennent QUE d'ici, jamais du navigateur.
+    // 3. Récupérer le véritable article — le prix et le nom ne
+    //    viennent QUE d'ici, jamais du navigateur. La table
+    //    dépend de productType, tout le reste est identique.
     // -----------------------------------------------------
-    const { data: formation, error: formationError } = await supabaseAdmin
-      .from("formations")
+    const tableName = productType === "digital_product" ? "digital_products" : "formations";
+
+    const { data: article, error: articleError } = await supabaseAdmin
+      .from(tableName)
       .select("*")
       .eq("id", courseId)
       .maybeSingle();
 
-    if (formationError) {
-      console.error("Erreur lecture formation :", formationError);
-      return res.status(500).json({ error: "Impossible de vérifier cette formation." });
+    if (articleError) {
+      console.error(`Erreur lecture ${tableName} :`, articleError);
+      return res.status(500).json({ error: "Impossible de vérifier cet article." });
     }
-    if (!formation) {
-      return res.status(404).json({ error: "Formation introuvable." });
+    if (!article) {
+      return res.status(404).json({ error: "Article introuvable." });
     }
-    if (Object.prototype.hasOwnProperty.call(formation, "disponible") && formation.disponible === false) {
-      return res.status(404).json({ error: "Cette formation n'est plus disponible." });
+    if (Object.prototype.hasOwnProperty.call(article, "disponible") && article.disponible === false) {
+      return res.status(404).json({ error: "Cet article n'est plus disponible." });
     }
 
-    const officialAmount = Math.round(Number(formation.promotion ?? formation.prix));
+    const officialAmount = Math.round(Number(article.promotion ?? article.prix));
     if (!Number.isFinite(officialAmount) || officialAmount <= 0) {
-      console.error("Prix invalide pour la formation :", courseId, formation.promotion, formation.prix);
-      return res.status(500).json({ error: "Le prix de cette formation est invalide." });
+      console.error("Prix invalide pour l'article :", courseId, article.promotion, article.prix);
+      return res.status(500).json({ error: "Le prix de cet article est invalide." });
     }
 
-    const courseName = formation.nom || "Formation MAHOUTO";
+    const articleName = article.nom || (productType === "digital_product" ? "Produit MAHOUTO+" : "Formation MAHOUTO");
 
     // -----------------------------------------------------
     // 4. Empêcher un paiement inutile si déjà acheté (défense
-    //    en profondeur ; school.html le fait déjà côté affichage)
+    //    en profondeur ; l'affichage le fait déjà côté client)
     // -----------------------------------------------------
     const { data: existingPurchase } = await supabaseAdmin
       .from("purchases")
       .select("id")
       .eq("user_id", authenticatedUser.id)
       .eq("course_id", courseId)
+      .eq("product_type", productType)
       .eq("status", "paid")
       .maybeSingle();
 
     if (existingPurchase) {
-      return res.status(409).json({ error: "Vous possédez déjà cette formation." });
+      return res.status(409).json({ error: "Vous possédez déjà cet article." });
     }
 
     // -----------------------------------------------------
@@ -139,6 +150,18 @@ export default async function handler(req, res) {
     const baseUrl = env === "live" ? "https://api.fedapay.com/v1" : "https://sandbox-api.fedapay.com/v1";
     const siteUrl = process.env.PUBLIC_SITE_URL || `https://${req.headers.host}`;
 
+    // La page de retour et le libellé dépendent du type d'article
+    // et, pour une formation, de sa plateforme d'origine.
+    let returnPage;
+    let platformLabel;
+    if (productType === "digital_product") {
+      returnPage = "produits.html";
+      platformLabel = "MAHOUTO+ Boutique";
+    } else {
+      returnPage = article.provider === "academie_majestepresse" ? "academie-majestepresse.html" : "school.html";
+      platformLabel = article.provider === "academie_majestepresse" ? "Académie Majesté Presse" : "MAHOUTO School";
+    }
+
     // -----------------------------------------------------
     // 6. Créer la transaction — montant officiel uniquement.
     //    Les champs sont à la RACINE de la requête (format réel
@@ -151,10 +174,10 @@ export default async function handler(req, res) {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        description: `MAHOUTO School — ${courseName}`,
+        description: `${platformLabel} — ${articleName}`,
         amount: officialAmount,
         currency: { iso: "XOF" },
-        callback_url: `${siteUrl}/school.html?payment=return&course=${encodeURIComponent(courseId)}`,
+        callback_url: `${siteUrl}/${returnPage}?payment=return&course=${encodeURIComponent(courseId)}&type=${productType}`,
         ...(customerPayload ? { customer: customerPayload } : {})
       })
     });
@@ -211,15 +234,15 @@ export default async function handler(req, res) {
     // 8. Enregistrer l'achat en attente — données serveur
     //    uniquement. Si cette écriture échoue, la transaction
     //    FedaPay existe déjà côté FedaPay mais resterait
-    //    "orpheline" (le webhook ne la retrouverait jamais,
-    //    donc l'achat ne pourrait jamais être crédité) : on
-    //    refuse alors d'envoyer l'utilisateur payer plutôt que
-    //    de promettre un achat qu'on ne pourra pas confirmer.
+    //    "orpheline" : on refuse alors d'envoyer l'utilisateur
+    //    payer plutôt que de promettre un achat qu'on ne pourra
+    //    pas confirmer.
     // -----------------------------------------------------
     const { error: insertError } = await supabaseAdmin.from("purchases").insert({
       user_id: authenticatedUser.id,
       course_id: courseId,
-      course_name: courseName,
+      course_name: articleName,
+      product_type: productType,
       amount: officialAmount,
       fedapay_transaction_id: String(transactionId),
       status: "pending"
