@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Administration — Produits numériques — MAHOUTO+</title>
+<meta name="theme-color" content="#0A0A0A">
+<link rel="manifest" href="../manifest.json">
+<link rel="icon" href="../assets/favicon.png">
+<link rel="stylesheet" href="../theme.css">
+<script src="../theme-toggle.js"></script>
+<style>
+  header { padding: 20px; background: var(--bg-elevated); border-bottom: 1px solid var(--border); }
+  header h1 { font-size: 20px; color: var(--gold); }
+  header p { font-size: 12.5px; color: var(--text-muted); margin-top: 6px; }
+
+  #access-denied, #loading-state { text-align: center; color: var(--text-dim); padding: 60px 24px; font-size: 14px; }
+
+  .product-row { display: flex; flex-direction: column; gap: 10px; margin: 12px 20px; padding: 14px; }
+  .product-row .top-line { display: flex; align-items: center; gap: 10px; }
+  .product-row .thumb { width: 44px; height: 44px; border-radius: 10px; object-fit: cover; flex: none; background: var(--bg); border: 1px solid var(--border); }
+  .product-row .emoji { width: 44px; height: 44px; border-radius: 10px; flex: none; display: flex; align-items: center; justify-content: center; font-size: 20px; background: rgba(212,175,55,.12); }
+  .product-row .nom { font-weight: bold; font-size: 14.5px; flex: 1; }
+  .product-row .type-tag { font-size: 10px; font-weight: 700; color: var(--gold); background: rgba(212,175,55,.12); padding: 3px 8px; border-radius: 999px; text-transform: uppercase; }
+  .product-row .sales { font-size: 11px; color: var(--text-dim); }
+
+  .product-row .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .product-row label { font-size: 10.5px; color: var(--text-dim); display: block; margin-bottom: 3px; }
+  .product-row input, .product-row select { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--white); font-size: 13.5px; }
+
+  .product-row .toggle-row { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-muted); }
+  .product-row .actions { display: flex; gap: 8px; margin-top: 4px; flex-wrap: wrap; }
+  .product-row .save-btn { flex: 1; font-size: 12.5px; font-weight: bold; background: var(--gold-bright); color: #0A0A0A; border: none; border-radius: 8px; padding: 9px; cursor: pointer; }
+  .product-row .save-btn:disabled { opacity: .5; cursor: wait; }
+  .product-row .save-status { font-size: 11px; color: var(--accent-green); align-self: center; }
+  .product-row .delete-btn { background: rgba(239,68,68,.15); color: #F87171; border: none; border-radius: 8px; padding: 9px 14px; font-size: 12.5px; font-weight: bold; cursor: pointer; }
+
+  #new-product-form { margin: 20px 20px 40px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+  #new-product-form h3 { color: var(--gold); font-size: 15px; margin-bottom: 4px; }
+  #new-product-form label { font-size: 11px; color: var(--text-dim); display: block; margin-bottom: 3px; }
+  #new-product-form input, #new-product-form select, #new-product-form textarea {
+    width: 100%; padding: 9px 10px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--white); font-size: 13.5px; font-family: inherit;
+  }
+  #new-product-form textarea { resize: vertical; min-height: 50px; }
+  #new-product-form .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  #new-product-form button[type="submit"] {
+    margin-top: 6px; background: var(--gold-bright); color: #0A0A0A; border: none;
+    border-radius: 10px; padding: 12px; font-weight: bold; font-size: 14px; cursor: pointer;
+  }
+  #new-product-form button[type="submit"]:disabled { opacity: .5; cursor: wait; }
+  #new-product-status { font-size: 12px; color: var(--accent-green); min-height: 16px; }
+
+  .image-upload-box, .file-upload-box {
+    border: 1.5px dashed var(--border); border-radius: 14px; padding: 14px;
+    display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center;
+  }
+  .image-upload-box .preview { width: 100%; max-width: 320px; aspect-ratio: 16/9; border-radius: 12px; background: var(--bg); object-fit: cover; display: none; }
+  .image-upload-box .preview.visible { display: block; }
+  .placeholder { font-size: 12.5px; color: var(--text-dim); }
+  .btn-row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  .image-upload-box button, .file-upload-box button {
+    font-size: 12px; font-weight: bold; border: none; border-radius: 8px; padding: 8px 14px; cursor: pointer;
+  }
+  .pick-btn { background: var(--gold-bright); color: #0A0A0A; }
+  .remove-btn { background: rgba(239,68,68,.15); color: #F87171; }
+  .upload-status { font-size: 11.5px; color: var(--text-dim); }
+  .file-info { font-size: 12.5px; color: var(--white); font-weight: 600; }
+  .file-meta { font-size: 11px; color: var(--text-dim); }
+  .progress-track { width: 100%; height: 6px; border-radius: 4px; background: var(--bg); overflow: hidden; display: none; }
+  .progress-track.visible { display: block; }
+  .progress-fill { height: 100%; background: var(--gold-bright); width: 0%; transition: width .2s; }
+</style>
+</head>
+<body>
+
+<button id="theme-toggle-btn" class="theme-toggle-fab">🌙</button>
+
+<div class="page-content">
+
+  <header>
+    <h1>🛍️ Administration — Produits numériques</h1>
+    <p>PDF, ebooks, vidéos, audios, ZIP, templates... vendus directement depuis MAHOUTO+.</p>
+  </header>
+
+  <div style="display:flex;gap:10px;padding:14px 20px 0;flex-wrap:wrap;">
+    <a href="formations.html" style="font-size:12.5px;font-weight:bold;color:var(--text-muted);background:var(--bg-card);border-radius:999px;padding:8px 16px;">Formations</a>
+    <a href="produits.html" style="font-size:12.5px;font-weight:bold;color:#0A0A0A;background:var(--gold-bright);border-radius:999px;padding:8px 16px;">Produits numériques</a>
+    <a href="users.html" style="font-size:12.5px;font-weight:bold;color:var(--text-muted);background:var(--bg-card);border-radius:999px;padding:8px 16px;">Utilisateurs</a>
+  </div>
+
+  <div id="loading-state">Vérification des droits...</div>
+  <div id="access-denied" class="hidden">🔒 Accès réservé aux administrateurs.</div>
+
+  <div id="products-container" class="hidden"></div>
+
+  <form id="new-product-form" class="card hidden">
+    <h3>➕ Ajouter un produit numérique</h3>
+
+    <div>
+      <label>Nom du produit</label>
+      <input type="text" id="np-nom" placeholder="Ex : Guide pratique de la sérigraphie" required>
+    </div>
+
+    <div>
+      <label>Description courte</label>
+      <textarea id="np-description" placeholder="Ex : Tout savoir pour se lancer, en 40 pages."></textarea>
+    </div>
+
+    <div>
+      <label>Description complète</label>
+      <textarea id="np-description-longue" placeholder="Présentation détaillée du produit..."></textarea>
+    </div>
+
+    <div class="row-2">
+      <div>
+        <label>Type</label>
+        <select id="np-type">
+          <option value="pdf">📕 PDF</option>
+          <option value="ebook">📚 Ebook</option>
+          <option value="video">🎬 Vidéo</option>
+          <option value="audio">🎧 Audio</option>
+          <option value="zip">📦 ZIP</option>
+          <option value="template">🎨 Template</option>
+          <option value="document">📄 Document</option>
+          <option value="other">📁 Autre</option>
+        </select>
+      </div>
+      <div>
+        <label>Domaine</label>
+        <input type="text" id="np-domaine" placeholder="Ex : Sérigraphie">
+      </div>
+    </div>
+
+    <div class="row-2">
+      <div>
+        <label>Prix (FCFA)</label>
+        <input type="number" id="np-prix" min="0" required>
+      </div>
+      <div>
+        <label>Prix promo (FCFA, optionnel)</label>
+        <input type="number" id="np-promo" min="0" placeholder="Aucune">
+      </div>
+    </div>
+
+    <div>
+      <label>Image de couverture</label>
+      <div class="image-upload-box" id="np-image-box">
+        <img class="preview" alt="Aperçu de l'image de couverture">
+        <div class="placeholder">Aucune image sélectionnée</div>
+        <div class="btn-row">
+          <button type="button" class="pick-btn">📷 Choisir une image</button>
+          <button type="button" class="remove-btn hidden">🗑️ Supprimer</button>
+        </div>
+        <div class="upload-status"></div>
+        <input type="file" accept="image/*" class="hidden">
+      </div>
+    </div>
+
+    <div>
+      <label>Fichier numérique (le produit vendu)</label>
+      <div class="file-upload-box" id="np-file-box">
+        <div class="placeholder">Aucun fichier sélectionné</div>
+        <div class="file-info hidden"></div>
+        <div class="file-meta hidden"></div>
+        <div class="progress-track"><div class="progress-fill"></div></div>
+        <div class="btn-row">
+          <button type="button" class="pick-btn">📁 Choisir un fichier</button>
+          <button type="button" class="remove-btn hidden">🗑️ Supprimer</button>
+        </div>
+        <div class="upload-status"></div>
+        <input type="file" class="hidden">
+      </div>
+    </div>
+
+    <button type="submit">Créer le produit</button>
+    <div id="new-product-status"></div>
+  </form>
+
+</div>
+
+<script src="../config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+(function () {
+  const cfg = window.MAHOUTO_CONFIG;
+  const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+
+  const MAX_FILE_SIZE = 300 * 1024 * 1024; // 300 Mo
+  const TYPE_LABELS = { pdf: "PDF", ebook: "EBOOK", video: "VIDÉO", audio: "AUDIO", zip: "ZIP", template: "TEMPLATE", document: "DOCUMENT", other: "AUTRE" };
+  const TYPE_EMOJI = { pdf: "📕", ebook: "📚", video: "🎬", audio: "🎧", zip: "📦", template: "🎨", document: "📄", other: "📁" };
+
+  const loadingEl = document.getElementById("loading-state");
+  const deniedEl = document.getElementById("access-denied");
+  const containerEl = document.getElementById("products-container");
+
+  // -------------------------------------------------------
+  // SÉCURITÉ : toute écriture (create/update/delete) passe par
+  // /api/admin/digital-products, qui revérifie le rôle côté serveur
+  // avec service_role — même modèle que admin/formations.html. Le
+  // fichier numérique lui-même est envoyé via une URL d'upload signée
+  // générée par /api/admin/product-file-sign (chemin "products/..."
+  // toujours choisi par le serveur), plus jamais un upload direct
+  // avec la clé anonyme.
+  // -------------------------------------------------------
+  let accessToken = null;
+
+  async function authorizedFetch(url, options) {
+    options = options || {};
+    options.headers = Object.assign({}, options.headers, {
+      "Authorization": "Bearer " + accessToken,
+      "Content-Type": "application/json"
+    });
+    return fetch(url, options);
+  }
+
+  function escapeHtmlLocal(str) {
+    const div = document.createElement("div");
+    div.textContent = str == null ? "" : String(str);
+    return div.innerHTML;
+  }
+
+  function money(xof) { return Number(xof).toLocaleString("fr-FR") + " FCFA"; }
+  function formatSize(bytes) {
+    if (!bytes) return "";
+    if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + " Ko";
+    return (bytes / (1024 * 1024)).toFixed(1) + " Mo";
+  }
+  function optimizedImageUrl(url, width) {
+    if (!url || !url.includes("/upload/")) return url;
+    return url.replace("/upload/", `/upload/f_auto,q_auto,w_${width},c_limit/`);
+  }
+  function safeStorageName(name) {
+    return (name || "fichier")
+      .normalize("NFD").replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-zA-Z0-9._-]/g, "_")
+      .slice(-150);
+  }
+
+  // Même contrôle d'origine Cloudinary que sur admin/formations.html —
+  // défense en profondeur avant d'insérer une image dans le DOM.
+  function isSafeImageUrl(url) {
+    if (typeof url !== "string" || !url) return false;
+    let parsed;
+    try { parsed = new URL(url, window.location.origin); } catch (_) { return false; }
+    if (parsed.protocol !== "https:" || parsed.hostname !== "res.cloudinary.com") return false;
+    const cloudName = cfg && cfg.CLOUDINARY_CLOUD_NAME;
+    return !cloudName || parsed.pathname.startsWith("/" + cloudName + "/");
+  }
+
+  // ===== Upload image de couverture (Cloudinary, même mécanisme que formations) =====
+  async function uploadImage(file, statusEl) {
+    statusEl.textContent = "Envoi de l'image...";
+
+    const signResp = await fetch("../api/cloudinary-sign", {
+      headers: accessToken ? { "Authorization": "Bearer " + accessToken } : {}
+    });
+    const sign = await signResp.json();
+    if (!signResp.ok) throw new Error(sign.error || "Signature indisponible");
+
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("api_key", sign.apiKey);
+    formData.append("timestamp", sign.timestamp);
+    formData.append("signature", sign.signature);
+    formData.append("folder", sign.folder);
+
+    const uploadResp = await fetch(sign.uploadUrl, { method: "POST", body: formData });
+    const uploadData = await uploadResp.json();
+    if (!uploadResp.ok) throw new Error((uploadData.error && uploadData.error.message) || "Envoi échoué");
+
+    statusEl.textContent = "";
+    return uploadData.secure_url;
+  }
+
+  function wireImageUpload(box) {
+    const preview = box.querySelector(".preview");
+    const placeholder = box.querySelector(".placeholder");
+    const pickBtn = box.querySelector(".pick-btn");
+    const removeBtn = box.querySelector(".remove-btn");
+    const status = box.querySelector(".upload-status");
+    const input = box.querySelector("input[type=file]");
+    let currentUrl = "";
+
+    function setUrl(url) {
+      currentUrl = (url && isSafeImageUrl(url)) ? url : "";
+      if (currentUrl) {
+        preview.src = optimizedImageUrl(currentUrl, 500);
+        preview.classList.add("visible");
+        placeholder.classList.add("hidden");
+        removeBtn.classList.remove("hidden");
+        pickBtn.textContent = "📷 Remplacer l'image";
+      } else {
+        preview.classList.remove("visible");
+        preview.src = "";
+        placeholder.classList.remove("hidden");
+        removeBtn.classList.add("hidden");
+        pickBtn.textContent = "📷 Choisir une image";
+      }
+    }
+
+    pickBtn.addEventListener("click", () => input.click());
+    removeBtn.addEventListener("click", () => { setUrl(""); input.value = ""; });
+    input.addEventListener("change", async () => {
+      const file = input.files[0];
+      input.value = "";
+      if (!file) return;
+      pickBtn.disabled = true; removeBtn.disabled = true;
+      try {
+        setUrl(await uploadImage(file, status));
+      } catch (err) {
+        console.error(err);
+        status.textContent = "Erreur : " + err.message;
+      } finally {
+        pickBtn.disabled = false; removeBtn.disabled = false;
+      }
+    });
+
+    return { getUrl: () => currentUrl, setUrl };
+  }
+
+  // ===== Upload du fichier numérique — URL d'upload signée générée par
+  // /api/admin/product-file-sign (jamais un upload direct avec la clé
+  // anonyme : le chemin de destination est choisi par le serveur). =====
+  function wireFileUpload(box) {
+    const placeholder = box.querySelector(".placeholder");
+    const infoEl = box.querySelector(".file-info");
+    const metaEl = box.querySelector(".file-meta");
+    const pickBtn = box.querySelector(".pick-btn");
+    const removeBtn = box.querySelector(".remove-btn");
+    const status = box.querySelector(".upload-status");
+    const input = box.querySelector("input[type=file]");
+    const track = box.querySelector(".progress-track");
+    const fill = box.querySelector(".progress-fill");
+
+    let current = null; // { path, name, mimeType, size }
+
+    function setFile(fileData) {
+      current = fileData;
+      if (current) {
+        infoEl.textContent = "📄 " + current.name;
+        infoEl.classList.remove("hidden");
+        metaEl.textContent = formatSize(current.size) + (current.mimeType ? " · " + current.mimeType : "");
+        metaEl.classList.remove("hidden");
+        placeholder.classList.add("hidden");
+        removeBtn.classList.remove("hidden");
+        pickBtn.textContent = "📁 Remplacer le fichier";
+      } else {
+        infoEl.classList.add("hidden");
+        metaEl.classList.add("hidden");
+        placeholder.classList.remove("hidden");
+        removeBtn.classList.add("hidden");
+        pickBtn.textContent = "📁 Choisir un fichier";
+      }
+    }
+
+    pickBtn.addEventListener("click", () => input.click());
+    removeBtn.addEventListener("click", () => { setFile(null); input.value = ""; });
+
+    input.addEventListener("change", async () => {
+      const file = input.files[0];
+      input.value = "";
+      if (!file) return;
+
+      if (file.size > MAX_FILE_SIZE) {
+        status.textContent = "Fichier trop volumineux (max " + formatSize(MAX_FILE_SIZE) + ").";
+        return;
+      }
+
+      pickBtn.disabled = true; removeBtn.disabled = true;
+      status.textContent = "Envoi du fichier...";
+      track.classList.add("visible");
+      fill.style.width = "10%";
+
+      try {
+        const signResp = await authorizedFetch("../api/admin/product-file-sign", {
+          method: "POST",
+          body: JSON.stringify({ fileName: safeStorageName(file.name) })
+        });
+        const sign = await signResp.json();
+        if (!signResp.ok) throw new Error(sign.error || "Signature indisponible");
+
+        fill.style.width = "50%";
+
+        const { error } = await supabase.storage
+          .from("digital-products")
+          .uploadToSignedUrl(sign.path, sign.token, file, { contentType: file.type || "application/octet-stream" });
+
+        if (error) throw error;
+
+        fill.style.width = "100%";
+        status.textContent = "";
+        setFile({ path: sign.path, name: file.name, mimeType: file.type || "application/octet-stream", size: file.size });
+      } catch (err) {
+        console.error(err);
+        status.textContent = "Erreur : " + err.message;
+      } finally {
+        pickBtn.disabled = false; removeBtn.disabled = false;
+        setTimeout(() => { track.classList.remove("visible"); fill.style.width = "0%"; }, 800);
+      }
+    });
+
+    return { getFile: () => current, setFile };
+  }
+
+  const newProductImage = wireImageUpload(document.getElementById("np-image-box"));
+  const newProductFile = wireFileUpload(document.getElementById("np-file-box"));
+
+  function renderProducts(products) {
+    containerEl.innerHTML = "";
+    products.forEach((p) => {
+      const row = document.createElement("div");
+      row.className = "card product-row";
+      const safeThumb = p.image_url && isSafeImageUrl(p.image_url) ? p.image_url : null;
+      const typeLabel = TYPE_LABELS[p.type] || escapeHtmlLocal(p.type);
+      const typeEmoji = TYPE_EMOJI[p.type] || "📁";
+      row.innerHTML = `
+        <div class="top-line">
+          ${safeThumb ? `<img class="thumb" src="${escapeHtmlLocal(optimizedImageUrl(safeThumb, 150))}" alt="">` : `<span class="emoji">${typeEmoji}</span>`}
+          <span class="nom">${escapeHtmlLocal(p.nom)}</span>
+          <span class="type-tag">${typeLabel}</span>
+        </div>
+        <div class="sales">🛒 ${escapeHtmlLocal(p.sales_count || 0)} vente(s)</div>
+        <div class="fields">
+          <div><label>Prix (FCFA)</label><input type="number" class="p-prix" value="${escapeHtmlLocal(p.prix)}" min="0"></div>
+          <div><label>Promo (FCFA)</label><input type="number" class="p-promo" value="${escapeHtmlLocal(p.promotion ?? "")}" min="0" placeholder="Aucune"></div>
+        </div>
+        <label class="toggle-row"><input type="checkbox" class="p-dispo" ${p.disponible ? "checked" : ""}> Disponible à l'achat</label>
+        <div class="actions">
+          <button class="save-btn">Enregistrer</button>
+          <button type="button" class="delete-btn">🗑️</button>
+          <span class="save-status hidden">✓ Enregistré</span>
+        </div>
+      `;
+
+      const saveBtn = row.querySelector(".save-btn");
+      const deleteBtn = row.querySelector(".delete-btn");
+      const statusEl = row.querySelector(".save-status");
+
+      saveBtn.addEventListener("click", async () => {
+        saveBtn.disabled = true;
+        const prix = parseInt(row.querySelector(".p-prix").value, 10);
+        const promoRaw = row.querySelector(".p-promo").value;
+        const promotion = promoRaw === "" ? null : parseInt(promoRaw, 10);
+        const disponible = row.querySelector(".p-dispo").checked;
+
+        try {
+          const resp = await authorizedFetch("../api/admin/digital-products", {
+            method: "POST",
+            body: JSON.stringify({ action: "update", id: p.id, prix, promotion, disponible })
+          });
+          const result = await resp.json();
+          if (!resp.ok) throw new Error(result.error || "Erreur");
+          statusEl.classList.remove("hidden");
+          setTimeout(() => statusEl.classList.add("hidden"), 2000);
+        } catch (err) {
+          console.error(err);
+          alert("Impossible d'enregistrer : " + err.message);
+        } finally {
+          saveBtn.disabled = false;
+        }
+      });
+
+      deleteBtn.addEventListener("click", async () => {
+        if (!confirm(`Supprimer définitivement "${p.nom}" ?`)) return;
+        deleteBtn.disabled = true;
+
+        try {
+          const resp = await authorizedFetch("../api/admin/digital-products", {
+            method: "POST",
+            body: JSON.stringify({ action: "delete", id: p.id })
+          });
+          const result = await resp.json();
+          if (!resp.ok) throw new Error(result.error || "Erreur");
+          row.remove();
+        } catch (err) {
+          console.error(err);
+          alert("Impossible de supprimer : " + err.message);
+          deleteBtn.disabled = false;
+        }
+      });
+
+      containerEl.appendChild(row);
+    });
+  }
+
+  async function loadProducts() {
+    const resp = await authorizedFetch("../api/admin/digital-products", { method: "GET" });
+    const result = await resp.json();
+
+    if (!resp.ok) {
+      containerEl.innerHTML = '<div style="padding:20px;color:var(--text-dim);">' +
+        escapeHtmlLocal(result.error || "Erreur de chargement des produits.") + '</div>';
+      return;
+    }
+    renderProducts(result.products || []);
+  }
+
+  async function init() {
+    const { data } = await supabase.auth.getSession();
+    if (!data || !data.session || !data.session.user) {
+      loadingEl.classList.add("hidden");
+      deniedEl.classList.remove("hidden");
+      deniedEl.textContent = "🔒 Connecte-toi avec un compte administrateur.";
+      return;
+    }
+
+    accessToken = data.session.access_token;
+
+    // Le rôle est revérifié côté serveur par /api/admin/digital-products —
+    // ce premier appel sert aussi de contrôle d'accès à la page.
+    const resp = await authorizedFetch("../api/admin/digital-products", { method: "GET" });
+    const result = await resp.json();
+
+    if (!resp.ok) {
+      loadingEl.classList.add("hidden");
+      deniedEl.classList.remove("hidden");
+      deniedEl.textContent = "🔒 " + (result.error || "Accès refusé.");
+      return;
+    }
+
+    loadingEl.classList.add("hidden");
+    containerEl.classList.remove("hidden");
+    document.getElementById("new-product-form").classList.remove("hidden");
+    renderProducts(result.products || []);
+  }
+
+  document.getElementById("new-product-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const statusEl = document.getElementById("new-product-status");
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+
+    const nom = document.getElementById("np-nom").value.trim();
+    const description = document.getElementById("np-description").value.trim();
+    const descriptionLongue = document.getElementById("np-description-longue").value.trim();
+    const type = document.getElementById("np-type").value;
+    const domaine = document.getElementById("np-domaine").value.trim() || null;
+    const prix = parseInt(document.getElementById("np-prix").value, 10);
+    const promoRaw = document.getElementById("np-promo").value;
+    const promotion = promoRaw === "" ? null : parseInt(promoRaw, 10);
+    const imageUrl = newProductImage.getUrl() || null;
+    const fileData = newProductFile.getFile();
+
+    if (!nom || !prix) return;
+    if (!fileData) {
+      statusEl.style.color = "#F87171";
+      statusEl.textContent = "Ajoute d'abord le fichier numérique du produit.";
+      return;
+    }
+
+    submitBtn.disabled = true;
+    statusEl.style.color = "";
+    statusEl.textContent = "Création en cours...";
+
+    // L'identifiant (slug) est généré côté serveur par
+    // /api/admin/digital-products, qui valide aussi tous les autres champs.
+    try {
+      const resp = await authorizedFetch("../api/admin/digital-products", {
+        method: "POST",
+        body: JSON.stringify({
+          action: "create",
+          nom, description, description_longue: descriptionLongue || null,
+          type, domaine, prix, promotion,
+          image_url: imageUrl,
+          file_path: fileData.path, file_name: fileData.name,
+          mime_type: fileData.mimeType, file_size: fileData.size
+        })
+      });
+      const result = await resp.json();
+      if (!resp.ok) throw new Error(result.error || "Erreur");
+
+      statusEl.textContent = "✓ Produit créé.";
+      document.getElementById("new-product-form").reset();
+      newProductImage.setUrl("");
+      newProductFile.setFile(null);
+      await loadProducts();
+    } catch (err) {
+      console.error(err);
+      statusEl.style.color = "#F87171";
+      statusEl.textContent = "Erreur : " + err.message;
+    } finally {
+      submitBtn.disabled = false;
+    }
+  });
+
+  init();
+})();
+</script>
+<script src="../pwa-install.js"></script>
+
+</body>
+</html>
