@@ -119,6 +119,37 @@
   .image-upload-box .pick-btn { background: var(--gold-bright); color: #0A0A0A; }
   .image-upload-box .remove-btn { background: rgba(239,68,68,.15); color: #F87171; }
   .image-upload-box .upload-status { font-size: 11.5px; color: var(--text-dim); }
+
+  /* ===== Programme vidéo (modules / leçons) ===== */
+  .curriculum-panel {
+    display: none; flex-direction: column; gap: 10px; margin-top: 4px;
+    padding-top: 10px; border-top: 1px dashed var(--border);
+  }
+  .curriculum-panel.open { display: flex; }
+  .module-block {
+    border: 1px solid var(--border); border-radius: 10px; padding: 10px;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .module-block .module-head { display: flex; gap: 8px; align-items: center; }
+  .module-block .module-head input[type="text"] { flex: 1; }
+  .module-block .module-head input[type="number"] { width: 64px; }
+  .lesson-row {
+    border: 1px solid var(--border); border-radius: 8px; padding: 8px;
+    display: flex; flex-direction: column; gap: 6px; background: var(--bg);
+  }
+  .lesson-row .lesson-head { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .lesson-row .lesson-head input[type="text"] { flex: 1; min-width: 120px; }
+  .lesson-row .lesson-head input[type="number"] { width: 56px; }
+  .lesson-row .lesson-head select { width: auto; }
+  .lesson-row .lesson-preview-row { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text-muted); }
+  .lesson-row .lesson-media-status { font-size: 11px; color: var(--text-dim); }
+  .curriculum-panel .mini-btn {
+    font-size: 11.5px; font-weight: bold; border: none; border-radius: 6px;
+    padding: 6px 10px; cursor: pointer;
+  }
+  .curriculum-panel .mini-btn.gold { background: var(--gold-bright); color: #0A0A0A; }
+  .curriculum-panel .mini-btn.muted { background: var(--bg-card); color: var(--text-muted); border: 1px solid var(--border); }
+  .curriculum-panel .mini-btn.danger { background: rgba(239,68,68,.15); color: #F87171; }
 </style>
 </head>
 <body>
@@ -407,6 +438,273 @@
     return (text || "").trim();
   }
 
+  // ===========================================================
+  // PROGRAMME VIDÉO (modules / leçons) — écritures via
+  // /api/admin/formation-curriculum, jamais directement sur Supabase
+  // (même modèle de sécurité que le reste de cette page).
+  // ===========================================================
+  async function curriculumFetch(payload) {
+    const resp = await authorizedFetch("../api/admin/formation-curriculum", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+    const result = await resp.json();
+    if (!resp.ok) throw new Error(result.error || "Erreur");
+    return result;
+  }
+
+  async function uploadLessonVideo(file, statusEl) {
+    statusEl.textContent = "Envoi de la vidéo...";
+    const signResp = await authorizedFetch("../api/admin/lesson-media-sign", {
+      method: "POST",
+      body: JSON.stringify({ action: "video" })
+    });
+    const sign = await signResp.json();
+    if (!signResp.ok) throw new Error(sign.error || "Signature indisponible");
+
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("api_key", sign.apiKey);
+    formData.append("timestamp", sign.timestamp);
+    formData.append("signature", sign.signature);
+    formData.append("folder", sign.folder);
+
+    const uploadResp = await fetch(sign.uploadUrl, { method: "POST", body: formData });
+    const uploadData = await uploadResp.json();
+    if (!uploadResp.ok) throw new Error((uploadData.error && uploadData.error.message) || "Envoi échoué");
+
+    statusEl.textContent = "";
+    return { url: uploadData.secure_url, duration: uploadData.duration ? Math.round(uploadData.duration) : null };
+  }
+
+  async function uploadLessonPdf(file, statusEl) {
+    statusEl.textContent = "Envoi du document...";
+    const signResp = await authorizedFetch("../api/admin/lesson-media-sign", {
+      method: "POST",
+      body: JSON.stringify({ action: "pdf", fileName: file.name })
+    });
+    const sign = await signResp.json();
+    if (!signResp.ok) throw new Error(sign.error || "Signature indisponible");
+
+    const { error } = await supabase.storage
+      .from("formation-media")
+      .uploadToSignedUrl(sign.path, sign.token, file);
+    if (error) throw error;
+
+    statusEl.textContent = "";
+    return sign.path;
+  }
+
+  function renderLesson(lesson, mediaByLessonId, moduleEl) {
+    const media = mediaByLessonId[lesson.id] || {};
+    const row = document.createElement("div");
+    row.className = "lesson-row";
+    row.innerHTML = `
+      <div class="lesson-head">
+        <input type="text" class="l-titre" value="${escapeHtmlLocal(lesson.titre)}" placeholder="Titre de la leçon">
+        <select class="l-type">
+          <option value="video" ${lesson.type === "video" ? "selected" : ""}>🎬 Vidéo</option>
+          <option value="pdf" ${lesson.type === "pdf" ? "selected" : ""}>📄 PDF</option>
+          <option value="text" ${lesson.type === "text" ? "selected" : ""}>📝 Texte</option>
+        </select>
+        <input type="number" class="l-ordre" value="${escapeHtmlLocal(lesson.ordre || 0)}" title="Ordre">
+      </div>
+      <label class="lesson-preview-row">
+        <input type="checkbox" class="l-preview" ${lesson.is_preview ? "checked" : ""}>
+        Leçon gratuite (aperçu public)
+      </label>
+      <div class="l-media-video ${lesson.type === "video" ? "" : "hidden"}">
+        <div class="lesson-media-status l-video-current">${media.video_url ? "🎬 Vidéo enregistrée" : "Aucune vidéo"}</div>
+        <input type="file" accept="video/*" class="l-video-input">
+      </div>
+      <div class="l-media-pdf ${lesson.type === "pdf" ? "" : "hidden"}">
+        <div class="lesson-media-status l-pdf-current">${media.pdf_path ? "📄 Document enregistré" : "Aucun document"}</div>
+        <input type="file" accept="application/pdf" class="l-pdf-input">
+      </div>
+      <div class="lesson-media-status l-media-status"></div>
+      <div style="display:flex;gap:8px;">
+        <button type="button" class="mini-btn gold l-save">Enregistrer la leçon</button>
+        <button type="button" class="mini-btn danger l-delete">🗑️ Supprimer</button>
+      </div>
+    `;
+
+    const typeSelect = row.querySelector(".l-type");
+    const videoBox = row.querySelector(".l-media-video");
+    const pdfBox = row.querySelector(".l-media-pdf");
+    typeSelect.addEventListener("change", () => {
+      videoBox.classList.toggle("hidden", typeSelect.value !== "video");
+      pdfBox.classList.toggle("hidden", typeSelect.value !== "pdf");
+    });
+
+    const mediaStatus = row.querySelector(".l-media-status");
+    let pendingVideoUrl;
+    let pendingPdfPath;
+    let pendingDuree;
+
+    row.querySelector(".l-video-input").addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      e.target.value = "";
+      if (!file) return;
+      try {
+        const result = await uploadLessonVideo(file, mediaStatus);
+        pendingVideoUrl = result.url;
+        pendingDuree = result.duration;
+        row.querySelector(".l-video-current").textContent = "🎬 Nouvelle vidéo prête (enregistrer pour confirmer)";
+      } catch (err) {
+        console.error(err);
+        mediaStatus.textContent = "Erreur : " + err.message;
+      }
+    });
+
+    row.querySelector(".l-pdf-input").addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      e.target.value = "";
+      if (!file) return;
+      try {
+        pendingPdfPath = await uploadLessonPdf(file, mediaStatus);
+        row.querySelector(".l-pdf-current").textContent = "📄 Nouveau document prêt (enregistrer pour confirmer)";
+      } catch (err) {
+        console.error(err);
+        mediaStatus.textContent = "Erreur : " + err.message;
+      }
+    });
+
+    row.querySelector(".l-save").addEventListener("click", async () => {
+      const saveBtn = row.querySelector(".l-save");
+      saveBtn.disabled = true;
+      try {
+        await curriculumFetch({
+          action: "save-lesson",
+          id: lesson.id,
+          moduleId: lesson.module_id,
+          titre: row.querySelector(".l-titre").value.trim(),
+          type: typeSelect.value,
+          ordre: parseInt(row.querySelector(".l-ordre").value, 10) || 0,
+          isPreview: row.querySelector(".l-preview").checked
+        });
+
+        if (pendingVideoUrl !== undefined || pendingPdfPath !== undefined) {
+          const mediaPayload = { action: "save-media", lessonId: lesson.id };
+          if (pendingVideoUrl !== undefined) mediaPayload.videoUrl = pendingVideoUrl;
+          if (pendingPdfPath !== undefined) mediaPayload.pdfPath = pendingPdfPath;
+          if (pendingDuree !== undefined && pendingDuree !== null) mediaPayload.dureeSecondes = pendingDuree;
+          await curriculumFetch(mediaPayload);
+          pendingVideoUrl = undefined;
+          pendingPdfPath = undefined;
+          pendingDuree = undefined;
+        }
+
+        mediaStatus.textContent = "✓ Enregistré";
+        setTimeout(() => { mediaStatus.textContent = ""; }, 2000);
+      } catch (err) {
+        console.error(err);
+        alert("Impossible d'enregistrer la leçon : " + err.message);
+      } finally {
+        saveBtn.disabled = false;
+      }
+    });
+
+    row.querySelector(".l-delete").addEventListener("click", async () => {
+      if (!confirm("Supprimer cette leçon ?")) return;
+      try {
+        await curriculumFetch({ action: "delete-lesson", id: lesson.id });
+        row.remove();
+      } catch (err) {
+        alert("Impossible de supprimer : " + err.message);
+      }
+    });
+
+    moduleEl.querySelector(".lessons-list").appendChild(row);
+  }
+
+  function renderModule(mod, lessonsByModuleId, mediaByLessonId, listEl) {
+    const modEl = document.createElement("div");
+    modEl.className = "module-block";
+    modEl.innerHTML = `
+      <div class="module-head">
+        <input type="text" class="m-titre" value="${escapeHtmlLocal(mod.titre)}" placeholder="Titre du module">
+        <input type="number" class="m-ordre" value="${escapeHtmlLocal(mod.ordre || 0)}" title="Ordre">
+        <button type="button" class="mini-btn gold m-save">Enregistrer</button>
+        <button type="button" class="mini-btn danger m-delete">🗑️</button>
+      </div>
+      <div class="lessons-list"></div>
+      <button type="button" class="mini-btn muted m-add-lesson">➕ Ajouter une leçon</button>
+    `;
+
+    modEl.querySelector(".m-save").addEventListener("click", async () => {
+      try {
+        await curriculumFetch({
+          action: "save-module",
+          id: mod.id,
+          titre: modEl.querySelector(".m-titre").value.trim(),
+          ordre: parseInt(modEl.querySelector(".m-ordre").value, 10) || 0
+        });
+      } catch (err) {
+        alert("Impossible d'enregistrer le module : " + err.message);
+      }
+    });
+
+    modEl.querySelector(".m-delete").addEventListener("click", async () => {
+      if (!confirm("Supprimer ce module et toutes ses leçons ?")) return;
+      try {
+        await curriculumFetch({ action: "delete-module", id: mod.id });
+        modEl.remove();
+      } catch (err) {
+        alert("Impossible de supprimer : " + err.message);
+      }
+    });
+
+    modEl.querySelector(".m-add-lesson").addEventListener("click", async () => {
+      try {
+        const result = await curriculumFetch({
+          action: "save-lesson",
+          moduleId: mod.id,
+          titre: "Nouvelle leçon",
+          type: "video",
+          ordre: 0,
+          isPreview: false
+        });
+        renderLesson({ id: result.id, module_id: mod.id, titre: "Nouvelle leçon", type: "video", ordre: 0, is_preview: false }, {}, modEl);
+      } catch (err) {
+        alert("Impossible d'ajouter la leçon : " + err.message);
+      }
+    });
+
+    (lessonsByModuleId[mod.id] || []).forEach((lesson) => {
+      renderLesson(lesson, mediaByLessonId, modEl);
+    });
+
+    listEl.appendChild(modEl);
+  }
+
+  async function loadCurriculum(formationId, panelEl) {
+    const listEl = panelEl.querySelector(".modules-list");
+    listEl.innerHTML = '<div style="font-size:12px;color:var(--text-dim);">Chargement...</div>';
+
+    try {
+      const result = await curriculumFetch({ action: "list", formationId });
+      listEl.innerHTML = "";
+
+      const lessonsByModuleId = {};
+      (result.lessons || []).forEach((l) => {
+        if (!lessonsByModuleId[l.module_id]) lessonsByModuleId[l.module_id] = [];
+        lessonsByModuleId[l.module_id].push(l);
+      });
+      const mediaByLessonId = {};
+      (result.media || []).forEach((m) => { mediaByLessonId[m.lesson_id] = m; });
+
+      (result.modules || []).forEach((mod) => {
+        renderModule(mod, lessonsByModuleId, mediaByLessonId, listEl);
+      });
+
+      if (!result.modules || !result.modules.length) {
+        listEl.innerHTML = '<div style="font-size:12px;color:var(--text-dim);">Aucun module pour l’instant.</div>';
+      }
+    } catch (err) {
+      listEl.innerHTML = '<div style="font-size:12px;color:#F87171;">Erreur : ' + escapeHtmlLocal(err.message) + '</div>';
+    }
+  }
+
   function renderFormations(formations) {
     containerEl.innerHTML = "";
     const byProvider = {};
@@ -448,8 +746,14 @@
           <div class="actions">
             <button class="save-btn">Enregistrer</button>
             <button type="button" class="details-btn">✏️ Fiche complète</button>
+            <button type="button" class="curriculum-btn">🎬 Cours vidéo</button>
             <button type="button" class="delete-btn">🗑️</button>
             <span class="save-status hidden">✓ Enregistré</span>
+          </div>
+
+          <div class="curriculum-panel">
+            <div class="modules-list"></div>
+            <button type="button" class="mini-btn gold add-module-btn">➕ Ajouter un module</button>
           </div>
 
           <div class="details-panel">
@@ -522,6 +826,26 @@
 
         detailsBtn.addEventListener("click", () => {
           detailsPanel.classList.toggle("open");
+        });
+
+        const curriculumBtn = row.querySelector(".curriculum-btn");
+        const curriculumPanel = row.querySelector(".curriculum-panel");
+        let curriculumLoaded = false;
+        curriculumBtn.addEventListener("click", async () => {
+          curriculumPanel.classList.toggle("open");
+          if (curriculumPanel.classList.contains("open") && !curriculumLoaded) {
+            curriculumLoaded = true;
+            await loadCurriculum(f.id, curriculumPanel);
+          }
+        });
+
+        curriculumPanel.querySelector(".add-module-btn").addEventListener("click", async () => {
+          try {
+            const result = await curriculumFetch({ action: "save-module", formationId: f.id, titre: "Nouveau module", ordre: 0 });
+            renderModule({ id: result.id, titre: "Nouveau module", ordre: 0 }, {}, {}, curriculumPanel.querySelector(".modules-list"));
+          } catch (err) {
+            alert("Impossible d'ajouter le module : " + err.message);
+          }
         });
 
         deleteBtn.addEventListener("click", async () => {
