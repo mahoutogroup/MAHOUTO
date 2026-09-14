@@ -152,6 +152,17 @@
     academie_majestepresse: "Académie Majesté Presse"
   };
 
+  let accessToken = null;
+
+  async function authorizedFetch(url, options) {
+    options = options || {};
+    options.headers = Object.assign({}, options.headers, {
+      "Authorization": "Bearer " + accessToken,
+      "Content-Type": "application/json"
+    });
+    return fetch(url, options);
+  }
+
   function money(xof) { return xof.toLocaleString("fr-FR") + " FCFA"; }
 
   function renderFormations(formations) {
@@ -204,17 +215,18 @@
           if (!confirm(`Supprimer définitivement "${f.nom}" ?`)) return;
           deleteBtn.disabled = true;
 
-          const { error } = await supabase
-            .from("formations")
-            .delete()
-            .eq("id", f.id);
-
-          if (error) {
+          try {
+            const resp = await authorizedFetch("/api/admin/formations", {
+              method: "POST",
+              body: JSON.stringify({ action: "delete", id: f.id })
+            });
+            const result = await resp.json();
+            if (!resp.ok) throw new Error(result.error || "Erreur");
+            row.remove();
+          } catch (error) {
             console.error(error);
             alert("Impossible de supprimer : " + error.message);
             deleteBtn.disabled = false;
-          } else {
-            row.remove();
           }
         });
 
@@ -227,19 +239,20 @@
           const promotion = promoRaw === "" ? null : parseInt(promoRaw, 10);
           const disponible = row.querySelector(".f-dispo").checked;
 
-          const { error } = await supabase
-            .from("formations")
-            .update({ prix, promotion, disponible })
-            .eq("id", f.id);
-
-          saveBtn.disabled = false;
-
-          if (error) {
-            console.error(error);
-            alert("Impossible d'enregistrer : " + error.message);
-          } else {
+          try {
+            const resp = await authorizedFetch("/api/admin/formations", {
+              method: "POST",
+              body: JSON.stringify({ action: "update", id: f.id, prix, promotion, disponible })
+            });
+            const result = await resp.json();
+            if (!resp.ok) throw new Error(result.error || "Erreur");
             statusEl.classList.remove("hidden");
             setTimeout(() => statusEl.classList.add("hidden"), 2000);
+          } catch (error) {
+            console.error(error);
+            alert("Impossible d'enregistrer : " + error.message);
+          } finally {
+            saveBtn.disabled = false;
           }
         });
 
@@ -251,30 +264,20 @@
   }
 
   async function loadFormations() {
-    const { data, error } = await supabase
-      .from("formations")
-      .select("*")
-      .order("provider", { ascending: true })
-      .order("nom", { ascending: true });
+    const resp = await authorizedFetch("/api/admin/formations", { method: "GET" });
+    const result = await resp.json();
 
-    if (error) {
-      containerEl.innerHTML = '<div style="padding:20px;color:var(--text-dim);">Erreur de chargement des formations.</div>';
-      console.error(error);
+    if (!resp.ok) {
+      containerEl.innerHTML = '<div style="padding:20px;color:var(--text-dim);">' +
+        (result.error || "Erreur de chargement des formations.") + '</div>';
       return;
     }
 
-    renderFormations(data || []);
+    renderFormations(result.formations || []);
   }
 
   async function init() {
     const { data } = await supabase.auth.getSession();
-
-    // === DIAGNOSTIC TEMPORAIRE — à retirer une fois résolu ===
-    alert(
-      "DIAGNOSTIC ADMIN\n" +
-      "Session trouvée : " + (data && data.session ? "OUI" : "NON") + "\n" +
-      "User ID : " + (data && data.session ? data.session.user.id : "—")
-    );
 
     if (!data || !data.session || !data.session.user) {
       loadingEl.classList.add("hidden");
@@ -283,31 +286,24 @@
       return;
     }
 
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", data.session.user.id)
-      .maybeSingle();
+    accessToken = data.session.access_token;
 
-    // === DIAGNOSTIC TEMPORAIRE — à retirer une fois résolu ===
-    alert(
-      "Profil trouvé : " + (profile ? "OUI" : "NON") + "\n" +
-      "Rôle lu : " + (profile ? profile.role : "—") + "\n" +
-      "Erreur : " + (profileError ? profileError.message : "aucune")
-    );
+    // Le rôle est revérifié côté serveur par /api/admin/formations —
+    // ce premier appel sert aussi de contrôle d'accès à la page.
+    const resp = await authorizedFetch("/api/admin/formations", { method: "GET" });
+    const result = await resp.json();
 
-    const role = profile ? profile.role : "user";
-
-    if (role !== "admin" && role !== "super_admin" && role !== "founder") {
+    if (!resp.ok) {
       loadingEl.classList.add("hidden");
       deniedEl.classList.remove("hidden");
+      deniedEl.textContent = "🔒 " + (result.error || "Accès refusé.");
       return;
     }
 
     loadingEl.classList.add("hidden");
     containerEl.classList.remove("hidden");
     document.getElementById("new-formation-form").classList.remove("hidden");
-    await loadFormations();
+    renderFormations(result.formations || []);
   }
 
   document.getElementById("new-formation-form").addEventListener("submit", async (e) => {
@@ -322,30 +318,28 @@
 
     if (!nom || !prix) return;
 
-    const slug = nom.toLowerCase()
-      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-    const prefix = provider === "academie_majestepresse" ? "amp-" : "";
-    const id = prefix + slug + "-" + Date.now().toString(36);
-
+    statusEl.style.color = "";
     statusEl.textContent = "Création en cours...";
 
-    const { error } = await supabase.from("formations").insert({
-      id, provider, nom, description, emoji, prix, disponible: true
-    });
+    // L'identifiant (slug) est désormais généré côté serveur par
+    // /api/admin/formations, qui valide aussi provider/nom/prix.
+    try {
+      const resp = await authorizedFetch("/api/admin/formations", {
+        method: "POST",
+        body: JSON.stringify({ action: "create", provider, nom, description, emoji, prix })
+      });
+      const result = await resp.json();
+      if (!resp.ok) throw new Error(result.error || "Erreur");
 
-    if (error) {
+      statusEl.textContent = "✓ Formation créée.";
+      document.getElementById("new-formation-form").reset();
+      document.getElementById("nf-emoji").value = "📘";
+      await loadFormations();
+    } catch (error) {
       console.error(error);
       statusEl.style.color = "#F87171";
       statusEl.textContent = "Erreur : " + error.message;
-      return;
     }
-
-    statusEl.style.color = "";
-    statusEl.textContent = "✓ Formation créée.";
-    document.getElementById("new-formation-form").reset();
-    document.getElementById("nf-emoji").value = "📘";
-    await loadFormations();
   });
 
   init();

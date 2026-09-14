@@ -197,3 +197,46 @@ drop trigger if exists trg_prevent_profile_role_change on public.profiles;
 create trigger trg_prevent_profile_role_change
   before update on public.profiles
   for each row execute function public.prevent_profile_role_change();
+
+-- =========================================================
+-- v6 — CORRECTIF SÉCURITÉ : formations modifiables côté client
+--
+-- PROBLÈME : "formations" (catalogue MAHOUTO School / Académie
+-- Majesté Presse) était absente de ce schéma versionné, et
+-- admin/formations.html écrivait dessus directement avec la clé
+-- anonyme (INSERT/UPDATE/DELETE), sans aucune vérification serveur
+-- du rôle. Le prix officiel utilisé par /api/fedapay-checkout.js
+-- vient de cette même table : la modifier sans contrôle permettait
+-- de fixer n'importe quel prix (y compris 0).
+--
+-- CORRECTIF :
+--   - déclaration explicite de la table si elle n'existe pas déjà
+--     (si elle existe déjà en production avec d'autres colonnes,
+--     ce create table est un no-op — ne touche à aucune donnée) ;
+--   - RLS activée : lecture publique (le catalogue doit rester
+--     visible sans connexion, comme le fait déjà school.html) ;
+--   - AUCUNE policy d'insertion/mise à jour/suppression : par défaut
+--     Postgres refuse alors ces opérations à "anon"/"authenticated" —
+--     seule la clé service_role (utilisée uniquement par la nouvelle
+--     route /api/admin/formations.js) peut désormais écrire.
+-- =========================================================
+
+create table if not exists public.formations (
+  id text primary key,
+  provider text not null,
+  nom text not null,
+  description text,
+  emoji text not null default '📘',
+  prix integer not null,
+  promotion integer,
+  disponible boolean not null default true,
+  created_at timestamptz not null default now()
+);
+
+alter table public.formations enable row level security;
+
+drop policy if exists "Lecture formations" on public.formations;
+create policy "Lecture formations" on public.formations
+  for select using (true);
+
+-- Aucune policy insert/update/delete : réservé à service_role.
