@@ -20,6 +20,20 @@
 
   // ===== ENREGISTREMENT SERVICE WORKER =====
   if ("serviceWorker" in navigator) {
+    // Dès qu'un nouveau Service Worker prend le contrôle de la page
+    // (sw.js appelle déjà skipWaiting() + clients.claim()), on force
+    // UN SEUL rechargement automatique. Sans ça, la page déjà ouverte
+    // continue d'afficher son ancien contenu/comportement de cache
+    // jusqu'à ce que l'utilisateur ferme et rouvre l'app lui-même —
+    // c'est exactement ce qui a empêché le lien "Produits" d'apparaître
+    // immédiatement après son ajout à admin/formations.html.
+    let refreshingAfterUpdate = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (refreshingAfterUpdate) return;
+      refreshingAfterUpdate = true;
+      window.location.reload();
+    });
+
     window.addEventListener("load", () => {
       navigator.serviceWorker.register("/sw.js")
         .then(reg => console.log("SW enregistré:", reg.scope))
