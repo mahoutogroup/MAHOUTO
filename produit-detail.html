@@ -31,6 +31,8 @@
   .section-block p { font-size: 13.5px; color: var(--text-muted); line-height: 1.7; }
 
   .owned-banner { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 700; color: var(--accent-green); background: rgba(34,197,94,.12); padding: 10px 14px; border-radius: 12px; }
+  .pending-banner { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 700; color: var(--gold); background: rgba(212,175,55,.12); padding: 10px 14px; border-radius: 12px; }
+  .sticky-buy button.pending { background: rgba(212,175,55,.18); color: var(--gold); }
 
   .sticky-buy {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
@@ -99,12 +101,17 @@
     return false;
   }
 
-  async function checkOwned(productId) {
-    if (!currentUser) return false;
+  // Renvoie l'état réel de l'achat pour CET utilisateur et CE produit
+  // ("paid" | "pending" | null) — jamais déduit d'un simple booléen côté
+  // client, toujours lu depuis purchases (RLS : auth.uid() = user_id).
+  async function getPurchaseStatus(productId) {
+    if (!currentUser) return null;
     const { data } = await supabase
-      .from("purchases").select("id").eq("user_id", currentUser.id)
-      .eq("course_id", productId).eq("product_type", "digital_product").eq("status", "paid").maybeSingle();
-    return !!data;
+      .from("purchases").select("status").eq("user_id", currentUser.id)
+      .eq("course_id", productId).eq("product_type", "digital_product")
+      .order("created_at", { ascending: false }).limit(1).maybeSingle();
+    if (!data) return null;
+    return data.status === "paid" ? "paid" : (data.status === "pending" ? "pending" : null);
   }
 
   async function buy(productId, btn) {
@@ -185,7 +192,9 @@
     }
 
     await ensureLoggedIn();
-    const owned = await checkOwned(productId);
+    const purchaseStatus = await getPurchaseStatus(productId);
+    const owned = purchaseStatus === "paid";
+    const pending = purchaseStatus === "pending";
 
     const amount = product.promotion ?? product.prix;
     const originalAmount = product.promotion ? product.prix : null;
@@ -215,6 +224,7 @@
         </div>
 
         ${owned ? `<div class="owned-banner">✓ Vous possédez déjà ce produit</div>` : ""}
+        ${pending ? `<div class="pending-banner">⏳ Paiement en cours de confirmation</div>` : ""}
 
         <div class="section-block">
           <h2>📝 Description</h2>
@@ -231,19 +241,24 @@
 
     const accessLabel = ACCESS_LABEL[product.type] || "📥 Télécharger";
     const buyLabel = product.disponible ? "🔒 Acheter maintenant" : "Indisponible";
+    const pendingLabel = "⏳ Paiement en cours de confirmation";
+
+    let btnClass = "";
+    let btnLabel = buyLabel;
+    let btnDisabled = !product.disponible && !owned;
+    if (owned) { btnClass = "owned"; btnLabel = accessLabel; }
+    else if (pending) { btnClass = "pending"; btnLabel = pendingLabel; btnDisabled = true; }
 
     sticky.innerHTML = `
       <div class="sticky-price">${money(amount)}</div>
-      <button id="action-btn" class="${owned ? "owned" : ""}" ${!product.disponible && !owned ? "disabled" : ""}>
-        ${owned ? accessLabel : buyLabel}
-      </button>
+      <button id="action-btn" class="${btnClass}" ${btnDisabled ? "disabled" : ""}>${btnLabel}</button>
     `;
     document.body.appendChild(sticky);
 
     const actionBtn = document.getElementById("action-btn");
     if (owned) {
       actionBtn.addEventListener("click", () => accessProduct(productId, actionBtn, product.type));
-    } else if (product.disponible) {
+    } else if (!pending && product.disponible) {
       actionBtn.addEventListener("click", () => buy(productId, actionBtn));
     }
   }
