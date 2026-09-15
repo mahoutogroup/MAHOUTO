@@ -455,9 +455,9 @@
 
   async function uploadLessonVideo(file, statusEl) {
     statusEl.textContent = "Envoi de la vidéo...";
-    const signResp = await authorizedFetch("../api/admin/lesson-media-sign", {
+    const signResp = await authorizedFetch("../api/admin/media-sign", {
       method: "POST",
-      body: JSON.stringify({ action: "video" })
+      body: JSON.stringify({ target: "lesson", action: "video" })
     });
     const sign = await signResp.json();
     if (!signResp.ok) throw new Error(sign.error || "Signature indisponible");
@@ -479,9 +479,9 @@
 
   async function uploadLessonPdf(file, statusEl) {
     statusEl.textContent = "Envoi du document...";
-    const signResp = await authorizedFetch("../api/admin/lesson-media-sign", {
+    const signResp = await authorizedFetch("../api/admin/media-sign", {
       method: "POST",
-      body: JSON.stringify({ action: "pdf", fileName: file.name })
+      body: JSON.stringify({ target: "lesson", action: "pdf", fileName: file.name })
     });
     const sign = await signResp.json();
     if (!signResp.ok) throw new Error(sign.error || "Signature indisponible");

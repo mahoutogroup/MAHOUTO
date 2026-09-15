@@ -199,7 +199,7 @@
   // /api/admin/digital-products, qui revérifie le rôle côté serveur
   // avec service_role — même modèle que admin/formations.html. Le
   // fichier numérique lui-même est envoyé via une URL d'upload signée
-  // générée par /api/admin/product-file-sign (chemin "products/..."
+  // générée par /api/admin/media-sign (target: "product") (chemin "products/..."
   // toujours choisi par le serveur), plus jamais un upload direct
   // avec la clé anonyme.
   // -------------------------------------------------------
@@ -320,7 +320,7 @@
   }
 
   // ===== Upload du fichier numérique — URL d'upload signée générée par
-  // /api/admin/product-file-sign (jamais un upload direct avec la clé
+  // /api/admin/media-sign (target: "product") (jamais un upload direct avec la clé
   // anonyme : le chemin de destination est choisi par le serveur). =====
   function wireFileUpload(box) {
     const placeholder = box.querySelector(".placeholder");
@@ -373,9 +373,9 @@
       fill.style.width = "10%";
 
       try {
-        const signResp = await authorizedFetch("../api/admin/product-file-sign", {
+        const signResp = await authorizedFetch("../api/admin/media-sign", {
           method: "POST",
-          body: JSON.stringify({ fileName: safeStorageName(file.name) })
+          body: JSON.stringify({ target: "product", fileName: safeStorageName(file.name) })
         });
         const sign = await signResp.json();
         if (!signResp.ok) throw new Error(sign.error || "Signature indisponible");

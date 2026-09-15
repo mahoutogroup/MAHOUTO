@@ -410,7 +410,7 @@
     if (action === "delete" && !confirm("Cette action est irréversible. Vraiment supprimer ce compte ?")) return;
 
     try {
-      const resp = await authorizedFetch("/api/admin/user-action", {
+      const resp = await authorizedFetch("/api/admin/users", {
         method: "POST",
         body: JSON.stringify({ action, userId: u.id })
       });
@@ -444,7 +444,7 @@
     accessToken = data.session.access_token;
 
     try {
-      const resp = await authorizedFetch("/api/admin/list-users", { method: "GET" });
+      const resp = await authorizedFetch("/api/admin/users", { method: "GET" });
       const result = await resp.json();
 
       if (!resp.ok) {

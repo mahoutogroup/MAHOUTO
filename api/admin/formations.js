@@ -24,7 +24,7 @@
 //
 // Remplace les écritures directes que admin/formations.html faisait
 // auparavant sur Supabase avec la clé anonyme (voir historique du
-// dépôt) — même modèle de sécurité que api/admin/user-action.js.
+// dépôt) — même modèle de sécurité que api/admin/users.js.
 //
 // Variables d'environnement Vercel attendues :
 //   SUPABASE_URL

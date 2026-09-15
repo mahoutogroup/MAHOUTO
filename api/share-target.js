@@ -1,7 +1,7 @@
 /**
  * MAHOUTO+ — Web Share Target
  *
- * Flux :
+ * Flux documenté à l'origine de ce fichier :
  *
  * Android / WhatsApp / Galerie
  *          ↓
@@ -15,9 +15,21 @@
  *          ↓
  * choix du salon
  *          ↓
- * /api/share-finalize
+ * /api/share (mode: "finalize")
  *          ↓
  * messages
+ *
+ * CONSTAT (audit de consolidation des Serverless Functions, 2026) :
+ * manifest.json déclare "share_target": { "action": "/share-target" }
+ * (sans /api/), et sw.js intercepte lui-même cette requête POST côté
+ * client (Service Worker) pour la traiter entièrement en local
+ * (IndexedDB, voir share.html → loadLocalShare()/local_share_id),
+ * sans jamais appeler le serveur. Cette route /api/share-target ne
+ * semble donc plus atteinte en pratique — aucun rewrite Vercel ne
+ * mappe /share-target vers /api/share-target, et aucun autre appelant
+ * n'a été trouvé dans le dépôt. Conservée telle quelle par prudence
+ * (non supprimée sans confirmation) ; à vérifier dans les logs Vercel
+ * avant suppression éventuelle.
  */
 
 export const config = {

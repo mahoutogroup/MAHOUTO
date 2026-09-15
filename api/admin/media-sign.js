@@ -1,23 +1,33 @@
 // =========================================================
-// /api/admin/lesson-media-sign.js
-// Autorise un envoi direct (vidéo Cloudinary ou PDF Supabase Storage)
-// pour une leçon de formation — réservé aux administrateurs.
+// /api/admin/media-sign.js
+// Autorise un envoi direct de média administratif :
+// - vidéo de leçon (Cloudinary, resource_type=video)
+// - PDF de leçon (Supabase Storage, bucket "formation-media")
+// - fichier de produit numérique (Supabase Storage, bucket "digital-products")
+// Réservé aux administrateurs.
+//
+// Fusion de api/admin/lesson-media-sign.js + api/admin/product-file-sign.js
+// (consolidation pour rester sous la limite de Serverless Functions du
+// plan Vercel Hobby) — dispatch par body.target, comportement et
+// sécurité inchangés pour chaque cas.
 //
 // SÉCURITÉ :
 // - Jeton Supabase + rôle admin/super_admin/founder vérifiés côté
-//   serveur, exactement comme api/admin/formation-curriculum.js.
+//   serveur, exactement comme les autres routes api/admin/*.
 // - Le dossier/chemin de destination est TOUJOURS choisi par le
 //   serveur (jamais fourni par le client) : "mahoutoplus/lessons"
-//   pour Cloudinary, "lessons/<horodatage>-<nom>" pour Supabase
-//   Storage. Un administrateur malveillant ne peut pas écraser un
-//   fichier arbitraire ni sortir de ces dossiers.
-// - Pour le PDF, on ne renvoie jamais une clé permanente : une URL
-//   d'upload signée à durée très courte (createSignedUploadUrl) est
-//   générée à la demande, sur le bucket privé "formation-media".
+//   pour Cloudinary, "lessons/<horodatage>-<nom>" pour le bucket
+//   "formation-media", "products/<horodatage>-<nom>" pour le bucket
+//   "digital-products". Un administrateur malveillant ne peut pas
+//   écraser un fichier arbitraire ni sortir de ces dossiers.
+// - Pour les fichiers Supabase Storage, on ne renvoie jamais une clé
+//   permanente : une URL d'upload signée à durée courte
+//   (createSignedUploadUrl) est générée à la demande.
 //
-// Actions (POST, body.action) :
-//   "video" : { }                 -> signature Cloudinary (resource_type=video)
-//   "pdf"   : { fileName }        -> URL d'upload signée + chemin final
+// Actions (POST, body.target + body.action) :
+//   target="lesson", action="video"  -> signature Cloudinary (resource_type=video)
+//   target="lesson", action="pdf"    -> URL d'upload signée (bucket "formation-media")
+//   target="product"                 -> URL d'upload signée (bucket "digital-products")
 //
 // Variables d'environnement Vercel attendues :
 //   SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
@@ -77,7 +87,8 @@ export default async function handler(req, res) {
 
   const body = req.body || {};
 
-  if (body.action === "video") {
+  // -------- Leçon de formation : vidéo (Cloudinary) --------
+  if (body.target === "lesson" && body.action === "video") {
     const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
     const apiKey = process.env.CLOUDINARY_API_KEY;
     const apiSecret = process.env.CLOUDINARY_API_SECRET;
@@ -100,7 +111,8 @@ export default async function handler(req, res) {
     });
   }
 
-  if (body.action === "pdf") {
+  // -------- Leçon de formation : PDF (Supabase Storage) --------
+  if (body.target === "lesson" && body.action === "pdf") {
     const fileName = safeStorageName(body.fileName);
     const path = "lessons/" + Date.now() + "-" + fileName;
 
@@ -114,11 +126,25 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: "Impossible de préparer l'envoi du document." });
     }
 
-    return res.status(200).json({
-      path,
-      token: data.token,
-      signedUrl: data.signedUrl
-    });
+    return res.status(200).json({ path, token: data.token, signedUrl: data.signedUrl });
+  }
+
+  // -------- Fichier de produit numérique (Supabase Storage) --------
+  if (body.target === "product") {
+    const fileName = safeStorageName(body.fileName);
+    const path = "products/" + Date.now() + "-" + fileName;
+
+    const { data, error } = await supabaseAdmin
+      .storage
+      .from("digital-products")
+      .createSignedUploadUrl(path);
+
+    if (error || !data) {
+      console.error("Erreur génération URL d'upload signée (produit) :", error);
+      return res.status(500).json({ error: "Impossible de préparer l'envoi du fichier." });
+    }
+
+    return res.status(200).json({ path, token: data.token, signedUrl: data.signedUrl });
   }
 
   return res.status(400).json({ error: "Action inconnue." });

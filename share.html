@@ -2954,7 +2954,7 @@ async function createPendingShare(
 
   const response =
     await fetch(
-      "/api/share-pending-create",
+      "/api/share",
       {
 
         method:
@@ -2967,6 +2967,9 @@ async function createPendingShare(
 
         body:
           JSON.stringify({
+
+            mode:
+              "create",
 
             filename:
               file.name,
@@ -3065,7 +3068,7 @@ async function finalizeShare(
 
   const response =
     await fetch(
-      "/api/share-finalize",
+      "/api/share",
       {
 
         method:
@@ -3084,6 +3087,9 @@ async function finalizeShare(
 
         body:
           JSON.stringify({
+
+            mode:
+              "finalize",
 
             share_id:
               shareId,
