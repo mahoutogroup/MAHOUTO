@@ -274,6 +274,39 @@ self.addEventListener("fetch", event => {
   }
 
   /*
+   * Network First pour l'administration (/admin/) :
+   * ces pages changent rarement, mais quand elles changent (ajout
+   * d'un lien de navigation, correctif d'urgence...), l'administrateur
+   * doit voir la version à jour dès le premier chargement — jamais
+   * une copie obsolète servie en priorité comme le ferait le
+   * stale-while-revalidate ci-dessous. On tente donc TOUJOURS le
+   * réseau en premier ; le cache ne sert que si le réseau est
+   * indisponible (mode hors-ligne), pour ne pas casser l'usage PWA.
+   * Le reste de MAHOUTO+ (chat, School, boutique...) garde sa
+   * stratégie stale-while-revalidate habituelle, inchangée.
+   */
+
+  if (url.pathname.startsWith("/admin/") && event.request.method === "GET") {
+    event.respondWith(
+      (async () => {
+        try {
+          const response = await fetch(event.request);
+          if (response && response.ok) {
+            const cache = await caches.open(CACHE_NAME);
+            cache.put(event.request, response.clone());
+          }
+          return response;
+        } catch (error) {
+          const cache = await caches.open(CACHE_NAME);
+          const cached = await cache.match(event.request);
+          return cached || Response.error();
+        }
+      })()
+    );
+    return;
+  }
+
+  /*
    * Stale-while-revalidate :
    * on sert immédiatement la version en cache si elle existe
    * (rapide, fonctionne hors ligne), ET on relance en parallèle
