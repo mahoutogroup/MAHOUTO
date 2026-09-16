@@ -111,6 +111,7 @@
   <div class="section-title">Mon compte</div>
   <div class="menu-list">
     <a class="card menu-item hidden" id="admin-dashboard-link" href="admin/formations.html"><span class="emoji">⚙️</span><span class="label">Tableau de bord Administrateur</span><span class="sub">→</span></a>
+    <a class="card menu-item hidden" id="admin-produits-link" href="admin/produits.html"><span class="emoji">🛍️</span><span class="label">Gestion des produits</span><span class="sub">→</span></a>
     <div class="card menu-item"><span class="emoji">💳</span><span class="label">Paiements</span><span class="sub">Bientôt</span></div>
     <div class="card menu-item"><span class="emoji">📜</span><span class="label">Certificats</span><span class="sub">Bientôt</span></div>
     <div class="card menu-item"><span class="emoji">⭐</span><span class="label">Abonnements</span><span class="sub">Bientôt</span></div>
@@ -211,6 +212,7 @@
       const role = profile ? profile.role : null;
       if (role === "admin" || role === "super_admin" || role === "founder") {
         document.getElementById("admin-dashboard-link").classList.remove("hidden");
+        document.getElementById("admin-produits-link").classList.remove("hidden");
       }
 
       document.getElementById("logout-btn").classList.remove("hidden");
