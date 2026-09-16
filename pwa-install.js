@@ -36,7 +36,17 @@
 
     window.addEventListener("load", () => {
       navigator.serviceWorker.register("/sw.js")
-        .then(reg => console.log("SW enregistré:", reg.scope))
+        .then(reg => {
+          console.log("SW enregistré:", reg.scope);
+          // Sur mobile (Android/Chrome notamment), le navigateur peut
+          // fortement retarder sa propre vérification automatique de
+          // mise à jour de sw.js (économie de données/batterie). On
+          // force donc explicitement une vérification à chaque
+          // chargement de page, pour ne jamais dépendre uniquement de
+          // ce mécanisme implicite. Sans effet si aucune mise à jour
+          // n'est disponible ; sans risque, purement une vérification.
+          reg.update().catch(() => {});
+        })
         .catch(err => console.log("SW erreur:", err));
     });
   }
