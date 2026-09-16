@@ -432,17 +432,45 @@
     }
   }
 
+  // Diagnostic + robustesse : supabase.auth.getSession() peut renvoyer
+  // session=null s'il est appelé avant la fin de la restauration interne
+  // de la session par le SDK (onglet réveillé, plusieurs onglets admin
+  // ouverts en parallèle sur la même origine...). L'événement
+  // "INITIAL_SESSION", déclenché une seule fois par client une fois cette
+  // restauration terminée (avec la session si elle existe, ou null sinon),
+  // est la source la plus fiable pour le tout premier contrôle d'accès.
+  function getInitialSession() {
+    return new Promise((resolve) => {
+      let done = false;
+      const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+        if (event === "INITIAL_SESSION" && !done) {
+          done = true;
+          sub.subscription.unsubscribe();
+          resolve(session);
+        }
+      });
+      supabase.auth.getSession().then(({ data }) => {
+        if (!done) {
+          done = true;
+          sub.subscription.unsubscribe();
+          resolve(data ? data.session : null);
+        }
+      });
+    });
+  }
+
   // -------- Chargement initial --------
   async function init() {
-    const { data } = await supabase.auth.getSession();
-    if (!data || !data.session || !data.session.user) {
+    const session = await getInitialSession();
+    console.log("[Admin users] session présente :", !!session, "| user présent :", !!(session && session.user));
+    if (!session || !session.user) {
       loadingEl.classList.add("hidden");
       deniedEl.classList.remove("hidden");
       deniedEl.textContent = "🔒 Connecte-toi avec un compte administrateur pour accéder à cette page.";
       return;
     }
 
-    accessToken = data.session.access_token;
+    accessToken = session.access_token;
 
     try {
       const resp = await authorizedFetch("/api/admin/users", { method: "GET" });
@@ -452,8 +480,10 @@
         loadingEl.classList.add("hidden");
         deniedEl.classList.remove("hidden");
         deniedEl.textContent = "🔒 " + (result.error || "Accès refusé.");
+        console.log("[Admin users] accès refusé par le serveur :", result.error);
         return;
       }
+      console.log("[Admin users] accès admin confirmé côté serveur.");
 
       allUsers = result.users || [];
       loadingEl.classList.add("hidden");

@@ -978,17 +978,45 @@
     renderFormations(result.formations || []);
   }
 
-  async function init() {
-    const { data } = await supabase.auth.getSession();
+  // Diagnostic + robustesse : supabase.auth.getSession() peut renvoyer
+  // session=null s'il est appelé avant la fin de la restauration interne
+  // de la session par le SDK (onglet réveillé, plusieurs onglets admin
+  // ouverts en parallèle sur la même origine...). L'événement
+  // "INITIAL_SESSION", déclenché une seule fois par client une fois cette
+  // restauration terminée (avec la session si elle existe, ou null sinon),
+  // est la source la plus fiable pour le tout premier contrôle d'accès.
+  function getInitialSession() {
+    return new Promise((resolve) => {
+      let done = false;
+      const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+        if (event === "INITIAL_SESSION" && !done) {
+          done = true;
+          sub.subscription.unsubscribe();
+          resolve(session);
+        }
+      });
+      supabase.auth.getSession().then(({ data }) => {
+        if (!done) {
+          done = true;
+          sub.subscription.unsubscribe();
+          resolve(data ? data.session : null);
+        }
+      });
+    });
+  }
 
-    if (!data || !data.session || !data.session.user) {
+  async function init() {
+    const session = await getInitialSession();
+    console.log("[Admin formations] session présente :", !!session, "| user présent :", !!(session && session.user));
+
+    if (!session || !session.user) {
       loadingEl.classList.add("hidden");
       deniedEl.classList.remove("hidden");
       deniedEl.textContent = "🔒 Connecte-toi avec un compte administrateur pour accéder à cette page.";
       return;
     }
 
-    accessToken = data.session.access_token;
+    accessToken = session.access_token;
 
     // Le rôle est revérifié côté serveur par /api/admin/formations —
     // ce premier appel sert aussi de contrôle d'accès à la page.
@@ -999,8 +1027,10 @@
       loadingEl.classList.add("hidden");
       deniedEl.classList.remove("hidden");
       deniedEl.textContent = "🔒 " + (result.error || "Accès refusé.");
+      console.log("[Admin formations] accès refusé par le serveur :", result.error);
       return;
     }
+    console.log("[Admin formations] accès admin confirmé côté serveur.");
 
     loadingEl.classList.add("hidden");
     containerEl.classList.remove("hidden");
