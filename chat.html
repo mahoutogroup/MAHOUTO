@@ -96,7 +96,7 @@
     font-size: 15px;
     font-family: inherit;
     resize: none;
-    max-height: 120px;
+    max-height: 220px;
     overflow-y: auto;
     line-height: 1.35;
   }
@@ -249,7 +249,7 @@
 <form id="composer" class="hidden">
   <button type="button" id="attach-btn" title="Envoyer un fichier" style="background:var(--bg-card);border:none;border-radius:20px;width:44px;flex:none;color:var(--gold-bright);font-size:18px;cursor:pointer;">📎</button>
   <input type="file" id="file-input" accept="image/*,video/*,application/pdf" class="hidden">
-  <textarea id="message-input" rows="1" placeholder="Écrire un message..." maxlength="2000"></textarea>
+  <textarea id="message-input" rows="1" placeholder="Écrire un message..." maxlength="20000"></textarea>
   <button type="submit">Envoyer</button>
 </form>
 
@@ -513,7 +513,7 @@
   // -------- Zone de texte extensible (vers le haut, comme WhatsApp) --------
   function autoGrow() {
     messageInput.style.height = "auto";
-    messageInput.style.height = Math.min(messageInput.scrollHeight, 120) + "px";
+    messageInput.style.height = Math.min(messageInput.scrollHeight, 220) + "px";
   }
 
   messageInput.addEventListener("input", autoGrow);
