@@ -200,10 +200,25 @@
   // est rejouée à chaque changement de session (onAuthStateChange),
   // jamais une seule fois au chargement initial comme c'était le cas
   // auparavant avec un simple getSession().
+  //
+  // CORRECTIF (diagnostic BUG 2, confirmé par test reproduit) : la
+  // requête "profiles" ci-dessous est asynchrone. Si applySession() est
+  // appelée une seconde fois (nouvel utilisateur) AVANT que cette
+  // requête pour l'utilisateur précédent n'ait répondu, sa réponse
+  // tardive écrasait l'affichage déjà correct du nouvel utilisateur —
+  // une condition de course classique entre requêtes qui se
+  // chevauchent, reproduite avec un délai réseau réaliste (la réponse
+  // lente de A arrivant après celle, plus rapide, de B). "requestId" est
+  // un jeton qui s'incrémente à chaque nouvelle session traitée ; si,
+  // au retour de l'await, une session PLUS RÉCENTE a déjà pris le
+  // dessus, cette réponse périmée est simplement ignorée.
+  let sessionRequestId = 0;
+
   async function applySession(session) {
     const user = session && session.user ? session.user : null;
 
     if (!user) {
+      sessionRequestId++; // invalide toute requête de profil encore en vol
       // Jamais conserver le profil d'un compte précédent après
       // déconnexion (ou reconnexion échouée) : réinitialisation complète.
       currentUser = null;
@@ -220,12 +235,16 @@
       return; // même utilisateur (ex: TOKEN_REFRESHED) : rien à recharger
     }
 
+    const requestId = ++sessionRequestId;
     currentUser = user;
     const { data: profile } = await supabase
       .from("profiles")
       .select("username, role, avatar_url")
       .eq("id", currentUser.id)
       .maybeSingle();
+
+    if (requestId !== sessionRequestId) return; // une session plus récente a déjà pris le dessus : réponse périmée, on l'ignore
+
     currentUsername = profile ? profile.username : null;
     currentAvatarUrl = (profile && profile.avatar_url)
       || (currentUser.user_metadata && currentUser.user_metadata.avatar_url)
