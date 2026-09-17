@@ -61,6 +61,8 @@
   .bubble.mine { background: var(--gold-bright); color: #0A0A0A; align-self: flex-end; }
   .bubble .meta { font-size: 11px; opacity: .65; margin-bottom: 4px; font-weight: bold; }
   .bubble .edited-tag { font-size: 10.5px; opacity: .6; margin-left: 6px; font-style: italic; }
+  .bubble .meta .ticks { margin-left: 4px; letter-spacing: -1px; }
+  .bubble .meta .ticks.read { color: #2FA8F5; }
   .bubble.deleted { font-style: italic; opacity: .6; }
 
   form#composer {
@@ -279,6 +281,16 @@
     return url.replace("/upload/", "/upload/fl_attachment:" + encodeURIComponent(safeName) + "/");
   }
 
+  // Accusés de réception (DM uniquement) — sens unique SENT -> DELIVERED
+  // -> READ, jamais de régression : les colonnes delivered_at/read_at
+  // sont NULL jusqu'à confirmation, et l'affichage ne fait ici que
+  // refléter leur état, jamais ne les modifie (voir sendReceipt()).
+  function receiptTicksHtml(msg) {
+    if (msg.read_at) return '<span class="ticks read" title="Lu">✓✓</span>';
+    if (msg.delivered_at) return '<span class="ticks" title="Distribué">✓✓</span>';
+    return '<span class="ticks" title="Envoyé">✓</span>';
+  }
+
   function renderMessage(msg) {
     if (hiddenMessageIds.has(msg.id)) return;
 
@@ -319,7 +331,8 @@
         (msg.edited_at ? '<span class="edited-tag">modifié</span>' : "");
     }
 
-    bubble.innerHTML = '<div class="meta">' + time + '</div>' + bodyHtml;
+    const ticksHtml = (isMine && !msg.is_deleted) ? " " + receiptTicksHtml(msg) : "";
+    bubble.innerHTML = '<div class="meta">' + time + ticksHtml + '</div>' + bodyHtml;
     bubble.addEventListener("click", () => openMessageActions(msg));
 
     const existing = messagesEl.querySelector('[data-id="' + msg.id + '"]');
@@ -358,7 +371,17 @@
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "dm_messages", filter: "conversation_id=eq." + CONV_ID },
-        (payload) => { renderMessage(payload.new); }
+        (payload) => {
+          renderMessage(payload.new);
+          // Un message qui vient d'arriver en direct par Realtime dans
+          // cette conversation est, par définition, effectivement reçu
+          // par ce client -> accusé "distribué" immédiat. S'il est en
+          // plus réellement visible à l'écran, il est aussi marqué "lu".
+          if (payload.new.sender_id !== currentUser.id) {
+            sendReceipt("delivered");
+            if (document.visibilityState === "visible") sendReceipt("read");
+          }
+        }
       )
       .on(
         "postgres_changes",
@@ -393,10 +416,18 @@
     await loadPeerProfile();
     await loadHiddenMessageIds();
     await loadHistory();
+    // L'historique vient d'être effectivement reçu par ce client :
+    // c'est la confirmation de livraison pour les messages du pair.
+    await sendReceipt("delivered");
     subscribeToNewMessages();
     subscribeToPresence();
     await markAsRead();
+    document.addEventListener("visibilitychange", handleConversationVisibilityChange);
     messageInput.focus();
+  }
+
+  function handleConversationVisibilityChange() {
+    if (document.visibilityState === "visible") markAsRead();
   }
 
   async function markAsRead() {
@@ -407,6 +438,33 @@
         { user_id: currentUser.id, conversation_id: CONV_ID, last_read_at: new Date().toISOString() },
         { onConflict: "user_id,conversation_id" }
       );
+
+    // Accusé "lu" par message : uniquement si la conversation est
+    // réellement affichée à l'écran (pas un onglet en arrière-plan).
+    if (document.visibilityState === "visible") {
+      await sendReceipt("read");
+    }
+  }
+
+  // Notifie le serveur d'un changement d'état de livraison/lecture pour
+  // cette conversation. Le serveur (middleware.js, route /api/dm-receipt)
+  // détermine seul l'identité réelle de l'appelant à partir de son jeton
+  // et ne met jamais à jour que les messages envoyés par L'AUTRE
+  // participant — jamais les nôtres.
+  async function sendReceipt(eventName) {
+    if (!currentUser) return;
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData && sessionData.session ? sessionData.session.access_token : null;
+      if (!accessToken) return;
+      await fetch("/api/dm-receipt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + accessToken },
+        body: JSON.stringify({ conversation_id: CONV_ID, event: eventName })
+      });
+    } catch (err) {
+      console.error("Accusé de réception (" + eventName + ") impossible :", err);
+    }
   }
 
   // -------- Statut en ligne (Presence Supabase, rien en base) --------

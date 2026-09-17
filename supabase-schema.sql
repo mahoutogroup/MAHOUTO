@@ -507,3 +507,71 @@ create policy "Progression : mise à jour propre" on public.course_progress
 -- user_id) n'est volontairement pas modifiée : elle ne pose aucun
 -- problème d'intégrité — un utilisateur ne lit que ses propres
 -- lignes, achetées ou non.
+
+-- =========================================================
+-- v10 — ACCUSÉS DE RÉCEPTION DM (WhatsApp-style : ✓ / ✓✓ / ✓✓ bleu)
+--
+-- PÉRIMÈTRE : conversations privées (dm_messages) UNIQUEMENT. Les
+-- salons de groupe (rooms/messages) ne sont volontairement PAS
+-- concernés par cette migration ni par cette fonctionnalité.
+--
+-- NOTE : dm_messages n'a pas de "create table" dans ce fichier (voir
+-- commentaire v7 ci-dessus) — elle existe déjà en production. Cette
+-- migration se contente d'y AJOUTER deux colonnes nullables, ajout
+-- purement additif, sans recréer ni modifier sa structure existante.
+--
+--   delivered_at : NULL tant que le message n'a pas été confirmé
+--                  reçu par le client du destinataire. Voir
+--                  middleware.js (route /api/dm-receipt) pour la
+--                  définition exacte retenue de "livré" dans cette
+--                  implémentation.
+--   read_at      : NULL tant que le destinataire n'a pas
+--                  effectivement consulté la conversation.
+--
+-- SÉCURITÉ — ces deux colonnes ne doivent JAMAIS être modifiables
+-- directement par un client, ni l'expéditeur ni le destinataire :
+-- seule une route serveur utilisant la clé service_role peut les
+-- écrire, après avoir vérifié l'identité réelle de l'appelant à
+-- partir de son jeton Supabase (jamais d'un ID envoyé par le
+-- navigateur) et sa participation réelle à la conversation.
+--
+-- RLS ne protège qu'au niveau LIGNE, jamais COLONNE (déjà documenté en
+-- v5/v8 ci-dessus) : la policy UPDATE déjà en place sur dm_messages
+-- (qui autorise l'expéditeur à modifier content/is_deleted/edited_at
+-- de ses propres messages — utilisée par "Modifier"/"Supprimer pour
+-- tous" dans dm-chat.html) permettrait techniquement à ce même
+-- expéditeur d'écrire aussi delivered_at/read_at sur ses propres
+-- messages si rien ne l'en empêchait explicitement. Un trigger BEFORE
+-- UPDATE (même mécanisme que trg_prevent_profile_role_change, v5)
+-- bloque donc tout changement de ces deux colonnes tant que l'appel ne
+-- vient pas de service_role — y compris pour l'expéditeur légitime du
+-- message.
+--
+-- Ne touche à AUCUNE autre colonne, AUCUNE autre table, et ne modifie
+-- aucune donnée existante.
+-- =========================================================
+
+alter table public.dm_messages add column if not exists delivered_at timestamptz;
+alter table public.dm_messages add column if not exists read_at timestamptz;
+
+create or replace function public.prevent_dm_receipt_tamper()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+begin
+  if (new.delivered_at is distinct from old.delivered_at
+      or new.read_at is distinct from old.read_at)
+     and auth.role() is distinct from 'service_role' then
+    raise exception
+      'Modification des accusés de réception interdite : cette opération doit passer par une route serveur autorisée.';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_prevent_dm_receipt_tamper on public.dm_messages;
+create trigger trg_prevent_dm_receipt_tamper
+  before update on public.dm_messages
+  for each row execute function public.prevent_dm_receipt_tamper();
