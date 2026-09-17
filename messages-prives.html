@@ -191,6 +191,26 @@
     return false;
   }
 
+  // Synchronisation réactive de l'identité (corrige le BUG « ancien
+  // compte affiché après déconnexion/reconnexion ») : rejouée à chaque
+  // changement de session, jamais une seule fois au chargement initial.
+  function applySession(session) {
+    const user = session && session.user ? session.user : null;
+
+    if (!user) {
+      currentUser = null;
+      convListEl.innerHTML = '<div id="empty-state">Connecte-toi depuis l\'accueil pour voir tes messages privés.</div>';
+      return;
+    }
+
+    if (currentUser && currentUser.id === user.id) {
+      return; // même utilisateur (ex: TOKEN_REFRESHED) : rien à recharger
+    }
+
+    currentUser = user;
+    loadConversations();
+  }
+
   searchInput.addEventListener("input", () => {
     clearTimeout(searchTimer);
     const q = searchInput.value.trim();
@@ -377,13 +397,21 @@
     });
   }
 
-  (async function init() {
-    if (!(await ensureLoggedIn())) {
-      convListEl.innerHTML = '<div id="empty-state">Connecte-toi depuis l\'accueil pour voir tes messages privés.</div>';
-      return;
+  let sessionReady = false;
+  supabase.auth.onAuthStateChange((event, session) => {
+    sessionReady = true;
+    applySession(session);
+  });
+  supabase.auth.getSession().then(({ data }) => {
+    if (!sessionReady) applySession(data ? data.session : null);
+  });
+
+  // Restauration bfcache : revalide la session réellement active.
+  window.addEventListener("pageshow", (e) => {
+    if (e.persisted) {
+      supabase.auth.getSession().then(({ data }) => applySession(data ? data.session : null));
     }
-    await loadConversations();
-  })();
+  });
 
 })();
 </script>

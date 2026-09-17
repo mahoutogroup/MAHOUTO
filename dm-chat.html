@@ -218,6 +218,9 @@
   let currentUser = null;
   let hiddenMessageIds = new Set();
   let peerAvatarUrl = null;
+  let dmChannel = null;
+  let presenceChannelRef = null;
+  let conversationEntered = false;
 
   function setStatus(text) { statusMessage.textContent = text || ""; }
 
@@ -366,7 +369,7 @@
   }
 
   function subscribeToNewMessages() {
-    supabase
+    dmChannel = supabase
       .channel("dm:" + CONV_ID)
       .on(
         "postgres_changes",
@@ -408,6 +411,9 @@
   }
 
   async function enterConversation() {
+    if (conversationEntered) return; // déjà entré pour cet utilisateur : ne pas ré-abonner deux fois
+    conversationEntered = true;
+
     notLoggedInEl.classList.add("hidden");
     chatHeader.classList.remove("hidden");
     messagesEl.classList.remove("hidden");
@@ -428,6 +434,22 @@
 
   function handleConversationVisibilityChange() {
     if (document.visibilityState === "visible") markAsRead();
+  }
+
+  // Nettoie tout état/abonnement lié à l'utilisateur précédent avant un
+  // changement d'identité (déconnexion, ou reconnexion avec un compte
+  // différent) — pour ne JAMAIS laisser la conversation ou les données
+  // de l'ancien compte visibles après un changement de session.
+  function leaveConversation() {
+    conversationEntered = false;
+    if (dmChannel) { supabase.removeChannel(dmChannel); dmChannel = null; }
+    if (presenceChannelRef) { supabase.removeChannel(presenceChannelRef); presenceChannelRef = null; }
+    document.removeEventListener("visibilitychange", handleConversationVisibilityChange);
+    hiddenMessageIds = new Set();
+    messagesEl.innerHTML = "";
+    chatHeader.classList.add("hidden");
+    messagesEl.classList.add("hidden");
+    composer.classList.add("hidden");
   }
 
   async function markAsRead() {
@@ -472,6 +494,7 @@
     const presenceChannel = supabase.channel("presence:mahouto", {
       config: { presence: { key: currentUser.id } }
     });
+    presenceChannelRef = presenceChannel;
 
     const statusEl = document.getElementById("peer-status");
 
@@ -496,13 +519,26 @@
 
     messageInput.value = "";
     autoGrow();
-    const { error } = await supabase.from("dm_messages").insert({
-      conversation_id: CONV_ID,
-      sender_id: currentUser.id,
-      content: content
-    });
+    // Rendu optimiste : on affiche le message dès que l'INSERT a
+    // réellement réussi, sans attendre le Realtime (qui reste le
+    // mécanisme de synchronisation pour B et pour les accusés). On
+    // récupère la ligne RÉELLEMENT créée par le serveur (id, created_at,
+    // delivered_at/read_at à null) plutôt que d'inventer quoi que ce
+    // soit côté client. renderMessage() dédoublonne déjà par data-id : si
+    // le Realtime livre ensuite le même message, il remplace la bulle en
+    // place au lieu d'en créer une seconde.
+    const { data, error } = await supabase
+      .from("dm_messages")
+      .insert({
+        conversation_id: CONV_ID,
+        sender_id: currentUser.id,
+        content: content
+      })
+      .select()
+      .single();
 
-    if (error) { console.error(error); setStatus("Message non envoyé."); }
+    if (error) { console.error(error); setStatus("Message non envoyé."); return; }
+    if (data) renderMessage(data);
   });
 
   // -------- Zone de texte extensible (vers le haut, comme WhatsApp) --------
@@ -785,21 +821,62 @@
       });
   });
 
-  (async function init() {
-    if (!CONV_ID || !PEER_ID) {
-      notLoggedInEl.classList.remove("hidden");
-      notLoggedInEl.textContent = "Conversation introuvable.";
-      return;
+  if (!CONV_ID || !PEER_ID) {
+    notLoggedInEl.classList.remove("hidden");
+    notLoggedInEl.textContent = "Conversation introuvable.";
+  } else {
+    // Synchronisation réactive de l'identité (corrige le BUG « ancien
+    // compte affiché après déconnexion/reconnexion ») : une seule
+    // souscription onAuthStateChange pour toute la durée de vie de la
+    // page, qui gère aussi bien l'état initial (événement
+    // INITIAL_SESSION) que tout changement ultérieur (SIGNED_IN,
+    // SIGNED_OUT, TOKEN_REFRESHED...). getSession() reste un filet de
+    // sécurité pour l'état initial seulement, au cas où INITIAL_SESSION
+    // tarderait anormalement — jamais un second traitement en doublon.
+    let sessionReady = false;
+
+    function applySession(session) {
+      const user = session && session.user ? session.user : null;
+
+      if (!user) {
+        // Jamais conserver la conversation/l'identité de l'ancien compte.
+        if (currentUser) leaveConversation();
+        currentUser = null;
+        notLoggedInEl.classList.remove("hidden");
+        return;
+      }
+
+      if (currentUser && currentUser.id === user.id) {
+        return; // même utilisateur (ex: TOKEN_REFRESHED) : rien à refaire
+      }
+
+      // Première connexion, ou reconnexion avec un compte différent du
+      // précédent : on repart d'un état propre puis on revalide l'accès
+      // à CETTE conversation pour le nouvel utilisateur.
+      if (currentUser) leaveConversation();
+      currentUser = user;
+      enterConversation();
     }
 
-    const { data } = await supabase.auth.getSession();
-    if (!data || !data.session || !data.session.user) {
-      notLoggedInEl.classList.remove("hidden");
-      return;
-    }
-    currentUser = data.session.user;
-    await enterConversation();
-  })();
+    supabase.auth.onAuthStateChange((event, session) => {
+      sessionReady = true;
+      applySession(session);
+    });
+
+    supabase.auth.getSession().then(({ data }) => {
+      if (!sessionReady) applySession(data ? data.session : null);
+    });
+
+    // Restauration depuis le cache "back-forward" (bfcache) du
+    // navigateur : la page peut être réanimée avec un ancien état JS
+    // gelé sans jamais ré-exécuter ce script. On revalide alors la
+    // session réellement active à cet instant précis.
+    window.addEventListener("pageshow", (e) => {
+      if (e.persisted) {
+        supabase.auth.getSession().then(({ data }) => applySession(data ? data.session : null));
+      }
+    });
+  }
 
 })();
 </script>

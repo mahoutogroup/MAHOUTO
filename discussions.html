@@ -695,7 +695,36 @@
     await loadRooms();
   });
 
-  trySilentResume();
+  // Réinitialise l'écran vers l'état "non connecté" — corrige le BUG
+  // « ancien compte affiché après déconnexion/reconnexion » pour un
+  // onglet discussions.html resté ouvert pendant qu'un autre
+  // onglet/page se déconnecte (Supabase synchronise les événements
+  // auth entre onglets du même navigateur).
+  function resetToLoginScreen() {
+    currentUser = null;
+    currentRole = "user";
+    loginScreen.classList.remove("hidden");
+    appEl.classList.add("hidden");
+  }
+
+  trySilentResume(); // lecture initiale de session (comportement existant, inchangé)
+
+  // Synchronisation réactive : une seule souscription, pour toute
+  // reconnexion/déconnexion survenant après ce chargement initial.
+  supabase.auth.onAuthStateChange((event, session) => {
+    const user = session && session.user ? session.user : null;
+    if (!user) {
+      if (currentUser) resetToLoginScreen();
+      return;
+    }
+    if (currentUser && currentUser.id === user.id) return;
+    trySilentResume();
+  });
+
+  // Restauration bfcache : revalide la session réellement active.
+  window.addEventListener("pageshow", (e) => {
+    if (e.persisted) trySilentResume();
+  });
 
 })();
 </script>

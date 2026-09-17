@@ -76,11 +76,25 @@ if (window.__MAHOUTO_AUTH_LOADED__) {
 
             if (!user) {
                 console.log("Aucun utilisateur connecté.");
+                // Réinitialise l'affichage à l'état "non connecté" — sans
+                // ce bloc, une déconnexion (SIGNED_OUT) déclenchait bien
+                // cet événement mais ne remettait jamais l'UI à jour : le
+                // profil du compte précédent restait affiché jusqu'à un
+                // rechargement manuel de la page.
+                const authMethodsEl = document.getElementById("auth-methods");
+                const guestNoteEl = document.getElementById("auth-guest-note");
+                const profileSummaryEl = document.getElementById("profile-summary");
+                const nameEl = document.getElementById("profile-name");
+                const avatarEl = document.getElementById("profile-avatar");
+                if (authMethodsEl) authMethodsEl.classList.remove("hidden-by-auth");
+                if (guestNoteEl) guestNoteEl.classList.remove("hidden");
+                if (profileSummaryEl) profileSummaryEl.classList.remove("visible");
+                if (nameEl) nameEl.textContent = "";
+                if (avatarEl) avatarEl.innerHTML = "";
                 return null;
             }
 
             const userName = user.user_metadata?.full_name || user.user_metadata?.name || user.email || "Utilisateur";
-            const userPhoto = user.user_metadata?.avatar_url || "";
 
             // Créer le profil si n'existe pas
             const { data: existingProfile } = await supabase
@@ -93,15 +107,21 @@ if (window.__MAHOUTO_AUTH_LOADED__) {
                 await ensureProfile(user.id, userName);
             }
 
-            // Mettre à jour le profil dans index.html
-            if(typeof refreshIdentityUI === 'function') {
-                const avatarEl = document.getElementById("profile-avatar");
-                const safePhoto = userPhoto && /^https:\/\//i.test(userPhoto) ? userPhoto : null;
-                if(avatarEl) avatarEl.innerHTML = safePhoto ? `<img src="${escapeHtml(safePhoto)}" alt="">` : userName.trim()[0].toUpperCase();
-                document.getElementById("profile-name").textContent = userName;
-                document.getElementById("auth-methods").classList.add("hidden-by-auth");
-                document.getElementById("auth-guest-note").classList.add("hidden");
-                document.getElementById("profile-summary").classList.add("visible");
+            // Mettre à jour le profil dans index.html.
+            //
+            // CORRECTIF (diagnostic BUG 2) : ce bloc testait
+            // "typeof refreshIdentityUI === 'function'", mais
+            // refreshIdentityUI() est déclarée à l'intérieur de l'IIFE du
+            // script inline d'index.html — elle n'a jamais été exposée
+            // sur window, donc ce typeof valait toujours "undefined" et
+            // ce bloc n'a JAMAIS pu s'exécuter depuis onAuthStateChange.
+            // Seul l'appel unique et direct de refreshIdentityUI() au tout
+            // premier chargement du script (index.html) affichait
+            // correctement l'utilisateur — d'où l'ancien compte qui
+            // restait affiché tant que la page n'était pas rechargée en
+            // entier : la mise à jour réactive était du code mort.
+            if (typeof window.refreshIdentityUI === 'function') {
+                window.refreshIdentityUI();
             }
 
             console.log("Utilisateur connecté :", userName);
@@ -119,6 +139,15 @@ if (window.__MAHOUTO_AUTH_LOADED__) {
     supabase.auth.onAuthStateChange((event, session) => {
         console.log("Etat de session :", event);
         checkUser();
+    });
+
+    // Restauration depuis le cache "back-forward" (bfcache) du
+    // navigateur : la page peut être réanimée avec un ancien état gelé
+    // sans jamais ré-exécuter ce script. On revalide alors la session
+    // réellement active à cet instant précis, pour ne jamais laisser
+    // affiché le profil d'un compte précédent.
+    window.addEventListener("pageshow", (event) => {
+        if (event.persisted) checkUser();
     });
 
     //=========================================================

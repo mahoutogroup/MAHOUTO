@@ -195,28 +195,47 @@
     }
   }
 
-  async function loadProfile() {
-    const { data } = await supabase.auth.getSession();
-    if (data && data.session && data.session.user) {
-      currentUser = data.session.user;
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("username, role, avatar_url")
-        .eq("id", currentUser.id)
-        .maybeSingle();
-      currentUsername = profile ? profile.username : null;
-      currentAvatarUrl = (profile && profile.avatar_url)
-        || (currentUser.user_metadata && currentUser.user_metadata.avatar_url)
-        || null;
+  // Synchronisation réactive de l'identité (corrige le BUG « ancien
+  // compte affiché après déconnexion/reconnexion ») : applySession()
+  // est rejouée à chaque changement de session (onAuthStateChange),
+  // jamais une seule fois au chargement initial comme c'était le cas
+  // auparavant avec un simple getSession().
+  async function applySession(session) {
+    const user = session && session.user ? session.user : null;
 
-      const role = profile ? profile.role : null;
-      if (role === "admin" || role === "super_admin" || role === "founder") {
-        document.getElementById("admin-dashboard-link").classList.remove("hidden");
-        document.getElementById("admin-produits-link").classList.remove("hidden");
-      }
-
-      document.getElementById("logout-btn").classList.remove("hidden");
+    if (!user) {
+      // Jamais conserver le profil d'un compte précédent après
+      // déconnexion (ou reconnexion échouée) : réinitialisation complète.
+      currentUser = null;
+      currentUsername = null;
+      currentAvatarUrl = null;
+      document.getElementById("admin-dashboard-link").classList.add("hidden");
+      document.getElementById("admin-produits-link").classList.add("hidden");
+      document.getElementById("logout-btn").classList.add("hidden");
+      render();
+      return;
     }
+
+    if (currentUser && currentUser.id === user.id) {
+      return; // même utilisateur (ex: TOKEN_REFRESHED) : rien à recharger
+    }
+
+    currentUser = user;
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("username, role, avatar_url")
+      .eq("id", currentUser.id)
+      .maybeSingle();
+    currentUsername = profile ? profile.username : null;
+    currentAvatarUrl = (profile && profile.avatar_url)
+      || (currentUser.user_metadata && currentUser.user_metadata.avatar_url)
+      || null;
+
+    const role = profile ? profile.role : null;
+    const isAdmin = role === "admin" || role === "super_admin" || role === "founder";
+    document.getElementById("admin-dashboard-link").classList.toggle("hidden", !isAdmin);
+    document.getElementById("admin-produits-link").classList.toggle("hidden", !isAdmin);
+    document.getElementById("logout-btn").classList.remove("hidden");
     render();
   }
 
@@ -311,7 +330,25 @@
     }
   });
 
-  loadProfile();
+  let sessionReady = false;
+  supabase.auth.onAuthStateChange((event, session) => {
+    sessionReady = true;
+    applySession(session);
+  });
+  supabase.auth.getSession().then(({ data }) => {
+    if (!sessionReady) applySession(data ? data.session : null);
+  });
+
+  // Restauration depuis le cache "back-forward" (bfcache) du
+  // navigateur : la page peut être réanimée avec un ancien état gelé
+  // sans jamais ré-exécuter ce script. On revalide alors la session
+  // réellement active, pour ne jamais laisser affiché le profil d'un
+  // compte précédent.
+  window.addEventListener("pageshow", (e) => {
+    if (e.persisted) {
+      supabase.auth.getSession().then(({ data }) => applySession(data ? data.session : null));
+    }
+  });
 
 })();
 </script>

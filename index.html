@@ -472,6 +472,14 @@
     }
   }
 
+  // Exposée sur window : auth.js (chargé avant ce script, voir ligne 378)
+  // appelle window.refreshIdentityUI() depuis son propre écouteur
+  // onAuthStateChange pour resynchroniser l'affichage à chaque connexion/
+  // déconnexion — sans cela, seul cet appel initial fonctionnait et
+  // l'affichage restait bloqué sur l'ancien compte jusqu'à un
+  // rechargement manuel (voir correctif correspondant dans auth.js).
+  window.refreshIdentityUI = refreshIdentityUI;
+
   refreshIdentityUI();
 })();
 </script>

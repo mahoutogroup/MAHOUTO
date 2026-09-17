@@ -575,3 +575,45 @@ drop trigger if exists trg_prevent_dm_receipt_tamper on public.dm_messages;
 create trigger trg_prevent_dm_receipt_tamper
   before update on public.dm_messages
   for each row execute function public.prevent_dm_receipt_tamper();
+
+-- =========================================================
+-- v11 — CORRECTIF BUG 3 (diagnostic) : dm_messages absente de la
+-- publication Realtime supabase_realtime
+--
+-- CONSTAT : seule "public.messages" (salons de groupe) est ajoutée à
+-- supabase_realtime dans ce fichier (v2 ci-dessus). Aucune instruction
+-- équivalente n'existe nulle part pour "public.dm_messages", alors que
+-- dm-chat.html écoute déjà des événements postgres_changes INSERT/UPDATE
+-- dessus (subscribeToNewMessages()). Si cette table n'a jamais été
+-- ajoutée à la publication en production, aucun de ces événements n'a
+-- jamais pu être livré à personne (ni l'expéditeur ni le destinataire) :
+-- c'est la cause la plus probable du message envoyé qui n'apparaît pas
+-- immédiatement (BUG 3) et donc de l'absence d'accusé visible (BUG 1).
+--
+-- Cette session n'a pas d'accès direct à la base de production pour
+-- exécuter la vérification demandée :
+--   select * from pg_publication_tables
+--   where pubname = 'supabase_realtime' and schemaname = 'public'
+--     and tablename = 'dm_messages';
+-- Plutôt que d'ajouter un "alter publication ... add table" qui
+-- échouerait si la table y figure déjà (Postgres ne fournit pas de
+-- "add table if not exists" pour ALTER PUBLICATION), ce correctif est
+-- rendu idempotent : il vérifie lui-même pg_publication_tables et
+-- n'ajoute la table que si elle n'y est pas déjà. Rejouable sans risque
+-- à tout moment, que la table soit déjà présente ou non.
+--
+-- Ne touche à AUCUNE autre table, AUCUNE autre publication, et ne
+-- modifie ni la migration v10 ni le trigger prevent_dm_receipt_tamper.
+-- =========================================================
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'dm_messages'
+  ) then
+    alter publication supabase_realtime add table public.dm_messages;
+  end if;
+end $$;
