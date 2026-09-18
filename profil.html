@@ -293,6 +293,18 @@
 
   loadProfile();
 
+  // -------- Réactivité à la session (corrige l'affichage figé sur --------
+  // -------- l'ancien compte après changement d'utilisateur) --------
+  supabase.auth.onAuthStateChange((_event, _session) => {
+    loadProfile();
+  });
+
+  // Filet de sécurité : si la page est restaurée depuis le cache
+  // arrière (retour navigateur) sans ré-exécution du script.
+  window.addEventListener("pageshow", (e) => {
+    if (e.persisted) loadProfile();
+  });
+
 })();
 </script>
 <script src="pwa-install.js"></script>
