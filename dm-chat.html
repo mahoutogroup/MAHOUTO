@@ -78,6 +78,11 @@
 
   .bubble.mine { background: var(--gold-bright); color: #0A0A0A; align-self: flex-end; }
   .bubble .meta { font-size: 11px; opacity: .65; margin-bottom: 4px; font-weight: bold; }
+
+  /* Accusés de réception : ✓ envoyé, ✓✓ gris livré, ✓✓ bleu lu — uniquement sur mes messages */
+  .bubble .ticks { margin-left: 6px; font-size: 12px; letter-spacing: -1px; opacity: 1; }
+  .bubble .ticks.sent, .bubble .ticks.delivered { color: rgba(10,10,10,.45); }
+  .bubble .ticks.read { color: #0B84FF; }
   .bubble .edited-tag { font-size: 10.5px; opacity: .6; margin-left: 6px; font-style: italic; }
   .bubble.deleted { font-style: italic; opacity: .6; }
 
@@ -302,6 +307,15 @@
     return url.replace("/upload/", "/upload/fl_attachment:" + encodeURIComponent(safeName) + "/");
   }
 
+  // Accusé de réception affiché uniquement sur mes propres messages,
+  // jamais sur les messages reçus. Basé uniquement sur delivered_at/
+  // read_at renvoyés par le serveur — jamais déduit côté client.
+  function receiptTicksHtml(msg) {
+    if (msg.read_at) return '<span class="ticks read">✓✓</span>';
+    if (msg.delivered_at) return '<span class="ticks delivered">✓✓</span>';
+    return '<span class="ticks sent">✓</span>';
+  }
+
   function renderMessage(msg) {
     if (hiddenMessageIds.has(msg.id)) return;
 
@@ -343,7 +357,8 @@
         (msg.edited_at ? '<span class="edited-tag">modifié</span>' : "");
     }
 
-    bubble.innerHTML = '<div class="meta">' + time + '</div>' + bodyHtml;
+    const ticksHtml = (isMine && !msg.is_deleted) ? receiptTicksHtml(msg) : "";
+    bubble.innerHTML = '<div class="meta">' + time + ticksHtml + '</div>' + bodyHtml;
     bubble.addEventListener("click", () => openMessageActions(msg));
 
     const existing = messagesEl.querySelector('[data-id="' + msg.id + '"]');
@@ -382,7 +397,13 @@
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "dm_messages", filter: "conversation_id=eq." + CONV_ID },
-        (payload) => { renderMessage(payload.new); }
+        (payload) => {
+          renderMessage(payload.new);
+          if (payload.new.sender_id !== currentUser.id) {
+            markConversationDelivered();
+            markConversationRead();
+          }
+        }
       )
       .on(
         "postgres_changes",
@@ -420,6 +441,8 @@
     subscribeToNewMessages();
     subscribeToPresence();
     await markAsRead();
+    await markConversationDelivered();
+    await markConversationRead();
     messageInput.focus();
   }
 
@@ -431,6 +454,24 @@
         { user_id: currentUser.id, conversation_id: CONV_ID, last_read_at: new Date().toISOString() },
         { onConflict: "user_id,conversation_id" }
       );
+  }
+
+  // -------- Accusés de réception (✓ / ✓✓ gris / ✓✓ bleu) --------
+  // Ces deux fonctions n'envoient jamais de timestamp : le serveur
+  // (fonctions RPC SECURITY DEFINER) génère delivered_at/read_at avec
+  // now() et vérifie lui-même que currentUser fait partie de la
+  // conversation. Aucune donnée sensible n'est fournie par le client.
+  async function markConversationDelivered() {
+    if (!currentUser || !CONV_ID) return;
+    const { error } = await supabase.rpc("mark_conversation_delivered", { p_conversation_id: CONV_ID });
+    if (error) console.error("mark_conversation_delivered :", error.message);
+  }
+
+  async function markConversationRead() {
+    if (!currentUser || !CONV_ID) return;
+    if (document.visibilityState !== "visible") return;
+    const { error } = await supabase.rpc("mark_conversation_read", { p_conversation_id: CONV_ID });
+    if (error) console.error("mark_conversation_read :", error.message);
   }
 
   // -------- Statut en ligne (Presence Supabase, rien en base) --------
@@ -462,13 +503,14 @@
 
     messageInput.value = "";
     autoGrow();
-    const { error } = await supabase.from("dm_messages").insert({
+    const { data, error } = await supabase.from("dm_messages").insert({
       conversation_id: CONV_ID,
       sender_id: currentUser.id,
       content: content
-    });
+    }).select("*").single();
 
     if (error) { console.error(error); setStatus("Message non envoyé."); }
+    else if (data) { renderMessage(data); }
   });
 
   // -------- Zone de texte extensible (vers le haut, comme WhatsApp) --------
@@ -523,16 +565,17 @@
       if (uploadData.resource_type === "image") attachmentType = "image";
       else if (uploadData.resource_type === "video") attachmentType = "video";
 
-      const { error } = await supabase.from("dm_messages").insert({
+      const { data, error } = await supabase.from("dm_messages").insert({
         conversation_id: CONV_ID,
         sender_id: currentUser.id,
         content: "",
         attachment_url: uploadData.secure_url,
         attachment_type: attachmentType,
         attachment_name: file.name || null
-      });
+      }).select("*").single();
 
       if (error) throw error;
+      if (data) renderMessage(data);
     } catch (err) {
       console.error(err);
       setStatus("Envoi du fichier impossible : " + err.message);
@@ -620,15 +663,16 @@
       const uploadData = await uploadResp.json();
       if (!uploadResp.ok) throw new Error(uploadData.error?.message || "Envoi échoué");
 
-      const { error } = await supabase.from("dm_messages").insert({
+      const { data, error } = await supabase.from("dm_messages").insert({
         conversation_id: CONV_ID,
         sender_id: currentUser.id,
         content: "",
         attachment_url: uploadData.secure_url,
         attachment_type: "audio"
-      });
+      }).select("*").single();
 
       if (error) throw error;
+      if (data) renderMessage(data);
       setStatus("");
     } catch (err) {
       console.error(err);
@@ -749,6 +793,12 @@
       .then(({ error }) => {
         if (error) { console.error(error); alert("Impossible de supprimer ce message."); }
       });
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && currentUser && CONV_ID) {
+      markConversationRead();
+    }
   });
 
   (async function init() {
