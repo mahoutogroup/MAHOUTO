@@ -55,13 +55,12 @@ if (window.__MAHOUTO_AUTH_LOADED__) {
     //=========================================================
     // CREATION DU PROFIL
     //=========================================================
-    async function ensureProfile(userId, username) {
+    async function ensureProfile(userId, username, avatarUrl) {
+        const payload = { id: userId, username: username };
+        if (avatarUrl) payload.avatar_url = avatarUrl;
         const { error } = await supabase
            .from("profiles")
-           .upsert(
-                { id: userId, username: username },
-                { onConflict: "id" }
-            );
+           .upsert(payload, { onConflict: "id" });
         if (error) {
             console.error("Profil non enregistré :", error.message);
         }
@@ -85,12 +84,24 @@ if (window.__MAHOUTO_AUTH_LOADED__) {
             // Créer le profil si n'existe pas
             const { data: existingProfile } = await supabase
                .from("profiles")
-               .select("username")
+               .select("username, avatar_url")
                .eq("id", user.id)
                .maybeSingle();
 
             if (!existingProfile) {
-                await ensureProfile(user.id, userName);
+                await ensureProfile(user.id, userName, userPhoto);
+            } else if (!existingProfile.avatar_url && userPhoto) {
+                // Synchronise la photo Google vers profiles.avatar_url
+                // UNIQUEMENT si la colonne est encore vide : ne remplace
+                // jamais une photo personnalisée déjà choisie par l'utilisateur.
+                const { error: avatarSyncError } = await supabase
+                    .from("profiles")
+                    .update({ avatar_url: userPhoto })
+                    .eq("id", user.id)
+                    .is("avatar_url", null);
+                if (avatarSyncError) {
+                    console.error("Synchronisation avatar Google échouée :", avatarSyncError.message);
+                }
             }
 
             // Mettre à jour le profil dans index.html
