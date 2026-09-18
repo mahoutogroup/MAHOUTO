@@ -1,4 +1,4 @@
-const CACHE_NAME = "mahoutoplus-shell-v59";
+const CACHE_NAME = "mahoutoplus-shell-v60";
 const SHARE_CACHE_NAME = "mahoutoplus-share-v1";
 
 const APP_SHELL = [
@@ -277,6 +277,44 @@ self.addEventListener("fetch", event => {
   }
 
   /*
+   * Documents HTML (navigations : index.html, profil.html, chat.html,
+   * dm-chat.html, etc.) → NETWORK FIRST.
+   *
+   * On veut toujours la dernière version déployée du HTML/JS d'une
+   * page, pour éviter qu'un ancien script (ex. profil.html sans son
+   * dernier correctif) reste servi depuis le cache après un déploiement.
+   * Le cache ne sert plus que de secours hors-ligne, jamais de
+   * première réponse.
+   */
+
+  const isHtmlDocument =
+    event.request.mode === "navigate" ||
+    url.pathname.endsWith(".html") ||
+    url.pathname === "/";
+
+  if (event.request.method === "GET" && isHtmlDocument) {
+    event.respondWith(
+      (async () => {
+        const cache = await caches.open(CACHE_NAME);
+        try {
+          const networkResponse = await fetch(event.request);
+          if (networkResponse && networkResponse.ok) {
+            cache.put(event.request, networkResponse.clone());
+          }
+          return networkResponse;
+        } catch (err) {
+          // Réseau indisponible : on retombe sur la dernière version
+          // connue en cache, si elle existe.
+          const cached = await cache.match(event.request);
+          if (cached) return cached;
+          throw err;
+        }
+      })()
+    );
+    return;
+  }
+
+  /*
    * Stale-while-revalidate :
    * on sert immédiatement la version en cache si elle existe
    * (rapide, fonctionne hors ligne), ET on relance en parallèle
@@ -284,6 +322,10 @@ self.addEventListener("fetch", event => {
    * de la prochaine visite. Plus besoin de changer CACHE_NAME
    * à chaque contenu modifié — seuls les fichiers de l'App Shell
    * eux-mêmes (structure/icônes) nécessitent encore un bump.
+   *
+   * S'applique désormais uniquement aux assets statiques
+   * (CSS, JS, images, icônes, polices, manifest, etc.) — plus aux
+   * documents HTML, gérés ci-dessus en Network First.
    */
 
   if (event.request.method === "GET") {
