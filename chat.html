@@ -70,7 +70,25 @@
     background: var(--bg-card);
     align-self: flex-start;
     word-wrap: break-word;
+    overflow-wrap: break-word;
+    white-space: pre-wrap;
   }
+
+  .bubble.long { max-width: 90%; }
+
+  .bubble pre.code-block {
+    margin: 6px 0;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: rgba(0,0,0,.28);
+    overflow-x: auto;
+    white-space: pre;
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 12.5px;
+    line-height: 1.5;
+  }
+  .bubble.mine pre.code-block { background: rgba(0,0,0,.14); }
+  .bubble pre.code-block code { white-space: pre; }
 
   .bubble.mine { background: var(--gold-bright); color: #0A0A0A; align-self: flex-end; }
 
@@ -313,6 +331,27 @@
     });
   }
 
+  // Met en forme le corps d'un message : détecte les blocs ```code```
+  // et les isole visuellement, sans jamais désactiver l'échappement.
+  // N'opère QUE sur du texte déjà passé par escapeHtml() — les
+  // backticks ne sont jamais échappés par escapeHtml, donc cette
+  // détection reste fiable sur le texte sûr. linkify() n'est appliqué
+  // qu'aux portions hors bloc de code, pour ne pas transformer une
+  // URL présente dans un extrait de code.
+  function formatMessageBody(escapedText) {
+    const parts = escapedText.split(/```([\s\S]*?)```/g);
+    let result = "";
+    for (let i = 0; i < parts.length; i++) {
+      if (i % 2 === 1) {
+        const codeContent = parts[i].replace(/^\n/, "").replace(/\n$/, "");
+        result += '<pre class="code-block"><code>' + codeContent + "</code></pre>";
+      } else {
+        result += linkify(parts[i]);
+      }
+    }
+    return result;
+  }
+
   // Nettoie un nom de fichier pour l'utiliser dans une URL de
   // transformation Cloudinary : les points, parenthèses, virgules...
   // ont un sens technique pour Cloudinary et cassent l'URL, même
@@ -339,7 +378,10 @@
     const bubble = document.createElement("div");
     bubble.dataset.id = msg.id;
     bubble.dataset.userId = msg.user_id;
-    bubble.className = "bubble" + (msg.user_id === currentUser.id ? " mine" : "") + (msg.is_deleted ? " deleted" : "");
+    bubble.className = "bubble" +
+      (msg.user_id === currentUser.id ? " mine" : "") +
+      (msg.is_deleted ? " deleted" : "") +
+      (msg.content && msg.content.length > 200 ? " long" : "");
     const time = new Date(msg.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
 
     let bodyHtml;
@@ -365,7 +407,7 @@
           mediaHtml = `<a href="${downloadUrl}" target="_blank" style="color:inherit;text-decoration:underline;display:block;margin-top:6px;">${label}</a>`;
         }
       }
-      bodyHtml = (msg.content ? linkify(escapeHtml(msg.content)) : "") + mediaHtml +
+      bodyHtml = (msg.content ? formatMessageBody(escapeHtml(msg.content)) : "") + mediaHtml +
         (msg.edited_at ? '<span class="edited-tag">modifié</span>' : "");
     }
 
