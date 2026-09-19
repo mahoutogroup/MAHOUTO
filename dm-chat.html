@@ -44,6 +44,17 @@
   }
   #avatar-viewer img { width: 90vw; height: 90vh; object-fit: contain; }
 
+  #media-viewer {
+    position: fixed; inset: 0; background: rgba(0,0,0,.9); z-index: 80;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #media-viewer img, #media-viewer video { width: 90vw; height: 90vh; object-fit: contain; }
+  #media-viewer-close {
+    position: absolute; top: 16px; right: 16px; width: 40px; height: 40px;
+    border-radius: 50%; border: none; background: rgba(0,0,0,.5); color: #fff;
+    font-size: 20px; line-height: 1; cursor: pointer; z-index: 81;
+  }
+
   header h1 { font-size: 17px; color: var(--gold-bright); }
 
   #messages {
@@ -202,6 +213,12 @@
   <img id="avatar-viewer-img" src="" alt="">
 </div>
 
+<div id="media-viewer" class="hidden">
+  <button type="button" id="media-viewer-close" aria-label="Fermer">✕</button>
+  <img id="media-viewer-img" class="hidden" src="" alt="">
+  <video id="media-viewer-video" class="hidden" controls></video>
+</div>
+
 <div id="messages" class="hidden"></div>
 <div id="recording-indicator" class="hidden">🔴 Enregistrement... <span id="recording-time">0:00</span></div>
 <div id="status-message"></div>
@@ -346,9 +363,9 @@
       let mediaHtml = "";
       if (msg.attachment_url) {
         if (msg.attachment_type === "image") {
-          mediaHtml = `<img src="${msg.attachment_url}" style="max-width:100%;border-radius:12px;margin-top:6px;display:block;">`;
+          mediaHtml = `<img src="${msg.attachment_url}" class="msg-media" style="max-width:100%;border-radius:12px;margin-top:6px;display:block;cursor:pointer;">`;
         } else if (msg.attachment_type === "video") {
-          mediaHtml = `<video src="${msg.attachment_url}" controls style="max-width:100%;border-radius:12px;margin-top:6px;display:block;"></video>`;
+          mediaHtml = `<video src="${msg.attachment_url}" class="msg-media" controls style="max-width:100%;border-radius:12px;margin-top:6px;display:block;cursor:pointer;"></video>`;
         } else if (msg.attachment_type === "audio") {
           mediaHtml = `<audio src="${msg.attachment_url}" controls></audio>`;
         } else if (isPdfUrl(msg.attachment_url)) {
@@ -370,7 +387,11 @@
 
     const ticksHtml = (isMine && !msg.is_deleted) ? receiptTicksHtml(msg) : "";
     bubble.innerHTML = '<div class="meta">' + time + ticksHtml + '</div>' + bodyHtml;
-    bubble.addEventListener("click", () => openMessageActions(msg));
+    bubble.addEventListener("click", (e) => {
+      const media = e.target.closest(".msg-media");
+      if (media) { openMediaViewer(media); return; }
+      openMessageActions(msg);
+    });
 
     const existing = messagesEl.querySelector('[data-id="' + msg.id + '"]');
     if (existing) {
@@ -452,6 +473,42 @@
   avatarViewer.addEventListener("click", () => {
     avatarViewer.classList.add("hidden");
     avatarViewerImg.src = "";
+  });
+
+  const mediaViewer = document.getElementById("media-viewer");
+  const mediaViewerImg = document.getElementById("media-viewer-img");
+  const mediaViewerVideo = document.getElementById("media-viewer-video");
+
+  function openMediaViewer(el) {
+    if (el.tagName === "VIDEO") {
+      mediaViewerVideo.src = el.currentSrc || el.src;
+      mediaViewerVideo.classList.remove("hidden");
+      mediaViewerImg.classList.add("hidden");
+      mediaViewerImg.src = "";
+      mediaViewerVideo.play().catch(() => {});
+    } else {
+      mediaViewerImg.src = el.src;
+      mediaViewerImg.classList.remove("hidden");
+      mediaViewerVideo.classList.add("hidden");
+      mediaViewerVideo.pause();
+      mediaViewerVideo.removeAttribute("src");
+      mediaViewerVideo.load();
+    }
+    mediaViewer.classList.remove("hidden");
+  }
+
+  function closeMediaViewer() {
+    mediaViewer.classList.add("hidden");
+    mediaViewerImg.classList.add("hidden");
+    mediaViewerImg.src = "";
+    mediaViewerVideo.pause();
+    mediaViewerVideo.removeAttribute("src");
+    mediaViewerVideo.load();
+  }
+
+  document.getElementById("media-viewer-close").addEventListener("click", closeMediaViewer);
+  mediaViewer.addEventListener("click", (e) => {
+    if (e.target === mediaViewer || e.target === mediaViewerImg) closeMediaViewer();
   });
 
   async function enterConversation() {
