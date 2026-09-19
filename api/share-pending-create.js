@@ -35,6 +35,57 @@ export default async function handler(req, res) {
     });
   }
 
+  const CLOUDINARY_CLOUD_NAME =
+    process.env.CLOUDINARY_CLOUD_NAME;
+
+  if (!CLOUDINARY_CLOUD_NAME) {
+    return res.status(500).json({
+      success: false,
+      error: "Variable CLOUDINARY_CLOUD_NAME manquante."
+    });
+  }
+
+  // ==================================================
+  // 2bis. Authentification obligatoire — empêche
+  // n'importe qui sur Internet d'appeler cette route
+  // pour créer des partages arbitraires.
+  // ==================================================
+
+  const authorization = String(req.headers.authorization || "");
+
+  if (!authorization.toLowerCase().startsWith("bearer ")) {
+    return res.status(401).json({
+      success: false,
+      error: "Utilisateur non authentifié."
+    });
+  }
+
+  const accessToken = authorization.slice(7).trim();
+
+  if (!accessToken) {
+    return res.status(401).json({
+      success: false,
+      error: "Token d'authentification manquant."
+    });
+  }
+
+  const userResponse = await fetch(
+    `${SUPABASE_URL}/auth/v1/user`,
+    {
+      headers: {
+        apikey: SUPABASE_SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${accessToken}`
+      }
+    }
+  );
+
+  if (!userResponse.ok) {
+    return res.status(401).json({
+      success: false,
+      error: "Session utilisateur invalide ou expirée."
+    });
+  }
+
   // ==================================================
   // 3. Lecture du body JSON
   // ==================================================
@@ -105,6 +156,22 @@ export default async function handler(req, res) {
       success: false,
       error:
         "L'URL Cloudinary du fichier est manquante."
+    });
+  }
+
+  /*
+   * L'URL doit provenir de VOTRE compte Cloudinary —
+   * jamais d'un lien externe arbitraire fourni par le
+   * client, qui pourrait servir à injecter un traqueur
+   * ou un contenu malveillant dans un message de salon.
+   */
+  const expectedCloudinaryPrefix =
+    `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/`;
+
+  if (attachmentUrl && !attachmentUrl.startsWith(expectedCloudinaryPrefix)) {
+    return res.status(400).json({
+      success: false,
+      error: "URL de fichier invalide."
     });
   }
 

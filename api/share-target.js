@@ -29,6 +29,70 @@ export const config = {
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
 const PENDING_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 
+// Cette route est appelée directement par le système de partage du
+// téléphone (menu "Partager" d'Android/Chrome) — elle ne peut donc pas
+// exiger de session Supabase comme les autres routes de l'app : le
+// navigateur ne joint jamais de jeton d'authentification à ce type
+// d'envoi. On limite les dégâts autrement : seuls les vrais fichiers
+// média sont acceptés, et le nombre d'envois par adresse IP est plafonné.
+const ALLOWED_MIME_PREFIXES = ["image/", "video/", "audio/"];
+const ALLOWED_MIME_EXACT = ["application/pdf"];
+
+const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000; // 10 minutes
+const RATE_LIMIT_MAX_PER_WINDOW = 8; // 8 envois / 10 min / IP
+
+function getClientIp(req) {
+  const forwarded = req.headers["x-forwarded-for"];
+  const first = Array.isArray(forwarded) ? forwarded[0] : forwarded;
+  const ip = (first || "").split(",")[0].trim();
+  return ip || (req.socket && req.socket.remoteAddress) || "unknown";
+}
+
+async function checkRateLimit(supabaseUrl, serviceRoleKey, ip) {
+  const headers = {
+    apikey: serviceRoleKey,
+    Authorization: `Bearer ${serviceRoleKey}`,
+  };
+
+  const getResp = await fetch(
+    `${supabaseUrl}/rest/v1/share_target_rate_limit?ip=eq.${encodeURIComponent(ip)}&select=*`,
+    { headers }
+  );
+  const rows = getResp.ok ? await getResp.json() : [];
+  const existing = Array.isArray(rows) ? rows[0] : null;
+  const now = Date.now();
+
+  if (!existing) {
+    await fetch(`${supabaseUrl}/rest/v1/share_target_rate_limit`, {
+      method: "POST",
+      headers: { ...headers, "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({ ip, window_start: new Date(now).toISOString(), count: 1 }),
+    });
+    return true;
+  }
+
+  const windowStart = new Date(existing.window_start).getTime();
+  if (now - windowStart > RATE_LIMIT_WINDOW_MS) {
+    await fetch(`${supabaseUrl}/rest/v1/share_target_rate_limit?ip=eq.${encodeURIComponent(ip)}`, {
+      method: "PATCH",
+      headers: { ...headers, "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({ window_start: new Date(now).toISOString(), count: 1 }),
+    });
+    return true;
+  }
+
+  if (existing.count >= RATE_LIMIT_MAX_PER_WINDOW) {
+    return false;
+  }
+
+  await fetch(`${supabaseUrl}/rest/v1/share_target_rate_limit?ip=eq.${encodeURIComponent(ip)}`, {
+    method: "PATCH",
+    headers: { ...headers, "Content-Type": "application/json", Prefer: "return=minimal" },
+    body: JSON.stringify({ count: existing.count + 1 }),
+  });
+  return true;
+}
+
 function getEnv(name) {
   const value = process.env[name];
 
@@ -113,6 +177,26 @@ async function handler(req, res) {
     const CLOUDINARY_FOLDER =
       process.env.CLOUDINARY_FOLDER ||
       "mahoutoplus/messages";
+
+    // ============================================================
+    // LIMITATION DE DÉBIT (par adresse IP)
+    // ============================================================
+
+    const clientIp = getClientIp(req);
+    const withinRateLimit = await checkRateLimit(
+      SUPABASE_URL,
+      SUPABASE_SERVICE_ROLE_KEY,
+      clientIp
+    );
+
+    if (!withinRateLimit) {
+      return sendJson(res, 429, {
+        success: false,
+        error:
+          "Trop d'envois depuis cette connexion. Réessayez dans quelques minutes.",
+      });
+    }
+
 
     // ============================================================
     // CONTENT TYPE
@@ -204,6 +288,26 @@ async function handler(req, res) {
         error:
           "Le fichier est trop volumineux.",
         max_size_mb: 50,
+      });
+    }
+
+    // ============================================================
+    // TYPE DE FICHIER AUTORISÉ
+    // ============================================================
+    // Seuls les fichiers média sont acceptés — évite d'héberger
+    // n'importe quel type de fichier sur votre compte Cloudinary
+    // via cette route non authentifiable.
+
+    const fileMime = (file.type || "").toLowerCase();
+    const mimeAllowed =
+      ALLOWED_MIME_PREFIXES.some((prefix) => fileMime.startsWith(prefix)) ||
+      ALLOWED_MIME_EXACT.includes(fileMime);
+
+    if (!mimeAllowed) {
+      return sendJson(res, 415, {
+        success: false,
+        error:
+          "Type de fichier non autorisé. Seuls les photos, vidéos, audios et PDF peuvent être partagés.",
       });
     }
 

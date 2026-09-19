@@ -56,6 +56,9 @@ async function handler(req, res) {
         "SUPABASE_SERVICE_ROLE_KEY"
       );
 
+    const CLOUDINARY_CLOUD_NAME =
+      getEnv("CLOUDINARY_CLOUD_NAME");
+
 
     // =========================================================
     // 2. AUTHENTIFICATION
@@ -266,6 +269,28 @@ async function handler(req, res) {
         success: false,
         error:
           "Ce partage a expiré.",
+      });
+    }
+
+
+    // =========================================================
+    // 6bis. PROVENANCE DU FICHIER
+    // =========================================================
+    // Filet de sécurité supplémentaire : même si share_pending
+    // contenait une URL non-Cloudinary (créée par un autre chemin
+    // que celui prévu), on refuse de la publier dans un salon.
+
+    const expectedCloudinaryPrefix =
+      `https://res.cloudinary.com/${CLOUDINARY_CLOUD_NAME}/`;
+
+    if (
+      !pending.attachment_url ||
+      !pending.attachment_url.startsWith(expectedCloudinaryPrefix)
+    ) {
+
+      return json(res, 400, {
+        success: false,
+        error: "URL de fichier invalide.",
       });
     }
 
