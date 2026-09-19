@@ -390,7 +390,8 @@
           mediaHtml = `<a href="${downloadUrl}" target="_blank" style="color:inherit;text-decoration:underline;display:block;margin-top:6px;">${label}</a>`;
         }
       }
-      bodyHtml = (msg.content ? formatMessageBody(escapeHtml(msg.content)) : "") + mediaHtml +
+      const textHtml = msg.content ? formatMessageBody(escapeHtml(msg.content)) : "";
+      bodyHtml = mediaHtml + (textHtml && mediaHtml ? '<div style="margin-top:6px;">' + textHtml + '</div>' : textHtml) +
         (msg.edited_at ? '<span class="edited-tag">modifié</span>' : "");
     }
 
