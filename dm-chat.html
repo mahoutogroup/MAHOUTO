@@ -36,6 +36,13 @@
     font-weight: bold; font-size: 14px; flex: none; overflow: hidden;
   }
   header .peer-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  header .peer-avatar.has-photo { cursor: pointer; }
+
+  #avatar-viewer {
+    position: fixed; inset: 0; background: rgba(0,0,0,.9); z-index: 80;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #avatar-viewer img { max-width: 90vw; max-height: 90vh; border-radius: 8px; object-fit: contain; }
 
   header h1 { font-size: 17px; color: var(--gold-bright); }
 
@@ -190,6 +197,10 @@
     <span class="peer-status" id="peer-status">Hors ligne</span>
   </div>
 </header>
+
+<div id="avatar-viewer" class="hidden">
+  <img id="avatar-viewer-img" src="" alt="">
+</div>
 
 <div id="messages" class="hidden"></div>
 <div id="recording-indicator" class="hidden">🔴 Enregistrement... <span id="recording-time">0:00</span></div>
@@ -423,11 +434,25 @@
     const avatarEl = document.getElementById("peer-avatar");
     if (peerAvatarUrl) {
       avatarEl.innerHTML = `<img src="${peerAvatarUrl}" alt="">`;
+      avatarEl.classList.add("has-photo");
     } else {
       const name = document.getElementById("peer-name").textContent;
       avatarEl.textContent = name ? name.trim()[0].toUpperCase() : "?";
+      avatarEl.classList.remove("has-photo");
     }
   }
+
+  const avatarViewer = document.getElementById("avatar-viewer");
+  const avatarViewerImg = document.getElementById("avatar-viewer-img");
+  document.getElementById("peer-avatar").addEventListener("click", () => {
+    if (!peerAvatarUrl) return;
+    avatarViewerImg.src = peerAvatarUrl;
+    avatarViewer.classList.remove("hidden");
+  });
+  avatarViewer.addEventListener("click", () => {
+    avatarViewer.classList.add("hidden");
+    avatarViewerImg.src = "";
+  });
 
   async function enterConversation() {
     notLoggedInEl.classList.add("hidden");
