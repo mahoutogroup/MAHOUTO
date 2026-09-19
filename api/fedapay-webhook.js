@@ -195,7 +195,11 @@ export default async function handler(req, res) {
   //    la ligne appartenant réellement à l'utilisateur concerné.
   // ---------------------------------------------------------
   let newStatus = "pending";
-  if (officialStatus === "approved") newStatus = "paid";
+  // "transferred" = fonds déjà transférés vers le compte marchand — c'est
+  // un statut final de succès au même titre que "approved" (FedaPay ne
+  // repasse pas forcément par "approved" au moment où ce webhook vérifie
+  // la transaction si l'événement reçu correspond au transfert).
+  if (officialStatus === "approved" || officialStatus === "transferred") newStatus = "paid";
   else if (officialStatus === "declined" || officialStatus === "canceled") newStatus = "failed";
 
   const updatePayload = { status: newStatus, fedapay_status: officialStatus };
