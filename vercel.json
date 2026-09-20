@@ -3,5 +3,8 @@
     "api/*.js": {
       "maxDuration": 60
     }
-  }
+  },
+  "rewrites": [
+    { "source": "/p/:id", "destination": "/api/produit-og?id=:id" }
+  ]
 }

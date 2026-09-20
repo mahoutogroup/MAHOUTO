@@ -32,6 +32,10 @@
 
   .owned-banner { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 700; color: var(--accent-green); background: rgba(34,197,94,.12); padding: 10px 14px; border-radius: 12px; }
 
+  .top-bar { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px 0; }
+  .share-btn { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; color: var(--gold); background: rgba(212,175,55,.12); border: none; border-radius: 999px; padding: 6px 14px; cursor: pointer; }
+  .share-btn:active { opacity: .7; }
+
   .sticky-buy {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
     padding: 14px 20px calc(14px + env(safe-area-inset-bottom));
@@ -154,6 +158,35 @@
     }
   }
 
+  function shareUrlFor(productId) {
+    return `${window.location.origin}/p/${encodeURIComponent(productId)}`;
+  }
+
+  async function shareProduct(productId, product) {
+    const amount = product.promotion ?? product.prix;
+    const url = shareUrlFor(productId);
+    const text = `${product.nom} — ${money(amount)}`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: product.nom, text, url });
+        return;
+      } catch (err) {
+        // L'utilisateur a annulé le partage natif : pas d'erreur à afficher.
+        if (err && err.name === "AbortError") return;
+      }
+    }
+
+    // Repli (desktop / navigateurs sans Web Share API) :
+    // on ouvre WhatsApp Web avec le message pré-rempli, et on copie
+    // aussi le lien dans le presse-papier au cas où.
+    try {
+      await navigator.clipboard.writeText(`${text}\n${url}`);
+    } catch (err) { /* presse-papier indisponible, on continue quand même */ }
+
+    window.open(`https://wa.me/?text=${encodeURIComponent(text + "\n" + url)}`, "_blank");
+  }
+
   async function init() {
     const params = new URLSearchParams(window.location.search);
     const productId = params.get("id");
@@ -180,8 +213,9 @@
     const originalAmount = product.promotion ? product.prix : null;
 
     contentEl.innerHTML = `
-      <div style="padding:14px 20px 0;">
+      <div class="top-bar">
         <a href="produits.html" style="font-size:12.5px;color:var(--text-muted);text-decoration:none;">← Retour à la boutique</a>
+        <button id="share-btn" class="share-btn" type="button">📤 Partager</button>
       </div>
 
       ${product.image_url
@@ -213,6 +247,9 @@
 
     loadingEl.classList.add("hidden");
     contentEl.classList.remove("hidden");
+
+    const shareBtn = document.getElementById("share-btn");
+    if (shareBtn) shareBtn.addEventListener("click", () => shareProduct(productId, product));
 
     const sticky = document.createElement("div");
     sticky.className = "sticky-buy";
