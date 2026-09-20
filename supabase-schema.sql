@@ -539,45 +539,27 @@ alter table public.share_pending enable row level security;
 alter table public.share_target_rate_limit enable row level security;
 
 -- ---------- profiles ----------
--- NOTE : "Ecriture/Lecture/Mise a jour profil personnel" (anciennes,
--- en français) et "profiles_insert/select/update_own" (nouvelles)
--- coexistent en prod et font le même travail en double — fidèlement
--- reproduites telles quelles ; un nettoyage éventuel (suppression des
--- anciennes) peut être fait plus tard sans rien casser.
-drop policy if exists "Ecriture profil personnel" on public.profiles;
-create policy "Ecriture profil personnel" on public.profiles
-  for insert with check (auth.uid() = id);
-
-drop policy if exists "Lecture profils" on public.profiles;
-create policy "Lecture profils" on public.profiles
-  for select using (auth.role() = 'authenticated');
-
-drop policy if exists "Mise a jour profil personnel" on public.profiles;
-create policy "Mise a jour profil personnel" on public.profiles
-  for update using (auth.uid() = id);
-
 drop policy if exists "profiles_insert_own" on public.profiles;
 create policy "profiles_insert_own" on public.profiles
   for insert with check (auth.uid() = id);
 
-drop policy if exists "profiles_select_own" on public.profiles;
-create policy "profiles_select_own" on public.profiles
-  for select using (auth.uid() = id);
+-- Lecture : tout utilisateur connecté peut lire n'importe quel profil
+-- (nécessaire pour afficher noms/avatars dans discussions, salons, etc.).
+-- Remplace les anciennes "Lecture profils" (FR) et "profiles_select_own"
+-- (EN, trop restrictive et jamais réellement appliquée) — nettoyage du
+-- 20/09/2026, comportement inchangé.
+drop policy if exists "profiles_select_authenticated" on public.profiles;
+create policy "profiles_select_authenticated" on public.profiles
+  for select using (auth.role() = 'authenticated');
 
 drop policy if exists "profiles_update_own" on public.profiles;
 create policy "profiles_update_own" on public.profiles
   for update using (auth.uid() = id) with check (auth.uid() = id);
 
 -- ---------- rooms ----------
--- Même remarque : doublons anciens/nouveaux conservés fidèlement.
-drop policy if exists "Allow public read rooms" on public.rooms;
-create policy "Allow public read rooms" on public.rooms
-  for select using (true);
-
-drop policy if exists "Lecture salons" on public.rooms;
-create policy "Lecture salons" on public.rooms
-  for select using (auth.role() = 'authenticated');
-
+-- Anciens doublons FR ("Allow public read rooms", "Lecture salons")
+-- supprimés le 20/09/2026 — rooms_public_read couvrait déjà le même
+-- effet (lecture publique), comportement inchangé.
 drop policy if exists "rooms_public_read" on public.rooms;
 create policy "rooms_public_read" on public.rooms
   for select using (true);
@@ -596,15 +578,9 @@ create policy "rooms_update_own_or_admin" on public.rooms
   with check (created_by = auth.uid() or is_admin());
 
 -- ---------- messages ----------
--- Même remarque : doublons anciens/nouveaux conservés fidèlement.
-drop policy if exists "Envoi message" on public.messages;
-create policy "Envoi message" on public.messages
-  for insert with check (auth.uid() = user_id);
-
-drop policy if exists "Lecture messages" on public.messages;
-create policy "Lecture messages" on public.messages
-  for select using (auth.role() = 'authenticated');
-
+-- Anciens doublons FR ("Envoi message", "Lecture messages") supprimés
+-- le 20/09/2026 — messages_insert_own et messages_public_read
+-- couvraient déjà le même effet, comportement inchangé.
 drop policy if exists "messages_insert_own" on public.messages;
 create policy "messages_insert_own" on public.messages
   for insert with check (auth.uid() = user_id);
