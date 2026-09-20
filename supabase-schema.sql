@@ -809,6 +809,18 @@ drop policy if exists "Lecture produits disponibles" on public.digital_products;
 create policy "Lecture produits disponibles" on public.digital_products
   for select using (disponible = true);
 
+drop policy if exists "digital_products_admin_insert" on public.digital_products;
+create policy "digital_products_admin_insert" on public.digital_products
+  for insert with check (is_admin());
+
+drop policy if exists "digital_products_admin_update" on public.digital_products;
+create policy "digital_products_admin_update" on public.digital_products
+  for update using (is_admin()) with check (is_admin());
+
+drop policy if exists "digital_products_admin_delete" on public.digital_products;
+create policy "digital_products_admin_delete" on public.digital_products
+  for delete using (is_admin());
+
 -- ---------- purchases ----------
 drop policy if exists "Lecture achats personnels" on public.purchases;
 create policy "Lecture achats personnels" on public.purchases
