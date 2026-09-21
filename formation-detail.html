@@ -278,7 +278,13 @@
     `;
     document.body.appendChild(sticky);
 
-    if (!owned && formation.disponible) {
+    if (owned) {
+      // Avant Phase 1 : ce bouton n'avait aucune action une fois la
+      // formation acquise. Il ouvre maintenant le lecteur de cours.
+      document.getElementById("sticky-buy-btn").addEventListener("click", () => {
+        window.location.href = "formation-lecture.html?course=" + encodeURIComponent(courseId);
+      });
+    } else if (formation.disponible) {
       document.getElementById("sticky-buy-btn").addEventListener("click", (e) => buy(courseId, e.target));
     }
   }

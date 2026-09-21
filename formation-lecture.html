@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Formation — MAHOUTO+</title>
+<meta name="theme-color" content="#0A0A0A">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="assets/favicon.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="stylesheet" href="theme.css">
+<script src="theme-toggle.js"></script>
+<style>
+  #loading-state, #error-state {
+    text-align: center; color: var(--text-dim); padding: 80px 24px; font-size: 14px;
+  }
+
+  header.top { padding: 14px 20px; background: var(--bg-elevated); border-bottom: 1px solid var(--border); }
+  header.top a.back { font-size: 12.5px; color: var(--text-muted); text-decoration: none; }
+  header.top h1 { font-size: 16.5px; margin-top: 6px; }
+
+  .player-wrap {
+    width: 100%; aspect-ratio: 16/9; background: #000;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .player-wrap video { width: 100%; height: 100%; }
+  .player-placeholder { color: var(--text-dim); font-size: 13px; text-align: center; padding: 20px; }
+
+  .current-lesson-bar {
+    padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .current-lesson-bar .titre { font-size: 14px; font-weight: 600; }
+  .mark-done-btn {
+    font-size: 12px; font-weight: 700; padding: 8px 14px; border-radius: 10px;
+    border: none; background: var(--gold-bright); color: #0A0A0A; cursor: pointer; white-space: nowrap;
+  }
+  .mark-done-btn.done { background: rgba(34,197,94,.18); color: var(--accent-green); }
+  .mark-done-btn:disabled { opacity: .6; cursor: wait; }
+
+  .modules-area { padding: 12px 20px 100px; }
+  .module-block { margin-bottom: 18px; }
+  .module-block h2 { font-size: 13.5px; color: var(--gold); margin-bottom: 8px; }
+
+  .lesson-item {
+    display: flex; align-items: center; gap: 10px; padding: 12px 14px;
+    border-radius: 12px; border: 1px solid var(--border); background: var(--bg-card);
+    margin-bottom: 8px; cursor: pointer;
+  }
+  .lesson-item.active { border-color: var(--gold); }
+  .lesson-item .check {
+    width: 20px; height: 20px; border-radius: 50%; flex: none;
+    display: flex; align-items: center; justify-content: center; font-size: 11px;
+    border: 1px solid var(--border); color: var(--text-dim);
+  }
+  .lesson-item.completed .check { background: var(--accent-green); border-color: var(--accent-green); color: #0A0A0A; }
+  .lesson-item .titre { font-size: 13.5px; flex: 1; }
+  .lesson-item .preview-tag { font-size: 10px; color: var(--gold); font-weight: 700; flex: none; }
+
+  .lesson-item.locked { opacity: .7; }
+  .lesson-item.locked .check { color: var(--gold); border-color: var(--gold); }
+
+  .locked-msg {
+    text-align: center; color: var(--text-dim); font-size: 13px; padding: 60px 24px;
+  }
+</style>
+</head>
+<body>
+
+<button id="theme-toggle-btn" class="theme-toggle-fab">🌙</button>
+
+<div class="page-content">
+  <div id="loading-state">Chargement de la formation...</div>
+  <div id="error-state" class="hidden">Formation introuvable ou accès non autorisé.</div>
+  <div id="content" class="hidden"></div>
+</div>
+
+<nav class="bottom-nav">
+  <a class="nav-item" href="index.html"><span class="icon">🏠</span>Accueil</a>
+  <a class="nav-item" href="discussions.html"><span class="icon">💬</span>Messages</a>
+  <a class="nav-item" href="https://ai.majestepresse.com/chat" target="_blank" rel="noopener"><span class="icon">🧠</span>MAHOUTO AI</a>
+  <a class="nav-item active" href="school.html"><span class="icon">🎓</span>School</a>
+  <a class="nav-item" href="profil.html"><span class="icon">👤</span>Profil</a>
+</nav>
+
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+(function () {
+  const cfg = window.MAHOUTO_CONFIG;
+  const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+
+  const loadingEl = document.getElementById("loading-state");
+  const errorEl = document.getElementById("error-state");
+  const contentEl = document.getElementById("content");
+
+  const params = new URLSearchParams(window.location.search);
+  const courseId = params.get("course");
+
+  let currentUser = null;
+  let allLessons = []; // à plat, avec module_titre
+  let progressMap = new Map(); // lesson_id -> completed
+  let currentLessonId = null;
+
+  async function getAccessToken() {
+    const { data } = await supabase.auth.getSession();
+    return data && data.session ? data.session.access_token : null;
+  }
+
+  // Point d'entrée serveur unique pour MAHOUTO SCHOOL — voir /api/course.js
+  async function callCourseApi(action, payload) {
+    const token = await getAccessToken();
+    const resp = await fetch("/api/course", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+      body: JSON.stringify({ action, ...payload })
+    });
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || "Erreur serveur.");
+    return data;
+  }
+
+  async function ensureLoggedIn() {
+    const { data } = await supabase.auth.getSession();
+    if (data && data.session && data.session.user) {
+      currentUser = data.session.user;
+      return true;
+    }
+    return false;
+  }
+
+  async function checkOwned() {
+    const { data } = await supabase
+      .from("purchases")
+      .select("id")
+      .eq("user_id", currentUser.id)
+      .eq("course_id", courseId)
+      .eq("product_type", "formation")
+      .eq("status", "paid")
+      .maybeSingle();
+    return !!data;
+  }
+
+  // NOTE SÉCURITÉ : cette valeur ne sert qu'à l'affichage (cadenas,
+  // message avant clic). L'autorité réelle reste /api/course.js, qui
+  // revérifie systématiquement l'achat côté serveur avant de délivrer
+  // une URL vidéo — même si ce flag client était falsifié, la vidéo
+  // resterait inaccessible.
+  let userOwnsFormation = false;
+
+  async function loadContent(formation) {
+    const { data: modules } = await supabase
+      .from("formation_modules")
+      .select("*")
+      .eq("formation_id", courseId)
+      .order("ordre", { ascending: true });
+
+    allLessons = [];
+    const moduleBlocks = [];
+
+    for (const mod of (modules || [])) {
+      const { data: lessons } = await supabase
+        .from("formation_lessons")
+        .select("*")
+        .eq("module_id", mod.id)
+        .order("ordre", { ascending: true });
+
+      (lessons || []).forEach((l) => allLessons.push(l));
+      moduleBlocks.push({ module: mod, lessons: lessons || [] });
+    }
+
+    if (currentUser) {
+      const lessonIds = allLessons.map((l) => l.id);
+      if (lessonIds.length) {
+        const { data: progress } = await supabase
+          .from("course_progress")
+          .select("lesson_id, completed")
+          .eq("user_id", currentUser.id)
+          .in("lesson_id", lessonIds);
+        (progress || []).forEach((p) => progressMap.set(p.lesson_id, p.completed));
+      }
+    }
+
+    renderLayout(formation, moduleBlocks);
+  }
+
+  function renderLayout(formation, moduleBlocks) {
+    contentEl.innerHTML = `
+      <header class="top">
+        <a class="back" href="formation-detail.html?course=${encodeURIComponent(courseId)}">← Retour à la formation</a>
+        <h1 id="formation-h1"></h1>
+      </header>
+
+      <div class="player-wrap" id="player-wrap">
+        <div class="player-placeholder">Sélectionnez une leçon ci-dessous pour commencer.</div>
+      </div>
+
+      <div class="current-lesson-bar hidden" id="current-lesson-bar">
+        <span class="titre" id="current-lesson-title"></span>
+        <button class="mark-done-btn" id="mark-done-btn">Marquer comme terminée</button>
+      </div>
+
+      <div class="modules-area" id="modules-area"></div>
+    `;
+
+    // formation.nom vient de la base : jamais interpolé dans du HTML,
+    // toujours affecté via textContent.
+    document.getElementById("formation-h1").textContent = formation.nom;
+
+    const modulesArea = document.getElementById("modules-area");
+    moduleBlocks.forEach(({ module: mod, lessons }) => {
+      const block = document.createElement("div");
+      block.className = "module-block";
+
+      const h2 = document.createElement("h2");
+      h2.textContent = mod.titre; // donnée Supabase : textContent, jamais innerHTML
+      block.appendChild(h2);
+
+      lessons.forEach((lesson) => {
+        const completed = !!progressMap.get(lesson.id);
+        const locked = !lesson.is_preview && !userOwnsFormation;
+
+        const item = document.createElement("div");
+        item.className = "lesson-item" + (completed ? " completed" : "") + (locked ? " locked" : "");
+        item.dataset.lessonId = lesson.id;
+
+        const checkSpan = document.createElement("span");
+        checkSpan.className = "check";
+        checkSpan.textContent = completed ? "✓" : locked ? "🔒" : "";
+        item.appendChild(checkSpan);
+
+        const titreSpan = document.createElement("span");
+        titreSpan.className = "titre";
+        titreSpan.textContent = lesson.titre; // donnée Supabase : textContent, jamais innerHTML
+        item.appendChild(titreSpan);
+
+        if (lesson.is_preview) {
+          const previewTag = document.createElement("span");
+          previewTag.className = "preview-tag";
+          previewTag.textContent = "APERÇU"; // texte fixe, sans donnée utilisateur
+          item.appendChild(previewTag);
+        }
+
+        item.addEventListener("click", () => playLesson(lesson, locked));
+        block.appendChild(item);
+      });
+
+      modulesArea.appendChild(block);
+    });
+
+    document.getElementById("mark-done-btn").addEventListener("click", markCurrentDone);
+  }
+
+  async function playLesson(lesson, locked) {
+    currentLessonId = lesson.id;
+
+    document.querySelectorAll(".lesson-item").forEach((el) => {
+      el.classList.toggle("active", Number(el.dataset.lessonId) === lesson.id);
+    });
+
+    const playerWrap = document.getElementById("player-wrap");
+    const barEl = document.getElementById("current-lesson-bar");
+
+    if (locked) {
+      // Court-circuit d'affichage uniquement : même sans ceci, un
+      // clic forcé appellerait course.js, qui refuserait avec 403.
+      playerWrap.innerHTML = `
+        <div class="player-placeholder">
+          🔒 Cette leçon fait partie du contenu payant.<br>
+          <a href="formation-detail.html?course=${encodeURIComponent(courseId)}" style="color:var(--gold);">Acheter la formation pour la débloquer</a>
+        </div>`;
+      barEl.classList.add("hidden");
+      return;
+    }
+
+    playerWrap.innerHTML = `<div class="player-placeholder">⏳ Chargement de la vidéo...</div>`;
+
+    barEl.classList.remove("hidden");
+    document.getElementById("current-lesson-title").textContent = lesson.titre;
+
+    const btn = document.getElementById("mark-done-btn");
+    const completed = !!progressMap.get(lesson.id);
+    btn.className = "mark-done-btn" + (completed ? " done" : "");
+    btn.textContent = completed ? "✓ Terminée" : "Marquer comme terminée";
+
+    try {
+      const data = await callCourseApi("lesson-video-url", { lessonId: lesson.id });
+      playerWrap.innerHTML = ""; // vide le conteneur (placeholder statique, sans donnée)
+      const videoEl = document.createElement("video");
+      videoEl.controls = true;
+      videoEl.playsInline = true;
+      videoEl.src = data.url; // affecté en propriété, jamais interpolé dans du HTML
+      playerWrap.appendChild(videoEl);
+    } catch (err) {
+      console.error(err);
+      playerWrap.innerHTML = "";
+      const errDiv = document.createElement("div");
+      errDiv.className = "player-placeholder";
+      errDiv.textContent = "❌ " + err.message; // jamais interpolé dans du HTML
+      playerWrap.appendChild(errDiv);
+    }
+  }
+
+  async function markCurrentDone() {
+    if (!currentLessonId || !currentUser) return;
+    const btn = document.getElementById("mark-done-btn");
+    btn.disabled = true;
+
+    const { error } = await supabase.from("course_progress").upsert({
+      user_id: currentUser.id,
+      lesson_id: currentLessonId,
+      completed: true,
+      updated_at: new Date().toISOString()
+    });
+
+    btn.disabled = false;
+
+    if (error) {
+      alert("Erreur : " + error.message);
+      return;
+    }
+
+    progressMap.set(currentLessonId, true);
+    btn.className = "mark-done-btn done";
+    btn.textContent = "✓ Terminée";
+    const item = document.querySelector(`.lesson-item[data-lesson-id="${currentLessonId}"]`);
+    if (item) {
+      item.classList.add("completed");
+      item.querySelector(".check").textContent = "✓";
+    }
+  }
+
+  async function init() {
+    if (!courseId) {
+      loadingEl.classList.add("hidden");
+      errorEl.classList.remove("hidden");
+      return;
+    }
+
+    if (!(await ensureLoggedIn())) {
+      window.location.href = "formation-detail.html?course=" + encodeURIComponent(courseId);
+      return;
+    }
+
+    // Ne bloque plus l'accès à la page : un utilisateur non-acheteur
+    // doit pouvoir ouvrir formation-lecture.html pour voir les leçons
+    // en aperçu gratuit (is_preview = true). L'accès à chaque leçon
+    // payante reste vérifié par /api/course.js, jamais ici.
+    userOwnsFormation = await checkOwned();
+
+    const { data: formation, error } = await supabase
+      .from("formations").select("*").eq("id", courseId).maybeSingle();
+
+    if (error || !formation) {
+      loadingEl.classList.add("hidden");
+      errorEl.classList.remove("hidden");
+      return;
+    }
+
+    await loadContent(formation);
+
+    loadingEl.classList.add("hidden");
+    contentEl.classList.remove("hidden");
+  }
+
+  init();
+})();
+</script>
+<script src="pwa-install.js"></script>
+
+</body>
+</html>
