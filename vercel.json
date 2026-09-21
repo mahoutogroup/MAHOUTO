@@ -5,6 +5,7 @@
     }
   },
   "rewrites": [
-    { "source": "/p/:id", "destination": "/api/produit-og?id=:id" }
+    { "source": "/p/:id", "destination": "/api/produit-og?type=produit&id=:id" },
+    { "source": "/f/:id", "destination": "/api/produit-og?type=formation&id=:id" }
   ]
 }

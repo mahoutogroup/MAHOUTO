@@ -72,6 +72,10 @@
   }
   .sticky-buy button.owned { background: rgba(34,197,94,.18); color: var(--accent-green); }
   .sticky-buy button:disabled { opacity: .6; cursor: wait; }
+
+  .top-bar { display: flex; align-items: center; justify-content: space-between; padding: 14px 20px 0; }
+  .share-btn { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; color: var(--gold); background: rgba(212,175,55,.12); border: none; border-radius: 999px; padding: 6px 14px; cursor: pointer; margin-right: 48px; }
+  .share-btn:active { opacity: .7; }
 </style>
 </head>
 <body>
@@ -174,6 +178,35 @@
     }
   }
 
+  function shareUrlFor(courseId) {
+    return `${window.location.origin}/f/${encodeURIComponent(courseId)}`;
+  }
+
+  async function shareFormation(courseId, formationData) {
+    const amount = formationData.promotion ?? formationData.prix;
+    const url = shareUrlFor(courseId);
+    const text = `${formationData.nom} — ${money(amount)}`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: formationData.nom, text, url });
+        return;
+      } catch (err) {
+        // L'utilisateur a annulé le partage natif : pas d'erreur à afficher.
+        if (err && err.name === "AbortError") return;
+      }
+    }
+
+    // Repli (desktop / navigateurs sans Web Share API) :
+    // on ouvre WhatsApp Web avec le message pré-rempli, et on copie
+    // aussi le lien dans le presse-papier au cas où.
+    try {
+      await navigator.clipboard.writeText(`${text}\n${url}`);
+    } catch (err) { /* presse-papier indisponible, on continue quand même */ }
+
+    window.open(`https://wa.me/?text=${encodeURIComponent(text + "\n" + url)}`, "_blank");
+  }
+
   async function init() {
     const params = new URLSearchParams(window.location.search);
     const courseId = params.get("course");
@@ -205,8 +238,9 @@
     const backHref = formation.provider === "academie_majestepresse" ? "academie-majestepresse.html" : "school.html";
 
     contentEl.innerHTML = `
-      <div style="padding:14px 20px 0;">
+      <div class="top-bar">
         <a href="${backHref}" style="font-size:12.5px;color:var(--text-muted);text-decoration:none;">← Retour au catalogue</a>
+        <button id="share-btn" class="share-btn" type="button">📤 Partager</button>
       </div>
 
       ${formation.image_url
@@ -267,6 +301,9 @@
 
     loadingEl.classList.add("hidden");
     contentEl.classList.remove("hidden");
+
+    const shareBtn = document.getElementById("share-btn");
+    if (shareBtn) shareBtn.addEventListener("click", () => shareFormation(courseId, formation));
 
     const sticky = document.createElement("div");
     sticky.className = "sticky-buy";
