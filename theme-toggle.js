@@ -172,6 +172,30 @@ document.addEventListener("DOMContentLoaded", () => {
     );
 
 
+    // Force un repaint complet du document.
+    //
+    // Cause du bug "zone noire résiduelle" : sur certains WebView
+    // Android, quand on change les variables CSS (--bg, --bg-card, ...)
+    // en togglant la classe "light-theme" sur <body>, le contenu qui
+    // se trouve hors de l'écran visible à cet instant (ex. le bas
+    // d'une longue liste de salons dans #room-list, qui a
+    // "overflow-y:auto") garde son ancien rendu (raster figé) tant
+    // qu'il n'est pas repeint manuellement. Faire défiler ne suffit
+    // pas toujours à le corriger. Aucune règle CSS n'était en cause
+    // (aucun background noir codé en dur trouvé) : c'est un problème
+    // de repaint, pas de couleur.
+    //
+    // Astuce standard et sans effet visuel : masquer puis réafficher
+    // <html> de façon synchrone force le navigateur à recalculer et
+    // repeindre tout le document, y compris ce qui est hors-écran.
+    function forceThemeRepaint(){
+        const html = document.documentElement;
+        html.style.display = "none";
+        void html.offsetHeight; // lecture forcée = reflow immédiat
+        html.style.display = "";
+    }
+
+
     // synchronise la couleur de la barre de statut (Android/Chrome)
     // avec le thème actif
     function syncThemeColorMeta(isLight){
@@ -272,6 +296,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
             }
 
+            forceThemeRepaint();
 
         });
 
