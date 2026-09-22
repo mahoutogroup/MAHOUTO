@@ -10,6 +10,7 @@
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <link rel="preload" as="image" href="assets/logo-mahouto-plus.png">
 <link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="attachment-card.css">
 <script src="theme-toggle.js"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
@@ -244,13 +245,14 @@
 <form id="composer" class="hidden">
   <button type="button" id="attach-btn" title="Envoyer un fichier" style="background:var(--bg-card);border:none;border-radius:20px;width:42px;flex:none;color:var(--gold-bright);font-size:17px;cursor:pointer;">📎</button>
   <button type="button" id="mic-btn" title="Message vocal">🎤</button>
-  <input type="file" id="file-input" accept="image/*,video/*,application/pdf" class="hidden">
+  <input type="file" id="file-input" accept=".jpg,.jpeg,.png,.webp,.gif,.tiff,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt,.md,.svg,.ai,.eps,.psd,.cdr,.dng,.cr2,.cr3,.nef,.arw,.raf,.mp3,.wav,.m4a,.ogg,.mp4,.webm,.mov,.mkv,.zip,.rar,.7z,.tar,.gz,.html,.css,.js,.ts,.json,.xml,.sql,.php,.py,.java,.c,.cpp,.h,.go,.rs" class="hidden">
   <textarea id="message-input" rows="1" placeholder="Écrire un message..." maxlength="20000"></textarea>
   <button type="submit">Envoyer</button>
 </form>
 
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="attachments.js"></script>
 <script>
 (function () {
   const cfg = window.MAHOUTO_CONFIG;
@@ -350,7 +352,12 @@
     return '<span class="ticks sent">✓</span>';
   }
 
-  function renderMessage(msg) {
+  // `resolvedMap` (optionnel) : Map(id -> {url, previewUrl, downloadUrl})
+  // déjà résolue en lot par loadHistory(). Un DM est TOUJOURS
+  // "authenticated" : sans cette map (message reçu en temps réel),
+  // la pièce jointe est résolue individuellement après le premier
+  // rendu, sans bloquer l'affichage du message.
+  function renderMessage(msg, resolvedMap) {
     if (hiddenMessageIds.has(msg.id)) return;
 
     const bubble = document.createElement("div");
@@ -362,41 +369,53 @@
       (msg.content && msg.content.length > 200 ? " long" : "");
     const time = new Date(msg.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
 
-    let bodyHtml;
+    const meta = document.createElement("div");
+    meta.className = "meta";
+    meta.textContent = time;
+    if (isMine && !msg.is_deleted) {
+      const ticks = document.createElement("span");
+      ticks.className = "ticks " + (msg.read_at ? "read" : msg.delivered_at ? "delivered" : "sent");
+      ticks.textContent = msg.read_at || msg.delivered_at ? "✓✓" : "✓";
+      meta.appendChild(ticks);
+    }
+    bubble.appendChild(meta);
+
     if (msg.is_deleted) {
-      bodyHtml = "🚫 Message supprimé";
+      bubble.appendChild(document.createTextNode("🚫 Message supprimé"));
     } else {
-      let mediaHtml = "";
       if (msg.attachment_url) {
-        if (msg.attachment_type === "image") {
-          mediaHtml = `<img src="${msg.attachment_url}" class="msg-media" style="max-width:100%;border-radius:12px;margin-top:6px;display:block;cursor:pointer;">`;
-        } else if (msg.attachment_type === "video") {
-          mediaHtml = `<div class="msg-media" data-type="video" data-src="${msg.attachment_url}" style="position:relative;display:inline-block;margin-top:6px;cursor:pointer;">` +
-            `<video src="${msg.attachment_url}" muted playsinline preload="metadata" style="max-width:100%;border-radius:12px;display:block;"></video>` +
-            `<span class="play-overlay">▶</span>` +
-            `</div>`;
-        } else if (msg.attachment_type === "audio") {
-          mediaHtml = `<audio src="${msg.attachment_url}" controls></audio>`;
-        } else if (isPdfUrl(msg.attachment_url)) {
-          const thumb = pdfThumbnailUrl(msg.attachment_url);
-          mediaHtml = `<a href="${msg.attachment_url}" target="_blank" style="display:block;margin-top:6px;position:relative;border-radius:12px;overflow:hidden;max-width:240px;">` +
-            `<img src="${thumb}" style="width:100%;display:block;background:#1a1a1a;" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">` +
-            `<div style="display:none;align-items:center;gap:6px;padding:14px;background:#1a1a1a;color:inherit;">📄 Ouvrir le PDF</div>` +
-            `<div style="position:absolute;bottom:6px;left:6px;background:rgba(0,0,0,0.75);color:#fff;font-size:11px;font-weight:700;padding:2px 7px;border-radius:6px;">PDF</div>` +
-            `</a>`;
-        } else {
-          const downloadUrl = attachmentDownloadUrl(msg.attachment_url, msg.attachment_name);
-          const label = msg.attachment_name ? "📄 " + escapeHtml(msg.attachment_name) : "📄 Ouvrir le fichier";
-          mediaHtml = `<a href="${downloadUrl}" target="_blank" style="color:inherit;text-decoration:underline;display:block;margin-top:6px;">${label}</a>`;
+        const resolved = resolvedMap ? resolvedMap.get(String(msg.id)) : null;
+        const mediaEl = MahoutoAttachments.renderAttachment(msg, resolved);
+        mediaEl.classList.add("msg-attachment-wrap");
+        bubble.appendChild(mediaEl);
+
+        if (!resolved && MahoutoAttachments.needsSignedUrl(msg)) {
+          MahoutoAttachments.resolveAttachmentUrls(supabase, "dm", CONV_ID, [msg]).then((map) => {
+            const r = map.get(String(msg.id));
+            if (r && mediaEl.isConnected) {
+              const fresh = MahoutoAttachments.renderAttachment(msg, r);
+              fresh.classList.add("msg-attachment-wrap");
+              mediaEl.replaceWith(fresh);
+            }
+          });
         }
       }
-      const textHtml = msg.content ? formatMessageBody(escapeHtml(msg.content)) : "";
-      bodyHtml = mediaHtml + (textHtml && mediaHtml ? '<div style="margin-top:6px;">' + textHtml + '</div>' : textHtml) +
-        (msg.edited_at ? '<span class="edited-tag">modifié</span>' : "");
+
+      if (msg.content) {
+        const textWrap = document.createElement("div");
+        if (msg.attachment_url) textWrap.style.marginTop = "6px";
+        textWrap.innerHTML = formatMessageBody(escapeHtml(msg.content));
+        bubble.appendChild(textWrap);
+      }
+
+      if (msg.edited_at) {
+        const editedTag = document.createElement("span");
+        editedTag.className = "edited-tag";
+        editedTag.textContent = "modifié";
+        bubble.appendChild(editedTag);
+      }
     }
 
-    const ticksHtml = (isMine && !msg.is_deleted) ? receiptTicksHtml(msg) : "";
-    bubble.innerHTML = '<div class="meta">' + time + ticksHtml + '</div>' + bodyHtml;
     bubble.addEventListener("click", (e) => {
       const media = e.target.closest(".msg-media");
       if (media) { openMediaViewer(media); return; }
@@ -430,7 +449,8 @@
       .limit(300);
 
     if (error) { setStatus("Erreur de chargement des messages."); console.error(error); return; }
-    (data || []).forEach(renderMessage);
+    const resolvedMap = await MahoutoAttachments.resolveAttachmentUrls(supabase, "dm", CONV_ID, data || []);
+    (data || []).forEach((m) => renderMessage(m, resolvedMap));
   }
 
   function subscribeToNewMessages() {
@@ -497,7 +517,7 @@
       mediaViewerImg.src = "";
       mediaViewerVideo.play().catch(() => {});
     } else {
-      mediaViewerImg.src = el.src;
+      mediaViewerImg.src = el.dataset.fullSrc || el.src;
       mediaViewerImg.classList.remove("hidden");
       mediaViewerVideo.classList.add("hidden");
       mediaViewerVideo.pause();
@@ -636,7 +656,8 @@
     try {
       const { data: sessionData } = await supabase.auth.getSession();
       const accessToken = sessionData && sessionData.session ? sessionData.session.access_token : null;
-      const signResp = await fetch("/api/cloudinary-sign", {
+      const signQuery = new URLSearchParams({ filename: file.name || "", context: "dm", contextId: CONV_ID });
+      const signResp = await fetch("/api/cloudinary-sign?" + signQuery.toString(), {
         headers: accessToken ? { "Authorization": "Bearer " + accessToken } : {}
       });
       const sign = await signResp.json();
@@ -648,6 +669,7 @@
       formData.append("timestamp", sign.timestamp);
       formData.append("signature", sign.signature);
       formData.append("folder", sign.folder);
+      if (sign.type) formData.append("type", sign.type);
 
       const uploadResp = await fetch(sign.uploadUrl, { method: "POST", body: formData });
       const uploadData = await uploadResp.json();
@@ -663,7 +685,12 @@
         content: "",
         attachment_url: uploadData.secure_url,
         attachment_type: attachmentType,
-        attachment_name: file.name || null
+        attachment_name: file.name || null,
+        attachment_size: file.size || null,
+        attachment_mime: file.type || null,
+        attachment_public_id: uploadData.public_id || null,
+        attachment_resource_type: uploadData.resource_type || null,
+        attachment_access: sign.accessType === "authenticated" ? "authenticated" : "public"
       }).select("*").single();
 
       if (error) throw error;
@@ -738,7 +765,8 @@
     try {
       const { data: sessionData } = await supabase.auth.getSession();
       const accessToken = sessionData && sessionData.session ? sessionData.session.access_token : null;
-      const signResp = await fetch("/api/cloudinary-sign", {
+      const signQuery = new URLSearchParams({ filename: "vocal.webm", context: "dm", contextId: CONV_ID });
+      const signResp = await fetch("/api/cloudinary-sign?" + signQuery.toString(), {
         headers: accessToken ? { "Authorization": "Bearer " + accessToken } : {}
       });
       const sign = await signResp.json();
@@ -750,6 +778,7 @@
       formData.append("timestamp", sign.timestamp);
       formData.append("signature", sign.signature);
       formData.append("folder", sign.folder);
+      if (sign.type) formData.append("type", sign.type);
 
       const uploadResp = await fetch(sign.uploadUrl, { method: "POST", body: formData });
       const uploadData = await uploadResp.json();
@@ -760,7 +789,13 @@
         sender_id: currentUser.id,
         content: "",
         attachment_url: uploadData.secure_url,
-        attachment_type: "audio"
+        attachment_type: "audio",
+        attachment_name: "vocal.webm",
+        attachment_size: blob.size || null,
+        attachment_mime: blob.type || "audio/webm",
+        attachment_public_id: uploadData.public_id || null,
+        attachment_resource_type: uploadData.resource_type || null,
+        attachment_access: sign.accessType === "authenticated" ? "authenticated" : "public"
       }).select("*").single();
 
       if (error) throw error;
@@ -810,7 +845,13 @@
 
     if (msg.attachment_url) {
       try {
-        const resp = await fetch(msg.attachment_url);
+        let fetchUrl = msg.attachment_url;
+        if (MahoutoAttachments.needsSignedUrl(msg)) {
+          const map = await MahoutoAttachments.resolveAttachmentUrls(supabase, "dm", CONV_ID, [msg]);
+          const r = map.get(String(msg.id));
+          if (r && r.url) fetchUrl = r.url;
+        }
+        const resp = await fetch(fetchUrl);
         const blob = await resp.blob();
         const ext = msg.attachment_type === "image" ? "jpg"
           : msg.attachment_type === "video" ? "mp4"

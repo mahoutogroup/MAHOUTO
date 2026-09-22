@@ -1,0 +1,136 @@
+/* =========================================================
+   MAHOUTO+ — Carte de pièce jointe professionnelle
+   Utilise les variables de theme.css : suit automatiquement le
+   mode clair/sombre, aucune couleur codée en dur.
+   ========================================================= */
+
+/* ---------- Image / vidéo (aperçu direct) ---------- */
+/* Reprend les styles qui étaient auparavant en ligne dans le HTML
+   généré (chat.html / dm-chat.html) — inchangés visuellement,
+   simplement déplacés ici puisque le rendu passe désormais par
+   des DOM APIs sûres (createElement) plutôt que par innerHTML. */
+img.msg-media,
+div.msg-media {
+  max-width: 100%;
+  border-radius: 12px;
+  margin-top: 6px;
+  display: block;
+  cursor: pointer;
+}
+
+div.msg-media { position: relative; display: inline-block; }
+
+div.msg-media video {
+  max-width: 100%;
+  border-radius: 12px;
+  display: block;
+}
+
+.attachment-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 6px;
+  padding: 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  max-width: 280px;
+}
+
+.attachment-card-icon {
+  font-size: 28px;
+  flex: none;
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-card);
+  border-radius: 10px;
+}
+
+.attachment-card-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.attachment-card-label {
+  font-size: 11px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: .03em;
+}
+
+.attachment-card-name {
+  font-size: 14px;
+  color: var(--white);
+  font-weight: bold;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.attachment-card-size {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.attachment-card-btn {
+  flex: none;
+  font-size: 12px;
+  font-weight: bold;
+  color: #0A0A0A;
+  background: var(--gold-bright);
+  padding: 7px 12px;
+  border-radius: 10px;
+  text-decoration: none;
+}
+
+/* ---------- Carte PDF (miniature 1ère page) ---------- */
+.attachment-pdf {
+  display: block;
+  margin-top: 6px;
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  max-width: 240px;
+  color: inherit;
+}
+
+.attachment-pdf-thumb {
+  width: 100%;
+  display: block;
+  background: var(--bg-card);
+}
+
+.attachment-pdf-fallback {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  padding: 14px;
+  background: var(--bg-card);
+  color: inherit;
+}
+
+.attachment-pdf-badge {
+  position: absolute;
+  bottom: 6px;
+  left: 6px;
+  background: rgba(0,0,0,0.75);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 6px;
+}
+
+.attachment-pdf-name {
+  padding: 6px 10px;
+  font-size: 12.5px;
+  background: var(--bg-card);
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
