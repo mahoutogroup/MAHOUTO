@@ -11,6 +11,7 @@
 <link rel="preload" as="image" href="assets/logo-mahouto-plus.png">
 <link rel="stylesheet" href="theme.css">
 <link rel="stylesheet" href="attachment-card.css">
+<link rel="stylesheet" href="audio-player.css">
 <script src="theme-toggle.js"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
@@ -310,6 +311,7 @@
   <video id="media-viewer-video" class="hidden" controls></video>
 </div>
 
+<button type="button" id="play-all-audio-btn" class="play-all-audio-btn hidden">▶ Lire tous les audios</button>
 <div id="messages" class="hidden"></div>
 
 <!-- Menu d'actions sur un message (modifier / supprimer / copier / partager) -->
@@ -324,9 +326,17 @@
   </div>
 </div>
 
+<div id="attachment-queue" class="attachment-queue hidden">
+  <div id="attachment-queue-list" class="attachment-queue-list"></div>
+  <div class="attachment-queue-actions">
+    <button type="button" id="attachment-queue-cancel" class="attachment-queue-cancel">Annuler</button>
+    <button type="button" id="attachment-queue-send" class="attachment-queue-send">Envoyer <span id="attachment-queue-count"></span></button>
+  </div>
+</div>
+
 <form id="composer" class="hidden">
   <button type="button" id="attach-btn" title="Envoyer un fichier" style="background:var(--bg-card);border:none;border-radius:20px;width:44px;flex:none;color:var(--gold-bright);font-size:18px;cursor:pointer;">📎</button>
-  <input type="file" id="file-input" accept=".jpg,.jpeg,.png,.webp,.gif,.tiff,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt,.md,.svg,.ai,.eps,.psd,.cdr,.dng,.cr2,.cr3,.nef,.arw,.raf,.mp3,.wav,.m4a,.ogg,.mp4,.webm,.mov,.mkv,.zip,.rar,.7z,.tar,.gz,.html,.css,.js,.ts,.json,.xml,.sql,.php,.py,.java,.c,.cpp,.h,.go,.rs" class="hidden">
+  <input type="file" id="file-input" multiple accept=".jpg,.jpeg,.png,.webp,.gif,.tiff,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt,.md,.svg,.ai,.eps,.psd,.cdr,.dng,.cr2,.cr3,.nef,.arw,.raf,.mp3,.wav,.m4a,.ogg,.mp4,.webm,.mov,.mkv,.zip,.rar,.7z,.tar,.gz,.html,.css,.js,.ts,.json,.xml,.sql,.php,.py,.java,.c,.cpp,.h,.go,.rs" class="hidden">
   <textarea id="message-input" rows="1" placeholder="Écrire un message..." maxlength="20000"></textarea>
   <button type="submit">Envoyer</button>
 </form>
@@ -334,6 +344,7 @@
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="attachments.js"></script>
+<script src="audio-player.js"></script>
 <script>
 (function () {
   const cfg = window.MAHOUTO_CONFIG;
@@ -353,6 +364,15 @@
   const messagesEl = document.getElementById("messages");
   const composer = document.getElementById("composer");
   const messageInput = document.getElementById("message-input");
+
+  // -------- Lecture en chaîne des audios du salon (playlist) --------
+  const playAllAudioBtn = document.getElementById("play-all-audio-btn");
+  if (window.MahoutoAudioPlayer) {
+    window.MahoutoAudioPlayer.setOnRegistryChange((count) => {
+      playAllAudioBtn.classList.toggle("hidden", count < 2);
+    });
+    playAllAudioBtn.addEventListener("click", () => window.MahoutoAudioPlayer.playAll());
+  }
 
   const mediaViewer = document.getElementById("media-viewer");
   const mediaViewerImg = document.getElementById("media-viewer-img");
@@ -493,6 +513,9 @@
     bubble.appendChild(meta);
 
     if (msg.is_deleted) {
+      if (msg.attachment_type === "audio" && window.MahoutoAudioPlayer) {
+        window.MahoutoAudioPlayer.unregisterTrack(msg.id); // retire proprement de la playlist si présent
+      }
       bubble.appendChild(document.createTextNode("🚫 Message supprimé"));
     } else {
       if (msg.attachment_url) {
@@ -766,67 +789,166 @@
 
   const attachBtn = document.getElementById("attach-btn");
   const fileInput = document.getElementById("file-input");
+  const attachQueueEl = document.getElementById("attachment-queue");
+  const attachQueueListEl = document.getElementById("attachment-queue-list");
+  const attachQueueCountEl = document.getElementById("attachment-queue-count");
+  const attachQueueSendBtn = document.getElementById("attachment-queue-send");
+  const attachQueueCancelBtn = document.getElementById("attachment-queue-cancel");
+
+  // File d'attente en mémoire : la sélection d'un fichier ne l'envoie
+  // plus jamais toute seule (voir renderQueue()/change ci-dessous).
+  // Chaque item : { localId, file, status: 'pending'|'uploading'|'sent'|'error' }
+  let pendingFiles = [];
+  let queueSending = false;
+  let localIdSeq = 0;
 
   attachBtn.addEventListener("click", () => fileInput.click());
 
-  fileInput.addEventListener("change", async () => {
-    const file = fileInput.files[0];
-    fileInput.value = "";
-    if (!file || !currentUser) return;
+  fileInput.addEventListener("change", () => {
+    const newFiles = Array.from(fileInput.files || []);
+    fileInput.value = ""; // permet de resélectionner le même fichier plus tard
+    if (!newFiles.length) return;
+    newFiles.forEach((file) => {
+      pendingFiles.push({ localId: ++localIdSeq, file, status: "pending" });
+    });
+    renderQueue();
+  });
 
-    attachBtn.textContent = "⏳";
-    attachBtn.disabled = true;
-
-    try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const accessToken = sessionData && sessionData.session ? sessionData.session.access_token : null;
-      const signQuery = new URLSearchParams({ filename: file.name || "", context: "room", contextId: ROOM_ID });
-      const signResp = await fetch("/api/attachment?" + signQuery.toString(), {
-        headers: accessToken ? { "Authorization": "Bearer " + accessToken } : {}
-      });
-      const sign = await signResp.json();
-      if (!signResp.ok) throw new Error(sign.error || "Signature indisponible");
-
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("api_key", sign.apiKey);
-      formData.append("timestamp", sign.timestamp);
-      formData.append("signature", sign.signature);
-      formData.append("folder", sign.folder);
-      if (sign.type) formData.append("type", sign.type);
-
-      const uploadResp = await fetch(sign.uploadUrl, { method: "POST", body: formData });
-      const uploadData = await uploadResp.json();
-      if (!uploadResp.ok) throw new Error(uploadData.error?.message || "Envoi échoué");
-
-      let attachmentType = "raw";
-      if (uploadData.resource_type === "image") attachmentType = "image";
-      else if (uploadData.resource_type === "video") attachmentType = "video";
-
-      const { error } = await supabase.from("messages").insert({
-        room_id: ROOM_ID,
-        user_id: currentUser.id,
-        username: currentUsername,
-        content: "",
-        attachment_url: uploadData.secure_url,
-        attachment_type: attachmentType,
-        attachment_name: file.name || null,
-        attachment_size: file.size || null,
-        attachment_mime: file.type || null,
-        attachment_public_id: uploadData.public_id || null,
-        attachment_resource_type: uploadData.resource_type || null,
-        attachment_access: sign.accessType === "authenticated" ? "authenticated" : "public"
-      });
-
-      if (error) throw error;
-      await markAsRead();
-    } catch (err) {
-      console.error(err);
-      setStatus("Envoi du fichier impossible : " + err.message);
-    } finally {
-      attachBtn.textContent = "📎";
-      attachBtn.disabled = false;
+  function renderQueue() {
+    if (!pendingFiles.length) {
+      attachQueueEl.classList.add("hidden");
+      attachQueueListEl.innerHTML = "";
+      return;
     }
+    attachQueueEl.classList.remove("hidden");
+    attachQueueListEl.innerHTML = "";
+    pendingFiles.forEach((item) => {
+      const row = document.createElement("div");
+      row.className = "attachment-queue-item";
+      row.dataset.localId = item.localId;
+
+      const icon = document.createElement("div");
+      icon.className = "attachment-queue-item-icon";
+      icon.textContent = "📎";
+
+      const info = document.createElement("div");
+      info.className = "attachment-queue-item-info";
+      const name = document.createElement("div");
+      name.className = "attachment-queue-item-name";
+      name.textContent = item.file.name;
+      const status = document.createElement("div");
+      status.className = "attachment-queue-item-status" + (item.status === "error" ? " error" : item.status === "sent" ? " sent" : "");
+      status.textContent =
+        item.status === "pending" ? "En attente" :
+        item.status === "uploading" ? "Envoi..." :
+        item.status === "sent" ? "Envoyé ✓" : "Erreur — sera retenté";
+      info.appendChild(name);
+      info.appendChild(status);
+
+      row.appendChild(icon);
+      row.appendChild(info);
+
+      if (item.status === "pending" || item.status === "error") {
+        const removeBtn = document.createElement("button");
+        removeBtn.type = "button";
+        removeBtn.className = "attachment-queue-item-remove";
+        removeBtn.textContent = "✕";
+        removeBtn.addEventListener("click", () => {
+          pendingFiles = pendingFiles.filter((f) => f.localId !== item.localId);
+          renderQueue();
+        });
+        row.appendChild(removeBtn);
+      }
+
+      attachQueueListEl.appendChild(row);
+    });
+    attachQueueCountEl.textContent = "(" + pendingFiles.filter((f) => f.status !== "sent").length + ")";
+  }
+
+  attachQueueCancelBtn.addEventListener("click", () => {
+    if (queueSending) return; // pas d'annulation en pleine transmission
+    pendingFiles = [];
+    renderQueue();
+  });
+
+  // Un seul fichier -> un seul message (comportement inchangé), mais
+  // désormais appelé UNIQUEMENT depuis "Envoyer", jamais depuis "change".
+  async function uploadAndSendFile(file) {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData && sessionData.session ? sessionData.session.access_token : null;
+    const signQuery = new URLSearchParams({ filename: file.name || "", context: "room", contextId: ROOM_ID });
+    const signResp = await fetch("/api/attachment?" + signQuery.toString(), {
+      headers: accessToken ? { "Authorization": "Bearer " + accessToken } : {}
+    });
+    const sign = await signResp.json();
+    if (!signResp.ok) throw new Error(sign.error || "Signature indisponible");
+
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("api_key", sign.apiKey);
+    formData.append("timestamp", sign.timestamp);
+    formData.append("signature", sign.signature);
+    formData.append("folder", sign.folder);
+    if (sign.type) formData.append("type", sign.type);
+
+    const uploadResp = await fetch(sign.uploadUrl, { method: "POST", body: formData });
+    const uploadData = await uploadResp.json();
+    if (!uploadResp.ok) throw new Error(uploadData.error?.message || "Envoi échoué");
+
+    let attachmentType = "raw";
+    if (uploadData.resource_type === "image") attachmentType = "image";
+    else if (uploadData.resource_type === "video") attachmentType = "video";
+
+    const { error } = await supabase.from("messages").insert({
+      room_id: ROOM_ID,
+      user_id: currentUser.id,
+      username: currentUsername,
+      content: "",
+      attachment_url: uploadData.secure_url,
+      attachment_type: attachmentType,
+      attachment_name: file.name || null,
+      attachment_size: file.size || null,
+      attachment_mime: file.type || null,
+      attachment_public_id: uploadData.public_id || null,
+      attachment_resource_type: uploadData.resource_type || null,
+      attachment_access: sign.accessType === "authenticated" ? "authenticated" : "public"
+    });
+    if (error) throw error;
+  }
+
+  attachQueueSendBtn.addEventListener("click", async () => {
+    if (queueSending || !currentUser) return;
+    const toSend = pendingFiles.filter((f) => f.status === "pending" || f.status === "error");
+    if (!toSend.length) return;
+
+    queueSending = true;
+    attachQueueSendBtn.disabled = true;
+    attachQueueCancelBtn.disabled = true;
+
+    // Envoi séquentiel (un fichier à la fois) : chaque fichier n'est
+    // envoyé qu'une seule fois, jamais deux fois même si l'utilisateur
+    // reclique pendant l'envoi (bouton désactivé le temps de la boucle).
+    for (const item of toSend) {
+      item.status = "uploading";
+      renderQueue();
+      try {
+        await uploadAndSendFile(item.file);
+        item.status = "sent";
+      } catch (err) {
+        console.error(err);
+        item.status = "error";
+      }
+      renderQueue();
+    }
+
+    await markAsRead();
+    // On retire les envois réussis ; les échecs restent affichés pour
+    // permettre de les retirer ou de recliquer sur "Envoyer" (retente).
+    pendingFiles = pendingFiles.filter((f) => f.status !== "sent");
+    queueSending = false;
+    attachQueueCancelBtn.disabled = false;
+    attachQueueSendBtn.disabled = false;
+    renderQueue();
   });
 
   // -------- Menu d'actions sur un message --------

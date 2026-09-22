@@ -1,0 +1,86 @@
+/* =========================================================
+   MAHOUTO+ — Barre de lecteur audio globale
+   ========================================================= */
+
+.mahouto-audio-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 58px; /* au-dessus de la barre de navigation basse */
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+  background: var(--bg-elevated);
+  border-top: 1px solid var(--border);
+}
+
+.mahouto-audio-bar.hidden { display: none; }
+
+.mahouto-audio-bar .maud-play,
+.mahouto-audio-bar .maud-prev,
+.mahouto-audio-bar .maud-next,
+.mahouto-audio-bar .maud-close {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: var(--bg-card);
+  color: var(--white);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.mahouto-audio-bar .maud-prev,
+.mahouto-audio-bar .maud-next {
+  width: 28px;
+  height: 28px;
+  font-size: 12px;
+}
+
+.mahouto-audio-bar .maud-prev.hidden,
+.mahouto-audio-bar .maud-next.hidden { display: none; }
+
+.mahouto-audio-bar .maud-play { background: var(--gold-bright); color: #0A0A0A; }
+
+.mahouto-audio-bar .maud-info { flex: 1; min-width: 0; }
+
+.mahouto-audio-bar .maud-title {
+  font-size: 12.5px;
+  font-weight: bold;
+  color: var(--white);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mahouto-audio-bar .maud-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.mahouto-audio-bar .maud-time {
+  font-size: 10px;
+  color: var(--text-muted);
+  flex: none;
+}
+
+.mahouto-audio-bar .maud-position {
+  font-size: 10px;
+  color: var(--text-dim);
+  flex: none;
+  margin-left: 2px;
+}
+
+.mahouto-audio-bar .maud-seek,
+.mahouto-audio-bar .maud-volume {
+  flex: 1;
+  accent-color: var(--gold-bright);
+}
+
+.mahouto-audio-bar .maud-volume { flex: none; width: 60px; }

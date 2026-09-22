@@ -83,8 +83,16 @@ div.msg-media video {
   color: #0A0A0A;
   background: var(--gold-bright);
   padding: 7px 12px;
+  border: none;
   border-radius: 10px;
   text-decoration: none;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.attachment-card-btn:disabled {
+  opacity: .5;
+  cursor: default;
 }
 
 /* ---------- Carte PDF (miniature 1ère page) ---------- */
@@ -134,3 +142,109 @@ div.msg-media video {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* ---------- File d'attente de pièces jointes avant envoi ---------- */
+.attachment-queue {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  background: var(--bg-elevated);
+  border-top: 1px solid var(--border);
+}
+
+.attachment-queue.hidden { display: none; }
+
+.attachment-queue-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.attachment-queue-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: var(--bg-card);
+  border-radius: 10px;
+}
+
+.attachment-queue-item-icon { flex: none; font-size: 16px; }
+
+.attachment-queue-item-info { flex: 1; min-width: 0; }
+
+.attachment-queue-item-name {
+  font-size: 12.5px;
+  color: var(--white);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.attachment-queue-item-status {
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+
+.attachment-queue-item-status.error { color: #E05555; }
+.attachment-queue-item-status.sent { color: var(--accent-green); }
+
+.attachment-queue-item-remove {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.attachment-queue-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.attachment-queue-actions button {
+  font-size: 12.5px;
+  font-weight: bold;
+  padding: 7px 14px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.attachment-queue-cancel {
+  background: var(--bg-card);
+  color: var(--text-muted);
+}
+
+.attachment-queue-send {
+  background: var(--gold-bright);
+  color: #0A0A0A;
+}
+
+.attachment-queue-send:disabled { opacity: .5; cursor: default; }
+
+/* ---------- Bouton "Lire tous les audios" ---------- */
+.play-all-audio-btn {
+  display: block;
+  margin: 6px auto;
+  font-size: 12px;
+  font-weight: bold;
+  color: #0A0A0A;
+  background: var(--gold-bright);
+  border: none;
+  border-radius: 12px;
+  padding: 6px 14px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.play-all-audio-btn.hidden { display: none; }

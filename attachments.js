@@ -235,10 +235,38 @@ window.MahoutoAttachments = (function () {
     return wrap;
   }
 
-  function buildAudioEl(r) {
-    const audio = el("audio", { controls: "" });
-    if (isSafeUrl(r.url)) audio.src = r.url;
-    return audio;
+  // Ne crée plus de <audio controls> indépendant par bulle : un seul
+  // lecteur global (audio-player.js) gère la lecture pour toute la
+  // page, afin qu'il ne puisse jamais y avoir deux sons en même temps.
+  // `isResolved` (nouveau) : true seulement quand r.url est réellement
+  // utilisable (public, ou déjà résolu via /api/attachment) — on
+  // n'enregistre JAMAIS dans la playlist globale une URL "brute" pas
+  // encore vérifiée pour une pièce authenticated (elle 401 sinon).
+  function buildAudioCard(msg, r, isResolved) {
+    const sizeText = formatFileSize(msg.attachment_size);
+    const title = msg.attachment_name || "Message vocal";
+
+    const card = el("div", { class: "attachment-card attachment-audio-card" }, [
+      el("div", { class: "attachment-card-icon", text: "🎤" }),
+      el("div", { class: "attachment-card-info" }, [
+        el("div", { class: "attachment-card-label", text: "Message vocal" }),
+        el("div", { class: "attachment-card-name", text: title }),
+        sizeText ? el("div", { class: "attachment-card-size", text: sizeText }) : null
+      ]),
+      el("button", { type: "button", class: "attachment-card-btn attachment-audio-play", text: "▶ Écouter" })
+    ]);
+
+    const playBtn = card.querySelector(".attachment-audio-play");
+    if (isResolved && isSafeUrl(r.url) && window.MahoutoAudioPlayer) {
+      window.MahoutoAudioPlayer.registerTrack({ id: msg.id, title: title, url: r.url });
+      playBtn.addEventListener("click", () => {
+        window.MahoutoAudioPlayer.playById(msg.id);
+      });
+    } else {
+      playBtn.disabled = true;
+      playBtn.textContent = "Indisponible";
+    }
+    return card;
   }
 
   // Point d'entrée : construit l'élément DOM représentant la pièce
@@ -248,9 +276,10 @@ window.MahoutoAttachments = (function () {
   // renvoyé par /api/attachment (POST) pour une pièce "authenticated".
   function renderAttachment(msg, resolved) {
     const r = resolved || { url: msg.attachment_url, previewUrl: null, downloadUrl: null };
+    const isResolved = !!resolved || !needsSignedUrl(msg);
 
     if (isSvgAttachment(msg)) return buildImageEl(r); // <img> = rendu sûr, jamais d'injection du SVG dans le DOM
-    if (msg.attachment_type === "audio") return buildAudioEl(r);
+    if (msg.attachment_type === "audio") return buildAudioCard(msg, r, isResolved);
     if (isPdfAttachment(msg)) return buildPdfCard(msg, r);
     if (msg.attachment_type === "image") return buildImageEl(r);
     if (msg.attachment_type === "video") return buildVideoEl(r);
