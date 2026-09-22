@@ -236,7 +236,10 @@ window.MahoutoAttachments = (function () {
     return img;
   }
 
-  function buildVideoEl(r) {
+  // `isResolved` : voir buildAudioCard plus bas — même principe, on
+  // n'enregistre jamais dans la playlist vidéo une URL pas encore
+  // vérifiée pour une pièce authenticated.
+  function buildVideoEl(msg, r, isResolved) {
     const wrap = el("div", { class: "msg-media", dataset: { type: "video" } });
     const video = el("video", { muted: "", playsinline: "", preload: "metadata" });
     if (isSafeUrl(r.url)) {
@@ -245,6 +248,19 @@ window.MahoutoAttachments = (function () {
     }
     wrap.appendChild(video);
     wrap.appendChild(el("span", { class: "play-overlay", text: "▶" }));
+
+    // La lecture réelle passe désormais par le lecteur vidéo global
+    // (une seule instance <video>, playlist, jamais deux vidéos en
+    // même temps) — la vignette dans la bulle ne fait qu'ouvrir/
+    // rejoindre ce lecteur, elle ne joue jamais elle-même le son.
+    if (isResolved && isSafeUrl(r.url) && window.MahoutoVideoPlayer) {
+      window.MahoutoVideoPlayer.registerVideo({ id: msg.id, title: msg.attachment_name || "Vidéo", url: r.url });
+      wrap.dataset.videoReady = "1"; // permet à la bulle de savoir qu'elle doit déléguer au lecteur global, pas à openMediaViewer
+      wrap.addEventListener("click", (e) => {
+        e.stopPropagation();
+        window.MahoutoVideoPlayer.playVideoById(msg.id);
+      });
+    }
     return wrap;
   }
 
@@ -295,7 +311,7 @@ window.MahoutoAttachments = (function () {
     if (msg.attachment_type === "audio") return buildAudioCard(msg, r, isResolved);
     if (isPdfAttachment(msg)) return buildPdfCard(msg, r);
     if (msg.attachment_type === "image") return buildImageEl(r);
-    if (msg.attachment_type === "video") return buildVideoEl(r);
+    if (msg.attachment_type === "video") return buildVideoEl(msg, r, isResolved);
     return buildGenericCard(msg, r);
   }
 

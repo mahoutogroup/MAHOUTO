@@ -1,0 +1,96 @@
+/* =========================================================
+   MAHOUTO+ — Lecteur vidéo global (overlay plein écran + barre)
+   ========================================================= */
+
+.mahouto-video-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 600; /* au-dessus de la barre audio (500) : jamais les deux affichées utilement en même temps de toute façon */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.92);
+}
+
+.mahouto-video-overlay.hidden { display: none; }
+
+.mahouto-video-overlay .mvid-video {
+  max-width: 100%;
+  max-height: calc(100% - 96px - env(safe-area-inset-bottom, 0px));
+  width: 100%;
+  object-fit: contain;
+  background: #000;
+}
+
+.mahouto-video-overlay .mvid-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  background: var(--bg-elevated);
+  border-top: 1px solid var(--border);
+}
+
+.mahouto-video-overlay .mvid-play,
+.mahouto-video-overlay .mvid-prev,
+.mahouto-video-overlay .mvid-next,
+.mahouto-video-overlay .mvid-close {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  background: var(--bg-card);
+  color: var(--white);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.mahouto-video-overlay .mvid-prev,
+.mahouto-video-overlay .mvid-next {
+  width: 28px;
+  height: 28px;
+  font-size: 12px;
+}
+
+.mahouto-video-overlay .mvid-prev.hidden,
+.mahouto-video-overlay .mvid-next.hidden { display: none; }
+
+.mahouto-video-overlay .mvid-play { background: var(--gold-bright); color: #0A0A0A; }
+
+.mahouto-video-overlay .mvid-info { flex: 1; min-width: 0; }
+
+.mahouto-video-overlay .mvid-title {
+  font-size: 12.5px;
+  font-weight: bold;
+  color: var(--white);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mahouto-video-overlay .mvid-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.mahouto-video-overlay .mvid-time {
+  font-size: 10px;
+  color: var(--text-muted);
+  flex: none;
+}
+
+.mahouto-video-overlay .mvid-position {
+  font-size: 10px;
+  color: var(--text-dim);
+  flex: none;
+  margin-left: 2px;
+}
+
+.mahouto-video-overlay .mvid-seek {
+  flex: 1;
+  accent-color: var(--gold-bright);
+}

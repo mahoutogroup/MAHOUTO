@@ -273,6 +273,12 @@ window.MahoutoAudioPlayer = (function () {
   // Point d'entrée par piste unique (compatibilité — inchangé pour
   // tout appelant existant). `track` = { id, title, url, contextLabel }.
   function play(track) {
+    // Modification minimale strictement nécessaire pour éviter un
+    // audio + une vidéo simultanés (voir video-player.js). N'a aucun
+    // effet si video-player.js n'est pas chargé sur la page.
+    if (window.MahoutoVideoPlayer && typeof window.MahoutoVideoPlayer.pause === "function") {
+      window.MahoutoVideoPlayer.pause();
+    }
     ensureAudio();
     showBar();
 
