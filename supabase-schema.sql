@@ -46,6 +46,15 @@ create table if not exists public.rooms (
   created_by uuid references auth.users(id)
 );
 
+-- Salons payants (ex : "Les Sérigraphes", 2000 FCFA pour rejoindre) —
+-- ajoutés le 22/09/2026. is_paid=false par défaut : tous les salons
+-- existants et tous les salons créés librement par les utilisateurs
+-- restent gratuits et inchangés. Seul un admin peut faire passer un
+-- salon à is_paid=true (voir policies rooms_insert_own /
+-- rooms_update_own_or_admin plus bas).
+alter table public.rooms add column if not exists is_paid boolean not null default false;
+alter table public.rooms add column if not exists price integer;
+
 -- ---------- Messages des salons ----------
 create table if not exists public.messages (
   id bigint generated always as identity primary key,
@@ -269,7 +278,7 @@ create table if not exists public.purchases (
   fedapay_transaction_id text unique,
   status text not null default 'pending', -- pending | paid | failed
   created_at timestamptz not null default now(),
-  product_type text not null default 'formation', -- 'formation' | 'digital_product'
+  product_type text not null default 'formation', -- 'formation' | 'digital_product' | 'salon'
   fedapay_status text,   -- statut brut renvoyé par l'API FedaPay
   paid_at timestamptz    -- horodatage de la confirmation réelle du paiement
 );
@@ -278,7 +287,7 @@ alter table public.purchases
   drop constraint if exists purchases_product_type_check;
 alter table public.purchases
   add constraint purchases_product_type_check
-  check (product_type = any (array['formation'::text, 'digital_product'::text]));
+  check (product_type = any (array['formation'::text, 'digital_product'::text, 'salon'::text]));
 
 -- ---------- Partage natif (Web Share Target) ----------
 create table if not exists public.share_pending (
@@ -564,34 +573,110 @@ drop policy if exists "rooms_public_read" on public.rooms;
 create policy "rooms_public_read" on public.rooms
   for select using (true);
 
+-- Modifié le 22/09/2026 : un salon payant (is_paid = true) ne peut
+-- être créé que par un admin. Tout le monde peut toujours créer un
+-- salon gratuit comme avant.
 drop policy if exists "rooms_insert_own" on public.rooms;
 create policy "rooms_insert_own" on public.rooms
-  for insert with check (created_by = auth.uid());
+  for insert with check (
+    created_by = auth.uid() and (is_paid = false or is_admin())
+  );
 
 drop policy if exists "rooms_delete_own_or_admin" on public.rooms;
 create policy "rooms_delete_own_or_admin" on public.rooms
   for delete using (created_by = auth.uid() or is_admin());
 
+-- Corrigé le 22/09/2026 (audit) : la clause USING gate désormais aussi
+-- sur l'état actuel de la ligne. Tant qu'un salon est is_paid = true,
+-- seul un admin peut le modifier (y compris pour le repasser gratuit) —
+-- un créateur non-admin ne peut gérer que ses salons déjà gratuits,
+-- exactement comme avant pour ce cas.
 drop policy if exists "rooms_update_own_or_admin" on public.rooms;
 create policy "rooms_update_own_or_admin" on public.rooms
-  for update using (created_by = auth.uid() or is_admin())
-  with check (created_by = auth.uid() or is_admin());
+  for update using (
+    (created_by = auth.uid() and is_paid = false) or is_admin()
+  )
+  with check (
+    (created_by = auth.uid() and is_paid = false) or is_admin()
+  );
 
 -- ---------- messages ----------
--- Anciens doublons FR ("Envoi message", "Lecture messages") supprimés
--- le 20/09/2026 — messages_insert_own et messages_public_read
--- couvraient déjà le même effet, comportement inchangé.
+-- Modifié le 22/09/2026 : un salon payant (rooms.is_paid = true)
+-- n'est lisible/écrivable que par un utilisateur ayant un achat
+-- validé (purchases.status = 'paid', product_type = 'salon',
+-- course_id = room_id), par le créateur du salon, ou par un admin.
+-- Les salons gratuits (is_paid = false, tous ceux d'aujourd'hui)
+-- restent ouverts à tous comme avant — comportement inchangé pour eux.
 drop policy if exists "messages_insert_own" on public.messages;
 create policy "messages_insert_own" on public.messages
-  for insert with check (auth.uid() = user_id);
+  for insert with check (
+    auth.uid() = user_id
+    and exists (
+      select 1 from rooms
+      where rooms.id = messages.room_id
+        and (
+          rooms.is_paid = false
+          or rooms.created_by = auth.uid()
+          or is_admin()
+          or exists (
+            select 1 from purchases
+            where purchases.user_id = auth.uid()
+              and purchases.course_id = messages.room_id
+              and purchases.product_type = 'salon'
+              and purchases.status = 'paid'
+          )
+        )
+    )
+  );
 
 drop policy if exists "messages_public_read" on public.messages;
 create policy "messages_public_read" on public.messages
-  for select using (true);
+  for select using (
+    exists (
+      select 1 from rooms
+      where rooms.id = messages.room_id
+        and (
+          rooms.is_paid = false
+          or rooms.created_by = auth.uid()
+          or is_admin()
+          or exists (
+            select 1 from purchases
+            where purchases.user_id = auth.uid()
+              and purchases.course_id = messages.room_id
+              and purchases.product_type = 'salon'
+              and purchases.status = 'paid'
+          )
+        )
+    )
+  );
 
+-- Corrigé le 22/09/2026 (audit) : même règle d'accès que
+-- messages_insert_own / messages_public_read pour les salons payants
+-- (achat validé, créateur, ou admin) — comportement inchangé pour les
+-- salons gratuits (is_paid = false). Un utilisateur ne peut toujours
+-- modifier que ses propres messages (auth.uid() = user_id).
 drop policy if exists "messages_update_own" on public.messages;
 create policy "messages_update_own" on public.messages
-  for update using (auth.uid() = user_id) with check (auth.uid() = user_id);
+  for update using (
+    auth.uid() = user_id
+    and exists (
+      select 1 from rooms
+      where rooms.id = messages.room_id
+        and (
+          rooms.is_paid = false
+          or rooms.created_by = auth.uid()
+          or is_admin()
+          or exists (
+            select 1 from purchases
+            where purchases.user_id = auth.uid()
+              and purchases.course_id = messages.room_id
+              and purchases.product_type = 'salon'
+              and purchases.status = 'paid'
+          )
+        )
+    )
+  )
+  with check (auth.uid() = user_id);
 
 drop policy if exists "messages_delete_room_owner_or_admin" on public.messages;
 create policy "messages_delete_room_owner_or_admin" on public.messages
