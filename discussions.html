@@ -190,6 +190,30 @@
     font-size: 14px;
   }
 
+  /* ---------- Salons payants ---------- */
+  .lock-badge {
+    background: rgba(212,175,55,.15);
+    color: var(--gold);
+    font-size: 11.5px;
+    font-weight: bold;
+    padding: 3px 9px;
+    border-radius: 999px;
+    flex: none;
+    white-space: nowrap;
+  }
+  .room-row.locked-room .preview { color: var(--gold); }
+
+  #payment-banner {
+    margin: 10px 16px 0;
+    padding: 12px 16px;
+    border-radius: 14px;
+    font-size: 13px;
+    text-align: center;
+  }
+  #payment-banner.pending { background: rgba(212,175,55,.12); color: var(--gold); }
+  #payment-banner.paid { background: rgba(34,197,94,.12); color: var(--accent-green); }
+  #payment-banner.failed { background: rgba(239,68,68,.12); color: #F87171; }
+
   /* ---------- Bouton flottant ---------- */
   #fab {
     position: fixed;
@@ -332,6 +356,8 @@
     </div>
   </header>
 
+  <div id="payment-banner" class="hidden"></div>
+
   <div class="tabs">
     <div class="tab active" data-filter="toutes">Toutes</div>
     <div class="tab" data-filter="non-lues">Non lues <span class="count" id="unread-tab-count">0</span></div>
@@ -384,9 +410,20 @@
 
   let currentUser = null;
   let currentRole = "user";
-  let roomsData = []; // { id, name, emoji, color, is_group, lastMessage, lastTime, unread, created_by }
+  let roomsData = []; // { id, name, emoji, color, is_group, lastMessage, lastTime, unread, created_by, is_paid, price }
+  let unlockedPaidRooms = new Set(); // ids des salons payants déjà achetés par l'utilisateur
   let activeFilter = "toutes";
   let searchTerm = "";
+  const bannerEl = document.getElementById("payment-banner");
+
+  function money(xof) { return Number(xof).toLocaleString("fr-FR") + " FCFA"; }
+
+  function canAccessPaidRoom(room) {
+    if (!room.is_paid) return true;
+    if (room.created_by === currentUser.id) return true;
+    if (["admin", "super_admin", "founder"].includes(currentRole)) return true;
+    return unlockedPaidRooms.has(room.id);
+  }
 
   function setStatus(text) { statusMessage.textContent = text || ""; }
 
@@ -433,6 +470,15 @@
 
     const readMap = {};
     (readStates || []).forEach((r) => { readMap[r.room_id] = r.last_read_at; });
+
+    const { data: paidPurchases } = await supabase
+      .from("purchases")
+      .select("course_id")
+      .eq("user_id", currentUser.id)
+      .eq("product_type", "salon")
+      .eq("status", "paid");
+
+    unlockedPaidRooms = new Set((paidPurchases || []).map((p) => p.course_id));
 
     const enriched = await Promise.all(
       rooms.map(async (room) => {
@@ -493,24 +539,27 @@
     roomListEl.innerHTML = "";
     filtered.forEach((room) => {
       const canManage = room.created_by === currentUser.id || ["admin", "super_admin", "founder"].includes(currentRole);
+      const locked = room.is_paid && !canAccessPaidRoom(room);
       const row = document.createElement("div");
-      row.className = "room-row";
+      row.className = "room-row" + (locked ? " locked-room" : "");
       row.innerHTML = `
         <div class="avatar" style="background:${room.color}">${room.emoji}</div>
         <div class="room-info">
           <div class="top-line">
             <span class="name">${escapeHtml(room.name)}</span>
-            <span class="time">${formatTime(room.lastTime)}</span>
+            ${locked ? "" : `<span class="time">${formatTime(room.lastTime)}</span>`}
           </div>
           <div class="bottom-line">
-            <span class="preview">${escapeHtml(room.lastMessage)}</span>
-            ${room.unread > 0 ? `<span class="unread-badge">${room.unread}</span>` : ""}
+            ${locked
+              ? `<span class="preview">🔒 Salon payant</span><span class="lock-badge">${money(room.price)}</span>`
+              : `<span class="preview">${escapeHtml(room.lastMessage)}</span>${room.unread > 0 ? `<span class="unread-badge">${room.unread}</span>` : ""}`}
           </div>
         </div>
         ${canManage ? '<button type="button" class="room-manage-btn" title="Gérer ce salon">⋮</button>' : ""}
       `;
       row.addEventListener("click", (e) => {
         if (e.target.closest(".room-manage-btn")) return;
+        if (locked) { buyRoom(room); return; }
         window.location.href = "chat.html?room=" + encodeURIComponent(room.id) + "&name=" + encodeURIComponent(room.name);
       });
 
@@ -524,6 +573,79 @@
 
       roomListEl.appendChild(row);
     });
+  }
+
+  // ---------- Achat d'accès à un salon payant (même circuit que
+  // les formations : FedaPay, via /api/fedapay-checkout) ----------
+  async function buyRoom(room) {
+    if (!confirm(`Rejoindre "${room.name}" coûte ${money(room.price)}. Continuer vers le paiement ?`)) return;
+
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData && sessionData.session ? sessionData.session.access_token : null;
+      if (!accessToken) {
+        alert("Ta session a expiré. Reconnecte-toi puis réessaie.");
+        return;
+      }
+
+      const resp = await fetch("/api/fedapay-checkout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + accessToken
+        },
+        body: JSON.stringify({ courseId: room.id, productType: "salon" })
+      });
+
+      const data = await resp.json();
+      if (!resp.ok || !data.checkoutUrl) {
+        throw new Error(data.error || "Réponse de paiement invalide.");
+      }
+
+      window.location.href = data.checkoutUrl;
+    } catch (err) {
+      console.error(err);
+      alert("Paiement indisponible : " + err.message);
+    }
+  }
+
+  async function checkReturnFromPayment() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("payment") !== "return" || params.get("type") !== "salon") return;
+
+    const courseId = params.get("course");
+    bannerEl.classList.remove("hidden");
+    bannerEl.className = "pending";
+    bannerEl.textContent = "⏳ Vérification du paiement en cours...";
+
+    let attempts = 0;
+    const poll = setInterval(async () => {
+      attempts++;
+      const { data } = await supabase
+        .from("purchases")
+        .select("status")
+        .eq("user_id", currentUser.id)
+        .eq("course_id", courseId)
+        .eq("product_type", "salon")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (data && data.status === "paid") {
+        clearInterval(poll);
+        bannerEl.className = "paid";
+        bannerEl.textContent = "✅ Paiement confirmé ! Salon débloqué.";
+        await loadRooms();
+      } else if (data && data.status === "failed") {
+        clearInterval(poll);
+        bannerEl.className = "failed";
+        bannerEl.textContent = "❌ Le paiement a échoué ou a été annulé.";
+      } else if (attempts > 8) {
+        clearInterval(poll);
+        bannerEl.className = "pending";
+        bannerEl.textContent = "⏳ Paiement en attente de confirmation. Reviens dans un instant.";
+      }
+    }, 2000);
   }
 
   tabs.forEach((tab) => {
@@ -579,6 +701,7 @@
       appEl.classList.remove("hidden");
 
       await loadRooms();
+      await checkReturnFromPayment();
     } catch (err) {
       console.error(err);
       setStatus("Connexion impossible. Vérifie config.js.");
@@ -608,6 +731,7 @@
       loginScreen.classList.add("hidden");
       appEl.classList.remove("hidden");
       await loadRooms();
+      await checkReturnFromPayment();
     }
   }
 

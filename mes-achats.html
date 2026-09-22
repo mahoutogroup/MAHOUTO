@@ -154,6 +154,22 @@
     return row;
   }
 
+  function renderRoomRow(purchase, room) {
+    const row = document.createElement("div");
+    row.className = "card purchase-row";
+    row.innerHTML = `
+      <span class="emoji" style="background:${(room && room.color) || 'rgba(212,175,55,.12)'}">${(room && room.emoji) || "💬"}</span>
+      <div class="info">
+        <div class="nom">${purchase.course_name}</div>
+        <div class="meta">${money(purchase.amount)} · Acheté le ${formatDate(purchase.created_at)}</div>
+      </div>
+      ${purchase.status === "paid"
+        ? `<a class="access-btn" href="chat.html?room=${encodeURIComponent(purchase.course_id)}&name=${encodeURIComponent(purchase.course_name)}">Ouvrir</a>`
+        : `<span class="status-pending">⏳ En attente</span>`}
+    `;
+    return row;
+  }
+
   async function init() {
     const { data: sessionData } = await supabase.auth.getSession();
     if (!sessionData || !sessionData.session || !sessionData.session.user) {
@@ -178,6 +194,7 @@
 
     const formationPurchases = purchases.filter((p) => p.product_type === "formation");
     const productPurchases = purchases.filter((p) => p.product_type === "digital_product");
+    const roomPurchases = purchases.filter((p) => p.product_type === "salon");
 
     if (formationPurchases.length) {
       const [{ data: formations }] = await Promise.all([
@@ -209,6 +226,22 @@
 
       productPurchases.forEach((p) => {
         contentEl.appendChild(renderProductRow(p, productsById[p.course_id]));
+      });
+    }
+
+    if (roomPurchases.length) {
+      const { data: rooms } = await supabase
+        .from("rooms").select("id, emoji, color").in("id", roomPurchases.map((p) => p.course_id));
+      const roomsById = {};
+      (rooms || []).forEach((r) => { roomsById[r.id] = r; });
+
+      const label = document.createElement("div");
+      label.className = "section-label";
+      label.textContent = "🔒 Mes salons";
+      contentEl.appendChild(label);
+
+      roomPurchases.forEach((p) => {
+        contentEl.appendChild(renderRoomRow(p, roomsById[p.course_id]));
       });
     }
   }

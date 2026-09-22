@@ -170,6 +170,33 @@
 
   #status-message { color: var(--text-muted); font-size: 13px; min-height: 18px; }
 
+  /* ---------- Salon payant non débloqué ---------- */
+  #locked-screen {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 24px;
+    text-align: center;
+  }
+  #locked-screen .lock-icon { font-size: 44px; }
+  #locked-screen h2 { color: var(--gold-bright); font-size: 22px; }
+  #locked-screen p { color: var(--text-muted); max-width: 300px; }
+  #locked-price { color: var(--gold); font-weight: bold; font-size: 18px; }
+  #locked-buy-btn {
+    padding: 12px 30px;
+    border: none;
+    border-radius: 12px;
+    background: var(--gold-bright);
+    font-weight: bold;
+    cursor: pointer;
+    margin-top: 6px;
+  }
+
   .hidden { display: none !important; }
 
   /* ---------- Bulle : état modifié / supprimé ---------- */
@@ -266,6 +293,15 @@
   <h1 id="room-title">💬 Discussion</h1>
   <span class="room">En direct</span>
 </header>
+
+<div id="locked-screen" class="hidden">
+  <a href="discussions.html" style="position:absolute;top:18px;left:18px;color:var(--text-muted);text-decoration:none;font-size:15px;">← Retour</a>
+  <div class="lock-icon">🔒</div>
+  <h2 id="locked-room-name">Salon payant</h2>
+  <p>Rejoins ce salon pour lire et écrire les messages.</p>
+  <div id="locked-price"></div>
+  <button id="locked-buy-btn" type="button">Débloquer l'accès</button>
+</div>
 
 <div id="media-viewer" class="hidden">
   <button type="button" id="media-viewer-close" aria-label="Fermer">✕</button>
@@ -572,8 +608,87 @@
     }
   }
 
+  function money(xof) { return Number(xof).toLocaleString("fr-FR") + " FCFA"; }
+
+  // Vérifie l'accès à un salon payant. La vraie barrière est côté
+  // base de données (RLS sur "messages") — ce contrôle ne sert qu'à
+  // donner un écran clair plutôt qu'un chat vide et muet.
+  async function checkRoomAccess() {
+    const { data: room } = await supabase
+      .from("rooms")
+      .select("name, is_paid, price, created_by")
+      .eq("id", ROOM_ID)
+      .maybeSingle();
+
+    if (!room || !room.is_paid) return true;
+    if (room.created_by === currentUser.id) return true;
+
+    const { data: profile } = await supabase
+      .from("profiles").select("role").eq("id", currentUser.id).maybeSingle();
+    if (profile && ["admin", "super_admin", "founder"].includes(profile.role)) return true;
+
+    const { data: purchase } = await supabase
+      .from("purchases")
+      .select("id")
+      .eq("user_id", currentUser.id)
+      .eq("course_id", ROOM_ID)
+      .eq("product_type", "salon")
+      .eq("status", "paid")
+      .maybeSingle();
+
+    if (purchase) return true;
+
+    document.getElementById("locked-room-name").textContent = room.name;
+    document.getElementById("locked-price").textContent = money(room.price);
+    document.getElementById("locked-screen").classList.remove("hidden");
+    document.getElementById("locked-buy-btn").onclick = () => buyRoomAccess(room);
+    return false;
+  }
+
+  async function buyRoomAccess(room) {
+    const btn = document.getElementById("locked-buy-btn");
+    btn.disabled = true;
+    btn.textContent = "Redirection...";
+
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData && sessionData.session ? sessionData.session.access_token : null;
+      if (!accessToken) {
+        alert("Ta session a expiré. Reconnecte-toi puis réessaie.");
+        btn.disabled = false;
+        btn.textContent = "Débloquer l'accès";
+        return;
+      }
+
+      const resp = await fetch("/api/fedapay-checkout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + accessToken
+        },
+        body: JSON.stringify({ courseId: ROOM_ID, productType: "salon" })
+      });
+
+      const data = await resp.json();
+      if (!resp.ok || !data.checkoutUrl) {
+        throw new Error(data.error || "Réponse de paiement invalide.");
+      }
+
+      window.location.href = data.checkoutUrl;
+    } catch (err) {
+      console.error(err);
+      alert("Paiement indisponible : " + err.message);
+      btn.disabled = false;
+      btn.textContent = "Débloquer l'accès";
+    }
+  }
+
   async function enterRoom() {
     loginScreen.classList.add("hidden");
+
+    const hasAccess = await checkRoomAccess();
+    if (!hasAccess) return;
+
     chatHeader.classList.remove("hidden");
     messagesEl.classList.remove("hidden");
     composer.classList.remove("hidden");
