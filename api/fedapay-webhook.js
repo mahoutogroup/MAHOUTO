@@ -18,7 +18,8 @@
 //   https://TON-SITE.vercel.app/api/fedapay-webhook
 // =========================================================
 
-import fedapayPkg from "fedapay";
+import * as fedapayNS from "fedapay";
+const fedapayPkg = fedapayNS.default || fedapayNS;
 const { FedaPay, Transaction, Webhook } = fedapayPkg;
 
 // Empêche Vercel de parser le corps automatiquement : la vérification
