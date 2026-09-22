@@ -47,17 +47,20 @@
     display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
   }
   .formation-row label {
-    font-size: 10.5px; color: var(--text-dim); display: block; margin-bottom: 3px;
+    font-size: 13px; color: var(--text-muted); display: block; margin-bottom: 4px;
   }
   .formation-row input[type="number"], .formation-row input[type="text"],
   .formation-row textarea, .formation-row select {
-    width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border);
-    background: var(--bg); color: var(--white); font-size: 13.5px; font-family: inherit;
+    width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--white); font-size: 15.5px; font-family: inherit;
+  }
+  .formation-row input::placeholder, .formation-row textarea::placeholder {
+    color: var(--text-muted); opacity: 1;
   }
   .formation-row textarea { resize: vertical; min-height: 44px; }
 
   .formation-row .toggle-row {
-    display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-muted);
+    display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text-muted);
   }
 
   .formation-row .actions {
@@ -87,10 +90,13 @@
     margin: 20px 20px 40px; padding: 16px; display: flex; flex-direction: column; gap: 10px;
   }
   #new-formation-form h3 { color: var(--gold); font-size: 15px; margin-bottom: 4px; }
-  #new-formation-form label { font-size: 11px; color: var(--text-dim); display: block; margin-bottom: 3px; }
+  #new-formation-form label { font-size: 13px; color: var(--text-muted); display: block; margin-bottom: 4px; }
   #new-formation-form input, #new-formation-form select, #new-formation-form textarea {
-    width: 100%; padding: 9px 10px; border-radius: 8px; border: 1px solid var(--border);
-    background: var(--bg); color: var(--white); font-size: 13.5px; font-family: inherit;
+    width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--white); font-size: 15.5px; font-family: inherit;
+  }
+  #new-formation-form input::placeholder, #new-formation-form textarea::placeholder {
+    color: var(--text-muted); opacity: 1;
   }
   #new-formation-form textarea { resize: vertical; min-height: 50px; }
   #new-formation-form .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
