@@ -1,19 +1,22 @@
 // =========================================================
 // /api/fedapay-checkout.js — Version sécurisée (production)
 //
-// Gère à la fois les FORMATIONS et les PRODUITS NUMÉRIQUES,
+// Gère les FORMATIONS, les PRODUITS NUMÉRIQUES et les SALONS PAYANTS,
 // avec exactement la même logique de sécurité : le navigateur
 // n'envoie que { courseId, productType? }. Le serveur :
 //   - authentifie l'appelant via son jeton Supabase (Authorization: Bearer)
-//   - récupère le vrai article (formations OU digital_products)
+//   - récupère le vrai article (formations OU digital_products OU rooms)
 //   - calcule le montant officiel lui-même
 //   - crée la transaction FedaPay avec CE montant, jamais celui du client
 //
 // productType vaut "formation" (défaut, rétrocompatible avec
-// l'existant) ou "digital_product". Toute la partie FedaPay
+// l'existant), "digital_product" ou "salon". Toute la partie FedaPay
 // (création de transaction, lecture de la réponse, génération
-// du lien de paiement) est strictement identique dans les deux
-// cas — seule la table lue pour trouver l'article change.
+// du lien de paiement) est strictement identique dans tous les
+// cas — seule la table lue pour trouver l'article change. L'accès
+// réel au salon (lecture/écriture des messages) est ensuite imposé
+// par les policies RLS sur "messages", pas par ce fichier : ce
+// fichier ne fait qu'enregistrer l'achat une fois payé.
 //
 // Variables d'environnement Vercel attendues :
 //   FEDAPAY_SECRET_KEY
@@ -42,7 +45,10 @@ export default async function handler(req, res) {
     //    est ignoré même si envoyé.
     // -----------------------------------------------------
     const { courseId, productType: rawProductType } = req.body || {};
-    const productType = rawProductType === "digital_product" ? "digital_product" : "formation";
+    const productType =
+      rawProductType === "digital_product" ? "digital_product" :
+      rawProductType === "salon" ? "salon" :
+      "formation";
 
     if (!courseId || typeof courseId !== "string" || courseId.length > 200) {
       return res.status(400).json({ error: "Identifiant d'article invalide." });
@@ -85,7 +91,10 @@ export default async function handler(req, res) {
     //    viennent QUE d'ici, jamais du navigateur. La table
     //    dépend de productType, tout le reste est identique.
     // -----------------------------------------------------
-    const tableName = productType === "digital_product" ? "digital_products" : "formations";
+    const tableName =
+      productType === "digital_product" ? "digital_products" :
+      productType === "salon" ? "rooms" :
+      "formations";
 
     const { data: article, error: articleError } = await supabaseAdmin
       .from(tableName)
@@ -103,14 +112,23 @@ export default async function handler(req, res) {
     if (Object.prototype.hasOwnProperty.call(article, "disponible") && article.disponible === false) {
       return res.status(404).json({ error: "Cet article n'est plus disponible." });
     }
+    if (productType === "salon" && article.is_paid !== true) {
+      // Défense en profondeur : on refuse de faire payer l'accès à un
+      // salon que l'admin n'a pas explicitement marqué comme payant.
+      return res.status(404).json({ error: "Ce salon n'est pas payant." });
+    }
 
-    const officialAmount = Math.round(Number(article.promotion ?? article.prix));
+    const officialAmount = productType === "salon"
+      ? Math.round(Number(article.price))
+      : Math.round(Number(article.promotion ?? article.prix));
     if (!Number.isFinite(officialAmount) || officialAmount <= 0) {
-      console.error("Prix invalide pour l'article :", courseId, article.promotion, article.prix);
+      console.error("Prix invalide pour l'article :", courseId, article.promotion, article.prix, article.price);
       return res.status(500).json({ error: "Le prix de cet article est invalide." });
     }
 
-    const articleName = article.nom || (productType === "digital_product" ? "Produit MAHOUTO+" : "Formation MAHOUTO");
+    const articleName = productType === "salon"
+      ? (article.name || "Salon MAHOUTO+")
+      : (article.nom || (productType === "digital_product" ? "Produit MAHOUTO+" : "Formation MAHOUTO"));
 
     // -----------------------------------------------------
     // 4. Empêcher un paiement inutile si déjà acheté (défense
@@ -157,6 +175,9 @@ export default async function handler(req, res) {
     if (productType === "digital_product") {
       returnPage = "produits.html";
       platformLabel = "MAHOUTO+ Boutique";
+    } else if (productType === "salon") {
+      returnPage = "discussions.html";
+      platformLabel = "MAHOUTO+ Salons";
     } else {
       returnPage = article.provider === "academie_majestepresse" ? "academie-majestepresse.html" : "school.html";
       platformLabel = article.provider === "academie_majestepresse" ? "Académie Majesté Presse" : "MAHOUTO School";

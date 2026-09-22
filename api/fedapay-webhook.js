@@ -108,24 +108,11 @@ export default async function handler(req, res) {
   const supabaseAdmin = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
   // ---------------------------------------------------------
-  // 3. Protection contre le rejeu / traitement en double :
-  //    chaque événement FedaPay (event.id) n'est traité qu'une fois.
-  //    La contrainte d'unicité de webhook_events fait le travail.
+  // 3. Protection contre le traitement en double : indépendante
+  //    de tout historique d'événements FedaPay, elle repose sur
+  //    l'état réel de l'achat en base (étape 6 plus bas —
+  //    purchases.status === "paid" — jamais retraité une fois payé).
   // ---------------------------------------------------------
-  const eventId = String(event.id || `${eventType}:${transactionId}`);
-  const { error: dedupError } = await supabaseAdmin
-    .from("webhook_events")
-    .insert({ id: eventId, event_type: eventType });
-
-  if (dedupError) {
-    if (dedupError.code === "23505") {
-      log("info", "Événement déjà traité — ignoré (idempotence)", { eventId, eventType });
-      return res.status(200).json({ received: true, duplicate: true });
-    }
-    log("error", "Impossible d'enregistrer l'événement (dédoublonnage)", { eventId, error: dedupError.message });
-    // On continue : le contrôle de statut plus bas (étape 6) empêche
-    // de toute façon un double crédit du paiement.
-  }
 
   // ---------------------------------------------------------
   // 4. Ne jamais faire confiance au corps du webhook pour le statut
