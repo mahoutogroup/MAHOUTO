@@ -61,6 +61,7 @@ window.MahoutoAudioPlayer = (function () {
 
   function registerTrack(track) {
     registry.set(String(track.id), track);
+    console.log("[AUDIO] registerTrack", track.id, track.title, "| playlist length:", registry.size);
     // Si la piste restaurée depuis localStorage (après navigation)
     // correspond à celle qu'on vient d'enregistrer, on retrouve sa
     // position dans CETTE playlist pour que "suivant" refonctionne.
@@ -189,6 +190,7 @@ window.MahoutoAudioPlayer = (function () {
     // depuis l'écran verrouillé) ne déclenche JAMAIS "ended", donc la
     // playlist reste bien en pause tant que l'audio n'est pas terminé.
     audio.addEventListener("ended", () => {
+      console.log("[AUDIO] ended", current && current.id, "| current index", currentIndex);
       persistState(true);
       advance();
     });
@@ -296,8 +298,10 @@ window.MahoutoAudioPlayer = (function () {
   // fonctionne ensuite automatiquement, y compris quand on démarre
   // directement sur le 3e, 4e... fichier.
   function playById(id) {
+    console.log("[AUDIO] playById", id, "| playlist length:", registry.size);
     const tracks = getOrderedTracks();
     const idx = tracks.findIndex((t) => String(t.id) === String(id));
+    console.log("[AUDIO] current index", idx);
     if (idx === -1) return; // piste inconnue/plus disponible (ex: supprimée) — on ignore proprement
     play(tracks[idx]);
   }
@@ -311,7 +315,12 @@ window.MahoutoAudioPlayer = (function () {
 
   function advance() {
     const tracks = getOrderedTracks();
-    if (currentIndex === -1 || currentIndex + 1 >= tracks.length) return; // dernier audio atteint : on s'arrête proprement
+    console.log("[AUDIO] advance | current index", currentIndex, "| playlist length:", tracks.length);
+    if (currentIndex === -1 || currentIndex + 1 >= tracks.length) {
+      console.log("[AUDIO] advance: fin de playlist, rien à enchaîner");
+      return; // dernier audio atteint : on s'arrête proprement
+    }
+    console.log("[AUDIO] next track", tracks[currentIndex + 1].id, tracks[currentIndex + 1].title);
     play(tracks[currentIndex + 1]);
   }
 

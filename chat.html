@@ -897,7 +897,7 @@
 
     let attachmentType = "raw";
     if (uploadData.resource_type === "image") attachmentType = "image";
-    else if (uploadData.resource_type === "video") attachmentType = "video";
+    else if (uploadData.resource_type === "video") attachmentType = MahoutoAttachments.isAudioFile(file) ? "audio" : "video";
 
     const { error } = await supabase.from("messages").insert({
       room_id: ROOM_ID,

@@ -74,6 +74,19 @@ window.MahoutoAttachments = (function () {
     rs: { icon: "💻", label: "Fichier de code" }
   };
 
+  // Cloudinary classe les fichiers AUDIO (mp3, wav, m4a, ogg) sous
+  // resource_type "video", comme les vraies vidéos — ce n'est pas
+  // configurable côté upload. On ne peut donc pas se fier uniquement
+  // à uploadData.resource_type pour distinguer audio/vidéo au moment
+  // de l'upload : il faut recroiser avec l'extension/MIME du fichier
+  // ORIGINAL choisi par l'utilisateur, seule source fiable. Utilisé
+  // par chat.html/dm-chat.html juste après l'upload Cloudinary.
+  const AUDIO_EXTENSIONS = new Set(["mp3", "wav", "m4a", "ogg"]);
+  function isAudioFile(file) {
+    const ext = (file.name || "").split(".").pop().toLowerCase();
+    return AUDIO_EXTENSIONS.has(ext) || (file.type || "").startsWith("audio/");
+  }
+
   function getExtension(name) {
     if (!name) return "";
     const m = /\.([a-zA-Z0-9]+)$/.exec(name.trim());
@@ -330,6 +343,7 @@ window.MahoutoAttachments = (function () {
     getExtension,
     isPdfAttachment,
     isSvgAttachment,
+    isAudioFile,
     formatFileSize,
     buildDownloadUrl,
     pdfThumbnailUrl,

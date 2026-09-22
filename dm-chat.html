@@ -768,7 +768,7 @@
 
     let attachmentType = "raw";
     if (uploadData.resource_type === "image") attachmentType = "image";
-    else if (uploadData.resource_type === "video") attachmentType = "video";
+    else if (uploadData.resource_type === "video") attachmentType = MahoutoAttachments.isAudioFile(file) ? "audio" : "video";
 
     const { data, error } = await supabase.from("dm_messages").insert({
       conversation_id: CONV_ID,
