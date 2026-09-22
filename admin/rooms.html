@@ -238,8 +238,10 @@
           alert("Impossible d'enregistrer : " + error.message);
         } else {
           statusEl.classList.remove("hidden");
-          setTimeout(() => statusEl.classList.add("hidden"), 2000);
-          await loadRooms();
+          setTimeout(async () => {
+            statusEl.classList.add("hidden");
+            await loadRooms();
+          }, 1200);
         }
       });
 
