@@ -8,7 +8,7 @@
    - construire la carte de pièce jointe avec les DOM APIs
      (createElement/textContent) — jamais avec innerHTML sur des
      données venant de l'utilisateur (nom de fichier, etc.) ;
-   - regrouper les appels à /api/attachment-url pour les pièces
+   - regrouper les appels à /api/attachment (POST) pour les pièces
      jointes "authenticated" (DM et salons payants), afin de ne
      faire qu'UNE requête par lot de messages chargés plutôt
      qu'un appel par pièce jointe.
@@ -245,7 +245,7 @@ window.MahoutoAttachments = (function () {
   // jointe d'un message.
   // `resolved` : undefined/null (pièce publique — on utilise
   // msg.attachment_url directement) ou { url, previewUrl, downloadUrl }
-  // renvoyé par /api/attachment-url pour une pièce "authenticated".
+  // renvoyé par /api/attachment (POST) pour une pièce "authenticated".
   function renderAttachment(msg, resolved) {
     const r = resolved || { url: msg.attachment_url, previewUrl: null, downloadUrl: null };
 
@@ -261,7 +261,7 @@ window.MahoutoAttachments = (function () {
     return msg.attachment_url && msg.attachment_access === "authenticated";
   }
 
-  // Regroupe en UN seul appel /api/attachment-url la résolution des
+  // Regroupe en UN seul appel /api/attachment (POST) la résolution des
   // URLs signées pour tous les messages "authenticated" d'un lot
   // (chargement initial d'une conversation/d'un salon). Les pièces
   // jointes publiques n'appellent jamais cette route : leur URL est
@@ -276,7 +276,7 @@ window.MahoutoAttachments = (function () {
       const accessToken = sessionData && sessionData.session ? sessionData.session.access_token : null;
       if (!accessToken) return map;
 
-      const resp = await fetch("/api/attachment-url", {
+      const resp = await fetch("/api/attachment", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": "Bearer " + accessToken },
         body: JSON.stringify({
