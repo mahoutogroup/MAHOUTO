@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Administration — Salons — MAHOUTO+</title>
+<meta name="theme-color" content="#0A0A0A">
+<link rel="manifest" href="../manifest.json">
+<link rel="icon" href="../assets/favicon.png">
+<link rel="stylesheet" href="../theme.css">
+<script src="../theme-toggle.js"></script>
+<style>
+  header { padding: 20px; background: var(--bg-elevated); border-bottom: 1px solid var(--border); }
+  header h1 { font-size: 20px; color: var(--gold); }
+  header p { font-size: 12.5px; color: var(--text-muted); margin-top: 6px; }
+
+  #access-denied, #loading-state {
+    text-align: center; color: var(--text-dim); padding: 60px 24px; font-size: 14px;
+  }
+
+  .room-row {
+    display: flex; flex-direction: column; gap: 10px;
+    margin-bottom: 12px; padding: 14px;
+  }
+  .room-row .top-line { display: flex; align-items: center; gap: 10px; }
+  .room-row .emoji {
+    width: 44px; height: 44px; border-radius: 10px; flex: none;
+    display: flex; align-items: center; justify-content: center; font-size: 20px;
+  }
+  .room-row .nom { font-weight: bold; font-size: 14.5px; flex: 1; }
+  .room-row .free-tag {
+    font-size: 11px; color: var(--text-muted); background: var(--bg-card);
+    border-radius: 999px; padding: 3px 10px; flex: none;
+  }
+
+  .room-row label {
+    font-size: 13px; color: var(--text-muted); display: block; margin-bottom: 4px;
+  }
+  .room-row .toggle-row {
+    display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text-muted);
+  }
+  .room-row .fields {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+  }
+  .room-row input[type="number"], .room-row input[type="text"] {
+    width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--white); font-size: 15.5px; font-family: inherit;
+  }
+  .room-row input::placeholder { color: var(--text-muted); opacity: 1; }
+  .room-row input:disabled { opacity: .45; }
+
+  .room-row .actions { display: flex; gap: 8px; margin-top: 4px; flex-wrap: wrap; }
+  .room-row .save-btn {
+    flex: 1; font-size: 12.5px; font-weight: bold; background: var(--gold-bright);
+    color: #0A0A0A; border: none; border-radius: 8px; padding: 9px; cursor: pointer;
+  }
+  .room-row .save-btn:disabled { opacity: .5; cursor: wait; }
+  .room-row .save-status { font-size: 11px; color: var(--accent-green); align-self: center; }
+  .room-row .delete-btn {
+    background: rgba(239,68,68,.15); color: #F87171; border: none; border-radius: 8px;
+    padding: 9px 14px; font-size: 12.5px; font-weight: bold; cursor: pointer;
+  }
+
+  #new-room-form {
+    margin: 20px 20px 40px; padding: 16px; display: flex; flex-direction: column; gap: 10px;
+  }
+  #new-room-form h3 { color: var(--gold); font-size: 15px; margin-bottom: 4px; }
+  #new-room-form label { font-size: 13px; color: var(--text-muted); display: block; margin-bottom: 4px; }
+  #new-room-form input {
+    width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--white); font-size: 15.5px; font-family: inherit;
+  }
+  #new-room-form input::placeholder { color: var(--text-muted); opacity: 1; }
+  #new-room-form input:disabled { opacity: .45; }
+  #new-room-form .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  #new-room-form .toggle-row {
+    display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text-muted);
+  }
+  #new-room-form button[type="submit"] {
+    margin-top: 6px; background: var(--gold-bright); color: #0A0A0A; border: none;
+    border-radius: 10px; padding: 12px; font-weight: bold; font-size: 14px; cursor: pointer;
+  }
+  #new-room-status { font-size: 12px; color: var(--accent-green); min-height: 16px; }
+</style>
+</head>
+<body>
+
+<button id="theme-toggle-btn" class="theme-toggle-fab">🌙</button>
+
+<div class="page-content">
+
+  <header>
+    <h1>⚙️ Administration — Salons</h1>
+    <p>Crée des salons payants (accès débloqué par achat via FedaPay, comme une formation) et gère le prix des salons existants.</p>
+  </header>
+
+  <div style="display:flex;gap:10px;padding:14px 20px 0;flex-wrap:wrap;">
+    <a href="formations.html" style="font-size:12.5px;font-weight:bold;color:var(--text-muted);background:var(--bg-card);border-radius:999px;padding:8px 16px;">Formations</a>
+    <a href="produits.html" style="font-size:12.5px;font-weight:bold;color:var(--text-muted);background:var(--bg-card);border-radius:999px;padding:8px 16px;">Produits numériques</a>
+    <a href="users.html" style="font-size:12.5px;font-weight:bold;color:var(--text-muted);background:var(--bg-card);border-radius:999px;padding:8px 16px;">Utilisateurs</a>
+    <a href="rooms.html" style="font-size:12.5px;font-weight:bold;color:#0A0A0A;background:var(--gold-bright);border-radius:999px;padding:8px 16px;">Salons</a>
+  </div>
+
+  <div id="loading-state">Vérification des droits...</div>
+  <div id="access-denied" class="hidden">🔒 Accès réservé aux administrateurs.</div>
+
+  <div id="rooms-container" class="hidden"></div>
+
+  <form id="new-room-form" class="card hidden">
+    <h3>➕ Créer un salon</h3>
+
+    <div>
+      <label>Nom du salon</label>
+      <input type="text" id="nr-nom" placeholder="Ex : Les Sérigraphes" required>
+    </div>
+
+    <div class="row-2">
+      <div>
+        <label>Emoji</label>
+        <input type="text" id="nr-emoji" placeholder="💬" value="💬">
+      </div>
+      <div>
+        <label>Couleur</label>
+        <input type="text" id="nr-color" placeholder="#38BDF8" value="#38BDF8">
+      </div>
+    </div>
+
+    <label class="toggle-row">
+      <input type="checkbox" id="nr-is-paid">
+      Salon payant (accès sur achat)
+    </label>
+
+    <div>
+      <label>Prix (FCFA)</label>
+      <input type="number" id="nr-price" min="0" placeholder="Ex : 2000" disabled>
+    </div>
+
+    <button type="submit">Créer le salon</button>
+    <div id="new-room-status"></div>
+  </form>
+
+</div>
+
+<script src="../config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+(function () {
+  const cfg = window.MAHOUTO_CONFIG;
+  const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+
+  const loadingEl = document.getElementById("loading-state");
+  const deniedEl = document.getElementById("access-denied");
+  const containerEl = document.getElementById("rooms-container");
+
+  function money(xof) { return Number(xof).toLocaleString("fr-FR") + " FCFA"; }
+  function escapeHtml(str) {
+    const div = document.createElement("div");
+    div.textContent = str || "";
+    return div.innerHTML;
+  }
+
+  async function loadRooms() {
+    const { data, error } = await supabase
+      .from("rooms")
+      .select("*")
+      .order("created_at", { ascending: true });
+
+    if (error) {
+      containerEl.innerHTML = '<div id="loading-state">Impossible de charger les salons.</div>';
+      console.error(error);
+      return;
+    }
+
+    renderRooms(data || []);
+  }
+
+  function renderRooms(rooms) {
+    containerEl.innerHTML = "";
+
+    rooms.forEach((r) => {
+      const row = document.createElement("div");
+      row.className = "card room-row";
+      row.innerHTML = `
+        <div class="top-line">
+          <span class="emoji" style="background:${r.color || 'rgba(212,175,55,.12)'}">${r.emoji || "💬"}</span>
+          <span class="nom">${escapeHtml(r.name)}</span>
+          ${r.is_paid ? "" : '<span class="free-tag">Gratuit</span>'}
+        </div>
+
+        <label class="toggle-row">
+          <input type="checkbox" class="r-is-paid" ${r.is_paid ? "checked" : ""}>
+          Salon payant (accès sur achat)
+        </label>
+
+        <div>
+          <label>Prix (FCFA)</label>
+          <input type="number" class="r-price" min="0" value="${r.price ?? ""}" placeholder="Ex : 2000" ${r.is_paid ? "" : "disabled"}>
+        </div>
+
+        <div class="actions">
+          <button class="save-btn">Enregistrer</button>
+          <button type="button" class="delete-btn">🗑️ Supprimer</button>
+          <span class="save-status hidden">✓ Enregistré</span>
+        </div>
+      `;
+
+      const isPaidBox = row.querySelector(".r-is-paid");
+      const priceInput = row.querySelector(".r-price");
+      const saveBtn = row.querySelector(".save-btn");
+      const deleteBtn = row.querySelector(".delete-btn");
+      const statusEl = row.querySelector(".save-status");
+
+      isPaidBox.addEventListener("change", () => {
+        priceInput.disabled = !isPaidBox.checked;
+      });
+
+      saveBtn.addEventListener("click", async () => {
+        const is_paid = isPaidBox.checked;
+        const priceRaw = priceInput.value;
+        const price = priceRaw === "" ? null : parseInt(priceRaw, 10);
+
+        if (is_paid && (!Number.isFinite(price) || price <= 0)) {
+          alert("Indique un prix valide pour un salon payant.");
+          return;
+        }
+
+        saveBtn.disabled = true;
+        statusEl.classList.add("hidden");
+
+        const { error } = await supabase
+          .from("rooms")
+          .update({ is_paid, price: is_paid ? price : null })
+          .eq("id", r.id);
+
+        saveBtn.disabled = false;
+        if (error) {
+          console.error(error);
+          alert("Impossible d'enregistrer : " + error.message);
+        } else {
+          statusEl.classList.remove("hidden");
+          setTimeout(() => statusEl.classList.add("hidden"), 2000);
+          await loadRooms();
+        }
+      });
+
+      deleteBtn.addEventListener("click", async () => {
+        if (!confirm(`Supprimer définitivement le salon "${r.name}" et tous ses messages ?`)) return;
+        deleteBtn.disabled = true;
+
+        const { error: msgError } = await supabase.from("messages").delete().eq("room_id", r.id);
+        if (msgError) {
+          alert("Impossible de supprimer les messages de ce salon.");
+          console.error(msgError);
+          deleteBtn.disabled = false;
+          return;
+        }
+
+        const { error: roomError } = await supabase.from("rooms").delete().eq("id", r.id);
+        if (roomError) {
+          alert("Impossible de supprimer ce salon.");
+          console.error(roomError);
+          deleteBtn.disabled = false;
+          return;
+        }
+        row.remove();
+      });
+
+      containerEl.appendChild(row);
+    });
+  }
+
+  document.getElementById("nr-is-paid").addEventListener("change", (e) => {
+    document.getElementById("nr-price").disabled = !e.target.checked;
+  });
+
+  document.getElementById("new-room-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    const currentUserId = sessionData && sessionData.session ? sessionData.session.user.id : null;
+    const statusEl = document.getElementById("new-room-status");
+
+    const name = document.getElementById("nr-nom").value.trim();
+    const emoji = document.getElementById("nr-emoji").value.trim() || "💬";
+    const color = document.getElementById("nr-color").value.trim() || "#38BDF8";
+    const is_paid = document.getElementById("nr-is-paid").checked;
+    const priceRaw = document.getElementById("nr-price").value;
+    const price = priceRaw === "" ? null : parseInt(priceRaw, 10);
+
+    if (!name) return;
+    if (is_paid && (!Number.isFinite(price) || price <= 0)) {
+      statusEl.style.color = "#F87171";
+      statusEl.textContent = "Indique un prix valide pour un salon payant.";
+      return;
+    }
+
+    const slug = name.toLowerCase()
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || ("salon-" + Date.now());
+
+    statusEl.style.color = "";
+    statusEl.textContent = "Création en cours...";
+
+    const { error } = await supabase.from("rooms").insert({
+      id: slug,
+      name,
+      emoji,
+      color,
+      is_group: true,
+      is_paid,
+      price: is_paid ? price : null,
+      created_by: currentUserId
+    });
+
+    if (error) {
+      console.error(error);
+      statusEl.style.color = "#F87171";
+      statusEl.textContent = "Erreur : " + error.message;
+      return;
+    }
+
+    statusEl.style.color = "";
+    statusEl.textContent = "✓ Salon créé.";
+    document.getElementById("new-room-form").reset();
+    document.getElementById("nr-emoji").value = "💬";
+    document.getElementById("nr-color").value = "#38BDF8";
+    document.getElementById("nr-price").disabled = true;
+    await loadRooms();
+  });
+
+  async function init() {
+    const { data } = await supabase.auth.getSession();
+
+    if (!data || !data.session || !data.session.user) {
+      loadingEl.classList.add("hidden");
+      deniedEl.classList.remove("hidden");
+      deniedEl.textContent = "🔒 Connecte-toi avec un compte administrateur pour accéder à cette page.";
+      return;
+    }
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", data.session.user.id)
+      .maybeSingle();
+
+    const role = profile ? profile.role : "user";
+
+    if (role !== "admin" && role !== "super_admin" && role !== "founder") {
+      loadingEl.classList.add("hidden");
+      deniedEl.classList.remove("hidden");
+      return;
+    }
+
+    loadingEl.classList.add("hidden");
+    containerEl.classList.remove("hidden");
+    document.getElementById("new-room-form").classList.remove("hidden");
+    await loadRooms();
+  }
+
+  init();
+})();
+</script>
+<script src="../pwa-install.js"></script>
+
+</body>
+</html>
