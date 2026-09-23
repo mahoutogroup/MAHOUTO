@@ -39,6 +39,16 @@
 
   header h1 { font-size: 18px; color: var(--gold-bright); }
 
+  #room-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    flex: none;
+    overflow: hidden;
+    cursor: pointer;
+  }
+  #room-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
   header .room {
     margin-left: auto;
     font-size: 12px;
@@ -293,6 +303,7 @@
 
 <header class="hidden" id="chat-header">
   <a class="back" href="discussions.html" aria-label="Retour">←</a>
+  <div id="room-avatar" class="hidden"></div>
   <h1 id="room-title">💬 Discussion</h1>
   <span class="room">En direct</span>
 </header>
@@ -665,12 +676,18 @@
   // Vérifie l'accès à un salon payant. La vraie barrière est côté
   // base de données (RLS sur "messages") — ce contrôle ne sert qu'à
   // donner un écran clair plutôt qu'un chat vide et muet.
+  let roomPhotoUrl = null;
+
   async function checkRoomAccess() {
     const { data: room } = await supabase
       .from("rooms")
-      .select("name, is_paid, price, created_by")
+      .select("name, is_paid, price, created_by, photo_url")
       .eq("id", ROOM_ID)
       .maybeSingle();
+
+    if (room && typeof room.photo_url === "string" && /^https:\/\//i.test(room.photo_url)) {
+      roomPhotoUrl = room.photo_url;
+    }
 
     if (!room || !room.is_paid) return true;
     if (room.created_by === currentUser.id) return true;
@@ -744,6 +761,16 @@
     chatHeader.classList.remove("hidden");
     messagesEl.classList.remove("hidden");
     composer.classList.remove("hidden");
+
+    if (roomPhotoUrl) {
+      const avatarEl = document.getElementById("room-avatar");
+      const img = document.createElement("img");
+      img.src = roomPhotoUrl;
+      img.alt = "";
+      avatarEl.appendChild(img);
+      avatarEl.classList.remove("hidden");
+      avatarEl.addEventListener("click", () => openMediaViewer(img));
+    }
 
     await loadHiddenMessageIds();
     await loadHistory();
