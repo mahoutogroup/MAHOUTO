@@ -60,6 +60,11 @@
     background: rgba(239,68,68,.15); color: #F87171; border: none; border-radius: 8px;
     padding: 9px 14px; font-size: 12.5px; font-weight: bold; cursor: pointer;
   }
+  .room-row .photo-btn {
+    background: var(--bg); color: var(--text-muted); border: 1px solid var(--border); border-radius: 8px;
+    padding: 9px 14px; font-size: 12.5px; font-weight: bold; cursor: pointer;
+  }
+  .room-row .photo-btn:disabled { opacity: .5; cursor: wait; }
 
   #new-room-form {
     margin: 20px 20px 40px; padding: 16px; display: flex; flex-direction: column; gap: 10px;
@@ -182,7 +187,7 @@
       row.className = "card room-row";
       row.innerHTML = `
         <div class="top-line">
-          <span class="emoji" style="background:${r.color || 'rgba(212,175,55,.12)'}">${r.emoji || "💬"}</span>
+          <span class="emoji" style="background:${r.color || 'rgba(212,175,55,.12)'}"></span>
           <span class="nom">${escapeHtml(r.name)}</span>
           ${r.is_paid ? "" : '<span class="free-tag">Gratuit</span>'}
         </div>
@@ -199,16 +204,74 @@
 
         <div class="actions">
           <button class="save-btn">Enregistrer</button>
+          <button type="button" class="photo-btn">🖼️ Photo</button>
           <button type="button" class="delete-btn">🗑️ Supprimer</button>
           <span class="save-status hidden">✓ Enregistré</span>
         </div>
       `;
 
+      // Emoji ou vraie photo — même logique que discussions.html/chat.html.
+      const emojiEl = row.querySelector(".emoji");
+      if (typeof r.photo_url === "string" && /^https:\/\//i.test(r.photo_url)) {
+        const img = document.createElement("img");
+        img.src = r.photo_url;
+        img.alt = "";
+        img.style.cssText = "width:100%;height:100%;object-fit:cover;border-radius:50%;";
+        emojiEl.appendChild(img);
+      } else {
+        emojiEl.textContent = r.emoji || "💬";
+      }
+
       const isPaidBox = row.querySelector(".r-is-paid");
       const priceInput = row.querySelector(".r-price");
       const saveBtn = row.querySelector(".save-btn");
+      const photoBtn = row.querySelector(".photo-btn");
       const deleteBtn = row.querySelector(".delete-btn");
       const statusEl = row.querySelector(".save-status");
+
+      photoBtn.addEventListener("click", () => {
+        const input = document.createElement("input");
+        input.type = "file";
+        input.accept = "image/jpeg,image/png,image/webp";
+        input.addEventListener("change", async () => {
+          const file = input.files && input.files[0];
+          if (!file) return;
+          photoBtn.disabled = true;
+
+          try {
+            const { data: sessionData } = await supabase.auth.getSession();
+            const accessToken = sessionData && sessionData.session ? sessionData.session.access_token : null;
+            const signQuery = new URLSearchParams({ filename: file.name || "photo.jpg", context: "room", contextId: r.id });
+            const signResp = await fetch("/api/attachment?" + signQuery.toString(), {
+              headers: accessToken ? { "Authorization": "Bearer " + accessToken } : {}
+            });
+            const sign = await signResp.json();
+            if (!signResp.ok) throw new Error(sign.error || "Signature indisponible");
+
+            const formData = new FormData();
+            formData.append("file", file);
+            formData.append("api_key", sign.apiKey);
+            formData.append("timestamp", sign.timestamp);
+            formData.append("signature", sign.signature);
+            formData.append("folder", sign.folder);
+            if (sign.type) formData.append("type", sign.type);
+
+            const uploadResp = await fetch(sign.uploadUrl, { method: "POST", body: formData });
+            const uploadData = await uploadResp.json();
+            if (!uploadResp.ok) throw new Error(uploadData.error?.message || "Envoi échoué");
+
+            const { error } = await supabase.from("rooms").update({ photo_url: uploadData.secure_url }).eq("id", r.id);
+            if (error) throw error;
+
+            await loadRooms();
+          } catch (err) {
+            console.error(err);
+            alert("Impossible de changer la photo : " + err.message);
+            photoBtn.disabled = false;
+          }
+        });
+        input.click();
+      });
 
       isPaidBox.addEventListener("change", () => {
         priceInput.disabled = !isPaidBox.checked;
