@@ -376,10 +376,12 @@
     <div class="sheet">
       <div class="sheet-handle"></div>
       <div class="sheet-title" id="room-action-title"></div>
+      <button type="button" data-action="photo">🖼️ Changer la photo</button>
       <button type="button" data-action="rename">✏️ Renommer le salon</button>
       <button type="button" class="danger" data-action="delete">🗑️ Supprimer le salon</button>
     </div>
   </div>
+  <input type="file" id="room-photo-input" accept="image/jpeg,image/png,image/webp" class="hidden">
 
   <nav class="bottom-nav">
     <a class="nav-item" href="index.html"><span class="icon">🏠</span>Accueil</a>
@@ -544,7 +546,7 @@
       const row = document.createElement("div");
       row.className = "room-row" + (locked ? " locked-room" : "");
       row.innerHTML = `
-        <div class="avatar" style="background:${room.color}">${room.emoji}</div>
+        <div class="avatar" style="background:${room.color}">${room.photo_url ? "" : room.emoji}</div>
         <div class="room-info">
           <div class="top-line">
             <span class="name">${escapeHtml(room.name)}</span>
@@ -563,6 +565,18 @@
         if (locked) { buyRoom(room); return; }
         window.location.href = "chat.html?room=" + encodeURIComponent(room.id) + "&name=" + encodeURIComponent(room.name);
       });
+
+      // Photo du salon : ajoutée via l'API DOM (pas innerHTML) même si
+      // l'URL vient de notre propre Cloudinary, par cohérence avec le
+      // reste du projet (attachments.js) — seules les URL https sont
+      // acceptées comme src.
+      if (typeof room.photo_url === "string" && /^https:\/\//i.test(room.photo_url)) {
+        const img = document.createElement("img");
+        img.src = room.photo_url;
+        img.alt = "";
+        img.style.cssText = "width:100%;height:100%;object-fit:cover;border-radius:50%;";
+        row.querySelector(".avatar").appendChild(img);
+      }
 
       const manageBtn = row.querySelector(".room-manage-btn");
       if (manageBtn) {
@@ -764,6 +778,65 @@
 
   roomActionSheet.addEventListener("click", (e) => {
     if (e.target === roomActionSheet) closeRoomActions();
+  });
+
+  const roomPhotoInput = document.getElementById("room-photo-input");
+
+  roomActionSheet.querySelector('[data-action="photo"]').addEventListener("click", () => {
+    if (!activeRoom) return;
+    const room = activeRoom;
+    closeRoomActions();
+    roomPhotoInput.dataset.roomId = room.id;
+    roomPhotoInput.click();
+  });
+
+  roomPhotoInput.addEventListener("change", async () => {
+    const file = roomPhotoInput.files && roomPhotoInput.files[0];
+    const roomId = roomPhotoInput.dataset.roomId;
+    roomPhotoInput.value = "";
+    if (!file || !roomId) return;
+
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData && sessionData.session ? sessionData.session.access_token : null;
+      const signQuery = new URLSearchParams({ filename: file.name || "photo.jpg", context: "room", contextId: roomId });
+      const signResp = await fetch("/api/attachment?" + signQuery.toString(), {
+        headers: accessToken ? { "Authorization": "Bearer " + accessToken } : {}
+      });
+      const sign = await signResp.json();
+      if (!signResp.ok) throw new Error(sign.error || "Signature indisponible");
+
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("api_key", sign.apiKey);
+      formData.append("timestamp", sign.timestamp);
+      formData.append("signature", sign.signature);
+      formData.append("folder", sign.folder);
+      if (sign.type) formData.append("type", sign.type);
+
+      const uploadResp = await fetch(sign.uploadUrl, { method: "POST", body: formData });
+      const uploadData = await uploadResp.json();
+      if (!uploadResp.ok) throw new Error(uploadData.error?.message || "Envoi échoué");
+
+      // L'écriture réelle reste gouvernée par la RLS de "rooms" : un
+      // créateur non-admin ne peut réussir cette mise à jour que sur
+      // SES salons gratuits — sur un salon payant, seul un admin y
+      // parvient, même si l'upload Cloudinary ci-dessus a réussi.
+      const { error } = await supabase
+        .from("rooms")
+        .update({ photo_url: uploadData.secure_url })
+        .eq("id", roomId);
+
+      if (error) {
+        alert("Photo envoyée, mais impossible de l'associer à ce salon (droits insuffisants).");
+        console.error(error);
+        return;
+      }
+      await loadRooms();
+    } catch (err) {
+      console.error(err);
+      alert("Impossible de changer la photo : " + err.message);
+    }
   });
 
   roomActionSheet.querySelector('[data-action="rename"]').addEventListener("click", async () => {

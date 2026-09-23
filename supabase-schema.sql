@@ -55,6 +55,13 @@ create table if not exists public.rooms (
 alter table public.rooms add column if not exists is_paid boolean not null default false;
 alter table public.rooms add column if not exists price integer;
 
+-- Photo de profil du salon (façon WhatsApp), ajoutée le 22/09/2026.
+-- NULL par défaut = émoji/couleur actuels inchangés en repli. Écriture
+-- déjà couverte par les policies rooms_update_own_or_admin existantes :
+-- le créateur peut la définir sur SES salons gratuits, l'admin sur
+-- n'importe quel salon (gratuit ou payant) — aucune policy à changer.
+alter table public.rooms add column if not exists photo_url text;
+
 -- ---------- Messages des salons ----------
 create table if not exists public.messages (
   id bigint generated always as identity primary key,
@@ -69,6 +76,20 @@ create table if not exists public.messages (
   is_deleted boolean not null default false,
   attachment_name text
 );
+
+-- Ajoutées lors du chantier "pièces jointes professionnelles" (22/09/2026),
+-- déjà présentes en production — ce bloc ne fait que documenter
+-- fidèlement l'état réel de la base dans ce fichier de référence.
+-- attachment_public_id/attachment_resource_type : identifiant et type
+-- Cloudinary, nécessaires pour générer une URL signée. attachment_access :
+-- 'public' (salon gratuit) | 'authenticated' (salon payant/DM, URL
+-- signée temporaire via /api/attachment). Utilisées par attachments.js,
+-- api/attachment.js et api/_attachment-rules.js.
+alter table public.messages add column if not exists attachment_public_id text;
+alter table public.messages add column if not exists attachment_resource_type text;
+alter table public.messages add column if not exists attachment_access text;
+alter table public.messages add column if not exists attachment_size bigint;
+alter table public.messages add column if not exists attachment_mime text;
 
 alter table public.messages
   drop constraint if exists messages_content_or_attachment;
@@ -138,6 +159,15 @@ create table if not exists public.dm_messages (
   delivered_at timestamptz,
   read_at timestamptz
 );
+
+-- Même ajout que sur "messages" (voir commentaire plus haut) — les DM
+-- utilisent toujours attachment_access = 'authenticated' (URL signée
+-- systématique, jamais publique, cf. api/_attachment-rules.js).
+alter table public.dm_messages add column if not exists attachment_public_id text;
+alter table public.dm_messages add column if not exists attachment_resource_type text;
+alter table public.dm_messages add column if not exists attachment_access text;
+alter table public.dm_messages add column if not exists attachment_size bigint;
+alter table public.dm_messages add column if not exists attachment_mime text;
 
 alter table public.dm_messages
   drop constraint if exists dm_messages_content_check;
