@@ -368,12 +368,35 @@
     cursor: pointer;
   }
   #send-to-sheet .target-row:active { background: var(--bg-card); }
+  #send-to-sheet .target-row.selected { background: var(--bg-card); }
+  #send-to-sheet .target-row .check {
+    margin-left: auto; width: 22px; height: 22px; border-radius: 50%;
+    border: 2px solid var(--border); flex: none;
+    display: flex; align-items: center; justify-content: center; font-size: 13px;
+  }
+  #send-to-sheet .target-row.selected .check {
+    background: var(--gold-bright); border-color: var(--gold-bright); color: #0A0A0A;
+  }
   #send-to-sheet .target-row .avatar {
     width: 40px; height: 40px; border-radius: 50%; flex: none;
     display: flex; align-items: center; justify-content: center; font-size: 18px;
     overflow: hidden;
   }
   #send-to-sheet .target-row .avatar img { width: 100%; height: 100%; object-fit: cover; }
+  #send-to-confirm-btn {
+    display: block;
+    width: calc(100% - 44px);
+    margin: 10px 22px 0;
+    padding: 13px;
+    border: none;
+    border-radius: 12px;
+    background: var(--gold-bright);
+    color: #0A0A0A;
+    font-weight: bold;
+    font-size: 15px;
+    cursor: pointer;
+  }
+  #send-to-confirm-btn:disabled { opacity: .4; cursor: not-allowed; }
 </style>
 </head>
 <body>
@@ -407,7 +430,7 @@
       <input id="search-input" type="text" placeholder="Rechercher...">
     </div>
   </header>
-  <input type="file" id="quick-photo-input" accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime" class="hidden">
+  <input type="file" id="quick-photo-input" accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime" multiple class="hidden">
 
   <div id="payment-banner" class="hidden"></div>
 
@@ -438,8 +461,9 @@
   <div id="send-to-sheet" class="hidden">
     <div class="sheet">
       <div class="sheet-handle"></div>
-      <div class="sheet-title">Envoyer à...</div>
+      <div class="sheet-title">Envoyer à... <span id="send-to-count"></span></div>
       <div id="send-to-list"></div>
+      <button type="button" id="send-to-confirm-btn" disabled>Envoyer</button>
     </div>
   </div>
 
@@ -906,23 +930,37 @@
   const quickPhotoInput = document.getElementById("quick-photo-input");
   const sendToSheet = document.getElementById("send-to-sheet");
   const sendToList = document.getElementById("send-to-list");
-  let pendingQuickFile = null;
+  const sendToCountEl = document.getElementById("send-to-count");
+  const sendToConfirmBtn = document.getElementById("send-to-confirm-btn");
+  let pendingQuickFiles = [];
+  let selectedTargetRooms = new Map(); // room.id -> room
 
   cameraBtn.addEventListener("click", () => quickPhotoInput.click());
 
   function closeSendToSheet() {
     sendToSheet.classList.add("hidden");
-    pendingQuickFile = null;
+    pendingQuickFiles = [];
+    selectedTargetRooms.clear();
   }
   sendToSheet.addEventListener("click", (e) => {
     if (e.target === sendToSheet) closeSendToSheet();
   });
 
+  function updateSendToFooter() {
+    const n = selectedTargetRooms.size;
+    sendToCountEl.textContent = n > 0 ? `(${n} sélectionné${n > 1 ? "s" : ""})` : "";
+    sendToConfirmBtn.disabled = n === 0;
+  }
+
   quickPhotoInput.addEventListener("change", () => {
-    const file = quickPhotoInput.files && quickPhotoInput.files[0];
+    const files = Array.from(quickPhotoInput.files || []);
     quickPhotoInput.value = "";
-    if (!file) return;
-    pendingQuickFile = file;
+    if (!files.length) return;
+    pendingQuickFiles = files;
+    selectedTargetRooms.clear();
+
+    document.querySelector("#send-to-sheet .sheet-title").firstChild.textContent =
+      files.length > 1 ? `Envoyer ${files.length} fichiers à... ` : "Envoyer à... ";
 
     // Seuls les salons réellement accessibles à l'utilisateur (gratuits,
     // ou payants déjà débloqués/créés/administrés) sont proposés — un
@@ -938,75 +976,113 @@
       const row = document.createElement("button");
       row.type = "button";
       row.className = "target-row";
-      row.innerHTML = `<span class="avatar" style="background:${r.color}">${r.photo_url ? "" : r.emoji}</span><span>${escapeHtml(r.name)}</span>`;
+      row.innerHTML = `<span class="avatar" style="background:${r.color}">${r.photo_url ? "" : r.emoji}</span><span style="flex:1;">${escapeHtml(r.name)}</span><span class="check"></span>`;
       if (typeof r.photo_url === "string" && /^https:\/\//i.test(r.photo_url)) {
         const img = document.createElement("img");
         img.src = r.photo_url;
         img.alt = "";
         row.querySelector(".avatar").appendChild(img);
       }
-      row.addEventListener("click", () => sendQuickFileToRoom(r));
+      row.addEventListener("click", () => {
+        if (selectedTargetRooms.has(r.id)) {
+          selectedTargetRooms.delete(r.id);
+          row.classList.remove("selected");
+          row.querySelector(".check").textContent = "";
+        } else {
+          selectedTargetRooms.set(r.id, r);
+          row.classList.add("selected");
+          row.querySelector(".check").textContent = "✓";
+        }
+        updateSendToFooter();
+      });
       sendToList.appendChild(row);
     });
 
+    updateSendToFooter();
     sendToSheet.classList.remove("hidden");
   });
 
-  async function sendQuickFileToRoom(room) {
-    const file = pendingQuickFile;
+  sendToConfirmBtn.addEventListener("click", async () => {
+    const files = pendingQuickFiles;
+    const targets = Array.from(selectedTargetRooms.values());
+    if (!files.length || !targets.length) return;
+
+    sendToConfirmBtn.disabled = true;
     closeSendToSheet();
-    if (!file) return;
 
-    try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const accessToken = sessionData && sessionData.session ? sessionData.session.access_token : null;
-      const { data: profile } = await supabase
-        .from("profiles").select("username").eq("id", currentUser.id).maybeSingle();
-
-      const signQuery = new URLSearchParams({ filename: file.name || "photo.jpg", context: "room", contextId: room.id });
-      const signResp = await fetch("/api/attachment?" + signQuery.toString(), {
-        headers: accessToken ? { "Authorization": "Bearer " + accessToken } : {}
-      });
-      const sign = await signResp.json();
-      if (!signResp.ok) throw new Error(sign.error || "Signature indisponible");
-
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("api_key", sign.apiKey);
-      formData.append("timestamp", sign.timestamp);
-      formData.append("signature", sign.signature);
-      formData.append("folder", sign.folder);
-      if (sign.type) formData.append("type", sign.type);
-
-      const uploadResp = await fetch(sign.uploadUrl, { method: "POST", body: formData });
-      const uploadData = await uploadResp.json();
-      if (!uploadResp.ok) throw new Error(uploadData.error?.message || "Envoi échoué");
-
-      let attachmentType = "raw";
-      if (uploadData.resource_type === "image") attachmentType = "image";
-      else if (uploadData.resource_type === "video") attachmentType = "video";
-
-      const { error } = await supabase.from("messages").insert({
-        room_id: room.id,
-        user_id: currentUser.id,
-        username: (profile && profile.username) || "Utilisateur",
-        content: "",
-        attachment_url: uploadData.secure_url,
-        attachment_type: attachmentType,
-        attachment_name: file.name || null,
-        attachment_size: file.size || null,
-        attachment_mime: file.type || null,
-        attachment_public_id: uploadData.public_id || null,
-        attachment_resource_type: uploadData.resource_type || null,
-        attachment_access: sign.accessType === "authenticated" ? "authenticated" : "public"
-      });
-      if (error) throw error;
-
-      window.location.href = "chat.html?room=" + encodeURIComponent(room.id) + "&name=" + encodeURIComponent(room.name);
-    } catch (err) {
-      console.error(err);
-      alert("Impossible d'envoyer le fichier : " + err.message);
+    const failed = [];
+    let done = 0;
+    const total = files.length * targets.length;
+    for (const room of targets) {
+      for (const file of files) {
+        done++;
+        sendToConfirmBtn.textContent = `Envoi ${done}/${total}...`;
+        try {
+          await sendQuickFileToRoom(file, room);
+        } catch (err) {
+          console.error(err);
+          failed.push(`${file.name || "fichier"} → ${room.name}`);
+        }
+      }
     }
+
+    sendToConfirmBtn.disabled = false;
+    sendToConfirmBtn.textContent = "Envoyer";
+
+    if (failed.length) {
+      alert("Échec pour :\n" + failed.join("\n"));
+    }
+    await loadRooms();
+  });
+
+  // Envoie le fichier vers UN salon : upload Cloudinary séparé à chaque
+  // salon (plutôt qu'un seul envoi réutilisé partout), pour que le
+  // niveau d'accès (public/authentifié) reste toujours celui du salon
+  // réellement ciblé, salon par salon — jamais mélangé.
+  async function sendQuickFileToRoom(file, room) {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData && sessionData.session ? sessionData.session.access_token : null;
+    const { data: profile } = await supabase
+      .from("profiles").select("username").eq("id", currentUser.id).maybeSingle();
+
+    const signQuery = new URLSearchParams({ filename: file.name || "photo.jpg", context: "room", contextId: room.id });
+    const signResp = await fetch("/api/attachment?" + signQuery.toString(), {
+      headers: accessToken ? { "Authorization": "Bearer " + accessToken } : {}
+    });
+    const sign = await signResp.json();
+    if (!signResp.ok) throw new Error(sign.error || "Signature indisponible");
+
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("api_key", sign.apiKey);
+    formData.append("timestamp", sign.timestamp);
+    formData.append("signature", sign.signature);
+    formData.append("folder", sign.folder);
+    if (sign.type) formData.append("type", sign.type);
+
+    const uploadResp = await fetch(sign.uploadUrl, { method: "POST", body: formData });
+    const uploadData = await uploadResp.json();
+    if (!uploadResp.ok) throw new Error(uploadData.error?.message || "Envoi échoué");
+
+    let attachmentType = "raw";
+    if (uploadData.resource_type === "image") attachmentType = "image";
+    else if (uploadData.resource_type === "video") attachmentType = "video";
+
+    const { error } = await supabase.from("messages").insert({
+      room_id: room.id,
+      user_id: currentUser.id,
+      username: (profile && profile.username) || "Utilisateur",
+      content: "",
+      attachment_url: uploadData.secure_url,
+      attachment_type: attachmentType,
+      attachment_name: file.name || null,
+      attachment_size: file.size || null,
+      attachment_mime: file.type || null,
+      attachment_public_id: uploadData.public_id || null,
+      attachment_resource_type: uploadData.resource_type || null,
+      attachment_access: sign.accessType === "authenticated" ? "authenticated" : "public"
+    });
+    if (error) throw error;
   }
 
   roomActionSheet.querySelector('[data-action="rename"]').addEventListener("click", async () => {
