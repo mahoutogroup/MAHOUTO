@@ -323,6 +323,57 @@
 
   #room-action-sheet button:active { background: var(--bg-card); }
   #room-action-sheet button.danger { color: #F87171; }
+
+  #send-to-sheet {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.6);
+    z-index: 70;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+  }
+  #send-to-sheet .sheet {
+    width: 100%;
+    max-width: 480px;
+    max-height: 70vh;
+    overflow-y: auto;
+    background: var(--bg-elevated);
+    border-radius: 20px 20px 0 0;
+    padding: 10px 0 max(10px, env(safe-area-inset-bottom));
+  }
+  #send-to-sheet .sheet-handle {
+    width: 40px;
+    height: 4px;
+    background: var(--border);
+    border-radius: 3px;
+    margin: 0 auto 10px;
+  }
+  #send-to-sheet .sheet-title {
+    padding: 4px 22px 12px;
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+  #send-to-sheet .target-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 12px 22px;
+    background: none;
+    border: none;
+    color: var(--white);
+    font-size: 15px;
+    text-align: left;
+    cursor: pointer;
+  }
+  #send-to-sheet .target-row:active { background: var(--bg-card); }
+  #send-to-sheet .target-row .avatar {
+    width: 40px; height: 40px; border-radius: 50%; flex: none;
+    display: flex; align-items: center; justify-content: center; font-size: 18px;
+    overflow: hidden;
+  }
+  #send-to-sheet .target-row .avatar img { width: 100%; height: 100%; object-fit: cover; }
 </style>
 </head>
 <body>
@@ -347,7 +398,7 @@
     <div class="title-row">
       <h1>MAHOUTO<span class="plus">+</span></h1>
       <div class="icons">
-        <span title="Nouvelle discussion">📷</span>
+        <span id="camera-btn" title="Envoyer une photo">📷</span>
         <span title="Menu">⋮</span>
       </div>
     </div>
@@ -356,6 +407,7 @@
       <input id="search-input" type="text" placeholder="Rechercher...">
     </div>
   </header>
+  <input type="file" id="quick-photo-input" accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime" class="hidden">
 
   <div id="payment-banner" class="hidden"></div>
 
@@ -382,6 +434,14 @@
     </div>
   </div>
   <input type="file" id="room-photo-input" accept="image/jpeg,image/png,image/webp" class="hidden">
+
+  <div id="send-to-sheet" class="hidden">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">Envoyer à...</div>
+      <div id="send-to-list"></div>
+    </div>
+  </div>
 
   <nav class="bottom-nav">
     <a class="nav-item" href="index.html"><span class="icon">🏠</span>Accueil</a>
@@ -838,6 +898,116 @@
       alert("Impossible de changer la photo : " + err.message);
     }
   });
+
+  // ---------- Raccourci caméra (haut de page) : choisir une photo/vidéo
+  // puis un salon à qui l'envoyer, sans passer par l'ouverture du salon.
+  // Réutilise le même circuit de signature/upload que chat.html. ----------
+  const cameraBtn = document.getElementById("camera-btn");
+  const quickPhotoInput = document.getElementById("quick-photo-input");
+  const sendToSheet = document.getElementById("send-to-sheet");
+  const sendToList = document.getElementById("send-to-list");
+  let pendingQuickFile = null;
+
+  cameraBtn.addEventListener("click", () => quickPhotoInput.click());
+
+  function closeSendToSheet() {
+    sendToSheet.classList.add("hidden");
+    pendingQuickFile = null;
+  }
+  sendToSheet.addEventListener("click", (e) => {
+    if (e.target === sendToSheet) closeSendToSheet();
+  });
+
+  quickPhotoInput.addEventListener("change", () => {
+    const file = quickPhotoInput.files && quickPhotoInput.files[0];
+    quickPhotoInput.value = "";
+    if (!file) return;
+    pendingQuickFile = file;
+
+    // Seuls les salons réellement accessibles à l'utilisateur (gratuits,
+    // ou payants déjà débloqués/créés/administrés) sont proposés — un
+    // salon verrouillé n'apparaît pas dans la liste, plutôt que de
+    // proposer un envoi qui échouerait de toute façon côté RLS.
+    const targets = roomsData.filter((r) => canAccessPaidRoom(r));
+
+    sendToList.innerHTML = "";
+    if (!targets.length) {
+      sendToList.innerHTML = '<div style="padding:14px 22px;color:var(--text-dim);font-size:14px;">Aucun salon accessible pour le moment.</div>';
+    }
+    targets.forEach((r) => {
+      const row = document.createElement("button");
+      row.type = "button";
+      row.className = "target-row";
+      row.innerHTML = `<span class="avatar" style="background:${r.color}">${r.photo_url ? "" : r.emoji}</span><span>${escapeHtml(r.name)}</span>`;
+      if (typeof r.photo_url === "string" && /^https:\/\//i.test(r.photo_url)) {
+        const img = document.createElement("img");
+        img.src = r.photo_url;
+        img.alt = "";
+        row.querySelector(".avatar").appendChild(img);
+      }
+      row.addEventListener("click", () => sendQuickFileToRoom(r));
+      sendToList.appendChild(row);
+    });
+
+    sendToSheet.classList.remove("hidden");
+  });
+
+  async function sendQuickFileToRoom(room) {
+    const file = pendingQuickFile;
+    closeSendToSheet();
+    if (!file) return;
+
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData && sessionData.session ? sessionData.session.access_token : null;
+      const { data: profile } = await supabase
+        .from("profiles").select("username").eq("id", currentUser.id).maybeSingle();
+
+      const signQuery = new URLSearchParams({ filename: file.name || "photo.jpg", context: "room", contextId: room.id });
+      const signResp = await fetch("/api/attachment?" + signQuery.toString(), {
+        headers: accessToken ? { "Authorization": "Bearer " + accessToken } : {}
+      });
+      const sign = await signResp.json();
+      if (!signResp.ok) throw new Error(sign.error || "Signature indisponible");
+
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("api_key", sign.apiKey);
+      formData.append("timestamp", sign.timestamp);
+      formData.append("signature", sign.signature);
+      formData.append("folder", sign.folder);
+      if (sign.type) formData.append("type", sign.type);
+
+      const uploadResp = await fetch(sign.uploadUrl, { method: "POST", body: formData });
+      const uploadData = await uploadResp.json();
+      if (!uploadResp.ok) throw new Error(uploadData.error?.message || "Envoi échoué");
+
+      let attachmentType = "raw";
+      if (uploadData.resource_type === "image") attachmentType = "image";
+      else if (uploadData.resource_type === "video") attachmentType = "video";
+
+      const { error } = await supabase.from("messages").insert({
+        room_id: room.id,
+        user_id: currentUser.id,
+        username: (profile && profile.username) || "Utilisateur",
+        content: "",
+        attachment_url: uploadData.secure_url,
+        attachment_type: attachmentType,
+        attachment_name: file.name || null,
+        attachment_size: file.size || null,
+        attachment_mime: file.type || null,
+        attachment_public_id: uploadData.public_id || null,
+        attachment_resource_type: uploadData.resource_type || null,
+        attachment_access: sign.accessType === "authenticated" ? "authenticated" : "public"
+      });
+      if (error) throw error;
+
+      window.location.href = "chat.html?room=" + encodeURIComponent(room.id) + "&name=" + encodeURIComponent(room.name);
+    } catch (err) {
+      console.error(err);
+      alert("Impossible d'envoyer le fichier : " + err.message);
+    }
+  }
 
   roomActionSheet.querySelector('[data-action="rename"]').addEventListener("click", async () => {
     if (!activeRoom) return;
