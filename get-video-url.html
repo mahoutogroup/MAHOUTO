@@ -121,21 +121,36 @@
       resultsEl.innerHTML = "";
       messages.forEach((m) => {
         const url = signedMap[String(m.id)] || m.attachment_url;
+
         const item = document.createElement("div");
         item.className = "video-item";
-        item.innerHTML = `
-          <div class="name">${m.attachment_name || "(sans nom)"} — ${m.attachment_access || "public"}</div>
-          <textarea readonly>${url || "(URL introuvable)"}</textarea>
-          <button type="button" class="copy-btn">📋 Copier cette URL</button>
-        `;
-        item.querySelector(".copy-btn").addEventListener("click", (e) => {
-          const ta = item.querySelector("textarea");
-          ta.select();
-          navigator.clipboard && navigator.clipboard.writeText(ta.value).then(() => {
+
+        const nameEl = document.createElement("div");
+        nameEl.className = "name";
+        // attachment_name vient de l'utilisateur (nom de fichier choisi
+        // à l'upload) — jamais interpolé dans du HTML, toujours via
+        // textContent, comme partout ailleurs dans MAHOUTO+.
+        nameEl.textContent = (m.attachment_name || "(sans nom)") + " — " + (m.attachment_access || "public");
+
+        const textarea = document.createElement("textarea");
+        textarea.readOnly = true;
+        textarea.value = url || "(URL introuvable)";
+
+        const copyBtn = document.createElement("button");
+        copyBtn.type = "button";
+        copyBtn.className = "copy-btn";
+        copyBtn.textContent = "📋 Copier cette URL";
+        copyBtn.addEventListener("click", (e) => {
+          textarea.select();
+          navigator.clipboard && navigator.clipboard.writeText(textarea.value).then(() => {
             e.target.textContent = "✅ Copié !";
             setTimeout(() => { e.target.textContent = "📋 Copier cette URL"; }, 1500);
           }).catch(() => { document.execCommand("copy"); });
         });
+
+        item.appendChild(nameEl);
+        item.appendChild(textarea);
+        item.appendChild(copyBtn);
         resultsEl.appendChild(item);
       });
     } catch (err) {
