@@ -60,8 +60,9 @@ export default async function handler(req, res) {
   }
 
   if (body.action === "subscribe") return handleSubscribe(res, supabaseAdmin, callerId, body);
+  if (body.action === "unsubscribe") return handleUnsubscribe(res, supabaseAdmin, callerId, body);
   if (body.action === "send") return handleSend(res, supabaseAdmin, callerId, body);
-  return res.status(400).json({ error: "action invalide (attendu: subscribe | send)" });
+  return res.status(400).json({ error: "action invalide (attendu: subscribe | unsubscribe | send)" });
 }
 
 // ---------------------------------------------------------
@@ -87,6 +88,32 @@ async function handleSubscribe(res, supabaseAdmin, callerId, body) {
   if (error) {
     console.error("push subscribe:", error);
     return res.status(500).json({ error: "Impossible d'enregistrer l'abonnement" });
+  }
+  return res.status(200).json({ ok: true });
+}
+
+// ---------------------------------------------------------
+// Oublie l'abonnement de CET appareil pour l'utilisateur connecté.
+// Filtré par user_id ET endpoint : un utilisateur ne peut jamais
+// désabonner l'appareil de quelqu'un d'autre, même en devinant un
+// endpoint (la RLS sur push_subscriptions l'empêcherait de toute
+// façon, mais on le vérifie explicitement ici aussi).
+// ---------------------------------------------------------
+async function handleUnsubscribe(res, supabaseAdmin, callerId, body) {
+  const endpoint = String(body.endpoint || "").trim();
+  if (!endpoint) {
+    return res.status(400).json({ error: "endpoint manquant" });
+  }
+
+  const { error } = await supabaseAdmin
+    .from("push_subscriptions")
+    .delete()
+    .eq("user_id", callerId)
+    .eq("endpoint", endpoint);
+
+  if (error) {
+    console.error("push unsubscribe:", error);
+    return res.status(500).json({ error: "Impossible de désactiver l'abonnement" });
   }
   return res.status(200).json({ ok: true });
 }
