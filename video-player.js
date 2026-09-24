@@ -174,6 +174,12 @@ window.MahoutoVideoPlayer = (function () {
 
     video = els.video;
 
+    // Le SDK Cast peut devenir disponible AVANT que ce lecteur ne soit
+    // construit (il ne l'est qu'à la première ouverture d'une vidéo) —
+    // sans ce rattrapage, le bouton resterait caché indéfiniment même
+    // une fois le SDK prêt.
+    if (castAvailable) els.castBtn.classList.remove("hidden");
+
     els.playBtn.addEventListener("click", () => toggle());
     els.prevBtn.addEventListener("click", () => previousVideo());
     els.nextBtn.addEventListener("click", () => nextVideo());
