@@ -111,7 +111,7 @@
   <div class="section-title">Mon compte</div>
   <div class="menu-list">
     <a class="card menu-item hidden" id="admin-dashboard-link" href="admin/formations.html"><span class="emoji">⚙️</span><span class="label">Tableau de bord Administrateur</span><span class="sub">→</span></a>
-    <div class="card menu-item hidden" id="notif-status-item"><span class="emoji">🔔</span><span class="label">Notifications</span><span class="sub" id="notif-status-sub">Activées</span></div>
+    <button type="button" class="card menu-item hidden" id="notif-status-item" style="border:none;width:100%;text-align:left;cursor:pointer;background:var(--bg-card);color:var(--white);font-family:inherit;"><span class="emoji">🔔</span><span class="label">Notifications</span><span class="sub" id="notif-status-sub">Activées — toucher pour désactiver</span></button>
     <button type="button" class="card menu-item hidden" id="notif-enable-btn" style="border:none;width:100%;text-align:left;cursor:pointer;background:var(--bg-card);color:var(--white);font-family:inherit;">
       <span class="emoji">🔔</span><span class="label">Activer les notifications</span><span class="sub">→</span>
     </button>
@@ -236,6 +236,21 @@
       alert("Permission refusée. Tu peux l'activer plus tard dans les réglages de ton navigateur.");
     } else {
       alert("Impossible d'activer les notifications pour le moment.");
+    }
+  });
+
+  document.getElementById("notif-status-item").addEventListener("click", async () => {
+    if (!confirm("Désactiver les notifications sur cet appareil ?")) return;
+    const item = document.getElementById("notif-status-item");
+    item.disabled = true;
+    const result = await MahoutoPush.disable(supabase);
+    item.disabled = false;
+
+    if (result.ok) {
+      item.classList.add("hidden");
+      document.getElementById("notif-enable-btn").classList.remove("hidden");
+    } else {
+      alert("Impossible de désactiver les notifications pour le moment.");
     }
   });
 

@@ -84,5 +84,39 @@ window.MahoutoPush = (function () {
     }
   }
 
-  return { isSupported, enable, notifyDm };
+  // Désactive les notifications pour CET appareil : coupe l'abonnement
+  // navigateur ET prévient le serveur pour qu'il oublie cet endpoint
+  // (sinon la ligne resterait en base, inoffensive mais inutile).
+  async function disable(supabase) {
+    if (!isSupported()) return { ok: false, reason: "unsupported" };
+
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      const subscription = await registration.pushManager.getSubscription();
+      if (!subscription) return { ok: true }; // déjà désactivé sur cet appareil
+
+      const endpoint = subscription.endpoint;
+      await subscription.unsubscribe();
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData && sessionData.session ? sessionData.session.access_token : null;
+      if (accessToken) {
+        // Best effort : le désabonnement navigateur ci-dessus a déjà
+        // eu lieu, donc on considère l'action réussie côté utilisateur
+        // même si cet appel serveur échoue (l'entrée sera de toute
+        // façon nettoyée automatiquement au prochain envoi manqué).
+        await fetch("/api/push", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": "Bearer " + accessToken },
+          body: JSON.stringify({ action: "unsubscribe", endpoint })
+        }).catch(() => {});
+      }
+      return { ok: true };
+    } catch (err) {
+      console.warn("[PUSH] disable a échoué :", err);
+      return { ok: false, reason: "error" };
+    }
+  }
+
+  return { isSupported, enable, disable, notifyDm };
 })();

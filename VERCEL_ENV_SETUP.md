@@ -78,7 +78,25 @@ Où trouver: Cloudinary Dashboard > Settings > API Keys
 ⚠️ JAMAIS exposer cette clé au client
 ```
 
-### 4. Google OAuth
+### 4. Notifications Push (VAPID)
+
+```
+VAPID_PUBLIC_KEY
+Description: Clé publique VAPID pour les notifications push web (DM)
+Où trouver: générée avec `npx web-push generate-vapid-keys` (le
+package "web-push" est déjà une dépendance du projet)
+⚠️ Doit être IDENTIQUE à window.MAHOUTO_CONFIG.VAPID_PUBLIC_KEY dans
+config.js — les deux valeurs doivent correspondre exactement.
+```
+
+```
+VAPID_PRIVATE_KEY
+Description: Clé privée VAPID (côté serveur uniquement, utilisée par api/push.js)
+Où trouver: générée en même temps que la clé publique ci-dessus
+⚠️ JAMAIS exposer cette clé au client, jamais dans config.js
+```
+
+### 5. Google OAuth
 
 ```
 GOOGLE_CLIENT_ID
@@ -92,7 +110,7 @@ Description: Secret Google OAuth
 Où trouver: Google Cloud Console > Credentials > OAuth 2.0 Client ID
 ```
 
-### 5. Configuration Générale
+### 6. Configuration Générale
 
 ```
 PUBLIC_SITE_URL
