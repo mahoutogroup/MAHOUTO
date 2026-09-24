@@ -64,6 +64,21 @@ window.MahoutoVideoPlayer = (function () {
   let remotePlayerController = null;
   let isCasting = false; // reflète l'état réel du RemotePlayer — source de vérité pour aiguiller local vs TV
   let castMedia = null; // objet chrome.cast.media.Media courant, pour détecter la fin naturelle
+  let hasStartedPlayingRemote = false; // évite un faux déclenchement du secours juste après connexion
+  let advanceGuard = 0; // anti-double-déclenchement entre les deux mécanismes de détection de fin
+
+  // Point d'entrée unique pour avancer suite à une fin détectée côté
+  // Cast, quel que soit le mécanisme qui l'a repérée — si les deux
+  // (idleReason FINISHED et le secours RemotePlayer) se déclenchent
+  // pour le même évènement, un seul advanceVideo() part réellement.
+  function triggerAdvanceOnce(source) {
+    const guard = ++advanceGuard;
+    console.log("[VIDEO] Cast : fin détectée via", source);
+    setTimeout(() => {
+      if (guard !== advanceGuard) return; // un autre déclenchement a déjà pris le relais entre-temps
+      advanceVideo();
+    }, 150); // courte fenêtre pour laisser l'autre mécanisme, s'il arrive, être ignoré au lieu de doublonner
+  }
 
   window["__onGCastApiAvailable"] = function (isAvailable) {
     if (!isAvailable) { console.log("[VIDEO] Google Cast indisponible sur ce navigateur."); return; }
@@ -99,7 +114,29 @@ window.MahoutoVideoPlayer = (function () {
         console.log("[VIDEO] Cast connecté :", isCasting);
         if (!isCasting) {
           castMedia = null;
+          hasStartedPlayingRemote = false;
           if (els.position) updatePositionLabel(); // réaffiche X/Y en mode local si une playlist existe
+        }
+      }
+    );
+
+    // Mécanisme de SECOURS (en plus de attachCastMediaListener ci-dessous,
+    // pas à sa place) : si, pour une raison quelconque, l'objet Media
+    // (chrome.cast.media.Media) ne signale pas idleReason=FINISHED de
+    // façon fiable sur certains récepteurs, on surveille aussi le
+    // statut exposé directement par RemotePlayer — dès qu'il repasse à
+    // IDLE APRÈS avoir réellement joué (jamais juste après connexion,
+    // pour ne pas déclencher un enchaînement au moment où on se
+    // connecte simplement à la TV sans rien lire).
+    remotePlayerController.addEventListener(
+      cast.framework.RemotePlayerEventType.PLAYER_STATE_CHANGED,
+      () => {
+        if (!isCasting) return;
+        console.log("[VIDEO] Cast playerState (RemotePlayer) :", remotePlayer.playerState);
+        if (remotePlayer.playerState === chrome.cast.media.PlayerState.PLAYING) {
+          hasStartedPlayingRemote = true;
+        } else if (remotePlayer.playerState === chrome.cast.media.PlayerState.IDLE && hasStartedPlayingRemote) {
+          triggerAdvanceOnce("RemotePlayer IDLE (secours)");
         }
       }
     );
@@ -137,6 +174,8 @@ window.MahoutoVideoPlayer = (function () {
     const session = castContext.getCurrentSession();
     if (!session || !track) return;
 
+    hasStartedPlayingRemote = false; // repart de zéro pour cette nouvelle vidéo — évite un faux déclenchement du secours
+
     const mediaInfo = new chrome.cast.media.MediaInfo(track.url, "video/mp4");
     mediaInfo.metadata = new chrome.cast.media.GenericMediaMetadata();
     mediaInfo.metadata.title = track.title || "Vidéo MAHOUTO+";
@@ -156,11 +195,13 @@ window.MahoutoVideoPlayer = (function () {
     );
   }
 
-  // Seule façon fiable de savoir qu'une vidéo castée s'est terminée
-  // NATURELLEMENT (par opposition à une simple pause) : le statut
-  // IDLE du média avec idleReason = FINISHED, exposé sur l'objet
-  // Media de la session (pas sur RemotePlayer). Documentation Cast
-  // officielle — c'est le mécanisme recommandé pour ce cas précis.
+  // Mécanisme PRINCIPAL de détection de fin naturelle : le statut IDLE
+  // du média avec idleReason = FINISHED, exposé sur l'objet Media de
+  // la session (chrome.cast.media.Media, pas RemotePlayer). C'est le
+  // mécanisme documenté par Google pour ce cas précis. Doublé par un
+  // secours (PLAYER_STATE_CHANGED, voir plus haut) au cas où ce
+  // premier mécanisme ne se déclencherait pas de façon fiable sur
+  // certains récepteurs/TV.
   function attachCastMediaListener(session) {
     const media = session.getMediaSession();
     if (!media) return;
@@ -170,9 +211,8 @@ window.MahoutoVideoPlayer = (function () {
       if (!isAlive || media !== castMedia) { media.removeUpdateListener(onMediaUpdate); return; }
       if (media.playerState === chrome.cast.media.PlayerState.IDLE
         && media.idleReason === chrome.cast.media.IdleReason.FINISHED) {
-        console.log("[VIDEO] Cast : fin naturelle détectée sur la TV —", current && current.title);
         media.removeUpdateListener(onMediaUpdate);
-        advanceVideo();
+        triggerAdvanceOnce("Media.idleReason=FINISHED (principal)");
       }
     }
     media.addUpdateListener(onMediaUpdate);
