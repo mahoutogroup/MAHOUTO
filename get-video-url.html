@@ -120,7 +120,13 @@
 
       resultsEl.innerHTML = "";
       messages.forEach((m) => {
-        const url = signedMap[String(m.id)] || m.attachment_url;
+        // signedMap[id] est un objet { url, previewUrl, downloadUrl }
+        // renvoyé par /api/attachment — pas une chaîne. Il faut son
+        // champ .url (l'URL de lecture, la même que celle déjà
+        // utilisée par le lecteur vidéo normal), sinon le navigateur
+        // convertit l'objet en texte ("[object Object]").
+        const resolved = signedMap[String(m.id)];
+        const url = (resolved && resolved.url) || m.attachment_url;
 
         const item = document.createElement("div");
         item.className = "video-item";
