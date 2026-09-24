@@ -49,6 +49,70 @@ window.MahoutoVideoPlayer = (function () {
   function getTrackCount() { return registry.size; }
   function setOnRegistryChange(cb) { onRegistryChange = cb; }
 
+  // ---------- Google Cast ----------
+  // Repose entièrement sur le Default Media Receiver de Google (aucun
+  // récepteur personnalisé nécessaire) — validé le 24/09/2026 via
+  // cast-prototype.html : le récepteur lit correctement aussi bien les
+  // URLs Cloudinary publiques QUE "authenticated" (signées) telles que
+  // notre système les produit déjà. Le Cast envoie l'URL de LECTURE
+  // COURANTE (celle déjà résolue avec succès par le lecteur local) —
+  // jamais construite séparément — donc les mêmes règles d'accès
+  // (RLS, signature Cloudinary) s'appliquent sans rien dupliquer.
+  let castContext = null;
+  let castAvailable = false;
+
+  window["__onGCastApiAvailable"] = function (isAvailable) {
+    if (!isAvailable) { console.log("[VIDEO] Google Cast indisponible sur ce navigateur."); return; }
+    castContext = cast.framework.CastContext.getInstance();
+    castContext.setOptions({
+      receiverApplicationId: chrome.cast.media.DEFAULT_MEDIA_RECEIVER_APP_ID,
+      autoJoinPolicy: chrome.cast.AutoJoinPolicy.ORIGIN_SCOPED
+    });
+    castAvailable = true;
+    if (els.castBtn) els.castBtn.classList.remove("hidden");
+    console.log("[VIDEO] Cast prêt (Default Media Receiver).");
+
+    castContext.addEventListener(
+      cast.framework.CastContextEventType.SESSION_STATE_CHANGED,
+      (e) => {
+        const connected = e.sessionState === cast.framework.SessionState.SESSION_STARTED
+          || e.sessionState === cast.framework.SessionState.SESSION_RESUMED;
+        if (els.castBtn) els.castBtn.classList.toggle("mvid-cast-active", connected);
+      }
+    );
+  };
+
+  function castCurrentVideo() {
+    const session = castContext.getCurrentSession();
+    if (!session || !current) return;
+
+    const mediaInfo = new chrome.cast.media.MediaInfo(current.url, "video/mp4");
+    mediaInfo.metadata = new chrome.cast.media.GenericMediaMetadata();
+    mediaInfo.metadata.title = current.title || "Vidéo MAHOUTO+";
+
+    const request = new chrome.cast.media.LoadRequest(mediaInfo);
+    session.loadMedia(request).then(
+      () => {
+        console.log("[VIDEO] Cast : lecture envoyée à la TV —", current.title);
+        video.pause(); // évite de lire le son en local ET sur la TV en même temps
+      },
+      (err) => console.error("[VIDEO] Cast : échec de l'envoi à la TV", err)
+    );
+  }
+
+  function onCastButtonClick() {
+    if (!castAvailable || !castContext) return;
+    const session = castContext.getCurrentSession();
+    if (session) {
+      castCurrentVideo();
+    } else {
+      castContext.requestSession().then(
+        () => castCurrentVideo(),
+        (err) => console.log("[VIDEO] Cast : sélection de la TV annulée ou échouée", err)
+      );
+    }
+  }
+
   function fmtTime(sec) {
     if (!isFinite(sec) || sec < 0) return "0:00";
     const m = Math.floor(sec / 60);
@@ -80,6 +144,7 @@ window.MahoutoVideoPlayer = (function () {
         '<button type="button" class="mvid-prev hidden" aria-label="Précédente">⏮</button>' +
         '<button type="button" class="mvid-play" aria-label="Lecture/Pause">▶</button>' +
         '<button type="button" class="mvid-next hidden" aria-label="Suivante">⏭</button>' +
+        '<button type="button" class="mvid-cast hidden" aria-label="Caster sur une TV">📺</button>' +
         '<div class="mvid-info">' +
           '<div class="mvid-title"></div>' +
           '<div class="mvid-progress-row">' +
@@ -98,6 +163,7 @@ window.MahoutoVideoPlayer = (function () {
       prevBtn: el.querySelector(".mvid-prev"),
       playBtn: el.querySelector(".mvid-play"),
       nextBtn: el.querySelector(".mvid-next"),
+      castBtn: el.querySelector(".mvid-cast"),
       title: el.querySelector(".mvid-title"),
       seek: el.querySelector(".mvid-seek"),
       cur: el.querySelector(".mvid-time-cur"),
@@ -112,6 +178,7 @@ window.MahoutoVideoPlayer = (function () {
     els.prevBtn.addEventListener("click", () => previousVideo());
     els.nextBtn.addEventListener("click", () => nextVideo());
     els.close.addEventListener("click", () => stopAndHide());
+    els.castBtn.addEventListener("click", () => onCastButtonClick());
     els.seek.addEventListener("input", () => {
       if (video && video.duration) video.currentTime = (els.seek.value / 100) * video.duration;
     });
