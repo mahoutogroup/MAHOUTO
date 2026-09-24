@@ -60,6 +60,10 @@ window.MahoutoVideoPlayer = (function () {
   // (RLS, signature Cloudinary) s'appliquent sans rien dupliquer.
   let castContext = null;
   let castAvailable = false;
+  let remotePlayer = null;
+  let remotePlayerController = null;
+  let isCasting = false; // reflète l'état réel du RemotePlayer — source de vérité pour aiguiller local vs TV
+  let castMedia = null; // objet chrome.cast.media.Media courant, pour détecter la fin naturelle
 
   window["__onGCastApiAvailable"] = function (isAvailable) {
     if (!isAvailable) { console.log("[VIDEO] Google Cast indisponible sur ce navigateur."); return; }
@@ -80,34 +84,108 @@ window.MahoutoVideoPlayer = (function () {
         if (els.castBtn) els.castBtn.classList.toggle("mvid-cast-active", connected);
       }
     );
+
+    // RemotePlayer/RemotePlayerController : pilote play/pause/seek de la
+    // TV et reçoit ses changements d'état (y compris une pause faite
+    // depuis la télécommande physique de la TV, pas seulement depuis
+    // le téléphone) — c'est le mécanisme standard du SDK pour ça.
+    remotePlayer = new cast.framework.RemotePlayer();
+    remotePlayerController = new cast.framework.RemotePlayerController(remotePlayer);
+
+    remotePlayerController.addEventListener(
+      cast.framework.RemotePlayerEventType.IS_CONNECTED_CHANGED,
+      () => {
+        isCasting = remotePlayer.isConnected;
+        console.log("[VIDEO] Cast connecté :", isCasting);
+        if (!isCasting) {
+          castMedia = null;
+          if (els.position) updatePositionLabel(); // réaffiche X/Y en mode local si une playlist existe
+        }
+      }
+    );
+
+    remotePlayerController.addEventListener(
+      cast.framework.RemotePlayerEventType.IS_PAUSED_CHANGED,
+      () => {
+        if (!isCasting || !els.playBtn) return;
+        els.playBtn.textContent = remotePlayer.isPaused ? "▶" : "⏸";
+      }
+    );
+
+    remotePlayerController.addEventListener(
+      cast.framework.RemotePlayerEventType.CURRENT_TIME_CHANGED,
+      () => {
+        if (!isCasting || !els.seek || !remotePlayer.duration) return;
+        els.seek.value = String((remotePlayer.currentTime / remotePlayer.duration) * 100);
+        els.cur.textContent = fmtTime(remotePlayer.currentTime);
+      }
+    );
+
+    remotePlayerController.addEventListener(
+      cast.framework.RemotePlayerEventType.DURATION_CHANGED,
+      () => {
+        if (!isCasting || !els.dur) return;
+        els.dur.textContent = fmtTime(remotePlayer.duration);
+      }
+    );
   };
 
-  function castCurrentVideo() {
+  // Envoie une piste précise à la TV (utilisée aussi bien par le
+  // bouton 📺 que par nextVideo()/previousVideo()/playAllVideos(),
+  // puisque tout passe par play(track) ci-dessous).
+  function castTrack(track) {
     const session = castContext.getCurrentSession();
-    if (!session || !current) return;
+    if (!session || !track) return;
 
-    const mediaInfo = new chrome.cast.media.MediaInfo(current.url, "video/mp4");
+    const mediaInfo = new chrome.cast.media.MediaInfo(track.url, "video/mp4");
     mediaInfo.metadata = new chrome.cast.media.GenericMediaMetadata();
-    mediaInfo.metadata.title = current.title || "Vidéo MAHOUTO+";
+    mediaInfo.metadata.title = track.title || "Vidéo MAHOUTO+";
 
     const request = new chrome.cast.media.LoadRequest(mediaInfo);
     session.loadMedia(request).then(
       () => {
-        console.log("[VIDEO] Cast : lecture envoyée à la TV —", current.title);
-        video.pause(); // évite de lire le son en local ET sur la TV en même temps
+        console.log("[VIDEO] Cast : lecture envoyée à la TV —", track.title);
+        if (video) video.pause(); // évite de lire le son en local ET sur la TV en même temps
+        attachCastMediaListener(session);
       },
-      (err) => console.error("[VIDEO] Cast : échec de l'envoi à la TV", err)
+      (err) => {
+        console.error("[VIDEO] Cast : échec de l'envoi à la TV", err);
+        // Ne bloque jamais toute la playlist — on tente proprement la suivante.
+        advanceVideo();
+      }
     );
+  }
+
+  // Seule façon fiable de savoir qu'une vidéo castée s'est terminée
+  // NATURELLEMENT (par opposition à une simple pause) : le statut
+  // IDLE du média avec idleReason = FINISHED, exposé sur l'objet
+  // Media de la session (pas sur RemotePlayer). Documentation Cast
+  // officielle — c'est le mécanisme recommandé pour ce cas précis.
+  function attachCastMediaListener(session) {
+    const media = session.getMediaSession();
+    if (!media) return;
+    castMedia = media;
+
+    function onMediaUpdate(isAlive) {
+      if (!isAlive || media !== castMedia) { media.removeUpdateListener(onMediaUpdate); return; }
+      if (media.playerState === chrome.cast.media.PlayerState.IDLE
+        && media.idleReason === chrome.cast.media.IdleReason.FINISHED) {
+        console.log("[VIDEO] Cast : fin naturelle détectée sur la TV —", current && current.title);
+        media.removeUpdateListener(onMediaUpdate);
+        advanceVideo();
+      }
+    }
+    media.addUpdateListener(onMediaUpdate);
   }
 
   function onCastButtonClick() {
     if (!castAvailable || !castContext) return;
     const session = castContext.getCurrentSession();
     if (session) {
-      castCurrentVideo();
+      castTrack(current);
     } else {
       castContext.requestSession().then(
-        () => castCurrentVideo(),
+        () => castTrack(current),
         (err) => console.log("[VIDEO] Cast : sélection de la TV annulée ou échouée", err)
       );
     }
@@ -186,6 +264,13 @@ window.MahoutoVideoPlayer = (function () {
     els.close.addEventListener("click", () => stopAndHide());
     els.castBtn.addEventListener("click", () => onCastButtonClick());
     els.seek.addEventListener("input", () => {
+      if (isCasting) {
+        if (remotePlayer && remotePlayer.duration) {
+          remotePlayer.currentTime = (els.seek.value / 100) * remotePlayer.duration;
+          remotePlayerController.seek();
+        }
+        return;
+      }
       if (video && video.duration) video.currentTime = (els.seek.value / 100) * video.duration;
     });
 
@@ -267,6 +352,14 @@ window.MahoutoVideoPlayer = (function () {
     setupMediaSession();
     updatePositionLabel();
 
+    // Une session Cast active est la SEULE différence : la playlist,
+    // l'index courant, le titre, X/Y restent gérés exactement comme en
+    // local (ci-dessus) — seule la façon de "jouer" change.
+    if (isCasting) {
+      castTrack(track);
+      return;
+    }
+
     if (!isSameTrack || !video.src || video.src !== track.url) {
       video.src = track.url;
       video.currentTime = 0;
@@ -314,12 +407,20 @@ window.MahoutoVideoPlayer = (function () {
   }
 
   function toggle() {
+    if (isCasting) {
+      if (remotePlayerController) remotePlayerController.playOrPause();
+      return;
+    }
     if (!video) return;
     if (video.paused) play(current); else pause();
   }
 
   function pause() {
     console.log("[VIDEO] pause", current && current.id);
+    if (isCasting) {
+      if (remotePlayerController && !remotePlayer.isPaused) remotePlayerController.playOrPause();
+      return;
+    }
     if (video) video.pause();
   }
 
