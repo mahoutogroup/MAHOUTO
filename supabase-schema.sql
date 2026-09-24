@@ -319,6 +319,29 @@ alter table public.purchases
   add constraint purchases_product_type_check
   check (product_type = any (array['formation'::text, 'digital_product'::text, 'salon'::text]));
 
+-- ---------- Abonnements aux notifications push (24/09/2026) ----------
+-- Un utilisateur peut avoir plusieurs appareils abonnés (téléphone +
+-- ordinateur, par ex.) — endpoint est l'identifiant unique fourni par
+-- le navigateur pour CET appareil précis.
+create table if not exists public.push_subscriptions (
+  id bigint generated always as identity primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  endpoint text not null unique,
+  p256dh text not null,
+  auth text not null,
+  created_at timestamptz not null default now()
+);
+
+alter table public.push_subscriptions enable row level security;
+
+drop policy if exists "push_subscriptions_own" on public.push_subscriptions;
+create policy "push_subscriptions_own" on public.push_subscriptions
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+-- Note : l'envoi effectif des notifications se fait via api/push.js
+-- avec la clé service_role (contourne la RLS pour lire les abonnements
+-- du destinataire) — comportement identique au modèle déjà utilisé
+-- pour purchases/fedapay-webhook.
+
 -- ---------- Partage natif (Web Share Target) ----------
 create table if not exists public.share_pending (
   id uuid primary key default gen_random_uuid(),

@@ -31,6 +31,43 @@ const APP_SHELL = [
    INSTALLATION
 --------------------------------------------------------- */
 
+/* ---------------------------------------------------------
+   NOTIFICATIONS PUSH (24/09/2026)
+   N'interfère avec rien de ce qui précède : deux nouveaux
+   écouteurs, indépendants du cache/partage déjà en place.
+--------------------------------------------------------- */
+
+self.addEventListener("push", (event) => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch (e) { /* payload non-JSON, ignoré */ }
+
+  const title = data.title || "MAHOUTO+";
+  const options = {
+    body: data.body || "",
+    icon: "/assets/icon-192.png",
+    badge: "/assets/icon-192.png",
+    data: { url: data.url || "/" }
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const targetUrl = (event.notification.data && event.notification.data.url) || "/";
+
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        // Réutilise un onglet déjà ouvert sur cette page plutôt que
+        // d'en ouvrir un nouveau, si possible.
+        if (client.url.includes(targetUrl) && "focus" in client) return client.focus();
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(targetUrl);
+    })
+  );
+});
+
 self.addEventListener("install", event => {
   event.waitUntil(
     caches.open(CACHE_NAME)

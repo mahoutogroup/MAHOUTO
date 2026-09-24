@@ -48,7 +48,18 @@ window.MAHOUTO_CONFIG = {
     "hefa5gqf",
 
   CLOUDINARY_UPLOAD_PRESET:
-    "mahouto_share"
+    "mahouto_share",
+
+  // -------------------------------------------------------
+  // NOTIFICATIONS PUSH — clé PUBLIQUE VAPID (24/09/2026)
+  // -------------------------------------------------------
+  // ⚠️ Clé publique uniquement — jamais VAPID_PRIVATE_KEY ici (elle
+  // reste côté serveur, dans les variables d'environnement Vercel).
+  // Volontairement absente de requiredKeys ci-dessous : son absence
+  // ne doit jamais bloquer tout le site.
+
+  VAPID_PUBLIC_KEY:
+    "BGCPu2DSlvCCKKeJeYByyKHF1WdaF6RweAp1uHNQk1glKzic5uyg4ZJqd_tTVgvAr78NQ1xnMYFfrf5aFCo3jY0"
 };
 
 

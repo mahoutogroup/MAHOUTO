@@ -263,6 +263,7 @@
 </form>
 
 <script src="config.js"></script>
+<script src="push-notifications.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="attachments.js"></script>
 <script src="audio-player.js"></script>
@@ -308,8 +309,26 @@
   let currentUser = null;
   let hiddenMessageIds = new Set();
   let peerAvatarUrl = null;
+  let myUsername = null;
 
   function setStatus(text) { statusMessage.textContent = text || ""; }
+
+  // Notifie l'autre personne (push) après un envoi réussi — jamais
+  // bloquant, jamais visible si ça échoue (voir push-notifications.js).
+  async function notifyPeerOfMessage(preview) {
+    if (!window.MahoutoPush) return;
+    if (!myUsername) {
+      const { data: profile } = await supabase
+        .from("profiles").select("username").eq("id", currentUser.id).maybeSingle();
+      myUsername = (profile && profile.username) || "Quelqu'un";
+    }
+    MahoutoPush.notifyDm(supabase, {
+      conversationId: CONV_ID,
+      title: myUsername,
+      body: preview,
+      url: "/dm-chat.html?conv=" + encodeURIComponent(CONV_ID) + "&name=" + encodeURIComponent(myUsername)
+    });
+  }
 
   function escapeHtml(str) {
     const div = document.createElement("div");
@@ -661,7 +680,7 @@
     }).select("*").single();
 
     if (error) { console.error(error); setStatus("Message non envoyé."); }
-    else if (data) { renderMessage(data); }
+    else if (data) { renderMessage(data); notifyPeerOfMessage(content.slice(0, 120)); }
   });
 
   // -------- Zone de texte extensible (vers le haut, comme WhatsApp) --------
@@ -801,7 +820,7 @@
     }).select("*").single();
 
     if (error) throw error;
-    if (data) renderMessage(data);
+    if (data) { renderMessage(data); notifyPeerOfMessage("📎 " + (file.name || "Pièce jointe")); }
   }
 
   attachQueueSendBtn.addEventListener("click", async () => {
@@ -928,7 +947,7 @@
       }).select("*").single();
 
       if (error) throw error;
-      if (data) renderMessage(data);
+      if (data) { renderMessage(data); notifyPeerOfMessage("🎤 Message vocal"); }
       setStatus("");
     } catch (err) {
       console.error(err);

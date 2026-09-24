@@ -5,6 +5,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",
     "cloudinary": "^2.5.0",
-    "fedapay": "^1.2.5"
+    "fedapay": "^1.2.5",
+    "web-push": "^3.6.7"
   }
 }
