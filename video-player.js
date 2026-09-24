@@ -65,19 +65,19 @@ window.MahoutoVideoPlayer = (function () {
   let isCasting = false; // reflète l'état réel du RemotePlayer — source de vérité pour aiguiller local vs TV
   let castMedia = null; // objet chrome.cast.media.Media courant, pour détecter la fin naturelle
   let hasStartedPlayingRemote = false; // évite un faux déclenchement du secours juste après connexion
-  let advanceGuard = 0; // anti-double-déclenchement entre les deux mécanismes de détection de fin
+  let advancing = false; // anti-double-déclenchement entre les deux mécanismes de détection de fin — sans délai artificiel
 
   // Point d'entrée unique pour avancer suite à une fin détectée côté
   // Cast, quel que soit le mécanisme qui l'a repérée — si les deux
   // (idleReason FINISHED et le secours RemotePlayer) se déclenchent
-  // pour le même évènement, un seul advanceVideo() part réellement.
+  // pour le même évènement, un seul advanceVideo() part réellement,
+  // et IMMÉDIATEMENT (aucun délai ajouté, pour ne pas laisser le
+  // récepteur Google afficher son écran d'attente entre deux vidéos).
   function triggerAdvanceOnce(source) {
-    const guard = ++advanceGuard;
+    if (advancing) return; // l'autre mécanisme a déjà pris le relais pour cette même fin de vidéo
+    advancing = true;
     console.log("[VIDEO] Cast : fin détectée via", source);
-    setTimeout(() => {
-      if (guard !== advanceGuard) return; // un autre déclenchement a déjà pris le relais entre-temps
-      advanceVideo();
-    }, 150); // courte fenêtre pour laisser l'autre mécanisme, s'il arrive, être ignoré au lieu de doublonner
+    advanceVideo();
   }
 
   window["__onGCastApiAvailable"] = function (isAvailable) {
@@ -115,6 +115,7 @@ window.MahoutoVideoPlayer = (function () {
         if (!isCasting) {
           castMedia = null;
           hasStartedPlayingRemote = false;
+          advancing = false;
           if (els.position) updatePositionLabel(); // réaffiche X/Y en mode local si une playlist existe
         }
       }
@@ -175,6 +176,7 @@ window.MahoutoVideoPlayer = (function () {
     if (!session || !track) return;
 
     hasStartedPlayingRemote = false; // repart de zéro pour cette nouvelle vidéo — évite un faux déclenchement du secours
+    advancing = false; // réarme la protection anti-doublon pour la fin de CETTE vidéo
 
     const mediaInfo = new chrome.cast.media.MediaInfo(track.url, "video/mp4");
     mediaInfo.metadata = new chrome.cast.media.GenericMediaMetadata();
