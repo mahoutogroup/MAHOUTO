@@ -326,7 +326,7 @@
       conversationId: CONV_ID,
       title: myUsername,
       body: preview,
-      url: "/dm-chat.html?conv=" + encodeURIComponent(CONV_ID) + "&name=" + encodeURIComponent(myUsername)
+      url: "/dm-chat.html?conv=" + encodeURIComponent(CONV_ID) + "&with=" + encodeURIComponent(currentUser.id) + "&name=" + encodeURIComponent(myUsername)
     });
   }
 
