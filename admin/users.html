@@ -196,6 +196,8 @@
 
   let allUsers = [];
   let accessToken = null;
+  let currentAdminId = null;
+  let formationsCache = null;
   let chartMode = "day";
 
   function escapeHtml(str) {
@@ -366,6 +368,7 @@
         </div>
         <div class="actions">
           <button class="btn-view" data-action="view">👁️ Voir</button>
+          <button class="btn-view" data-action="certificate">🎓 Certificat</button>
           ${u.status === "actif"
             ? '<button class="btn-disable" data-action="disable">🚫 Désactiver</button>'
             : '<button class="btn-reactivate" data-action="reactivate">✅ Réactiver</button>'}
@@ -374,6 +377,7 @@
       `;
 
       row.querySelector('[data-action="view"]').addEventListener("click", () => showProfile(u));
+      row.querySelector('[data-action="certificate"]').addEventListener("click", () => issueCertificate(u));
       const disableBtn = row.querySelector('[data-action="disable"]');
       if (disableBtn) disableBtn.addEventListener("click", () => performAction(u, "disable"));
       const reactivateBtn = row.querySelector('[data-action="reactivate"]');
@@ -432,6 +436,45 @@
     }
   }
 
+  // -------- Délivrer un certificat manuellement --------
+  // Insertion directe côté client : la policy RLS "certificates_insert_admin"
+  // (voir sql/2026-09-certificates.sql) est la véritable autorité — elle
+  // exige déjà le rôle admin et issued_by = l'admin connecté, donc aucune
+  // fonction serveur supplémentaire n'est nécessaire ici.
+  async function issueCertificate(u) {
+    if (!formationsCache) {
+      const { data } = await supabase.from("formations").select("id, nom").order("nom");
+      formationsCache = data || [];
+    }
+    if (!formationsCache.length) { alert("Aucune formation trouvée."); return; }
+
+    const list = formationsCache.map((f, i) => (i + 1) + ". " + f.nom).join("\n");
+    const choice = prompt(`Délivrer un certificat à "${u.name}" pour quelle formation ?\n\n${list}\n\nTape le numéro :`);
+    const index = parseInt(choice, 10) - 1;
+    if (isNaN(index) || !formationsCache[index]) return;
+
+    const formation = formationsCache[index];
+    if (!confirm(`Confirmer : délivrer le certificat "${formation.nom}" à ${u.name} ?`)) return;
+
+    const code = "MHT-" + Math.random().toString(36).slice(2, 8).toUpperCase() + "-" + Date.now().toString(36).toUpperCase();
+
+    const { error } = await supabase.from("certificates").insert({
+      user_id: u.id,
+      formation_id: formation.id,
+      formation_title: formation.nom,
+      issued_by: currentAdminId,
+      status: "issued",
+      code
+    });
+
+    if (error) {
+      alert("Impossible de délivrer le certificat : " + (error.message.includes("duplicate") ? "cet utilisateur a déjà ce certificat." : error.message));
+      console.error(error);
+    } else {
+      alert("Certificat délivré ✅");
+    }
+  }
+
   // -------- Chargement initial --------
   async function init() {
     const { data } = await supabase.auth.getSession();
@@ -443,6 +486,7 @@
     }
 
     accessToken = data.session.access_token;
+    currentAdminId = data.session.user.id;
 
     try {
       const resp = await authorizedFetch("/api/admin/list-users", { method: "GET" });
