@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vérification de certificat — MAHOUTO+</title>
+<meta name="theme-color" content="#0A0A0A">
+<link rel="icon" href="assets/favicon.png">
+<link rel="stylesheet" href="theme.css">
+<script src="theme-toggle.js"></script>
+<style>
+  body { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; }
+  .verify-card { max-width: 420px; width: 100%; padding: 26px 22px; text-align: center; }
+  .logo { width: 64px; margin-bottom: 14px; }
+  .state { font-size: 17px; font-weight: bold; margin-bottom: 16px; }
+  .state.ok { color: var(--accent-green); }
+  .state.notfound { color: #F87171; }
+  .state.revoked { color: #F5A524; }
+  .field { text-align: left; margin-bottom: 12px; }
+  .field .k { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .04em; }
+  .field .v { font-size: 15px; color: var(--white); font-weight: bold; }
+  .footer-note { margin-top: 18px; font-size: 11px; color: var(--text-muted); }
+  .loading { color: var(--text-muted); font-size: 14px; }
+</style>
+</head>
+<body>
+
+<button id="theme-toggle-btn" class="theme-toggle-fab">🌙</button>
+
+<div class="card verify-card" id="result">
+  <img class="logo" src="assets/logo-mahouto-plus.png" alt="MAHOUTO+">
+  <div class="loading" id="loading">Vérification en cours...</div>
+</div>
+
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+(function () {
+  const cfg = window.MAHOUTO_CONFIG;
+  const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+  const resultEl = document.getElementById("result");
+
+  // Le code peut arriver soit via /verify/CODE (réécrit par vercel.json
+  // vers /verify.html?code=CODE), soit directement en ?code=CODE.
+  const params = new URLSearchParams(window.location.search);
+  const code = (params.get("code") || "").trim();
+
+  function render(html) {
+    resultEl.innerHTML = "";
+    resultEl.appendChild(html);
+  }
+
+  function el(tag, props, children) {
+    const node = document.createElement(tag);
+    if (props) Object.keys(props).forEach((k) => {
+      if (k === "text") node.textContent = props[k];
+      else if (k === "class") node.className = props[k];
+      else node.setAttribute(k, props[k]);
+    });
+    (children || []).forEach((c) => c && node.appendChild(c));
+    return node;
+  }
+
+  function showState(kind, title, fields) {
+    const logo = el("img", { class: "logo", src: "assets/logo-mahouto-plus.png", alt: "MAHOUTO+" });
+    const state = el("div", { class: "state " + kind, text: title });
+    const children = [logo, state];
+    (fields || []).forEach(([k, v]) => {
+      children.push(el("div", { class: "field" }, [
+        el("div", { class: "k", text: k }),
+        el("div", { class: "v", text: v })
+      ]));
+    });
+    children.push(el("div", { class: "footer-note", text: "Vérification officielle MAHOUTO+" }));
+    render(el("div", {}, children));
+  }
+
+  async function verify() {
+    if (!code) {
+      showState("notfound", "✗ AUCUN CODE FOURNI");
+      return;
+    }
+
+    // La page ne fait AUCUNE confiance à des données locales : tout
+    // vient d'un appel serveur (fonction PostgreSQL SECURITY DEFINER),
+    // accessible sans connexion, et qui ne renvoie que des champs
+    // volontairement non sensibles (jamais d'email, jamais d'ID interne).
+    const { data, error } = await supabase.rpc("verify_certificate", { p_code: code });
+
+    if (error) {
+      console.error(error);
+      showState("notfound", "✗ VÉRIFICATION IMPOSSIBLE");
+      return;
+    }
+
+    const cert = Array.isArray(data) ? data[0] : data;
+    if (!cert) {
+      showState("notfound", "✗ CERTIFICAT INTROUVABLE");
+      return;
+    }
+
+    if (cert.status === "revoked") {
+      showState("revoked", "⚠ CERTIFICAT NON VALIDE", [
+        ["Titulaire", cert.recipient_name || "—"],
+        ["Formation", cert.formation_title || "—"],
+        ["Code du certificat", cert.code || code]
+      ]);
+      return;
+    }
+
+    const dateStr = cert.issued_at
+      ? new Date(cert.issued_at).toLocaleDateString("fr-FR", { year: "numeric", month: "long", day: "numeric" })
+      : "—";
+
+    showState("ok", "✓ CERTIFICAT AUTHENTIQUE", [
+      ["Titulaire", cert.recipient_name || "—"],
+      ["Formation", cert.formation_title || "—"],
+      ["Date d'obtention", dateStr],
+      ["Code du certificat", cert.code || code],
+      ["Délivré par", "MAHOUTO+"],
+      ["Développé par", "MAJESTÉ PRESSE"]
+    ]);
+  }
+
+  verify();
+})();
+</script>
+
+</body>
+</html>

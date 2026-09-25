@@ -87,12 +87,13 @@
     }
 
     certs.forEach((cert) => {
+      const isRevoked = cert.status === "revoked";
       const card = document.createElement("div");
       card.className = "card cert-card";
 
       const emoji = document.createElement("div");
       emoji.className = "emoji";
-      emoji.textContent = "📜";
+      emoji.textContent = isRevoked ? "🚫" : "📜";
 
       const title = document.createElement("div");
       title.className = "title";
@@ -100,7 +101,9 @@
 
       const date = document.createElement("div");
       date.className = "date";
-      date.textContent = "Délivré le " + new Date(cert.created_at).toLocaleDateString("fr-FR", { year: "numeric", month: "long", day: "numeric" });
+      date.textContent = "Délivré le " + new Date(cert.created_at).toLocaleDateString("fr-FR", { year: "numeric", month: "long", day: "numeric" })
+        + (isRevoked ? " — révoqué" : "");
+      if (isRevoked) date.style.color = "#F87171";
 
       const code = document.createElement("div");
       code.className = "code";
@@ -110,22 +113,27 @@
       btn.type = "button";
       btn.className = "dl-btn";
       btn.textContent = "⬇ Télécharger le PDF";
-      btn.addEventListener("click", async () => {
+      if (isRevoked) {
         btn.disabled = true;
-        btn.textContent = "Génération...";
-        try {
-          await window.MahoutoCertificatePdf.download({
-            userName,
-            formationTitle: cert.formation_title,
-            issuedAt: cert.created_at,
-            code: cert.code
-          });
-        } catch (err) {
-          alert("Impossible de générer le PDF : " + err.message);
-        }
-        btn.disabled = false;
-        btn.textContent = "⬇ Télécharger le PDF";
-      });
+        btn.textContent = "Certificat révoqué";
+      } else {
+        btn.addEventListener("click", async () => {
+          btn.disabled = true;
+          btn.textContent = "Génération...";
+          try {
+            await window.MahoutoCertificatePdf.download({
+              userName,
+              formationTitle: cert.formation_title,
+              issuedAt: cert.created_at,
+              code: cert.code
+            });
+          } catch (err) {
+            alert("Impossible de générer le PDF : " + err.message);
+          }
+          btn.disabled = false;
+          btn.textContent = "⬇ Télécharger le PDF";
+        });
+      }
 
       card.appendChild(emoji);
       card.appendChild(title);

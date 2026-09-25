@@ -6,6 +6,7 @@
   },
   "rewrites": [
     { "source": "/p/:id", "destination": "/api/produit-og?type=produit&id=:id" },
-    { "source": "/f/:id", "destination": "/api/produit-og?type=formation&id=:id" }
+    { "source": "/f/:id", "destination": "/api/produit-og?type=formation&id=:id" },
+    { "source": "/verify/:code", "destination": "/verify.html?code=:code" }
   ]
 }

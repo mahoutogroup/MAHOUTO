@@ -417,15 +417,15 @@
     const allDone = allLessons.every((l) => progressMap.get(l.id) === true);
     if (!allDone) return;
 
-    const code = "MHT-" + Math.random().toString(36).slice(2, 8).toUpperCase() + "-" + Date.now().toString(36).toUpperCase();
-
+    // Le code de vérification est désormais généré par PostgreSQL
+    // (valeur par défaut de la colonne) — jamais par le navigateur,
+    // pour éliminer tout risque de collision ou de manipulation.
     const { error } = await supabase.from("certificates").insert({
       user_id: currentUser.id,
       formation_id: courseId,
       formation_title: formationTitle || "Formation MAHOUTO School",
       issued_by: "auto",
-      status: "issued",
-      code
+      status: "issued"
     });
 
     // Une erreur ici est normale et silencieuse si le certificat
