@@ -42,8 +42,16 @@
 
   // Le code peut arriver soit via /verify/CODE (réécrit par vercel.json
   // vers /verify.html?code=CODE), soit directement en ?code=CODE.
+  // Le code peut arriver soit via /verify/CODE (le cas réel en
+  // production — vercel.json réécrit ça vers /verify.html, mais
+  // cette réécriture est invisible pour le navigateur : l'adresse
+  // reste /verify/CODE, jamais ?code=... dans window.location.search),
+  // soit directement en ?code=CODE (pratique pour tester ce fichier
+  // isolément, sans passer par la réécriture).
+  const pathParts = window.location.pathname.split("/").filter(Boolean);
+  const codeFromPath = (pathParts[0] === "verify" && pathParts[1]) ? pathParts[1] : "";
   const params = new URLSearchParams(window.location.search);
-  const code = (params.get("code") || "").trim();
+  const code = (codeFromPath || params.get("code") || "").trim();
 
   function render(html) {
     resultEl.innerHTML = "";
