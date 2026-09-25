@@ -456,15 +456,14 @@
     const formation = formationsCache[index];
     if (!confirm(`Confirmer : délivrer le certificat "${formation.nom}" à ${u.name} ?`)) return;
 
-    const code = "MHT-" + Math.random().toString(36).slice(2, 8).toUpperCase() + "-" + Date.now().toString(36).toUpperCase();
-
+    // Le code est généré par PostgreSQL (valeur par défaut de la
+    // colonne), jamais côté navigateur.
     const { error } = await supabase.from("certificates").insert({
       user_id: u.id,
       formation_id: formation.id,
       formation_title: formation.nom,
       issued_by: currentAdminId,
-      status: "issued",
-      code
+      status: "issued"
     });
 
     if (error) {
