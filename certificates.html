@@ -76,10 +76,14 @@
 
     const [{ data: certs }, { data: profile }] = await Promise.all([
       supabase.from("certificates").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
-      supabase.from("profiles").select("username").eq("id", user.id).maybeSingle()
+      supabase.from("profiles").select("username, full_name").eq("id", user.id).maybeSingle()
     ]);
 
-    const userName = (profile && profile.username) || user.email || "Utilisateur MAHOUTO+";
+    // Le nom légal complet (renseigné dans profil.html) est prioritaire
+    // sur les certificats — c'est exactement ce à quoi il sert. Repli
+    // sur le pseudo puis l'e-mail si l'utilisateur ne l'a pas encore
+    // renseigné.
+    const userName = (profile && profile.full_name) || (profile && profile.username) || user.email || "Utilisateur MAHOUTO+";
 
     if (!certs || !certs.length) {
       emptyEl.classList.remove("hidden");
