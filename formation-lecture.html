@@ -107,6 +107,7 @@
   let allLessons = []; // à plat, avec module_titre
   let progressMap = new Map(); // lesson_id -> completed
   let currentLessonId = null;
+  let formationTitle = "";
 
   // ---------- Google Cast (même mécanisme validé pour les salons —
   // cast-prototype.html, 24/09/2026 — Default Media Receiver de
@@ -209,6 +210,7 @@
   let userOwnsFormation = false;
 
   async function loadContent(formation) {
+    formationTitle = formation.nom;
     const { data: modules } = await supabase
       .from("formation_modules")
       .select("*")
@@ -399,6 +401,38 @@
     if (item) {
       item.classList.add("completed");
       item.querySelector(".check").textContent = "✓";
+    }
+
+    maybeIssueCertificate();
+  }
+
+  // Délivrance automatique du certificat : uniquement si TOUTES les
+  // leçons de la formation sont maintenant marquées terminées. La
+  // vraie vérification est faite côté serveur par la policy RLS
+  // "certificates_insert_auto" (voir sql/2026-09-certificates.sql) —
+  // ce contrôle client n'est qu'une optimisation pour éviter une
+  // tentative d'insertion inutile, jamais la source d'autorité.
+  async function maybeIssueCertificate() {
+    if (!currentUser || !courseId || !allLessons.length) return;
+    const allDone = allLessons.every((l) => progressMap.get(l.id) === true);
+    if (!allDone) return;
+
+    const code = "MHT-" + Math.random().toString(36).slice(2, 8).toUpperCase() + "-" + Date.now().toString(36).toUpperCase();
+
+    const { error } = await supabase.from("certificates").insert({
+      user_id: currentUser.id,
+      formation_id: courseId,
+      formation_title: formationTitle || "Formation MAHOUTO School",
+      issued_by: "auto",
+      status: "issued",
+      code
+    });
+
+    // Une erreur ici est normale et silencieuse si le certificat
+    // existe déjà (contrainte unique user_id+formation_id) — pas la
+    // peine de déranger l'utilisateur pour ce cas.
+    if (!error) {
+      console.log("[CERTIFICAT] délivré automatiquement pour", formationTitle);
     }
   }
 

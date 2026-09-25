@@ -300,11 +300,11 @@
       <p>Compte, informations personnelles.</p>
       <div class="go">Ouvrir →</div>
     </a>
-    <div class="card module-card disabled">
+    <a class="card module-card" href="certificates.html">
       <h2>📜 Certificats</h2>
       <p>Diplômes numériques.</p>
-      <div class="go">Bientôt disponible</div>
-    </div>
+      <div class="go">Ouvrir →</div>
+    </a>
     <div class="card module-card disabled">
       <h2>🔔 Notifications</h2>
       <p>Alertes et rappels.</p>
@@ -475,7 +475,7 @@
       // ne se reflèterait jamais ici.
       const { data: profile } = await supabase
         .from("profiles")
-        .select("username, avatar_url, created_at")
+        .select("username, avatar_url, created_at, country")
         .eq("id", user.id)
         .maybeSingle();
 
@@ -519,10 +519,18 @@
         })
         .catch(() => {});
 
-      // Certificats et Pays : aucune donnée n'existe encore côté base
-      // pour ces deux statistiques (pas de table certificats, pas de
-      // champ pays sur profiles) — laissés volontairement à "—"
-      // plutôt que d'afficher une fausse valeur.
+      // Certificats : nombre réel de certificats délivrés.
+      supabase
+        .from("certificates")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .then(({ count }) => {
+          document.getElementById("stat-certificats").textContent = String(count || 0);
+        })
+        .catch(() => {});
+
+      // Pays : affiché s'il a été renseigné dans le profil.
+      document.getElementById("stat-pays").textContent = (profile && profile.country) || "—";
     } catch (err) {
       console.error("Vérification de session impossible :", err);
     }

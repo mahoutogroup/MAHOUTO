@@ -81,7 +81,7 @@
   }
 
   #edit-modal h3 { color: var(--gold); font-size: 16px; margin-bottom: 14px; }
-  #edit-modal input {
+  #edit-modal input, #edit-modal select {
     width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border);
     background: var(--bg); color: var(--white); font-size: 14.5px; margin-bottom: 14px;
   }
@@ -116,7 +116,7 @@
       <span class="emoji">🔔</span><span class="label">Activer les notifications</span><span class="sub">→</span>
     </button>
     <div class="card menu-item"><span class="emoji">💳</span><span class="label">Paiements</span><span class="sub">Bientôt</span></div>
-    <div class="card menu-item"><span class="emoji">📜</span><span class="label">Certificats</span><span class="sub">Bientôt</span></div>
+    <a class="card menu-item" href="certificates.html"><span class="emoji">📜</span><span class="label">Certificats</span><span class="sub">→</span></a>
     <div class="card menu-item"><span class="emoji">⭐</span><span class="label">Abonnements</span><span class="sub">Bientôt</span></div>
     <a class="card menu-item" href="mes-achats.html"><span class="emoji">📦</span><span class="label">Mes achats</span><span class="sub">→</span></a>
     <div class="card menu-item"><span class="emoji">🔳</span><span class="label">QR Code</span><span class="sub">Bientôt</span></div>
@@ -132,6 +132,21 @@
   <div class="box">
     <h3>Modifier ton pseudo</h3>
     <input id="new-username" type="text" maxlength="24" placeholder="Nouveau pseudo">
+    <select id="new-country">
+      <option value="">Pays (optionnel)</option>
+      <option value="Bénin">Bénin</option>
+      <option value="Togo">Togo</option>
+      <option value="Côte d'Ivoire">Côte d'Ivoire</option>
+      <option value="Sénégal">Sénégal</option>
+      <option value="Ghana">Ghana</option>
+      <option value="Nigeria">Nigeria</option>
+      <option value="Mali">Mali</option>
+      <option value="Burkina Faso">Burkina Faso</option>
+      <option value="Niger">Niger</option>
+      <option value="Cameroun">Cameroun</option>
+      <option value="France">France</option>
+      <option value="Autre">Autre</option>
+    </select>
     <div class="actions">
       <button class="btn-outline" id="cancel-edit">Annuler</button>
       <button class="btn-gold" id="save-edit">Enregistrer</button>
@@ -167,6 +182,7 @@
   let currentUser = null;
   let currentUsername = null;
   let currentAvatarUrl = null;
+  let currentCountry = null;
 
   function render() {
     nameEl.textContent = currentUsername || "Non connecté";
@@ -187,10 +203,11 @@
       currentUser = data.session.user;
       const { data: profile } = await supabase
         .from("profiles")
-        .select("username, role, avatar_url")
+        .select("username, role, avatar_url, country")
         .eq("id", currentUser.id)
         .maybeSingle();
       currentUsername = profile ? profile.username : null;
+      currentCountry = profile ? profile.country : null;
       currentAvatarUrl = (profile && profile.avatar_url)
         || (currentUser.user_metadata && currentUser.user_metadata.avatar_url)
         || null;
@@ -323,6 +340,7 @@
       return;
     }
     newUsernameInput.value = currentUsername || "";
+    document.getElementById("new-country").value = currentCountry || "";
     modal.classList.remove("hidden");
   });
 
@@ -331,13 +349,15 @@
   saveEdit.addEventListener("click", async () => {
     const value = newUsernameInput.value.trim();
     if (!value) return;
+    const country = document.getElementById("new-country").value || null;
 
     const { error } = await supabase
       .from("profiles")
-      .upsert({ id: currentUser.id, username: value }, { onConflict: "id" });
+      .upsert({ id: currentUser.id, username: value, country }, { onConflict: "id" });
 
     if (!error) {
       currentUsername = value;
+      currentCountry = country;
       render();
       modal.classList.add("hidden");
     } else {

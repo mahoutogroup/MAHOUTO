@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Certificats — MAHOUTO+</title>
+<meta name="theme-color" content="#0A0A0A">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="assets/favicon.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="stylesheet" href="theme.css">
+<script src="theme-toggle.js"></script>
+<style>
+  .page-content { padding-bottom: 90px; }
+  .top-bar { display: flex; align-items: center; gap: 10px; padding: 18px 20px 6px; }
+  .top-bar a { color: var(--text-muted); font-size: 20px; text-decoration: none; }
+  .top-bar h1 { font-size: 18px; }
+
+  .cert-list { padding: 14px 20px; display: flex; flex-direction: column; gap: 12px; }
+
+  .cert-card { padding: 18px; display: flex; flex-direction: column; gap: 6px; }
+  .cert-card .emoji { font-size: 26px; }
+  .cert-card .title { font-weight: bold; font-size: 15px; }
+  .cert-card .date { font-size: 12px; color: var(--text-muted); }
+  .cert-card .code { font-size: 10.5px; color: var(--text-dim); }
+  .cert-card .dl-btn {
+    margin-top: 8px; align-self: flex-start;
+    background: var(--gold-bright); color: #0A0A0A; border: none;
+    border-radius: 10px; padding: 9px 16px; font-weight: bold; font-size: 13px;
+    cursor: pointer; font-family: inherit;
+  }
+  .cert-card .dl-btn:disabled { opacity: .5; }
+
+  .empty-state { text-align: center; padding: 60px 24px; color: var(--text-muted); }
+</style>
+</head>
+<body>
+
+<button id="theme-toggle-btn" class="theme-toggle-fab">🌙</button>
+
+<div class="page-content">
+  <div class="top-bar">
+    <a href="profil.html">←</a>
+    <h1>📜 Mes certificats</h1>
+  </div>
+
+  <div id="empty-state" class="empty-state hidden">
+    Aucun certificat pour le moment.<br>Termine une formation sur MAHOUTO School pour en obtenir un.
+  </div>
+
+  <div id="cert-list" class="cert-list"></div>
+</div>
+
+<nav class="bottom-nav">
+  <a class="nav-item" href="index.html"><span class="icon">🏠</span>Accueil</a>
+  <a class="nav-item" href="discussions.html"><span class="icon">💬</span>Messages</a>
+  <a class="nav-item" href="https://ai.majestepresse.com/chat" target="_blank" rel="noopener"><span class="icon">🧠</span>MAHOUTO AI</a>
+  <a class="nav-item" href="school.html"><span class="icon">🎓</span>School</a>
+  <a class="nav-item active" href="profil.html"><span class="icon">👤</span>Profil</a>
+</nav>
+
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="certificate-pdf.js"></script>
+<script>
+(function () {
+  const cfg = window.MAHOUTO_CONFIG;
+  const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+
+  const listEl = document.getElementById("cert-list");
+  const emptyEl = document.getElementById("empty-state");
+
+  async function load() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { window.location.href = "index.html"; return; }
+
+    const [{ data: certs }, { data: profile }] = await Promise.all([
+      supabase.from("certificates").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
+      supabase.from("profiles").select("username").eq("id", user.id).maybeSingle()
+    ]);
+
+    const userName = (profile && profile.username) || user.email || "Utilisateur MAHOUTO+";
+
+    if (!certs || !certs.length) {
+      emptyEl.classList.remove("hidden");
+      return;
+    }
+
+    certs.forEach((cert) => {
+      const card = document.createElement("div");
+      card.className = "card cert-card";
+
+      const emoji = document.createElement("div");
+      emoji.className = "emoji";
+      emoji.textContent = "📜";
+
+      const title = document.createElement("div");
+      title.className = "title";
+      title.textContent = cert.formation_title; // textContent uniquement — jamais innerHTML avec une donnée
+
+      const date = document.createElement("div");
+      date.className = "date";
+      date.textContent = "Délivré le " + new Date(cert.created_at).toLocaleDateString("fr-FR", { year: "numeric", month: "long", day: "numeric" });
+
+      const code = document.createElement("div");
+      code.className = "code";
+      code.textContent = "Code : " + cert.code;
+
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "dl-btn";
+      btn.textContent = "⬇ Télécharger le PDF";
+      btn.addEventListener("click", async () => {
+        btn.disabled = true;
+        btn.textContent = "Génération...";
+        try {
+          await window.MahoutoCertificatePdf.download({
+            userName,
+            formationTitle: cert.formation_title,
+            issuedAt: cert.created_at,
+            code: cert.code
+          });
+        } catch (err) {
+          alert("Impossible de générer le PDF : " + err.message);
+        }
+        btn.disabled = false;
+        btn.textContent = "⬇ Télécharger le PDF";
+      });
+
+      card.appendChild(emoji);
+      card.appendChild(title);
+      card.appendChild(date);
+      card.appendChild(code);
+      card.appendChild(btn);
+      listEl.appendChild(card);
+    });
+  }
+
+  load();
+})();
+</script>
+<script src="pwa-install.js"></script>
+
+</body>
+</html>
