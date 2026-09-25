@@ -52,7 +52,29 @@ async function handleSign(req, res) {
     return res.status(415).json({ error: "Type de fichier non autorisé." });
   }
 
-  const context = req.query.context === "dm" ? "dm" : "room";
+  const context = req.query.context === "dm" ? "dm" : req.query.context === "avatar" ? "avatar" : "room";
+
+  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+  const apiKey = process.env.CLOUDINARY_API_KEY;
+  const apiSecret = process.env.CLOUDINARY_API_SECRET;
+  if (!cloudName || !apiKey || !apiSecret) {
+    return res.status(500).json({ error: "Variables Cloudinary manquantes sur Vercel" });
+  }
+
+  // Photo de profil : aucun salon/DM à vérifier, juste être connecté
+  // (déjà garanti ci-dessus). Toujours publique (accessType "upload") :
+  // un avatar est visible par quiconque voit les messages de la
+  // personne, quel que soit le salon — pas un contenu à protéger.
+  // Extension restreinte aux images, même si le nom de fichier a déjà
+  // passé la liste blanche générale, par prudence supplémentaire.
+  if (context === "avatar") {
+    const ext = filename.split(".").pop().toLowerCase();
+    if (!["jpg", "jpeg", "png", "webp", "gif"].includes(ext)) {
+      return res.status(415).json({ error: "Une photo de profil doit être une image." });
+    }
+    return signAndRespond(res, { cloudName, apiKey, apiSecret, folder: "mahoutoplus/avatars", accessType: "upload" });
+  }
+
   const contextId = String(req.query.contextId || "");
   if (!contextId) {
     return res.status(400).json({ error: "Contexte manquant." });
@@ -76,15 +98,11 @@ async function handleSign(req, res) {
     accessType = room && room.is_paid ? "authenticated" : "upload";
   }
 
-  const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
-  const apiKey = process.env.CLOUDINARY_API_KEY;
-  const apiSecret = process.env.CLOUDINARY_API_SECRET;
-  if (!cloudName || !apiKey || !apiSecret) {
-    return res.status(500).json({ error: "Variables Cloudinary manquantes sur Vercel" });
-  }
+  return signAndRespond(res, { cloudName, apiKey, apiSecret, folder: "mahoutoplus", accessType });
+}
 
+function signAndRespond(res, { cloudName, apiKey, apiSecret, folder, accessType }) {
   const timestamp = Math.round(Date.now() / 1000);
-  const folder = "mahoutoplus";
 
   const paramsToSign =
     accessType === "authenticated"
