@@ -334,7 +334,13 @@ self.addEventListener("fetch", event => {
       (async () => {
         const cache = await caches.open(CACHE_NAME);
         try {
-          const networkResponse = await fetch(event.request);
+          // { cache: "reload" } : ignore le cache HTTP habituel du
+          // navigateur, va toujours chercher la vraie réponse la plus
+          // récente sur le réseau — sinon même ce fetch "réseau" du
+          // Service Worker pouvait recevoir une réponse déjà cachée
+          // par le navigateur lui-même, rendant une mise à jour
+          // invisible malgré un rechargement de page.
+          const networkResponse = await fetch(event.request, { cache: "reload" });
           if (networkResponse && networkResponse.ok) {
             cache.put(event.request, networkResponse.clone());
           }
@@ -370,7 +376,11 @@ self.addEventListener("fetch", event => {
       caches.open(CACHE_NAME).then(async (cache) => {
         const cached = await cache.match(event.request);
 
-        const networkUpdate = fetch(event.request)
+        // Même raison qu'au-dessus (Network First) : on force le
+        // contournement du cache HTTP du navigateur pour que cette
+        // revalidation en arrière-plan aille vraiment chercher la
+        // dernière version déployée, pas une copie déjà en cache.
+        const networkUpdate = fetch(event.request, { cache: "reload" })
           .then((response) => {
             if (response && response.ok) {
               cache.put(event.request, response.clone());
