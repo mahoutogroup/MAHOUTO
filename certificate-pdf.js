@@ -33,13 +33,22 @@ window.MahoutoCertificatePdf = (function () {
 
   function loadJsPDF() {
     if (window.jspdf && window.jspdf.jsPDF) return Promise.resolve();
-    if (!jsPDFLoaded) jsPDFLoaded = loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
+    if (jsPDFLoaded) return jsPDFLoaded;
+    jsPDFLoaded = loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js")
+      .catch(() => loadScript("https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js"));
     return jsPDFLoaded;
   }
 
+  // Deux CDN pour LE MÊME paquet npm "qrcode" (donc la même API
+  // QRCode.toDataURL) : si le premier échoue (blocage réseau
+  // ponctuel, lenteur mobile...), on retente automatiquement avec le
+  // second avant d'abandonner. Ne jamais mélanger avec une autre
+  // librairie QR (API différente, ex. davidshimjs/qrcodejs).
   function loadQrLib() {
     if (window.QRCode && window.QRCode.toDataURL) return Promise.resolve();
-    if (!qrLoaded) qrLoaded = loadScript("https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js");
+    if (qrLoaded) return qrLoaded;
+    qrLoaded = loadScript("https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js")
+      .catch(() => loadScript("https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js"));
     return qrLoaded;
   }
 
