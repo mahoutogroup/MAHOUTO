@@ -43,6 +43,18 @@ window.MahoutoCertificatePdf = (function () {
     return qrLoaded;
   }
 
+  // La version précompilée navigateur de "qrcode" exige un callback
+  // explicite (elle ne renvoie pas toujours une Promise selon le
+  // build) — on l'enveloppe nous-mêmes pour garder un await propre,
+  // sans dépendre d'un comportement Promise non garanti.
+  function qrToDataURL(text, options) {
+    return new Promise((resolve, reject) => {
+      window.QRCode.toDataURL(text, options, (err, url) => {
+        if (err) reject(err); else resolve(url);
+      });
+    });
+  }
+
   // Charge une image (même origine) et la renvoie en data URL PNG,
   // avec ses dimensions naturelles pour préserver le ratio et ne
   // jamais déformer le logo ou la signature.
@@ -177,10 +189,16 @@ window.MahoutoCertificatePdf = (function () {
     try {
       await loadQrLib();
       const verifyUrl = window.location.origin + "/verify/" + encodeURIComponent(certificate.code || "");
-      const qrDataUrl = await window.QRCode.toDataURL(verifyUrl, { margin: 1, width: 300, color: { dark: "#1E1A12", light: "#FDFAF2" } });
+      console.log("[CERTIFICAT] génération QR pour :", verifyUrl);
+      const qrDataUrl = await qrToDataURL(verifyUrl, { margin: 1, width: 300, color: { dark: "#1E1A12", light: "#FDFAF2" } });
       doc.addImage(qrDataUrl, "PNG", qrX - qrSize / 2, qrY, qrSize, qrSize);
+      console.log("[CERTIFICAT] QR code inséré avec succès");
     } catch (err) {
-      console.warn("[CERTIFICAT] QR code non généré :", err.message);
+      console.error("[CERTIFICAT] QR code NON généré :", err);
+      // Diagnostic temporaire : affiche l'erreur directement à l'écran
+      // (pratique sur Android, sans PC ni chrome://inspect). À retirer
+      // une fois le QR code confirmé fonctionnel.
+      alert("[Diagnostic QR code] " + (err && err.message ? err.message : String(err)));
     }
     doc.setTextColor(...muted);
     doc.setFont("times", "normal");
