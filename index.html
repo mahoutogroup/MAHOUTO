@@ -230,15 +230,15 @@
         <div class="avatar" id="profile-avatar">?</div>
         <div>
           <div class="name" id="profile-name">—</div>
-          <div class="mahouto-id">ID MAHOUTO+ : —</div>
+          <div class="mahouto-id" id="mahouto-id">ID MAHOUTO+ : —</div>
         </div>
       </div>
       <div class="profile-stats">
-        <div class="stat"><div class="value">—</div><div class="label">Certificats</div></div>
-        <div class="stat"><div class="value">—</div><div class="label">Formations</div></div>
-        <div class="stat"><div class="value">—</div><div class="label">Ancienneté</div></div>
-        <div class="stat"><div class="value">—</div><div class="label">Messages</div></div>
-        <div class="stat"><div class="value">—</div><div class="label">Pays</div></div>
+        <div class="stat"><div class="value" id="stat-certificats">—</div><div class="label">Certificats</div></div>
+        <div class="stat"><div class="value" id="stat-formations">—</div><div class="label">Formations</div></div>
+        <div class="stat"><div class="value" id="stat-anciennete">—</div><div class="label">Ancienneté</div></div>
+        <div class="stat"><div class="value" id="stat-messages">—</div><div class="label">Messages</div></div>
+        <div class="stat"><div class="value" id="stat-pays">—</div><div class="label">Pays</div></div>
       </div>
     </div>
   </div>
@@ -450,6 +450,15 @@
     showInfo("Cette méthode de connexion n'est pas encore configurée.");
   });
 
+  function formatAnciennete(createdAt) {
+    if (!createdAt) return "—";
+    const days = Math.floor((Date.now() - new Date(createdAt).getTime()) / 86400000);
+    if (days < 1) return "Nouveau";
+    if (days < 30) return days + "j";
+    if (days < 365) return Math.floor(days / 30) + " mois";
+    return Math.floor(days / 365) + " an" + (Math.floor(days / 365) > 1 ? "s" : "");
+  }
+
   async function refreshIdentityUI() {
     try {
       if (typeof supabase === "undefined" ||!supabase.auth || typeof supabase.auth.getUser!== "function") return;
@@ -460,12 +469,60 @@
       document.getElementById("auth-guest-note").classList.add("hidden");
       document.getElementById("profile-summary").classList.add("visible");
 
-      const name = (user.user_metadata && (user.user_metadata.full_name || user.user_metadata.name)) || user.email || "Utilisateur";
+      // Le pseudo affiché doit venir de la table profiles (celle que
+      // l'utilisateur modifie réellement dans profil.html), pas
+      // uniquement des métadonnées Google — sinon un pseudo personnalisé
+      // ne se reflèterait jamais ici.
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("username, avatar_url, created_at")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      const name = (profile && profile.username)
+        || (user.user_metadata && (user.user_metadata.full_name || user.user_metadata.name))
+        || user.email || "Utilisateur";
       document.getElementById("profile-name").textContent = name;
 
       const avatarEl = document.getElementById("profile-avatar");
-      const photo = user.user_metadata && user.user_metadata.avatar_url;
+      const photo = (profile && profile.avatar_url) || (user.user_metadata && user.user_metadata.avatar_url);
       avatarEl.innerHTML = photo? '<img src="' + photo + '" alt="">' : name.trim()[0].toUpperCase();
+
+      // ID MAHOUTO+ : dérivé de l'identifiant Supabase de l'utilisateur
+      // (8 premiers caractères, en majuscules) — aucun champ dédié
+      // n'existe encore en base pour un identifiant public séparé.
+      document.getElementById("mahouto-id").textContent = "ID MAHOUTO+ : " + user.id.slice(0, 8).toUpperCase();
+
+      document.getElementById("stat-anciennete").textContent = formatAnciennete(profile && profile.created_at);
+
+      // Formations : nombre de formations distinctes réellement payées.
+      supabase
+        .from("purchases")
+        .select("course_id", { count: "exact", head: false })
+        .eq("user_id", user.id)
+        .eq("product_type", "formation")
+        .eq("status", "paid")
+        .then(({ data }) => {
+          const distinct = new Set((data || []).map((p) => p.course_id));
+          document.getElementById("stat-formations").textContent = String(distinct.size);
+        })
+        .catch(() => {});
+
+      // Messages : total envoyé, salons + messages privés confondus.
+      Promise.all([
+        supabase.from("messages").select("id", { count: "exact", head: true }).eq("user_id", user.id),
+        supabase.from("dm_messages").select("id", { count: "exact", head: true }).eq("sender_id", user.id)
+      ])
+        .then(([roomRes, dmRes]) => {
+          const total = (roomRes.count || 0) + (dmRes.count || 0);
+          document.getElementById("stat-messages").textContent = String(total);
+        })
+        .catch(() => {});
+
+      // Certificats et Pays : aucune donnée n'existe encore côté base
+      // pour ces deux statistiques (pas de table certificats, pas de
+      // champ pays sur profiles) — laissés volontairement à "—"
+      // plutôt que d'afficher une fausse valeur.
     } catch (err) {
       console.error("Vérification de session impossible :", err);
     }

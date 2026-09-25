@@ -283,7 +283,8 @@
     try {
       const { data: sessionData } = await supabase.auth.getSession();
       const accessToken = sessionData && sessionData.session ? sessionData.session.access_token : null;
-      const signResp = await fetch("/api/cloudinary-sign", {
+      const signQuery = new URLSearchParams({ filename: file.name || "avatar.jpg", context: "avatar" });
+      const signResp = await fetch("/api/attachment?" + signQuery.toString(), {
         headers: accessToken ? { "Authorization": "Bearer " + accessToken } : {}
       });
       const sign = await signResp.json();
