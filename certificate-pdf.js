@@ -734,23 +734,24 @@ window.MahoutoCertificatePdf = (function () {
       doc.setLineWidth(1);
       doc.line(0, size, size, 0);
       if (label) {
-        // Taille choisie par MESURE réelle (doc.getTextWidth), pas par
-        // estimation à l'œil — la fois précédente, une taille devinée
-        // dépassait encore la zone verte : le texte devenait blanc sur
-        // fond ivoire (donc invisible) une fois sorti du triangle,
-        // donnant l'impression d'être "coupé".
-        const labelX = 8, labelY = 12;
-        const maxTravel = size - (labelX + labelY) - 4; // -4 mm de marge de sécurité avant l'arête dorée
+        // Texte HORIZONTAL, non pivoté, tassé près du coin (0,0) —
+        // fiable quel que soit le sens réel de rotation de jsPDF (deux
+        // tentatives précédentes avec un texte à 45° ont mal tourné,
+        // signe que je ne maîtrisais pas assez précisément cette API
+        // pour continuer à deviner). Une largeur maximale sûre est
+        // mesurée avec doc.getTextWidth() avant de dessiner.
+        const labelX = 6, labelY = 14;
+        const maxWidth = 34; // marge de sécurité réelle : à y=14, la limite du triangle (x+y≤62) autorise jusqu'à x=48
         doc.setTextColor(255, 255, 255);
         doc.setFont("helvetica", "bold");
         let labelSize = 7;
         while (labelSize > 3) {
           doc.setFontSize(labelSize);
-          if (doc.getTextWidth(label) <= maxTravel) break;
+          if (doc.getTextWidth(label) <= maxWidth) break;
           labelSize -= 0.2;
         }
         doc.setFontSize(labelSize);
-        doc.text(label, labelX, labelY, { angle: 45 });
+        doc.text(label, labelX, labelY);
       }
     } else {
       doc.setFillColor(...green);
@@ -876,11 +877,18 @@ window.MahoutoCertificatePdf = (function () {
     doc.text("Construire l'Afrique", pageW - 18, 18, { align: "right" });
     doc.text("numérique de demain.", pageW - 18, 24, { align: "right" });
 
-    // -------- Titre + laurier (approximation vectorielle) --------
+    // -------- Titre (centré sur la page) — Helvetica gras, avec un
+    // léger effet de "double trait" pour paraître plus épais que le
+    // nom du bénéficiaire, comme demandé. jsPDF n'a pas de graisse
+    // "black"/"extra-bold" au-delà de "bold" pour les polices de
+    // base, donc on simule le supplément de poids en dessinant le
+    // texte deux fois avec un minuscule décalage. --------
     doc.setTextColor(...green);
-    doc.setFont("times", "bold");
-    doc.setFontSize(20);
-    doc.text(spaced("CERTIFICAT DE RÉUSSITE"), cx, 44, { align: "center" });
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(21);
+    const titleText = spaced("CERTIFICAT DE RÉUSSITE");
+    doc.text(titleText, cx + 0.18, 44, { align: "center" });
+    doc.text(titleText, cx, 44, { align: "center" });
     doc.setDrawColor(...gold);
     doc.setLineWidth(0.4);
     doc.line(cx - 32, 49, cx + 32, 49);
