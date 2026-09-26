@@ -856,7 +856,7 @@ window.MahoutoCertificatePdf = (function () {
 
     // Bandeaux diagonaux (approximation — voir message d'accompagnement
     // pour la limite sur le motif géométrique intérieur, non reproduit).
-    drawCornerRibbon(doc, pageW, pageH, "tl", green, gold, "ÉCOSYSTÈME MAHOUTO+");
+    drawCornerRibbon(doc, pageW, pageH, "tl", green, gold, null);
     drawCornerRibbon(doc, pageW, pageH, "br", green, gold, null);
 
     // -------- Logo officiel MAHOUTO+ (fichier existant du dépôt) --------
@@ -887,7 +887,6 @@ window.MahoutoCertificatePdf = (function () {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(21);
     const titleText = spaced("CERTIFICAT DE RÉUSSITE");
-    doc.text(titleText, cx + 0.18, 44, { align: "center" });
     doc.text(titleText, cx, 44, { align: "center" });
     doc.setDrawColor(...gold);
     doc.setLineWidth(0.4);
@@ -974,9 +973,6 @@ window.MahoutoCertificatePdf = (function () {
     doc.setFontSize(8);
     doc.text("Scannez ce QR code pour vérifier", qrX - qrSize / 2, qrY + qrSize + 6);
     doc.text("l'authenticité de ce certificat", qrX - qrSize / 2, qrY + qrSize + 10.5);
-    doc.setFontSize(7);
-    doc.setTextColor(...green);
-    doc.text(verifyUrl, qrX - qrSize / 2, qrY + qrSize + 15.5);
 
     // -------- Sceau médaille (centre bas) — vrai logo + ruban vert --------
     const sealX = cx, sealY = 146;
