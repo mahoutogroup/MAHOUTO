@@ -734,14 +734,23 @@ window.MahoutoCertificatePdf = (function () {
       doc.setLineWidth(1);
       doc.line(0, size, size, 0);
       if (label) {
-        // Taille et position calculées pour que le texte reste entièrement
-        // dans le triangle vert (sinon il devient blanc sur fond ivoire,
-        // donc invisible, une fois sorti — c'est ce qui donnait
-        // l'impression d'un texte "coupé").
+        // Taille choisie par MESURE réelle (doc.getTextWidth), pas par
+        // estimation à l'œil — la fois précédente, une taille devinée
+        // dépassait encore la zone verte : le texte devenait blanc sur
+        // fond ivoire (donc invisible) une fois sorti du triangle,
+        // donnant l'impression d'être "coupé".
+        const labelX = 8, labelY = 12;
+        const maxTravel = size - (labelX + labelY) - 4; // -4 mm de marge de sécurité avant l'arête dorée
         doc.setTextColor(255, 255, 255);
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(5.8);
-        doc.text(label, 9, 13, { angle: 45 });
+        let labelSize = 7;
+        while (labelSize > 3) {
+          doc.setFontSize(labelSize);
+          if (doc.getTextWidth(label) <= maxTravel) break;
+          labelSize -= 0.2;
+        }
+        doc.setFontSize(labelSize);
+        doc.text(label, labelX, labelY, { angle: 45 });
       }
     } else {
       doc.setFillColor(...green);
@@ -888,20 +897,11 @@ window.MahoutoCertificatePdf = (function () {
     doc.line(cx - 34, 59.5, cx - 12, 59.5);
     doc.line(cx + 12, 59.5, cx + 34, 59.5);
 
-    // Nom du bénéficiaire — police manuscrite (Grand Hotel, fournie
-    // par l'utilisateur), avec repli automatique sur Times italique si
-    // le fichier ne se charge pas pour une raison quelconque.
+    // Nom du bénéficiaire — Helvetica gras (l'équivalent Arial déjà
+    // intégré à jsPDF, aucun fichier de police à charger).
     const nameText = certificate.userName || "—";
-    let usingScriptFont = false;
-    try {
-      await loadScriptFont(doc);
-      doc.setFont("GrandHotel", "normal");
-      usingScriptFont = true;
-    } catch (err) {
-      console.warn("[CERTIFICAT] police manuscrite indisponible, repli sur Times italique :", err.message);
-      doc.setFont("times", "bolditalic");
-    }
-    doc.setFontSize(usingScriptFont ? 34 : 28); // la police script est visuellement plus petite à taille égale
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(26);
     doc.setTextColor(...green);
     doc.text(nameText, cx, 73, { align: "center" });
     const nameWidth = doc.getTextWidth(nameText);
@@ -964,11 +964,11 @@ window.MahoutoCertificatePdf = (function () {
     doc.setTextColor(...muted);
     doc.setFont("times", "normal");
     doc.setFontSize(8);
-    doc.text("Scannez ce QR code pour vérifier", qrX + qrSize / 2 + 4, qrY + 6);
-    doc.text("l'authenticité de ce certificat", qrX + qrSize / 2 + 4, qrY + 10.5);
+    doc.text("Scannez ce QR code pour vérifier", qrX - qrSize / 2, qrY + qrSize + 6);
+    doc.text("l'authenticité de ce certificat", qrX - qrSize / 2, qrY + qrSize + 10.5);
     doc.setFontSize(7);
     doc.setTextColor(...green);
-    doc.text(verifyUrl, qrX - qrSize / 2, qrY + qrSize + 6);
+    doc.text(verifyUrl, qrX - qrSize / 2, qrY + qrSize + 15.5);
 
     // -------- Sceau médaille (centre bas) — vrai logo + ruban vert --------
     const sealX = cx, sealY = 146;
