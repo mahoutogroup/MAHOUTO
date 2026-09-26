@@ -461,8 +461,13 @@
 
   async function refreshIdentityUI() {
     try {
-      if (typeof supabase === "undefined" ||!supabase.auth || typeof supabase.auth.getUser!== "function") return;
-      const { data: { user } } = await supabase.auth.getUser();
+      if (typeof supabase === "undefined" || !supabase.auth || typeof supabase.auth.getSession !== "function") return;
+      // getSession() lit la session déjà stockée localement — contrairement
+      // à getUser(), ça ne dépend pas du réseau. Sans ça, l'app affichait
+      // à tort l'écran de connexion dès qu'on l'ouvrait hors connexion,
+      // même avec une session valide sur l'appareil.
+      const { data: sessionData } = await supabase.auth.getSession();
+      const user = sessionData && sessionData.session ? sessionData.session.user : null;
       if (!user) return;
 
       document.getElementById("auth-methods").classList.add("hidden-by-auth");
