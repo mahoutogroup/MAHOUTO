@@ -271,6 +271,12 @@
           .in("lesson_id", lessonIds);
         (progress || []).forEach((p) => progressMap.set(p.lesson_id, p.completed));
       }
+      // Couvre le cas d'une formation déjà entièrement terminée AVANT
+      // l'ajout du système de certificats/attestations (ou avant l'ajout
+      // d'une nouvelle leçon type quiz) — sans ce contrôle au chargement,
+      // la délivrance ne se déclenchait qu'en cochant une NOUVELLE leçon,
+      // jamais en rouvrant une formation déjà 100% complète.
+      maybeIssueCertificate();
     }
 
     renderLayout(formation, moduleBlocks);
