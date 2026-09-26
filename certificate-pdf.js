@@ -886,7 +886,7 @@ window.MahoutoCertificatePdf = (function () {
     doc.setTextColor(...green);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(21);
-    const titleText = spaced("CERTIFICAT DE RÉUSSITE");
+    const titleText = "CERTIFICAT DE RÉUSSITE";
     doc.text(titleText, cx, 44, { align: "center" });
     doc.setDrawColor(...gold);
     doc.setLineWidth(0.4);
