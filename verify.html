@@ -107,11 +107,16 @@
       return;
     }
 
+    const isAttestation = cert.document_type === "attestation";
+    const typeLabel = isAttestation ? "Attestation de fin de formation" : "Certificat de réussite";
+    const codeFieldLabel = isAttestation ? "N° de l'attestation" : "Code du certificat";
+
     if (cert.status === "revoked") {
-      showState("revoked", "⚠ CERTIFICAT NON VALIDE", [
+      showState("revoked", "⚠ DOCUMENT NON VALIDE", [
+        ["Type", typeLabel],
         ["Titulaire", cert.recipient_name || "—"],
         ["Formation", cert.formation_title || "—"],
-        ["Code du certificat", cert.code || code]
+        [codeFieldLabel, cert.code || code]
       ]);
       return;
     }
@@ -120,11 +125,12 @@
       ? new Date(cert.issued_at).toLocaleDateString("fr-FR", { year: "numeric", month: "long", day: "numeric" })
       : "—";
 
-    showState("ok", "✓ CERTIFICAT AUTHENTIQUE", [
+    showState("ok", "✓ DOCUMENT AUTHENTIQUE", [
+      ["Type", typeLabel],
       ["Titulaire", cert.recipient_name || "—"],
       ["Formation", cert.formation_title || "—"],
       ["Date d'obtention", dateStr],
-      ["Code du certificat", cert.code || code],
+      [codeFieldLabel, cert.code || code],
       ["Délivré par", "MAHOUTO+"],
       ["Développé par", "MAJESTÉ PRESSE"]
     ]);

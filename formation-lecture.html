@@ -583,33 +583,41 @@
     maybeIssueCertificate();
   }
 
-  // Délivrance automatique du certificat : uniquement si TOUTES les
-  // leçons de la formation sont maintenant marquées terminées. La
-  // vraie vérification est faite côté serveur par la policy RLS
-  // "certificates_insert_auto" (voir sql/2026-09-certificates.sql) —
-  // ce contrôle client n'est qu'une optimisation pour éviter une
-  // tentative d'insertion inutile, jamais la source d'autorité.
+  // Délivrance automatique : uniquement si TOUTES les leçons de la
+  // formation sont maintenant marquées terminées. La vraie vérification
+  // (accès, complétion réelle, type autorisé) est faite côté serveur
+  // par la policy RLS "certificates_insert_auto" — ce contrôle client
+  // n'est qu'une optimisation, jamais la source d'autorité.
+  //
+  // Type de document : une formation SANS leçon de quiz ne peut prouver
+  // que l'assiduité → Attestation de fin de formation. Une formation
+  // AVEC un quiz réussi (seule façon d'en marquer la leçon "terminée",
+  // voir grade_quiz côté serveur) → Certificat de réussite, comme avant.
   async function maybeIssueCertificate() {
     if (!currentUser || !courseId || !allLessons.length) return;
     const allDone = allLessons.every((l) => progressMap.get(l.id) === true);
     if (!allDone) return;
 
-    // Le code de vérification est désormais généré par PostgreSQL
-    // (valeur par défaut de la colonne) — jamais par le navigateur,
-    // pour éliminer tout risque de collision ou de manipulation.
+    const hasQuiz = allLessons.some((l) => l.type === "quiz");
+    const documentType = hasQuiz ? "certificat" : "attestation";
+
+    // Le code de vérification est généré par PostgreSQL (jamais par le
+    // navigateur), avec un format différent selon document_type — voir
+    // sql/2026-09-attestation.sql.
     const { error } = await supabase.from("certificates").insert({
       user_id: currentUser.id,
       formation_id: courseId,
       formation_title: formationTitle || "Formation MAHOUTO School",
       issued_by: "auto",
-      status: "issued"
+      status: "issued",
+      document_type: documentType
     });
 
-    // Une erreur ici est normale et silencieuse si le certificat
-    // existe déjà (contrainte unique user_id+formation_id) — pas la
-    // peine de déranger l'utilisateur pour ce cas.
+    // Une erreur ici est normale et silencieuse si le document existe
+    // déjà (contrainte unique user_id+formation_id) — pas la peine de
+    // déranger l'utilisateur pour ce cas.
     if (!error) {
-      console.log("[CERTIFICAT] délivré automatiquement pour", formationTitle);
+      console.log("[" + documentType.toUpperCase() + "] délivré automatiquement pour", formationTitle);
     }
   }
 

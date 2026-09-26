@@ -89,12 +89,17 @@
 
     certs.forEach((cert) => {
       const isRevoked = cert.status === "revoked";
+      const isAttestation = cert.document_type === "attestation";
       const card = document.createElement("div");
       card.className = "card cert-card";
 
       const emoji = document.createElement("div");
       emoji.className = "emoji";
-      emoji.textContent = isRevoked ? "🚫" : "📜";
+      emoji.textContent = isRevoked ? "🚫" : (isAttestation ? "📄" : "📜");
+
+      const typeLabel = document.createElement("div");
+      typeLabel.className = "code";
+      typeLabel.textContent = isAttestation ? "Attestation de fin de formation" : "Certificat de réussite";
 
       const title = document.createElement("div");
       title.className = "title";
@@ -116,7 +121,7 @@
       btn.textContent = "⬇ Télécharger le PDF";
       if (isRevoked) {
         btn.disabled = true;
-        btn.textContent = "Certificat révoqué";
+        btn.textContent = isAttestation ? "Attestation révoquée" : "Certificat révoqué";
       } else {
         btn.addEventListener("click", async () => {
           btn.disabled = true;
@@ -126,7 +131,8 @@
               userName,
               formationTitle: cert.formation_title,
               issuedAt: cert.created_at,
-              code: cert.code
+              code: cert.code,
+              documentType: cert.document_type
             });
           } catch (err) {
             alert("Impossible de générer le PDF : " + err.message);
@@ -137,6 +143,7 @@
       }
 
       card.appendChild(emoji);
+      card.appendChild(typeLabel);
       card.appendChild(title);
       card.appendChild(date);
       card.appendChild(code);

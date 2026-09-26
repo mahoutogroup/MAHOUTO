@@ -887,10 +887,30 @@ window.MahoutoCertificatePdf = (function () {
     // "black"/"extra-bold" au-delà de "bold" pour les polices de
     // base, donc on simule le supplément de poids en dessinant le
     // texte deux fois avec un minuscule décalage. --------
+    // -------- Titre (centré sur la page) — texte selon le type de
+    // document (Certificat ou Attestation), même mise en page pour
+    // les deux : seul le texte change, jamais la structure visuelle.
+    const docType = certificate.documentType === "attestation" ? "attestation" : "certificat";
+    const texts = docType === "attestation"
+      ? {
+          title: "ATTESTATION DE FIN DE FORMATION",
+          intro: "Nous attestons que",
+          body: "a suivi avec assiduité et achevé la formation",
+          dateLabel: "Date de délivrance :",
+          codeLabel: "N° de l'attestation :"
+        }
+      : {
+          title: "CERTIFICAT DE RÉUSSITE",
+          intro: "Décerné à",
+          body: "Pour avoir suivi et validé avec succès la formation",
+          dateLabel: "Date d'obtention :",
+          codeLabel: "Code du certificat :"
+        };
+
     doc.setTextColor(...green);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(21);
-    const titleText = "CERTIFICAT DE RÉUSSITE";
+    const titleText = texts.title;
     doc.text(titleText, cx, 44, { align: "center" });
     doc.setDrawColor(...gold);
     doc.setLineWidth(0.4);
@@ -902,7 +922,7 @@ window.MahoutoCertificatePdf = (function () {
     doc.setTextColor(...ink);
     doc.setFont("times", "normal");
     doc.setFontSize(12);
-    doc.text("Décerné à", cx, 59, { align: "center" });
+    doc.text(texts.intro, cx, 59, { align: "center" });
     doc.setDrawColor(...gold);
     doc.setLineWidth(0.3);
     doc.line(cx - 34, 59.5, cx - 12, 59.5);
@@ -923,7 +943,7 @@ window.MahoutoCertificatePdf = (function () {
     doc.setTextColor(...ink);
     doc.setFont("times", "normal");
     doc.setFontSize(11.5);
-    doc.text("Pour avoir suivi et validé avec succès la formation", cx, 86, { align: "center" });
+    doc.text(texts.body, cx, 86, { align: "center" });
 
     // -------- Bandeau formation (banderole) --------
     const formationTitle = certificate.formationTitle || "—";
@@ -943,7 +963,7 @@ window.MahoutoCertificatePdf = (function () {
     doc.setTextColor(...muted);
     doc.setFont("times", "normal");
     doc.setFontSize(8.5);
-    doc.text("Date d'obtention :", cx - 59, rowY - 1);
+    doc.text(texts.dateLabel, cx - 59, rowY - 1);
     doc.setTextColor(...ink);
     doc.setFont("times", "bold");
     doc.setFontSize(10.5);
@@ -953,7 +973,7 @@ window.MahoutoCertificatePdf = (function () {
     doc.setTextColor(...muted);
     doc.setFont("times", "normal");
     doc.setFontSize(8.5);
-    doc.text("Code du certificat :", cx + 21, rowY - 1);
+    doc.text(texts.codeLabel, cx + 21, rowY - 1);
     doc.setTextColor(...ink);
     doc.setFont("times", "bold");
     doc.setFontSize(10.5);
@@ -976,7 +996,7 @@ window.MahoutoCertificatePdf = (function () {
     doc.setFont("times", "normal");
     doc.setFontSize(8);
     doc.text("Scannez ce QR code pour vérifier", qrX - qrSize / 2, qrY + qrSize + 6);
-    doc.text("l'authenticité de ce certificat", qrX - qrSize / 2, qrY + qrSize + 10.5);
+    doc.text("l'authenticité de ce document", qrX - qrSize / 2, qrY + qrSize + 10.5);
 
     // -------- Sceau médaille (centre bas) — vrai logo + ruban vert --------
     const sealX = cx, sealY = 146;
@@ -1058,7 +1078,8 @@ window.MahoutoCertificatePdf = (function () {
     doc.text("Votre Sérigraphe Imprimeur de confiance.", cx + 43, footY + 3);
 
     const safeName = (certificate.formationTitle || "certificat").replace(/[^a-zA-Z0-9 _-]/g, "_");
-    doc.save("Certificat MAHOUTO+ - " + safeName + ".pdf");
+    const filePrefix = docType === "attestation" ? "Attestation" : "Certificat";
+    doc.save(filePrefix + " MAHOUTO+ - " + safeName + ".pdf");
   }
 
   return { download };
