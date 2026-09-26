@@ -26,6 +26,27 @@
   .player-wrap video { width: 100%; height: 100%; }
   .player-placeholder { color: var(--text-dim); font-size: 13px; text-align: center; padding: 20px; }
 
+  .quiz-container { padding: 16px; }
+  .quiz-title { font-size: 16px; margin-bottom: 10px; }
+  .quiz-already-passed { font-size: 12.5px; color: var(--accent-green); margin-bottom: 14px; }
+  .quiz-question { margin-bottom: 18px; }
+  .quiz-question-text { font-weight: 600; font-size: 14px; margin-bottom: 8px; }
+  .quiz-choice {
+    display: flex; align-items: center; gap: 8px; padding: 8px 10px;
+    border: 1px solid var(--border); border-radius: 10px; margin-bottom: 6px;
+    cursor: pointer; font-size: 13.5px;
+  }
+  .quiz-choice input { accent-color: var(--gold); }
+  .quiz-submit-btn {
+    width: 100%; padding: 12px; border: none; border-radius: 12px;
+    background: var(--gold-bright); color: #0A0A0A; font-weight: bold; font-size: 14px;
+    cursor: pointer; font-family: inherit; margin-top: 6px;
+  }
+  .quiz-submit-btn:disabled { opacity: .6; }
+  .quiz-result { margin-top: 14px; padding: 12px; border-radius: 10px; font-weight: bold; text-align: center; }
+  .quiz-result.quiz-passed { background: rgba(34,197,94,.15); color: var(--accent-green); }
+  .quiz-result.quiz-failed { background: rgba(248,113,113,.15); color: #F87171; }
+
   .current-lesson-bar {
     padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; gap: 10px;
     border-bottom: 1px solid var(--border);
@@ -338,6 +359,17 @@
       return;
     }
 
+    if (lesson.type === "quiz") {
+      // Le quiz gère sa propre validation (grade_quiz, côté serveur) —
+      // pas de bouton "Marquer comme terminée" ni de Cast pour ce type
+      // de leçon.
+      barEl.classList.add("hidden");
+      document.getElementById("cast-btn") && document.getElementById("cast-btn").classList.add("hidden");
+      currentVideoUrl = null;
+      await playQuiz(lesson);
+      return;
+    }
+
     playerWrap.innerHTML = `<div class="player-placeholder">⏳ Chargement de la vidéo...</div>`;
 
     barEl.classList.remove("hidden");
@@ -373,6 +405,139 @@
       currentVideoUrl = null;
       document.getElementById("cast-btn").classList.add("hidden");
     }
+  }
+
+  // -------- Quiz --------
+  // Les questions arrivent SANS la bonne réponse (get_quiz_questions
+  // ne l'expose jamais). La correction se fait entièrement côté
+  // serveur (grade_quiz) — impossible de tricher en lisant le réseau
+  // ou en modifiant le JavaScript de cette page.
+  async function playQuiz(lesson) {
+    const playerWrap = document.getElementById("player-wrap");
+    playerWrap.innerHTML = `<div class="player-placeholder">⏳ Chargement du quiz...</div>`;
+
+    const { data: questions, error } = await supabase.rpc("get_quiz_questions", { p_lesson_id: lesson.id });
+    if (error || !questions || !questions.length) {
+      playerWrap.innerHTML = "";
+      const errDiv = document.createElement("div");
+      errDiv.className = "player-placeholder";
+      errDiv.textContent = "❌ Impossible de charger ce quiz pour le moment.";
+      playerWrap.appendChild(errDiv);
+      console.error(error);
+      return;
+    }
+
+    renderQuizForm(lesson, questions);
+  }
+
+  function renderQuizForm(lesson, questions) {
+    const playerWrap = document.getElementById("player-wrap");
+    playerWrap.innerHTML = "";
+
+    const container = document.createElement("div");
+    container.className = "quiz-container";
+
+    const title = document.createElement("h2");
+    title.className = "quiz-title";
+    title.textContent = lesson.titre; // donnée Supabase : textContent uniquement
+    container.appendChild(title);
+
+    const alreadyDone = !!progressMap.get(lesson.id);
+    if (alreadyDone) {
+      const badge = document.createElement("div");
+      badge.className = "quiz-already-passed";
+      badge.textContent = "✓ Déjà réussi — vous pouvez repasser le quiz si vous le souhaitez.";
+      container.appendChild(badge);
+    }
+
+    questions.forEach((q, qIndex) => {
+      const block = document.createElement("div");
+      block.className = "quiz-question";
+
+      const qText = document.createElement("div");
+      qText.className = "quiz-question-text";
+      qText.textContent = (qIndex + 1) + ". " + q.question; // textContent uniquement
+      block.appendChild(qText);
+
+      const choices = Array.isArray(q.choices) ? q.choices : [];
+      choices.forEach((choiceText, cIndex) => {
+        const label = document.createElement("label");
+        label.className = "quiz-choice";
+
+        const radio = document.createElement("input");
+        radio.type = "radio";
+        radio.name = "quiz-q-" + qIndex;
+        radio.value = String(cIndex);
+
+        const span = document.createElement("span");
+        span.textContent = choiceText; // textContent uniquement — jamais innerHTML
+
+        label.appendChild(radio);
+        label.appendChild(span);
+        block.appendChild(label);
+      });
+
+      container.appendChild(block);
+    });
+
+    const submitBtn = document.createElement("button");
+    submitBtn.type = "button";
+    submitBtn.className = "quiz-submit-btn";
+    submitBtn.textContent = "Valider mes réponses";
+
+    const resultDiv = document.createElement("div");
+    resultDiv.className = "quiz-result hidden";
+
+    submitBtn.addEventListener("click", async () => {
+      const answers = questions.map((_, qIndex) => {
+        const checked = container.querySelector(`input[name="quiz-q-${qIndex}"]:checked`);
+        return checked ? parseInt(checked.value, 10) : -1;
+      });
+
+      if (answers.includes(-1)) {
+        alert("Merci de répondre à toutes les questions avant de valider.");
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Correction en cours...";
+
+      const { data, error } = await supabase.rpc("grade_quiz", {
+        p_lesson_id: lesson.id,
+        p_answers: answers
+      });
+
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Valider mes réponses";
+
+      if (error) {
+        alert("Impossible de corriger le quiz : " + error.message);
+        console.error(error);
+        return;
+      }
+
+      const result = Array.isArray(data) ? data[0] : data;
+      resultDiv.classList.remove("hidden");
+      resultDiv.className = "quiz-result " + (result.passed ? "quiz-passed" : "quiz-failed");
+      resultDiv.textContent = result.passed
+        ? `✓ Réussi ! Score : ${result.score}/${result.total}`
+        : `✗ Pas encore — Score : ${result.score}/${result.total} (70% requis). Vous pouvez réessayer.`;
+
+      if (result.passed) {
+        progressMap.set(lesson.id, true);
+        const item = document.querySelector(`.lesson-item[data-lesson-id="${lesson.id}"]`);
+        if (item) {
+          item.classList.add("completed");
+          const check = item.querySelector(".check");
+          if (check) check.textContent = "✓";
+        }
+        await maybeIssueCertificate();
+      }
+    });
+
+    container.appendChild(submitBtn);
+    container.appendChild(resultDiv);
+    playerWrap.appendChild(container);
   }
 
   async function markCurrentDone() {
