@@ -671,7 +671,7 @@ window.MahoutoCertificatePdf = (function () {
 
   let scriptFontBase64 = null;
 
-  // Charge la police manuscrite (assets/dancing-script-bold.ttf,
+  // Charge la police manuscrite (assets/grand-hotel.ttf,
   // fichier fourni par l'utilisateur — jamais générée/inventée ici).
   // Le FICHIER n'est téléchargé qu'une fois (mis en cache en mémoire),
   // mais il doit être enregistré séparément sur CHAQUE document PDF —
@@ -681,13 +681,13 @@ window.MahoutoCertificatePdf = (function () {
   // retombe simplement sur Times italique — jamais d'erreur bloquante.
   async function loadScriptFont(doc) {
     if (!scriptFontBase64) {
-      const resp = await fetch("assets/dancing-script-bold.ttf");
+      const resp = await fetch("assets/grand-hotel.ttf");
       if (!resp.ok) throw new Error("Police introuvable (" + resp.status + ")");
       const buffer = await resp.arrayBuffer();
       scriptFontBase64 = arrayBufferToBase64(buffer);
     }
-    doc.addFileToVFS("DancingScript-Bold.ttf", scriptFontBase64);
-    doc.addFont("DancingScript-Bold.ttf", "DancingScript", "normal");
+    doc.addFileToVFS("GrandHotel-Regular.ttf", scriptFontBase64);
+    doc.addFont("GrandHotel-Regular.ttf", "GrandHotel", "normal");
   }
 
   // Place une image en la faisant tenir dans une boîte maxW x maxH
@@ -734,10 +734,14 @@ window.MahoutoCertificatePdf = (function () {
       doc.setLineWidth(1);
       doc.line(0, size, size, 0);
       if (label) {
+        // Taille et position calculées pour que le texte reste entièrement
+        // dans le triangle vert (sinon il devient blanc sur fond ivoire,
+        // donc invisible, une fois sorti — c'est ce qui donnait
+        // l'impression d'un texte "coupé").
         doc.setTextColor(255, 255, 255);
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(8.5);
-        doc.text(label, 15, 22, { angle: 45 });
+        doc.setFontSize(5.8);
+        doc.text(label, 9, 13, { angle: 45 });
       }
     } else {
       doc.setFillColor(...green);
@@ -756,9 +760,13 @@ window.MahoutoCertificatePdf = (function () {
     doc.setFillColor(...fill);
     doc.setDrawColor(...border);
     doc.setLineWidth(0.6);
+    // Le tracé part de la POINTE gauche (x0, y) — le vecteur du 1er
+    // segment monte déjà de h/2, donc le point de départ doit être au
+    // centre vertical, pas déjà décalé vers le haut (c'était le bug :
+    // toute la forme se dessinait 6 mm au-dessus du texte).
     doc.lines(
       [[point, -h / 2], [w - 2 * point, 0], [point, h / 2], [-point, h / 2], [-(w - 2 * point), 0], [-point, -h / 2]],
-      x0, y - h / 2, [1, 1], "FD", true
+      x0, y, [1, 1], "FD", true
     );
     doc.setTextColor(...textColor);
     doc.setFont("times", "bold");
@@ -860,8 +868,6 @@ window.MahoutoCertificatePdf = (function () {
     doc.text("numérique de demain.", pageW - 18, 24, { align: "right" });
 
     // -------- Titre + laurier (approximation vectorielle) --------
-    drawLaurel(doc, cx - 82, 42, false, gold);
-    drawLaurel(doc, cx + 82, 42, true, gold);
     doc.setTextColor(...green);
     doc.setFont("times", "bold");
     doc.setFontSize(20);
@@ -882,14 +888,14 @@ window.MahoutoCertificatePdf = (function () {
     doc.line(cx - 34, 59.5, cx - 12, 59.5);
     doc.line(cx + 12, 59.5, cx + 34, 59.5);
 
-    // Nom du bénéficiaire — police manuscrite (Dancing Script, fournie
+    // Nom du bénéficiaire — police manuscrite (Grand Hotel, fournie
     // par l'utilisateur), avec repli automatique sur Times italique si
     // le fichier ne se charge pas pour une raison quelconque.
     const nameText = certificate.userName || "—";
     let usingScriptFont = false;
     try {
       await loadScriptFont(doc);
-      doc.setFont("DancingScript", "normal");
+      doc.setFont("GrandHotel", "normal");
       usingScriptFont = true;
     } catch (err) {
       console.warn("[CERTIFICAT] police manuscrite indisponible, repli sur Times italique :", err.message);
