@@ -369,6 +369,7 @@
         <div class="actions">
           <button class="btn-view" data-action="view">👁️ Voir</button>
           <button class="btn-view" data-action="certificate">🎓 Certificat</button>
+          <button class="btn-view" data-action="revoke-certificate">🚫 Révoquer certificat</button>
           ${u.status === "actif"
             ? '<button class="btn-disable" data-action="disable">🚫 Désactiver</button>'
             : '<button class="btn-reactivate" data-action="reactivate">✅ Réactiver</button>'}
@@ -378,6 +379,7 @@
 
       row.querySelector('[data-action="view"]').addEventListener("click", () => showProfile(u));
       row.querySelector('[data-action="certificate"]').addEventListener("click", () => issueCertificate(u));
+      row.querySelector('[data-action="revoke-certificate"]').addEventListener("click", () => revokeCertificate(u));
       const disableBtn = row.querySelector('[data-action="disable"]');
       if (disableBtn) disableBtn.addEventListener("click", () => performAction(u, "disable"));
       const reactivateBtn = row.querySelector('[data-action="reactivate"]');
@@ -471,6 +473,46 @@
       console.error(error);
     } else {
       alert("Certificat délivré ✅");
+    }
+  }
+
+  // -------- Révoquer un certificat --------
+  // Même principe que l'émission : mise à jour directe côté client,
+  // protégée par la policy RLS "certificates_update_admin" (rôle
+  // admin/super_admin/founder exigé) — aucune fonction serveur
+  // supplémentaire nécessaire. Un certificat révoqué reste visible
+  // dans "Mes certificats" côté utilisateur (marqué "révoqué", PDF
+  // désactivé) et sa page de vérification publique affiche désormais
+  // "⚠ CERTIFICAT NON VALIDE" au lieu de "✓ CERTIFICAT AUTHENTIQUE".
+  async function revokeCertificate(u) {
+    const { data: certs, error: fetchError } = await supabase
+      .from("certificates")
+      .select("id, formation_title, code, created_at")
+      .eq("user_id", u.id)
+      .eq("status", "issued")
+      .order("created_at", { ascending: false });
+
+    if (fetchError) { alert("Impossible de charger les certificats : " + fetchError.message); return; }
+    if (!certs || !certs.length) { alert(`Aucun certificat actif à révoquer pour ${u.name}.`); return; }
+
+    const list = certs.map((c, i) => (i + 1) + ". " + c.formation_title + " (" + c.code + ")").join("\n");
+    const choice = prompt(`Révoquer quel certificat de "${u.name}" ?\n\n${list}\n\nTape le numéro :`);
+    const index = parseInt(choice, 10) - 1;
+    if (isNaN(index) || !certs[index]) return;
+
+    const cert = certs[index];
+    if (!confirm(`Confirmer la révocation du certificat "${cert.formation_title}" (${cert.code}) de ${u.name} ?\n\nCette action rendra le certificat invalide côté vérification publique.`)) return;
+
+    const { error } = await supabase
+      .from("certificates")
+      .update({ status: "revoked" })
+      .eq("id", cert.id);
+
+    if (error) {
+      alert("Impossible de révoquer ce certificat : " + error.message);
+      console.error(error);
+    } else {
+      alert("Certificat révoqué 🚫");
     }
   }
 
