@@ -601,7 +601,11 @@ window.MahoutoCertificatePdf = (function () {
   function loadJsPDF() {
     if (window.jspdf && window.jspdf.jsPDF) return Promise.resolve();
     if (jsPDFLoaded) return jsPDFLoaded;
-    jsPDFLoaded = loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js")
+    // Fichier local en priorité (aucun réseau nécessaire une fois
+    // présent) — voir assets/jspdf.umd.min.js. Si absent (pas encore
+    // déposé), on retombe sur les deux CDN comme avant.
+    jsPDFLoaded = loadScript("assets/jspdf.umd.min.js")
+      .catch(() => loadScript("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"))
       .catch(() => loadScript("https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js"));
     return jsPDFLoaded;
   }
