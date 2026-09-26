@@ -2928,6 +2928,20 @@ async function createPendingShare(
 
   }
 
+  // Le jeton d'authentification manquait ici — /api/share-pending exige
+  // un en-tête Authorization, sinon il répond "Utilisateur non
+  // authentifié" même pour un utilisateur bien connecté (c'est
+  // exactement le bug rencontré : l'appel n'envoyait jamais ce jeton).
+  const session =
+    await getSession();
+
+  if (!session) {
+
+    throw new Error(
+      "Votre session a expiré. Veuillez vous reconnecter."
+    );
+
+  }
 
   const response =
     await fetch(
@@ -2939,7 +2953,11 @@ async function createPendingShare(
 
         headers: {
           "Content-Type":
-            "application/json"
+            "application/json",
+
+          "Authorization":
+            "Bearer " +
+            session.access_token
         },
 
         body:
