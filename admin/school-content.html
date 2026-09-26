@@ -40,6 +40,17 @@
   .lesson-row .status.none { color: #F87171; }
   .lesson-row .preview-tag { font-size: 10px; color: var(--gold); font-weight: 700; }
 
+  .quiz-admin-panel {
+    border-top: 1px dashed var(--border); margin-top: 8px; padding-top: 8px;
+  }
+  .quiz-question-admin-row {
+    background: var(--bg); border-radius: 10px; padding: 8px 10px; margin-bottom: 6px;
+  }
+  .quiz-question-admin-row .qq-text { font-size: 12.5px; margin-bottom: 4px; }
+  .quiz-question-admin-row .qq-choices { font-size: 11px; color: var(--text-muted); margin-bottom: 6px; }
+  .nq-choice-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+  .nq-choice-row input[type="text"] { flex: 1; }
+
   .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
   .btn-sm {
     font-size: 12px; font-weight: 600; padding: 7px 12px; border-radius: 8px;
@@ -173,6 +184,10 @@
         <form class="inline-form new-lesson-form" data-module-id="${mod.id}">
           <input type="text" class="nl-titre" placeholder="Titre de la leçon" required>
           <input type="number" class="nl-ordre" placeholder="Ordre" value="0" min="0">
+          <select class="nl-type">
+            <option value="video">🎬 Vidéo</option>
+            <option value="quiz">📝 Quiz</option>
+          </select>
           <label class="chk"><input type="checkbox" class="nl-preview"> Leçon gratuite (aperçu, sans achat)</label>
           <button type="submit" class="btn-sm primary">➕ Ajouter la leçon</button>
         </form>
@@ -207,6 +222,34 @@
 
     containerEl2.innerHTML = "";
     for (const lesson of (lessons || [])) {
+      const row = document.createElement("div");
+      row.className = "lesson-row";
+
+      if (lesson.type === "quiz") {
+        const { count } = await supabase
+          .from("quiz_questions")
+          .select("id", { count: "exact", head: true })
+          .eq("lesson_id", lesson.id);
+
+        row.innerHTML = `
+          <div class="top-line">
+            <span class="titre">📝 ${lesson.titre}</span>
+            ${lesson.is_preview ? '<span class="preview-tag">APERÇU GRATUIT</span>' : ""}
+          </div>
+          <div class="status ${count ? "ok" : "none"}">
+            ${count ? "✅ " + count + " question(s)" : "⚠️ Aucune question pour l'instant"}
+          </div>
+          <div class="btn-row">
+            <button class="btn-sm toggle-quiz-btn" data-id="${lesson.id}">📝 Gérer les questions</button>
+            <button class="btn-sm danger delete-lesson-btn" data-id="${lesson.id}">🗑️ Supprimer la leçon</button>
+          </div>
+          <div class="quiz-admin-panel hidden" data-lesson-id="${lesson.id}"></div>
+          <div class="msg lesson-msg" data-lesson-id="${lesson.id}"></div>
+        `;
+        containerEl2.appendChild(row);
+        continue;
+      }
+
       const { data: media } = await supabase
         .from("formation_lesson_media")
         .select("video_public_id, duree_secondes")
@@ -215,8 +258,6 @@
 
       const hasVideo = !!(media && media.video_public_id);
 
-      const row = document.createElement("div");
-      row.className = "lesson-row";
       row.innerHTML = `
         <div class="top-line">
           <span class="titre">${lesson.titre}</span>
@@ -243,7 +284,129 @@
     containerEl2.querySelectorAll(".delete-lesson-btn").forEach((btn) => {
       btn.addEventListener("click", onDeleteLesson);
     });
+    containerEl2.querySelectorAll(".toggle-quiz-btn").forEach((btn) => {
+      btn.addEventListener("click", onToggleQuizPanel);
+    });
   }
+
+  // -------- Gestion des questions d'un quiz --------
+  async function onToggleQuizPanel(e) {
+    const lessonId = e.target.dataset.id;
+    const panel = document.querySelector(`.quiz-admin-panel[data-lesson-id="${lessonId}"]`);
+    if (!panel) return;
+    const wasHidden = panel.classList.contains("hidden");
+    panel.classList.toggle("hidden");
+    if (wasHidden) await loadQuizQuestions(lessonId, panel);
+  }
+
+  async function loadQuizQuestions(lessonId, panel) {
+    panel.innerHTML = `<div class="msg">Chargement...</div>`;
+
+    const { data: questions, error } = await supabase
+      .from("quiz_questions")
+      .select("*")
+      .eq("lesson_id", lessonId)
+      .order("ordre", { ascending: true });
+
+    if (error) {
+      panel.innerHTML = `<div class="msg error">${error.message}</div>`;
+      return;
+    }
+
+    panel.innerHTML = "";
+
+    (questions || []).forEach((q) => {
+      const qRow = document.createElement("div");
+      qRow.className = "quiz-question-admin-row";
+      const choicesText = Array.isArray(q.choices)
+        ? q.choices.map((c, i) => (i === q.correct_index ? "✓ " : "— ") + c).join(" | ")
+        : "";
+      qRow.innerHTML = `
+        <div class="qq-text"><strong>${q.ordre}.</strong> ${q.question}</div>
+        <div class="qq-choices">${choicesText}</div>
+        <button class="btn-sm danger delete-question-btn" data-id="${q.id}" data-lesson-id="${lessonId}">🗑️ Supprimer cette question</button>
+      `;
+      panel.appendChild(qRow);
+    });
+
+    const form = document.createElement("form");
+    form.className = "inline-form new-question-form";
+    form.dataset.lessonId = lessonId;
+    form.innerHTML = `
+      <div style="font-weight:600; margin:10px 0 4px;">➕ Nouvelle question</div>
+      <input type="text" class="nq-question" placeholder="Intitulé de la question" required>
+      <input type="number" class="nq-ordre" placeholder="Ordre" value="${(questions || []).length + 1}" min="1">
+      <div class="nq-choice-row"><input type="radio" name="nq-correct" value="0" checked><input type="text" class="nq-choice" placeholder="Choix A" required></div>
+      <div class="nq-choice-row"><input type="radio" name="nq-correct" value="1"><input type="text" class="nq-choice" placeholder="Choix B" required></div>
+      <div class="nq-choice-row"><input type="radio" name="nq-correct" value="2"><input type="text" class="nq-choice" placeholder="Choix C (optionnel)"></div>
+      <div class="nq-choice-row"><input type="radio" name="nq-correct" value="3"><input type="text" class="nq-choice" placeholder="Choix D (optionnel)"></div>
+      <div style="font-size:11px; color:var(--text-muted); margin:2px 0 8px;">Cochez le bouton radio à gauche du bon choix.</div>
+      <button type="submit" class="btn-sm primary">➕ Ajouter la question</button>
+    `;
+    form.addEventListener("submit", onAddQuizQuestion);
+    panel.appendChild(form);
+
+    panel.querySelectorAll(".delete-question-btn").forEach((btn) => {
+      btn.addEventListener("click", onDeleteQuizQuestion);
+    });
+  }
+
+  async function onAddQuizQuestion(e) {
+    e.preventDefault();
+    const form = e.target;
+    const lessonId = form.dataset.lessonId;
+    const question = form.querySelector(".nq-question").value.trim();
+    const ordre = parseInt(form.querySelector(".nq-ordre").value, 10) || 1;
+
+    const rows = Array.from(form.querySelectorAll(".nq-choice-row"));
+    const choices = [];
+    let correctIndex = -1;
+    const correctRadioValue = parseInt(form.querySelector('input[name="nq-correct"]:checked').value, 10);
+
+    rows.forEach((row, i) => {
+      const text = row.querySelector(".nq-choice").value.trim();
+      if (!text) return; // choix vide (C/D optionnels) : ignoré
+      if (i === correctRadioValue) correctIndex = choices.length;
+      choices.push(text);
+    });
+
+    if (choices.length < 2) {
+      alert("Il faut au moins 2 choix remplis.");
+      return;
+    }
+    if (correctIndex === -1) {
+      alert("Le choix marqué comme correct doit avoir un texte rempli.");
+      return;
+    }
+
+    const { error } = await supabase.from("quiz_questions").insert({
+      lesson_id: lessonId, question, choices, correct_index: correctIndex, ordre
+    });
+
+    if (error) {
+      alert("Erreur : " + error.message);
+      return;
+    }
+
+    // loadModules() reconstruit toute la liste (pour rafraîchir le
+    // compteur de questions affiché sur la ligne de la leçon) — on
+    // rouvre ensuite le panneau de cette leçon pour rester au même
+    // endroit plutôt que de faire disparaître ce qu'on vient de faire.
+    await loadModules();
+    const panel = document.querySelector(`.quiz-admin-panel[data-lesson-id="${lessonId}"]`);
+    if (panel) { panel.classList.remove("hidden"); await loadQuizQuestions(lessonId, panel); }
+  }
+
+  async function onDeleteQuizQuestion(e) {
+    const id = e.target.dataset.id;
+    const lessonId = e.target.dataset.lessonId;
+    if (!confirm("Supprimer cette question ?")) return;
+    const { error } = await supabase.from("quiz_questions").delete().eq("id", id);
+    if (error) { alert("Erreur : " + error.message); return; }
+    const panel = document.querySelector(`.quiz-admin-panel[data-lesson-id="${lessonId}"]`);
+    if (panel) await loadQuizQuestions(lessonId, panel);
+  }
+
 
   document.getElementById("new-module-form").addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -273,9 +436,10 @@
     const titre = form.querySelector(".nl-titre").value.trim();
     const ordre = parseInt(form.querySelector(".nl-ordre").value, 10) || 0;
     const isPreview = form.querySelector(".nl-preview").checked;
+    const type = form.querySelector(".nl-type").value || "video";
 
     const { error } = await supabase.from("formation_lessons").insert({
-      module_id: moduleId, titre, ordre, is_preview: isPreview, type: "video"
+      module_id: moduleId, titre, ordre, is_preview: isPreview, type
     });
 
     if (error) {
