@@ -48,6 +48,11 @@
     Aucun certificat pour le moment.<br>Termine une formation sur MAHOUTO School pour en obtenir un.
   </div>
 
+  <div id="offline-state" class="empty-state hidden">
+    📡 Hors connexion, et aucune donnée enregistrée sur cet appareil pour l'instant.<br>
+    Ouvre cette page une première fois avec une connexion pour pouvoir la consulter hors ligne ensuite.
+  </div>
+
   <div id="cert-list" class="cert-list"></div>
 </div>
 
@@ -61,6 +66,7 @@
 
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="offline-cache.js"></script>
 <script src="certificate-pdf.js"></script>
 <script>
 (function () {
@@ -69,21 +75,12 @@
 
   const listEl = document.getElementById("cert-list");
   const emptyEl = document.getElementById("empty-state");
+  const offlineEl = document.getElementById("offline-state");
 
-  async function load() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { window.location.href = "index.html"; return; }
-
-    const [{ data: certs }, { data: profile }] = await Promise.all([
-      supabase.from("certificates").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
-      supabase.from("profiles").select("username, full_name").eq("id", user.id).maybeSingle()
-    ]);
-
-    // Le nom légal complet (renseigné dans profil.html) est prioritaire
-    // sur les certificats — c'est exactement ce à quoi il sert. Repli
-    // sur le pseudo puis l'e-mail si l'utilisateur ne l'a pas encore
-    // renseigné.
-    const userName = (profile && profile.full_name) || (profile && profile.username) || user.email || "Utilisateur MAHOUTO+";
+  function render(userName, certs) {
+    listEl.innerHTML = "";
+    emptyEl.classList.add("hidden");
+    offlineEl.classList.add("hidden");
 
     if (!certs || !certs.length) {
       emptyEl.classList.remove("hidden");
@@ -146,6 +143,46 @@
       card.appendChild(btn);
       listEl.appendChild(card);
     });
+  }
+
+  async function load() {
+    // getSession() lit la session déjà stockée localement — contrairement
+    // à getUser(), ça ne force pas un aller-retour réseau, donc ça
+    // fonctionne même hors connexion si l'utilisateur s'est déjà
+    // connecté au moins une fois sur cet appareil.
+    const { data: sessionData } = await supabase.auth.getSession();
+    const user = sessionData && sessionData.session ? sessionData.session.user : null;
+    if (!user) { window.location.href = "index.html"; return; }
+
+    const cacheKey = "certificates:" + user.id;
+
+    // Affichage instantané depuis le cache local, s'il existe — avant
+    // même de savoir si le réseau va répondre.
+    const cached = await window.MahoutoOfflineCache.load(cacheKey);
+    if (cached && cached.data) render(cached.data.userName, cached.data.certs);
+
+    try {
+      const [{ data: certs, error: certsError }, { data: profile }] = await Promise.all([
+        supabase.from("certificates").select("*").eq("user_id", user.id).order("created_at", { ascending: false }),
+        supabase.from("profiles").select("username, full_name").eq("id", user.id).maybeSingle()
+      ]);
+      if (certsError) throw certsError;
+
+      // Le nom légal complet (renseigné dans profil.html) est prioritaire
+      // sur les certificats — c'est exactement ce à quoi il sert. Repli
+      // sur le pseudo puis l'e-mail si l'utilisateur ne l'a pas encore
+      // renseigné.
+      const userName = (profile && profile.full_name) || (profile && profile.username) || user.email || "Utilisateur MAHOUTO+";
+      const certsList = certs || [];
+
+      render(userName, certsList);
+      await window.MahoutoOfflineCache.save(cacheKey, { userName, certs: certsList });
+    } catch (err) {
+      console.warn("[CERTIFICATS] Données fraîches indisponibles (hors connexion ?) :", err.message);
+      // Rien en cache ET le réseau ne répond pas : seul cas où on
+      // affiche un message explicite plutôt qu'une page vide muette.
+      if (!cached) offlineEl.classList.remove("hidden");
+    }
   }
 
   load();

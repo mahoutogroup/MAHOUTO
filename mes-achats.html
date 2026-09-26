@@ -48,6 +48,7 @@
   <div id="login-state" class="hidden">Connecte-toi pour voir tes achats. <br><a href="index.html">Retour à l'accueil</a></div>
   <div id="loading-state">Chargement de tes achats...</div>
   <div id="empty-state" class="hidden">Tu n'as encore rien acheté. Découvre le <a href="school.html" style="color:var(--gold);">catalogue de formations</a> ou la <a href="produits.html" style="color:var(--gold);">boutique</a>.</div>
+  <div id="offline-state" class="hidden">📡 Hors connexion, et aucune donnée enregistrée sur cet appareil pour l'instant.<br>Ouvre cette page une première fois avec une connexion pour pouvoir la consulter hors ligne ensuite.</div>
 
   <div id="content"></div>
 
@@ -63,6 +64,7 @@
 
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="offline-cache.js"></script>
 <script>
 (function () {
   const cfg = window.MAHOUTO_CONFIG;
@@ -83,6 +85,7 @@
   const loadingEl = document.getElementById("loading-state");
   const loginEl = document.getElementById("login-state");
   const emptyEl = document.getElementById("empty-state");
+  const offlineEl = document.getElementById("offline-state");
   const contentEl = document.getElementById("content");
 
   async function accessDigitalProduct(productId, btn) {
@@ -170,24 +173,49 @@
     return row;
   }
 
-  async function init() {
-    const { data: sessionData } = await supabase.auth.getSession();
-    if (!sessionData || !sessionData.session || !sessionData.session.user) {
-      loadingEl.classList.add("hidden");
-      loginEl.classList.remove("hidden");
-      return;
-    }
-    const userId = sessionData.session.user.id;
-
+  async function fetchData(userId) {
     const { data: purchases, error } = await supabase
       .from("purchases")
       .select("*")
       .eq("user_id", userId)
       .order("created_at", { ascending: false });
 
-    loadingEl.classList.add("hidden");
+    if (error) throw error;
+    if (!purchases || !purchases.length) return { purchases: [], formationsById: {}, productsById: {}, roomsById: {} };
 
-    if (error || !purchases || !purchases.length) {
+    const formationPurchases = purchases.filter((p) => p.product_type === "formation");
+    const productPurchases = purchases.filter((p) => p.product_type === "digital_product");
+    const roomPurchases = purchases.filter((p) => p.product_type === "salon");
+
+    const [{ data: formations }, { data: products }, { data: rooms }] = await Promise.all([
+      formationPurchases.length
+        ? supabase.from("formations").select("id, emoji, image_url").in("id", formationPurchases.map((p) => p.course_id))
+        : Promise.resolve({ data: [] }),
+      productPurchases.length
+        ? supabase.from("digital_products").select("id, type, image_url").in("id", productPurchases.map((p) => p.course_id))
+        : Promise.resolve({ data: [] }),
+      roomPurchases.length
+        ? supabase.from("rooms").select("id, emoji, color").in("id", roomPurchases.map((p) => p.course_id))
+        : Promise.resolve({ data: [] })
+    ]);
+
+    const formationsById = {};
+    (formations || []).forEach((f) => { formationsById[f.id] = f; });
+    const productsById = {};
+    (products || []).forEach((pr) => { productsById[pr.id] = pr; });
+    const roomsById = {};
+    (rooms || []).forEach((r) => { roomsById[r.id] = r; });
+
+    return { purchases, formationsById, productsById, roomsById };
+  }
+
+  function renderAll(data) {
+    contentEl.innerHTML = "";
+    emptyEl.classList.add("hidden");
+    offlineEl.classList.add("hidden");
+
+    const { purchases, formationsById, productsById, roomsById } = data;
+    if (!purchases || !purchases.length) {
       emptyEl.classList.remove("hidden");
       return;
     }
@@ -197,52 +225,62 @@
     const roomPurchases = purchases.filter((p) => p.product_type === "salon");
 
     if (formationPurchases.length) {
-      const [{ data: formations }] = await Promise.all([
-        supabase.from("formations").select("id, emoji, image_url").in("id", formationPurchases.map((p) => p.course_id))
-      ]);
-      const formationsById = {};
-      (formations || []).forEach((f) => { formationsById[f.id] = f; });
-
       const label = document.createElement("div");
       label.className = "section-label";
       label.textContent = "🎓 Mes formations";
       contentEl.appendChild(label);
-
       formationPurchases.forEach((p) => {
         contentEl.appendChild(renderFormationRow(p, formationsById[p.course_id]));
       });
     }
 
     if (productPurchases.length) {
-      const { data: products } = await supabase
-        .from("digital_products").select("id, type, image_url").in("id", productPurchases.map((p) => p.course_id));
-      const productsById = {};
-      (products || []).forEach((pr) => { productsById[pr.id] = pr; });
-
       const label = document.createElement("div");
       label.className = "section-label";
       label.textContent = "🛍️ Mes produits numériques";
       contentEl.appendChild(label);
-
       productPurchases.forEach((p) => {
         contentEl.appendChild(renderProductRow(p, productsById[p.course_id]));
       });
     }
 
     if (roomPurchases.length) {
-      const { data: rooms } = await supabase
-        .from("rooms").select("id, emoji, color").in("id", roomPurchases.map((p) => p.course_id));
-      const roomsById = {};
-      (rooms || []).forEach((r) => { roomsById[r.id] = r; });
-
       const label = document.createElement("div");
       label.className = "section-label";
       label.textContent = "🔒 Mes salons";
       contentEl.appendChild(label);
-
       roomPurchases.forEach((p) => {
         contentEl.appendChild(renderRoomRow(p, roomsById[p.course_id]));
       });
+    }
+  }
+
+  async function init() {
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData || !sessionData.session || !sessionData.session.user) {
+      loadingEl.classList.add("hidden");
+      loginEl.classList.remove("hidden");
+      return;
+    }
+    const userId = sessionData.session.user.id;
+    const cacheKey = "mes-achats:" + userId;
+
+    // Affichage instantané depuis le cache local, s'il existe.
+    const cached = await window.MahoutoOfflineCache.load(cacheKey);
+    if (cached && cached.data) {
+      loadingEl.classList.add("hidden");
+      renderAll(cached.data);
+    }
+
+    try {
+      const data = await fetchData(userId);
+      loadingEl.classList.add("hidden");
+      renderAll(data);
+      await window.MahoutoOfflineCache.save(cacheKey, data);
+    } catch (err) {
+      console.warn("[MES ACHATS] Données fraîches indisponibles (hors connexion ?) :", err.message);
+      loadingEl.classList.add("hidden");
+      if (!cached) offlineEl.classList.remove("hidden");
     }
   }
 

@@ -333,18 +333,43 @@ self.addEventListener("fetch", event => {
     event.respondWith(
       (async () => {
         const cache = await caches.open(CACHE_NAME);
+
+        // Le fetch réseau met à jour le cache dans tous les cas, même
+        // si on finit par répondre depuis le cache faute de temps —
+        // ainsi la PROCHAINE visite profite de la version fraîche.
+        // .catch(() => null) : si ce fetch échoue APRÈS que le délai
+        // ci-dessous a déjà fait gagner le cache, on ne veut surtout
+        // pas une erreur non gérée qui traîne en arrière-plan.
+        const networkFetch = fetch(event.request, { cache: "reload" })
+          .then((networkResponse) => {
+            if (networkResponse && networkResponse.ok) {
+              cache.put(event.request, networkResponse.clone());
+            }
+            return networkResponse;
+          })
+          .catch(() => null);
+
         try {
-          // { cache: "reload" } : ignore le cache HTTP habituel du
-          // navigateur, va toujours chercher la vraie réponse la plus
-          // récente sur le réseau — sinon même ce fetch "réseau" du
-          // Service Worker pouvait recevoir une réponse déjà cachée
-          // par le navigateur lui-même, rendant une mise à jour
-          // invisible malgré un rechargement de page.
-          const networkResponse = await fetch(event.request, { cache: "reload" });
-          if (networkResponse && networkResponse.ok) {
-            cache.put(event.request, networkResponse.clone());
-          }
-          return networkResponse;
+          // Sur un réseau lent, attendre le réseau indéfiniment rendait
+          // CHAQUE clic sur un onglet très lent, même quand une version
+          // parfaitement utilisable existait déjà en cache. On borne
+          // donc l'attente réseau à 2,5s : au-delà, on sert le cache
+          // immédiatement (s'il existe) et le fetch réseau continue en
+          // arrière-plan pour rafraîchir le cache en vue de la
+          // prochaine visite.
+          const timeout = new Promise((resolve) => setTimeout(() => resolve(null), 2500));
+          const winner = await Promise.race([networkFetch, timeout]);
+
+          if (winner) return winner; // le réseau a répondu à temps
+
+          const cached = await cache.match(event.request);
+          if (cached) return cached;
+
+          // Rien en cache : ça vaut le coup d'attendre le réseau
+          // jusqu'au bout plutôt que d'échouer pour rien.
+          const finalResponse = await networkFetch;
+          if (finalResponse) return finalResponse;
+          throw new Error("Réseau indisponible et rien en cache pour cette page.");
         } catch (err) {
           // Réseau indisponible : on retombe sur la dernière version
           // connue en cache, si elle existe.
