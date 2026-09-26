@@ -26,6 +26,15 @@
   .player-wrap video { width: 100%; height: 100%; }
   .player-placeholder { color: var(--text-dim); font-size: 13px; text-align: center; padding: 20px; }
 
+  /* Le quiz réutilise ce même conteneur, mais un fond noir fixe est
+     pensé pour une vidéo, pas pour du texte : sans ceci, le texte
+     redevient illisible dès qu'on repasse en thème clair (fond
+     toujours noir + texte devenu sombre). */
+  .player-wrap.quiz-mode {
+    background: var(--bg-card); aspect-ratio: unset;
+    align-items: stretch; justify-content: flex-start;
+  }
+
   .quiz-container { padding: 16px; }
   .quiz-title { font-size: 16px; margin-bottom: 10px; }
   .quiz-already-passed { font-size: 12.5px; color: var(--accent-green); margin-bottom: 14px; }
@@ -344,6 +353,7 @@
 
     const playerWrap = document.getElementById("player-wrap");
     const barEl = document.getElementById("current-lesson-bar");
+    playerWrap.classList.remove("quiz-mode"); // repart d'un état propre à chaque leçon
 
     if (locked) {
       // Court-circuit d'affichage uniquement : même sans ceci, un
@@ -362,7 +372,9 @@
     if (lesson.type === "quiz") {
       // Le quiz gère sa propre validation (grade_quiz, côté serveur) —
       // pas de bouton "Marquer comme terminée" ni de Cast pour ce type
-      // de leçon.
+      // de leçon. "quiz-mode" retire le fond noir pensé pour la vidéo,
+      // sinon le texte devient illisible en thème clair.
+      playerWrap.classList.add("quiz-mode");
       barEl.classList.add("hidden");
       document.getElementById("cast-btn") && document.getElementById("cast-btn").classList.add("hidden");
       currentVideoUrl = null;
