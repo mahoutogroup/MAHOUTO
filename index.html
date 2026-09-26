@@ -376,6 +376,7 @@
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="auth.js"></script>
+<script src="offline-cache.js"></script>
 <script>
 (function () {
   "use strict";
@@ -463,11 +464,23 @@
     try {
       if (typeof supabase === "undefined" || !supabase.auth || typeof supabase.auth.getSession !== "function") return;
       // getSession() lit la session déjà stockée localement — contrairement
-      // à getUser(), ça ne dépend pas du réseau. Sans ça, l'app affichait
-      // à tort l'écran de connexion dès qu'on l'ouvrait hors connexion,
-      // même avec une session valide sur l'appareil.
+      // à getUser(), ça ne dépend pas du réseau. MAIS : le client Supabase
+      // essaie de rafraîchir le token en arrière-plan toutes les 30s, et si
+      // cette tentative échoue faute de réseau, getSession() peut renvoyer
+      // "pas de session" même si elle est en réalité toujours valide,
+      // juste impossible à vérifier hors connexion. On garde donc notre
+      // propre trace de la dernière identité connue, indépendante de ce
+      // mécanisme, pour ne pas afficher l'écran de connexion à tort.
       const { data: sessionData } = await supabase.auth.getSession();
-      const user = sessionData && sessionData.session ? sessionData.session.user : null;
+      let user = sessionData && sessionData.session ? sessionData.session.user : null;
+
+      if (user && window.MahoutoOfflineCache) {
+        await window.MahoutoOfflineCache.save("auth:last-user", { id: user.id, email: user.email });
+      } else if (!user && !navigator.onLine && window.MahoutoOfflineCache) {
+        const last = await window.MahoutoOfflineCache.load("auth:last-user");
+        if (last && last.data) user = last.data;
+      }
+
       if (!user) return;
 
       document.getElementById("auth-methods").classList.add("hidden-by-auth");

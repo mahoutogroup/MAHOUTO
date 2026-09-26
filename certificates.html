@@ -147,12 +147,23 @@
 
   async function load() {
     // getSession() lit la session déjà stockée localement — contrairement
-    // à getUser(), ça ne force pas un aller-retour réseau, donc ça
-    // fonctionne même hors connexion si l'utilisateur s'est déjà
-    // connecté au moins une fois sur cet appareil.
+    // à getUser(), ça ne force pas un aller-retour réseau. MAIS : le
+    // client Supabase essaie de rafraîchir le token en tâche de fond, et
+    // si ça échoue faute de réseau, getSession() peut renvoyer "pas de
+    // session" même si elle est valide — juste invérifiable hors
+    // connexion. D'où le repli sur la dernière identité connue.
     const { data: sessionData } = await supabase.auth.getSession();
-    const user = sessionData && sessionData.session ? sessionData.session.user : null;
+    let user = sessionData && sessionData.session ? sessionData.session.user : null;
+
+    if (!user && !navigator.onLine) {
+      const last = await window.MahoutoOfflineCache.load("auth:last-user");
+      if (last && last.data) user = last.data;
+    }
+
     if (!user) { window.location.href = "index.html"; return; }
+    if (user.email !== undefined) {
+      await window.MahoutoOfflineCache.save("auth:last-user", { id: user.id, email: user.email });
+    }
 
     const cacheKey = "certificates:" + user.id;
 

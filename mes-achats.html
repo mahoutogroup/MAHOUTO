@@ -256,13 +256,28 @@
   }
 
   async function init() {
+    // getSession() peut renvoyer "pas de session" hors connexion si le
+    // client Supabase a tenté (et échoué) de rafraîchir le token en
+    // tâche de fond — même si la session est en réalité toujours
+    // valide. D'où le repli sur la dernière identité connue localement.
     const { data: sessionData } = await supabase.auth.getSession();
-    if (!sessionData || !sessionData.session || !sessionData.session.user) {
+    let user = sessionData && sessionData.session ? sessionData.session.user : null;
+
+    if (!user && !navigator.onLine) {
+      const last = await window.MahoutoOfflineCache.load("auth:last-user");
+      if (last && last.data) user = last.data;
+    }
+
+    if (!user) {
       loadingEl.classList.add("hidden");
       loginEl.classList.remove("hidden");
       return;
     }
-    const userId = sessionData.session.user.id;
+    if (user.email !== undefined) {
+      await window.MahoutoOfflineCache.save("auth:last-user", { id: user.id, email: user.email });
+    }
+
+    const userId = user.id;
     const cacheKey = "mes-achats:" + userId;
 
     // Affichage instantané depuis le cache local, s'il existe.
