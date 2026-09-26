@@ -626,8 +626,68 @@ window.MahoutoCertificatePdf = (function () {
     });
   }
 
+  // Identique, mais l'image est déjà éclaircie/rendue transparente au
+  // moment du dessin sur le canvas (ctx.globalAlpha, une API Canvas
+  // standard et fiable) — utilisé pour le filigrane, plutôt que de
+  // dépendre d'une fonctionnalité de transparence propre à jsPDF
+  // (GState) dont la syntaxe exacte n'est pas garantie selon la
+  // version/le CDN chargé.
+  function loadImageAsDataUrlWithOpacity(url, opacity) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext("2d");
+        ctx.globalAlpha = opacity;
+        ctx.drawImage(img, 0, 0);
+        try {
+          resolve({ dataUrl: canvas.toDataURL("image/png"), width: img.naturalWidth, height: img.naturalHeight });
+        } catch (e) { reject(e); }
+      };
+      img.onerror = () => reject(new Error("Image introuvable : " + url));
+      img.src = url;
+    });
+  }
+
   function spaced(text) {
     return String(text || "").split("").join("\u2009");
+  }
+
+  // Convertit un ArrayBuffer en base64, par blocs pour éviter tout
+  // dépassement de pile sur un fichier de police de plusieurs dizaines
+  // de Ko (String.fromCharCode.apply sur un très grand tableau peut
+  // planter d'un coup si on ne découpe pas).
+  function arrayBufferToBase64(buffer) {
+    let binary = "";
+    const bytes = new Uint8Array(buffer);
+    const chunkSize = 0x8000;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+    }
+    return btoa(binary);
+  }
+
+  let scriptFontBase64 = null;
+
+  // Charge la police manuscrite (assets/dancing-script-bold.ttf,
+  // fichier fourni par l'utilisateur — jamais générée/inventée ici).
+  // Le FICHIER n'est téléchargé qu'une fois (mis en cache en mémoire),
+  // mais il doit être enregistré séparément sur CHAQUE document PDF —
+  // jsPDF ne partage pas les polices entre deux instances différentes,
+  // et un nouveau document jsPDF est créé à chaque certificat généré.
+  // En cas d'échec (réseau, fichier absent), le nom du bénéficiaire
+  // retombe simplement sur Times italique — jamais d'erreur bloquante.
+  async function loadScriptFont(doc) {
+    if (!scriptFontBase64) {
+      const resp = await fetch("assets/dancing-script-bold.ttf");
+      if (!resp.ok) throw new Error("Police introuvable (" + resp.status + ")");
+      const buffer = await resp.arrayBuffer();
+      scriptFontBase64 = arrayBufferToBase64(buffer);
+    }
+    doc.addFileToVFS("DancingScript-Bold.ttf", scriptFontBase64);
+    doc.addFont("DancingScript-Bold.ttf", "DancingScript", "normal");
   }
 
   // Place une image en la faisant tenir dans une boîte maxW x maxH
@@ -641,6 +701,91 @@ window.MahoutoCertificatePdf = (function () {
     return h;
   }
 
+  // -------- Éléments décoratifs (approximations vectorielles — voir
+  // le message accompagnant cette livraison pour ce qui reste une
+  // simplification par rapport au modèle fourni) --------
+
+  // Branche de laurier simplifiée : une tige courbe avec quelques
+  // "feuilles" ovales. mirror=true la dessine inversée (miroir).
+  function drawLaurel(doc, x, y, mirror, color) {
+    const s = mirror ? -1 : 1;
+    doc.setFillColor(...color);
+    doc.setDrawColor(...color);
+    for (let i = 0; i < 6; i += 1) {
+      const t = i / 5;
+      const lx = x + s * (6 + t * 16);
+      const ly = y - t * 22;
+      const angle = mirror ? 200 - t * 40 : -20 + t * 40;
+      doc.ellipse(lx, ly, 3.2 - t * 1.2, 1.3, "F");
+    }
+  }
+
+  // Bandeau diagonal décoratif dans un coin (vert + liseré doré),
+  // avec une petite pointe façon "drapeau replié" — approximation du
+  // bandeau ornemental du modèle (sans le motif géométrique intérieur,
+  // trop complexe à reproduire fidèlement en vectoriel à la main).
+  function drawCornerRibbon(doc, pageW, pageH, corner, green, gold, label) {
+    const size = 62;
+    doc.saveGraphicsState ? null : null;
+    if (corner === "tl") {
+      doc.setFillColor(...green);
+      doc.triangle(0, 0, size, 0, 0, size, "F");
+      doc.setDrawColor(...gold);
+      doc.setLineWidth(1);
+      doc.line(0, size, size, 0);
+      if (label) {
+        doc.setTextColor(255, 255, 255);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(8.5);
+        doc.text(label, 15, 22, { angle: 45 });
+      }
+    } else {
+      doc.setFillColor(...green);
+      doc.triangle(pageW, pageH, pageW - size, pageH, pageW, pageH - size, "F");
+      doc.setDrawColor(...gold);
+      doc.setLineWidth(1);
+      doc.line(pageW - size, pageH, pageW, pageH - size);
+    }
+  }
+
+  // Bandeau/banderole (pointes aux deux extrémités) contenant le nom
+  // de la formation — reproduit fidèlement la forme du modèle.
+  function drawBanner(doc, cx, y, w, h, fill, border, text, textColor) {
+    const x0 = cx - w / 2, x1 = cx + w / 2;
+    const point = h * 0.55;
+    doc.setFillColor(...fill);
+    doc.setDrawColor(...border);
+    doc.setLineWidth(0.6);
+    doc.lines(
+      [[point, -h / 2], [w - 2 * point, 0], [point, h / 2], [-point, h / 2], [-(w - 2 * point), 0], [-point, -h / 2]],
+      x0, y - h / 2, [1, 1], "FD", true
+    );
+    doc.setTextColor(...textColor);
+    doc.setFont("times", "bold");
+    doc.setFontSize(15);
+    doc.text(text, cx, y + 1.8, { align: "center" });
+  }
+
+  // Petit badge carré coloré avec une icône vectorielle simplifiée
+  // (calendrier ou carte) — remplace une icône emoji, non fiable dans
+  // les polices de base de jsPDF.
+  function drawIconBadge(doc, x, y, size, kind, badgeColor) {
+    doc.setFillColor(...badgeColor);
+    doc.roundedRect(x, y, size, size, 1.2, 1.2, "F");
+    doc.setDrawColor(255, 255, 255);
+    doc.setLineWidth(0.35);
+    if (kind === "calendar") {
+      doc.rect(x + size * 0.2, y + size * 0.28, size * 0.6, size * 0.5);
+      doc.line(x + size * 0.32, y + size * 0.18, x + size * 0.32, y + size * 0.32);
+      doc.line(x + size * 0.68, y + size * 0.18, x + size * 0.68, y + size * 0.32);
+    } else {
+      doc.roundedRect(x + size * 0.2, y + size * 0.25, size * 0.6, size * 0.5, 0.8, 0.8);
+      doc.circle(x + size * 0.38, y + size * 0.42, size * 0.08);
+      doc.line(x + size * 0.55, y + size * 0.42, x + size * 0.72, y + size * 0.42);
+      doc.line(x + size * 0.3, y + size * 0.6, x + size * 0.62, y + size * 0.6);
+    }
+  }
+
   // certificate = { userName, formationTitle, issuedAt (ISO string), code }
   async function download(certificate) {
     await loadJsPDF();
@@ -651,94 +796,159 @@ window.MahoutoCertificatePdf = (function () {
     const pageH = doc.internal.pageSize.getHeight();
     const cx = pageW / 2;
 
+    // Palette reprise du modèle fourni (vert forêt + or), à la place
+    // de l'ancienne palette navy/or.
+    const green = [13, 58, 41];
     const gold = [197, 160, 60];
-    const goldDark = [140, 110, 30];
-    const ink = [30, 26, 18];
-    const muted = [120, 112, 96];
-    const ivory = [253, 250, 242];
+    const goldDark = [150, 118, 35];
+    const ink = [22, 34, 27];
+    const muted = [95, 105, 97];
+    const ivory = [253, 251, 244];
+    const white = [255, 255, 255];
 
-    // -------- Fond + cadre ornemental (inchangé) --------
+    // -------- Fond --------
     doc.setFillColor(...ivory);
     doc.rect(0, 0, pageW, pageH, "F");
+
+    // -------- Filigrane logo (très pâle, à droite) — dessiné en
+    // premier pour rester DERRIÈRE tout le reste. --------
+    try {
+      const logoWm = await loadImageAsDataUrlWithOpacity("assets/logo-mahouto-plus.png", 0.06);
+      drawImageFit(doc, logoWm, pageW - 70, 40, 130, 130);
+    } catch (err) {
+      console.warn("[CERTIFICAT] filigrane non affiché :", err.message);
+    }
+
+    // -------- Cadre ornemental --------
     doc.setDrawColor(...gold);
     doc.setLineWidth(1);
     doc.rect(9, 9, pageW - 18, pageH - 18);
     doc.setLineWidth(0.3);
     doc.rect(13, 13, pageW - 26, pageH - 26);
-    function corner(x, y, sx, sy) {
+    function cornerMark(x, y, sx, sy) {
       doc.setDrawColor(...gold);
       doc.setLineWidth(0.6);
       doc.line(x, y, x + 14 * sx, y);
       doc.line(x, y, x, y + 14 * sy);
     }
-    corner(13, 13, 1, 1);
-    corner(pageW - 13, 13, -1, 1);
-    corner(13, pageH - 13, 1, -1);
-    corner(pageW - 13, pageH - 13, -1, -1);
+    cornerMark(13, 13, 1, 1);
+    cornerMark(pageW - 13, 13, -1, 1);
+    cornerMark(13, pageH - 13, 1, -1);
+    cornerMark(pageW - 13, pageH - 13, -1, -1);
+
+    // Bandeaux diagonaux (approximation — voir message d'accompagnement
+    // pour la limite sur le motif géométrique intérieur, non reproduit).
+    drawCornerRibbon(doc, pageW, pageH, "tl", green, gold, "ÉCOSYSTÈME MAHOUTO+");
+    drawCornerRibbon(doc, pageW, pageH, "br", green, gold, null);
 
     // -------- Logo officiel MAHOUTO+ (fichier existant du dépôt) --------
     try {
       const logo = await loadImageAsDataUrl("assets/logo-mahouto-plus.png");
-      drawImageFit(doc, logo, cx, 15, 26, 22);
+      drawImageFit(doc, logo, cx, 11, 24, 20);
     } catch (err) {
       console.warn("[CERTIFICAT] logo introuvable, poursuite sans logo :", err.message);
     }
 
-    // -------- Titre --------
-    doc.setTextColor(...gold);
+    // -------- Bandeau slogan (haut droite) --------
+    doc.setDrawColor(...gold);
+    doc.setLineWidth(0.3);
+    doc.line(pageW - 82, 13, pageW - 82, 28);
+    doc.setTextColor(...ink);
+    doc.setFont("times", "normal");
+    doc.setFontSize(9.5);
+    doc.text("Construire l'Afrique", pageW - 18, 18, { align: "right" });
+    doc.text("numérique de demain.", pageW - 18, 24, { align: "right" });
+
+    // -------- Titre + laurier (approximation vectorielle) --------
+    drawLaurel(doc, cx - 82, 42, false, gold);
+    drawLaurel(doc, cx + 82, 42, true, gold);
+    doc.setTextColor(...green);
     doc.setFont("times", "bold");
-    doc.setFontSize(18);
-    doc.text(spaced("CERTIFICAT DE RÉUSSITE"), cx, 46, { align: "center" });
+    doc.setFontSize(20);
+    doc.text(spaced("CERTIFICAT DE RÉUSSITE"), cx, 44, { align: "center" });
     doc.setDrawColor(...gold);
     doc.setLineWidth(0.4);
-    doc.line(cx - 30, 50, cx + 30, 50);
+    doc.line(cx - 32, 49, cx + 32, 49);
     doc.setFillColor(...gold);
-    doc.circle(cx, 50, 0.8, "F");
+    doc.circle(cx, 49, 0.8, "F");
 
     // -------- Corps --------
     doc.setTextColor(...ink);
-    doc.setFont("times", "italic");
+    doc.setFont("times", "normal");
     doc.setFontSize(12);
-    doc.text("Décerné à", cx, 62, { align: "center" });
+    doc.text("Décerné à", cx, 59, { align: "center" });
+    doc.setDrawColor(...gold);
+    doc.setLineWidth(0.3);
+    doc.line(cx - 34, 59.5, cx - 12, 59.5);
+    doc.line(cx + 12, 59.5, cx + 34, 59.5);
 
+    // Nom du bénéficiaire — police manuscrite (Dancing Script, fournie
+    // par l'utilisateur), avec repli automatique sur Times italique si
+    // le fichier ne se charge pas pour une raison quelconque.
     const nameText = certificate.userName || "—";
-    doc.setFont("times", "bold");
-    doc.setFontSize(27);
-    doc.setTextColor(...goldDark);
-    doc.text(nameText, cx, 75, { align: "center" });
+    let usingScriptFont = false;
+    try {
+      await loadScriptFont(doc);
+      doc.setFont("DancingScript", "normal");
+      usingScriptFont = true;
+    } catch (err) {
+      console.warn("[CERTIFICAT] police manuscrite indisponible, repli sur Times italique :", err.message);
+      doc.setFont("times", "bolditalic");
+    }
+    doc.setFontSize(usingScriptFont ? 34 : 28); // la police script est visuellement plus petite à taille égale
+    doc.setTextColor(...green);
+    doc.text(nameText, cx, 73, { align: "center" });
     const nameWidth = doc.getTextWidth(nameText);
     doc.setDrawColor(...gold);
     doc.setLineWidth(0.5);
-    doc.line(cx - nameWidth / 2 - 4, 79, cx + nameWidth / 2 + 4, 79);
+    doc.line(cx - nameWidth / 2 - 4, 77, cx + nameWidth / 2 + 4, 77);
 
     doc.setTextColor(...ink);
     doc.setFont("times", "normal");
-    doc.setFontSize(12);
-    doc.text("Pour avoir réussi avec succès la formation :", cx, 90, { align: "center" });
+    doc.setFontSize(11.5);
+    doc.text("Pour avoir suivi et validé avec succès la formation", cx, 86, { align: "center" });
 
-    doc.setFont("times", "bolditalic");
-    doc.setFontSize(16);
-    doc.setTextColor(...goldDark);
-    doc.text(certificate.formationTitle || "—", cx, 100, { align: "center" });
+    // -------- Bandeau formation (banderole) --------
+    const formationTitle = certificate.formationTitle || "—";
+    const bannerW = Math.min(200, doc.getTextWidth(formationTitle) * 1.6 + 40);
+    drawBanner(doc, cx, 99, bannerW, 12, green, gold, formationTitle, white);
 
+    // -------- Date / Code --------
     const dateStr = certificate.issuedAt
       ? new Date(certificate.issuedAt).toLocaleDateString("fr-FR", { year: "numeric", month: "long", day: "numeric" })
       : "";
-    doc.setTextColor(...ink);
-    doc.setFont("times", "normal");
-    doc.setFontSize(10.5);
-    doc.text("Date d'obtention : " + dateStr, cx, 110, { align: "center" });
-    doc.setTextColor(...muted);
-    doc.setFontSize(9);
-    doc.text("Code : " + (certificate.code || ""), cx, 116, { align: "center" });
+    const rowY = 113;
+    doc.setDrawColor(...gold);
+    doc.setLineWidth(0.3);
+    doc.line(cx, rowY - 6, cx, rowY + 6);
 
-    // -------- QR code (bas gauche) — généré localement (voir plus
-    // haut), pointe vers la vraie page de vérification publique. --------
-    const qrY = 128;
-    const qrSize = 26;
-    const qrX = 46;
+    drawIconBadge(doc, cx - 70, rowY - 4, 8, "calendar", gold);
+    doc.setTextColor(...muted);
+    doc.setFont("times", "normal");
+    doc.setFontSize(8.5);
+    doc.text("Date d'obtention :", cx - 59, rowY - 1);
+    doc.setTextColor(...ink);
+    doc.setFont("times", "bold");
+    doc.setFontSize(10.5);
+    doc.text(dateStr, cx - 59, rowY + 4.5);
+
+    drawIconBadge(doc, cx + 10, rowY - 4, 8, "id", gold);
+    doc.setTextColor(...muted);
+    doc.setFont("times", "normal");
+    doc.setFontSize(8.5);
+    doc.text("Code du certificat :", cx + 21, rowY - 1);
+    doc.setTextColor(...ink);
+    doc.setFont("times", "bold");
+    doc.setFontSize(10.5);
+    doc.text(certificate.code || "", cx + 21, rowY + 4.5);
+
+    // -------- QR code (bas gauche) — généré localement, pointe vers
+    // la vraie page de vérification publique. --------
+    const qrY = 132;
+    const qrSize = 24;
+    const qrX = 42;
+    const verifyUrl = window.location.origin + "/verify/" + encodeURIComponent(certificate.code || "");
     try {
-      const verifyUrl = window.location.origin + "/verify/" + encodeURIComponent(certificate.code || "");
       console.log("[CERTIFICAT] génération QR (local, sans réseau) pour :", verifyUrl);
       drawQrCode(doc, verifyUrl, qrX - qrSize / 2, qrY, qrSize, ink);
       console.log("[CERTIFICAT] QR code inséré avec succès");
@@ -747,23 +957,43 @@ window.MahoutoCertificatePdf = (function () {
     }
     doc.setTextColor(...muted);
     doc.setFont("times", "normal");
-    doc.setFontSize(8.5);
-    doc.text("Scanner pour vérifier", qrX, qrY + qrSize + 6, { align: "center" });
-    doc.text("l'authenticité", qrX, qrY + qrSize + 10.5, { align: "center" });
+    doc.setFontSize(8);
+    doc.text("Scannez ce QR code pour vérifier", qrX + qrSize / 2 + 4, qrY + 6);
+    doc.text("l'authenticité de ce certificat", qrX + qrSize / 2 + 4, qrY + 10.5);
+    doc.setFontSize(7);
+    doc.setTextColor(...green);
+    doc.text(verifyUrl, qrX - qrSize / 2, qrY + qrSize + 6);
+
+    // -------- Sceau médaille (centre bas) — vrai logo + ruban vert --------
+    const sealX = cx, sealY = 146;
+    doc.setFillColor(...gold);
+    doc.triangle(sealX - 7, sealY + 5, sealX - 1, sealY + 20, sealX - 10, sealY + 16, "F");
+    doc.triangle(sealX + 7, sealY + 5, sealX + 1, sealY + 20, sealX + 10, sealY + 16, "F");
+    doc.setFillColor(...green);
+    doc.triangle(sealX - 6, sealY + 6, sealX - 1.5, sealY + 19, sealX - 8.5, sealY + 16, "F");
+    doc.triangle(sealX + 6, sealY + 6, sealX + 1.5, sealY + 19, sealX + 8.5, sealY + 16, "F");
+    doc.setFillColor(...gold);
+    doc.circle(sealX, sealY, 13, "F");
+    doc.setFillColor(...ivory);
+    doc.circle(sealX, sealY, 10.5, "F");
+    try {
+      const sealLogo = await loadImageAsDataUrl("assets/logo-mahouto-plus.png");
+      drawImageFit(doc, sealLogo, sealX, sealY - 8.5, 17, 17);
+    } catch (err) { /* repli silencieux : anneau doré seul */ }
 
     // -------- Signature du fondateur (bas droite) --------
-    const sigCenterX = pageW - 46;
+    const sigCenterX = pageW - 44;
     let sigLineY = qrY + 16;
     try {
       const sig = await loadImageAsDataUrl("assets/signature-fondateur.png");
-      const h = drawImageFit(doc, sig, sigCenterX, qrY, 34, 16);
+      const h = drawImageFit(doc, sig, sigCenterX, qrY, 32, 15);
       sigLineY = qrY + h + 2;
     } catch (err) {
       sigLineY = qrY + 12;
     }
     doc.setDrawColor(...muted);
     doc.setLineWidth(0.3);
-    doc.line(sigCenterX - 26, sigLineY, sigCenterX + 26, sigLineY);
+    doc.line(sigCenterX - 24, sigLineY, sigCenterX + 24, sigLineY);
     doc.setTextColor(...ink);
     doc.setFont("times", "bold");
     doc.setFontSize(10.5);
@@ -773,18 +1003,45 @@ window.MahoutoCertificatePdf = (function () {
     doc.setFontSize(8.5);
     doc.text("Fondateur — MAHOUTO+", sigCenterX, sigLineY + 9.5, { align: "center" });
 
-    // -------- Pied de page --------
-    doc.setTextColor(...gold);
+    // -------- Pied de page (3 colonnes) --------
+    const footY = 184;
+    doc.setDrawColor(...gold);
+    doc.setLineWidth(0.3);
+    doc.line(cx - 88, footY - 6, cx - 88, footY + 10);
+    doc.line(cx + 22, footY - 6, cx + 22, footY + 10);
+
+    doc.setTextColor(...ink);
     doc.setFont("times", "bold");
-    doc.setFontSize(11);
-    doc.text("MAHOUTO+", cx, pageH - 26, { align: "center" });
+    doc.setFontSize(8.5);
+    doc.text("Délivré par MAHOUTO+", cx - 130, footY, { align: "left" });
+    doc.text("/ MAJESTÉ PRESSE", cx - 130, footY + 5, { align: "left" });
+
+    try {
+      const mLogo = await loadImageAsDataUrl("assets/logo-mahouto-plus.png");
+      drawImageFit(doc, mLogo, cx - 55, footY - 7, 10, 10);
+    } catch (err) { /* repli silencieux */ }
+    doc.setTextColor(...goldDark);
+    doc.setFont("times", "bold");
+    doc.setFontSize(9);
+    doc.text("MAHOUTO+", cx - 44, footY - 2);
     doc.setTextColor(...muted);
     doc.setFont("times", "italic");
-    doc.setFontSize(8);
-    doc.text("L'Intelligence Artificielle, la Formation et le Business réunis dans une seule application.", cx, pageH - 20, { align: "center" });
-    doc.setFont("times", "normal");
-    doc.setFontSize(8);
-    doc.text("MAJESTÉ PRESSE", cx, pageH - 15, { align: "center" });
+    doc.setFontSize(6.5);
+    doc.text("L'Intelligence Artificielle, la Formation", cx - 44, footY + 3);
+    doc.text("et le Business réunis dans une seule application.", cx - 44, footY + 6.5);
+
+    try {
+      const mpLogo = await loadImageAsDataUrl("assets/logo-majeste-presse.png");
+      drawImageFit(doc, mpLogo, cx + 32, footY - 7, 10, 10);
+    } catch (err) { /* repli silencieux */ }
+    doc.setTextColor(...goldDark);
+    doc.setFont("times", "bold");
+    doc.setFontSize(9);
+    doc.text("MAJESTÉ PRESSE", cx + 43, footY - 2);
+    doc.setTextColor(...muted);
+    doc.setFont("times", "italic");
+    doc.setFontSize(6.5);
+    doc.text("Votre Sérigraphe Imprimeur de confiance.", cx + 43, footY + 3);
 
     const safeName = (certificate.formationTitle || "certificat").replace(/[^a-zA-Z0-9 _-]/g, "_");
     doc.save("Certificat MAHOUTO+ - " + safeName + ".pdf");
