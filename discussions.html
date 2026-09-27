@@ -478,6 +478,7 @@
 </div>
 
 <script src="config.js"></script>
+<script src="offline-cache.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
 (function () {
@@ -537,71 +538,88 @@
   }
 
   async function loadRooms() {
-    roomListEl.innerHTML = '<div id="loading-state">Chargement des discussions...</div>';
+    const cacheKey = "discussions:" + currentUser.id;
 
-    const { data: rooms, error: roomsError } = await supabase
-      .from("rooms")
-      .select("*")
-      .order("created_at", { ascending: true });
-
-    if (roomsError) {
-      roomListEl.innerHTML = '<div id="empty-state">Impossible de charger les discussions.</div>';
-      console.error(roomsError);
-      return;
+    // Affichage instantané depuis le cache local, s'il existe — avant
+    // même de savoir si le réseau va répondre (même principe que pour
+    // "Mes certificats" et "Mes achats").
+    const cached = await window.MahoutoOfflineCache.load(cacheKey);
+    if (cached && cached.data) {
+      roomsData = cached.data;
+      renderRooms();
+    } else {
+      roomListEl.innerHTML = '<div id="loading-state">Chargement des discussions...</div>';
     }
 
-    const { data: readStates } = await supabase
-      .from("read_state")
-      .select("room_id, last_read_at")
-      .eq("user_id", currentUser.id);
+    try {
+      const { data: rooms, error: roomsError } = await supabase
+        .from("rooms")
+        .select("*")
+        .order("created_at", { ascending: true });
 
-    const readMap = {};
-    (readStates || []).forEach((r) => { readMap[r.room_id] = r.last_read_at; });
+      if (roomsError) throw roomsError;
 
-    const { data: paidPurchases } = await supabase
-      .from("purchases")
-      .select("course_id")
-      .eq("user_id", currentUser.id)
-      .eq("product_type", "salon")
-      .eq("status", "paid");
+      const { data: readStates } = await supabase
+        .from("read_state")
+        .select("room_id, last_read_at")
+        .eq("user_id", currentUser.id);
 
-    unlockedPaidRooms = new Set((paidPurchases || []).map((p) => p.course_id));
+      const readMap = {};
+      (readStates || []).forEach((r) => { readMap[r.room_id] = r.last_read_at; });
 
-    const enriched = await Promise.all(
-      rooms.map(async (room) => {
-        const { data: lastMsgs } = await supabase
-          .from("messages")
-          .select("content, attachment_type, created_at, username")
-          .eq("room_id", room.id)
-          .order("created_at", { ascending: false })
-          .limit(1);
+      const { data: paidPurchases } = await supabase
+        .from("purchases")
+        .select("course_id")
+        .eq("user_id", currentUser.id)
+        .eq("product_type", "salon")
+        .eq("status", "paid");
 
-        const lastMessage = lastMsgs && lastMsgs[0] ? lastMsgs[0] : null;
-        const lastReadAt = readMap[room.id];
+      unlockedPaidRooms = new Set((paidPurchases || []).map((p) => p.course_id));
 
-        let unreadQuery = supabase
-          .from("messages")
-          .select("id", { count: "exact", head: true })
-          .eq("room_id", room.id);
+      const enriched = await Promise.all(
+        rooms.map(async (room) => {
+          const { data: lastMsgs } = await supabase
+            .from("messages")
+            .select("content, attachment_type, created_at, username")
+            .eq("room_id", room.id)
+            .order("created_at", { ascending: false })
+            .limit(1);
 
-        if (lastReadAt) unreadQuery = unreadQuery.gt("created_at", lastReadAt);
+          const lastMessage = lastMsgs && lastMsgs[0] ? lastMsgs[0] : null;
+          const lastReadAt = readMap[room.id];
 
-        const { count } = await unreadQuery;
+          let unreadQuery = supabase
+            .from("messages")
+            .select("id", { count: "exact", head: true })
+            .eq("room_id", room.id);
 
-        return {
-          ...room,
-          lastMessage: lastMessage
-            ? (lastMessage.content || (lastMessage.attachment_type === "image" ? "📷 Photo" : lastMessage.attachment_type === "video" ? "🎥 Vidéo" : lastMessage.attachment_type ? "📄 Fichier" : ""))
-            : "Aucun message pour le moment.",
-          lastTime: lastMessage ? lastMessage.created_at : room.created_at,
-          unread: count || 0
-        };
-      })
-    );
+          if (lastReadAt) unreadQuery = unreadQuery.gt("created_at", lastReadAt);
 
-    enriched.sort((a, b) => new Date(b.lastTime) - new Date(a.lastTime));
-    roomsData = enriched;
-    renderRooms();
+          const { count } = await unreadQuery;
+
+          return {
+            ...room,
+            lastMessage: lastMessage
+              ? (lastMessage.content || (lastMessage.attachment_type === "image" ? "📷 Photo" : lastMessage.attachment_type === "video" ? "🎥 Vidéo" : lastMessage.attachment_type ? "📄 Fichier" : ""))
+              : "Aucun message pour le moment.",
+            lastTime: lastMessage ? lastMessage.created_at : room.created_at,
+            unread: count || 0
+          };
+        })
+      );
+
+      enriched.sort((a, b) => new Date(b.lastTime) - new Date(a.lastTime));
+      roomsData = enriched;
+      renderRooms();
+      await window.MahoutoOfflineCache.save(cacheKey, roomsData);
+    } catch (err) {
+      console.warn("[DISCUSSIONS] Données fraîches indisponibles (hors connexion ?) :", err.message);
+      // Rien en cache ET le réseau ne répond pas : seul cas où on
+      // affiche un message explicite plutôt que de laisser "Chargement..."
+      if (!cached) {
+        roomListEl.innerHTML = '<div id="empty-state">📡 Hors connexion, et aucune discussion enregistrée sur cet appareil pour l\'instant.</div>';
+      }
+    }
   }
 
   function renderRooms() {

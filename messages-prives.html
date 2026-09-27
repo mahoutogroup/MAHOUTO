@@ -132,6 +132,7 @@
 </nav>
 
 <script src="config.js"></script>
+<script src="offline-cache.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
 (function () {
@@ -236,74 +237,98 @@
   }
 
   async function loadConversations() {
-    const { data: convs, error } = await supabase
-      .from("dm_conversations")
-      .select("id, user_one, user_two")
-      .order("created_at", { ascending: false });
+    const cacheKey = "messages-prives:" + currentUser.id;
 
-    if (error) {
-      convListEl.innerHTML = '<div id="empty-state">Impossible de charger les conversations.</div>';
-      console.error(error);
-      return;
+    // Affichage instantané depuis le cache local, s'il existe.
+    const cached = await window.MahoutoOfflineCache.load(cacheKey);
+    if (cached && cached.data) {
+      renderConversations(cached.data);
+    } else {
+      convListEl.innerHTML = '<div id="loading-state">Chargement des conversations...</div>';
     }
 
-    if (!convs || !convs.length) {
+    try {
+      const { data: convs, error } = await supabase
+        .from("dm_conversations")
+        .select("id, user_one, user_two")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+
+      if (!convs || !convs.length) {
+        renderConversations([]);
+        await window.MahoutoOfflineCache.save(cacheKey, []);
+        return;
+      }
+
+      const enriched = await Promise.all(
+        convs.map(async (conv) => {
+          const otherId = conv.user_one === currentUser.id ? conv.user_two : conv.user_one;
+
+          const { data: profileRows } = await supabase.rpc("get_public_profile", { uid: otherId });
+          const otherUser = (profileRows && profileRows[0]) || { id: otherId, username: "Utilisateur", avatar_url: null };
+
+          const { data: lastMsgs } = await supabase
+            .from("dm_messages")
+            .select("content, attachment_type, created_at, is_deleted")
+            .eq("conversation_id", conv.id)
+            .order("created_at", { ascending: false })
+            .limit(1);
+
+          const lastMessage = lastMsgs && lastMsgs[0] ? lastMsgs[0] : null;
+
+          let preview = "Aucun message pour le moment.";
+          if (lastMessage) {
+            if (lastMessage.is_deleted) preview = "🚫 Message supprimé";
+            else if (lastMessage.content) preview = lastMessage.content;
+            else if (lastMessage.attachment_type === "image") preview = "📷 Photo";
+            else if (lastMessage.attachment_type === "video") preview = "🎥 Vidéo";
+            else if (lastMessage.attachment_type === "audio") preview = "🎤 Message vocal";
+            else if (lastMessage.attachment_type) preview = "📄 Fichier";
+          }
+
+          const { data: readRow } = await supabase
+            .from("dm_read_state")
+            .select("last_read_at")
+            .eq("user_id", currentUser.id)
+            .eq("conversation_id", conv.id)
+            .maybeSingle();
+
+          let unreadQuery = supabase
+            .from("dm_messages")
+            .select("id", { count: "exact", head: true })
+            .eq("conversation_id", conv.id)
+            .neq("sender_id", currentUser.id);
+
+          if (readRow && readRow.last_read_at) unreadQuery = unreadQuery.gt("created_at", readRow.last_read_at);
+
+          const { count: unread } = await unreadQuery;
+
+          return {
+            convId: conv.id,
+            otherUser,
+            lastTime: lastMessage ? lastMessage.created_at : null,
+            preview,
+            unread: unread || 0
+          };
+        })
+      );
+
+      renderConversations(enriched);
+      await window.MahoutoOfflineCache.save(cacheKey, enriched);
+    } catch (err) {
+      console.warn("[MESSAGES PRIVÉS] Données fraîches indisponibles (hors connexion ?) :", err.message);
+      if (!cached) {
+        convListEl.innerHTML = '<div id="empty-state">📡 Hors connexion, et aucune conversation enregistrée sur cet appareil pour l\'instant.</div>';
+      }
+    }
+  }
+
+  function renderConversations(enriched) {
+    if (!enriched.length) {
       convListEl.innerHTML = '<div id="empty-state">Aucune conversation privée pour le moment.<br>Cherche quelqu\'un ci-dessus pour commencer.</div>';
       return;
     }
-
-    const enriched = await Promise.all(
-      convs.map(async (conv) => {
-        const otherId = conv.user_one === currentUser.id ? conv.user_two : conv.user_one;
-
-        const { data: profileRows } = await supabase.rpc("get_public_profile", { uid: otherId });
-        const otherUser = (profileRows && profileRows[0]) || { id: otherId, username: "Utilisateur", avatar_url: null };
-
-        const { data: lastMsgs } = await supabase
-          .from("dm_messages")
-          .select("content, attachment_type, created_at, is_deleted")
-          .eq("conversation_id", conv.id)
-          .order("created_at", { ascending: false })
-          .limit(1);
-
-        const lastMessage = lastMsgs && lastMsgs[0] ? lastMsgs[0] : null;
-
-        let preview = "Aucun message pour le moment.";
-        if (lastMessage) {
-          if (lastMessage.is_deleted) preview = "🚫 Message supprimé";
-          else if (lastMessage.content) preview = lastMessage.content;
-          else if (lastMessage.attachment_type === "image") preview = "📷 Photo";
-          else if (lastMessage.attachment_type === "video") preview = "🎥 Vidéo";
-          else if (lastMessage.attachment_type === "audio") preview = "🎤 Message vocal";
-          else if (lastMessage.attachment_type) preview = "📄 Fichier";
-        }
-
-        const { data: readRow } = await supabase
-          .from("dm_read_state")
-          .select("last_read_at")
-          .eq("user_id", currentUser.id)
-          .eq("conversation_id", conv.id)
-          .maybeSingle();
-
-        let unreadQuery = supabase
-          .from("dm_messages")
-          .select("id", { count: "exact", head: true })
-          .eq("conversation_id", conv.id)
-          .neq("sender_id", currentUser.id);
-
-        if (readRow && readRow.last_read_at) unreadQuery = unreadQuery.gt("created_at", readRow.last_read_at);
-
-        const { count: unread } = await unreadQuery;
-
-        return {
-          convId: conv.id,
-          otherUser,
-          lastTime: lastMessage ? lastMessage.created_at : null,
-          preview,
-          unread: unread || 0
-        };
-      })
-    );
 
     convListEl.innerHTML = "";
     enriched.forEach((c) => {
