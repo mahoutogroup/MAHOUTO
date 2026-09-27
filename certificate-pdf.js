@@ -659,6 +659,18 @@ window.MahoutoCertificatePdf = (function () {
     return String(text || "").split("").join("\u2009");
   }
 
+  // Formate une durée lisible entre deux dates (ex: "3 semaines",
+  // "2 mois") — jamais un nombre de jours brut, plus parlant sur un
+  // document officiel.
+  function formatDuration(startIso, endIso) {
+    if (!startIso || !endIso) return null;
+    const days = Math.round((new Date(endIso) - new Date(startIso)) / 86400000);
+    if (days < 0) return null;
+    if (days < 14) return days + (days <= 1 ? " jour" : " jours");
+    if (days < 60) return Math.round(days / 7) + " semaines";
+    return Math.round(days / 30) + " mois";
+  }
+
   // Convertit un ArrayBuffer en base64, par blocs pour éviter tout
   // dépassement de pile sur un fichier de police de plusieurs dizaines
   // de Ko (String.fromCharCode.apply sur un très grand tableau peut
@@ -888,29 +900,17 @@ window.MahoutoCertificatePdf = (function () {
     // base, donc on simule le supplément de poids en dessinant le
     // texte deux fois avec un minuscule décalage. --------
     // -------- Titre (centré sur la page) — texte selon le type de
-    // document (Certificat ou Attestation), même mise en page pour
-    // les deux : seul le texte change, jamais la structure visuelle.
+    // document (Certificat ou Attestation). L'Attestation a un texte
+    // plus long (mentions légales complètes) donc une mise en page un
+    // peu plus resserrée que le Certificat, mais la même structure
+    // générale (logo, sceau, QR, signature, pied de page).
     const docType = certificate.documentType === "attestation" ? "attestation" : "certificat";
-    const texts = docType === "attestation"
-      ? {
-          title: "ATTESTATION DE FIN DE FORMATION",
-          intro: "Nous attestons que",
-          body: "a suivi avec assiduité et achevé la formation",
-          dateLabel: "Date de délivrance :",
-          codeLabel: "N° de l'attestation :"
-        }
-      : {
-          title: "CERTIFICAT DE RÉUSSITE",
-          intro: "Décerné à",
-          body: "Pour avoir suivi et validé avec succès la formation",
-          dateLabel: "Date d'obtention :",
-          codeLabel: "Code du certificat :"
-        };
+    const isAttestation = docType === "attestation";
 
     doc.setTextColor(...green);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(21);
-    const titleText = texts.title;
+    const titleText = isAttestation ? "ATTESTATION DE FIN DE FORMATION" : "CERTIFICAT DE RÉUSSITE";
     doc.text(titleText, cx, 44, { align: "center" });
     doc.setDrawColor(...gold);
     doc.setLineWidth(0.4);
@@ -919,70 +919,134 @@ window.MahoutoCertificatePdf = (function () {
     doc.circle(cx, 49, 0.8, "F");
 
     // -------- Corps --------
+    const introY = isAttestation ? 58 : 59;
     doc.setTextColor(...ink);
     doc.setFont("times", "normal");
     doc.setFontSize(12);
-    doc.text(texts.intro, cx, 59, { align: "center" });
+    doc.text(isAttestation ? "Nous attestons par la présente que" : "Décerné à", cx, introY, { align: "center" });
     doc.setDrawColor(...gold);
     doc.setLineWidth(0.3);
-    doc.line(cx - 34, 59.5, cx - 12, 59.5);
-    doc.line(cx + 12, 59.5, cx + 34, 59.5);
+    doc.line(cx - 34, introY + 0.5, cx - 12, introY + 0.5);
+    doc.line(cx + 12, introY + 0.5, cx + 34, introY + 0.5);
 
     // Nom du bénéficiaire — Helvetica gras (l'équivalent Arial déjà
     // intégré à jsPDF, aucun fichier de police à charger).
+    const nameY = isAttestation ? 70 : 73;
     const nameText = certificate.userName || "—";
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(26);
+    doc.setFontSize(isAttestation ? 24 : 26);
     doc.setTextColor(...green);
-    doc.text(nameText, cx, 73, { align: "center" });
+    doc.text(nameText, cx, nameY, { align: "center" });
     const nameWidth = doc.getTextWidth(nameText);
     doc.setDrawColor(...gold);
     doc.setLineWidth(0.5);
-    doc.line(cx - nameWidth / 2 - 4, 77, cx + nameWidth / 2 + 4, 77);
+    doc.line(cx - nameWidth / 2 - 4, nameY + 4, cx + nameWidth / 2 + 4, nameY + 4);
 
     doc.setTextColor(...ink);
     doc.setFont("times", "normal");
     doc.setFontSize(11.5);
-    doc.text(texts.body, cx, 86, { align: "center" });
+    doc.text(
+      isAttestation ? "a suivi avec assiduité et achevé la formation :" : "Pour avoir suivi et validé avec succès la formation",
+      cx, isAttestation ? 82 : 86, { align: "center" }
+    );
 
     // -------- Bandeau formation (banderole) --------
     const formationTitle = certificate.formationTitle || "—";
     const bannerW = Math.min(200, doc.getTextWidth(formationTitle) * 1.6 + 40);
-    drawBanner(doc, cx, 99, bannerW, 12, green, gold, formationTitle, white);
+    const bannerY = isAttestation ? 94 : 99;
+    const bannerH = isAttestation ? 10 : 12;
+    drawBanner(doc, cx, bannerY, bannerW, bannerH, green, gold, formationTitle, white);
 
-    // -------- Date / Code --------
     const dateStr = certificate.issuedAt
       ? new Date(certificate.issuedAt).toLocaleDateString("fr-FR", { year: "numeric", month: "long", day: "numeric" })
       : "";
-    const rowY = 113;
-    doc.setDrawColor(...gold);
-    doc.setLineWidth(0.3);
-    doc.line(cx, rowY - 6, cx, rowY + 6);
 
-    drawIconBadge(doc, cx - 70, rowY - 4, 8, "calendar", gold);
-    doc.setTextColor(...muted);
-    doc.setFont("times", "normal");
-    doc.setFontSize(8.5);
-    doc.text(texts.dateLabel, cx - 59, rowY - 1);
-    doc.setTextColor(...ink);
-    doc.setFont("times", "bold");
-    doc.setFontSize(10.5);
-    doc.text(dateStr, cx - 59, rowY + 4.5);
+    let rowY;
+    if (isAttestation) {
+      // -------- Mentions complètes propres à l'Attestation --------
+      const startDateStr = certificate.startedAt
+        ? new Date(certificate.startedAt).toLocaleDateString("fr-FR", { year: "numeric", month: "long", day: "numeric" })
+        : null;
+      const duration = formatDuration(certificate.startedAt, certificate.issuedAt);
 
-    drawIconBadge(doc, cx + 10, rowY - 4, 8, "id", gold);
-    doc.setTextColor(...muted);
-    doc.setFont("times", "normal");
-    doc.setFontSize(8.5);
-    doc.text(texts.codeLabel, cx + 21, rowY - 1);
-    doc.setTextColor(...ink);
-    doc.setFont("times", "bold");
-    doc.setFontSize(10.5);
-    doc.text(certificate.code || "", cx + 21, rowY + 4.5);
+      doc.setTextColor(...ink);
+      doc.setFont("times", "normal");
+      doc.setFontSize(9);
+      doc.text("organisée par MAHOUTO+, dans le cadre de son programme de formation professionnelle.", cx, 104, { align: "center" });
+
+      if (startDateStr && duration) {
+        doc.text("La formation s'est déroulée du " + startDateStr + " au " + dateStr + ", pour une durée totale de " + duration + ".", cx, 110, { align: "center" });
+      } else {
+        // Repli honnête si la date d'achat n'est pas disponible (ex:
+        // certificat délivré manuellement par un admin, sans achat
+        // enregistré) — on omet la phrase plutôt que d'inventer une date.
+        doc.text("dans le cadre du programme de formation professionnelle MAHOUTO+.", cx, 110, { align: "center" });
+      }
+
+      doc.setFont("times", "italic");
+      doc.setFontSize(8.5);
+      doc.text("La présente attestation est délivrée à l'intéressé(e) pour servir et valoir ce que de droit.", cx, 117, { align: "center" });
+
+      doc.setFont("times", "normal");
+      doc.setFontSize(9);
+      doc.text("Fait à Cotonou, le " + dateStr, cx, 126, { align: "center" });
+
+      rowY = 137;
+      doc.setDrawColor(...gold);
+      doc.setLineWidth(0.3);
+      doc.line(cx, rowY - 6, cx, rowY + 6);
+
+      drawIconBadge(doc, cx - 70, rowY - 4, 8, "id", gold);
+      doc.setTextColor(...muted);
+      doc.setFont("times", "normal");
+      doc.setFontSize(8.5);
+      doc.text("N° de l'attestation :", cx - 59, rowY - 1);
+      doc.setTextColor(...ink);
+      doc.setFont("times", "bold");
+      doc.setFontSize(9.5);
+      doc.text(certificate.code || "", cx - 59, rowY + 4.5);
+
+      drawIconBadge(doc, cx + 10, rowY - 4, 8, "id", gold);
+      doc.setTextColor(...muted);
+      doc.setFont("times", "normal");
+      doc.setFontSize(8.5);
+      doc.text("Code de vérification :", cx + 21, rowY - 1);
+      doc.setTextColor(...ink);
+      doc.setFont("times", "bold");
+      doc.setFontSize(9.5);
+      doc.text(certificate.code || "", cx + 21, rowY + 4.5);
+    } else {
+      // -------- Date / Code (Certificat, mise en page inchangée) --------
+      rowY = 113;
+      doc.setDrawColor(...gold);
+      doc.setLineWidth(0.3);
+      doc.line(cx, rowY - 6, cx, rowY + 6);
+
+      drawIconBadge(doc, cx - 70, rowY - 4, 8, "calendar", gold);
+      doc.setTextColor(...muted);
+      doc.setFont("times", "normal");
+      doc.setFontSize(8.5);
+      doc.text("Date d'obtention :", cx - 59, rowY - 1);
+      doc.setTextColor(...ink);
+      doc.setFont("times", "bold");
+      doc.setFontSize(10.5);
+      doc.text(dateStr, cx - 59, rowY + 4.5);
+
+      drawIconBadge(doc, cx + 10, rowY - 4, 8, "id", gold);
+      doc.setTextColor(...muted);
+      doc.setFont("times", "normal");
+      doc.setFontSize(8.5);
+      doc.text("Code du certificat :", cx + 21, rowY - 1);
+      doc.setTextColor(...ink);
+      doc.setFont("times", "bold");
+      doc.setFontSize(10.5);
+      doc.text(certificate.code || "", cx + 21, rowY + 4.5);
+    }
 
     // -------- QR code (bas gauche) — généré localement, pointe vers
     // la vraie page de vérification publique. --------
-    const qrY = 132;
-    const qrSize = 24;
+    const qrY = isAttestation ? 148 : 132;
+    const qrSize = isAttestation ? 20 : 24;
     const qrX = 42;
     const verifyUrl = window.location.origin + "/verify/" + encodeURIComponent(certificate.code || "");
     try {
@@ -999,7 +1063,7 @@ window.MahoutoCertificatePdf = (function () {
     doc.text("l'authenticité de ce document", qrX - qrSize / 2, qrY + qrSize + 10.5);
 
     // -------- Sceau médaille (centre bas) — vrai logo + ruban vert --------
-    const sealX = cx, sealY = 146;
+    const sealX = cx, sealY = isAttestation ? 160 : 146;
     doc.setFillColor(...gold);
     doc.triangle(sealX - 7, sealY + 5, sealX - 1, sealY + 20, sealX - 10, sealY + 16, "F");
     doc.triangle(sealX + 7, sealY + 5, sealX + 1, sealY + 20, sealX + 10, sealY + 16, "F");

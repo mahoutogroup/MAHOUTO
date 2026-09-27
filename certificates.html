@@ -131,6 +131,7 @@
               userName,
               formationTitle: cert.formation_title,
               issuedAt: cert.created_at,
+              startedAt: cert.started_at,
               code: cert.code,
               documentType: cert.document_type
             });
@@ -192,6 +193,23 @@
       // renseigné.
       const userName = (profile && profile.full_name) || (profile && profile.username) || user.email || "Utilisateur MAHOUTO+";
       const certsList = certs || [];
+
+      // Pour le texte complet de l'Attestation ("s'est déroulée du ... au
+      // ..."), on utilise la date d'achat de la formation comme date de
+      // début — MAHOUTO+ ne suit pas de date de première leçon commencée,
+      // c'est l'approximation la plus honnête disponible aujourd'hui.
+      const formationIds = [...new Set(certsList.filter((c) => c.document_type === "attestation").map((c) => c.formation_id))];
+      let purchaseDateByFormation = {};
+      if (formationIds.length) {
+        const { data: purchases } = await supabase
+          .from("purchases")
+          .select("course_id, created_at")
+          .eq("user_id", user.id)
+          .eq("product_type", "formation")
+          .in("course_id", formationIds);
+        (purchases || []).forEach((p) => { purchaseDateByFormation[p.course_id] = p.created_at; });
+      }
+      certsList.forEach((c) => { c.started_at = purchaseDateByFormation[c.formation_id] || null; });
 
       render(userName, certsList);
       await window.MahoutoOfflineCache.save(cacheKey, { userName, certs: certsList });
