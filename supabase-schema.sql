@@ -1,5 +1,6 @@
 -- =========================================================
--- MAHOUTO+ — Schéma Supabase (régénéré le 19/09/2026)
+-- MAHOUTO+ — Schéma Supabase (régénéré le 19/09/2026, consolidé le
+-- 27/09/2026 avec les chantiers Certificats/Attestations et Quiz)
 -- Ce fichier reflète fidèlement l'état RÉEL de la base de
 -- production, vérifié colonne par colonne, policy par policy,
 -- fonction par fonction et trigger par trigger avec l'utilisateur.
@@ -28,6 +29,9 @@ create table if not exists public.profiles (
   role text not null default 'user',
   avatar_url text
 );
+
+alter table public.profiles add column if not exists country text;
+alter table public.profiles add column if not exists full_name text; -- nom légal complet, pour les certificats/attestations (distinct du pseudo)
 
 alter table public.profiles
   drop constraint if exists profiles_role_check;
@@ -363,6 +367,67 @@ create table if not exists public.share_target_rate_limit (
   count integer not null default 1
 );
 
+-- ---------- Certificats / Attestations ----------
+-- document_type distingue les documents auto-délivrés selon le
+-- contenu de la formation (quiz présent ou non) de ceux réservés à
+-- une décision manuelle (attestation_apprentissage, système de suivi
+-- sur 3 ans avec dépôt de dossier CQM — jamais auto-délivrée).
+create table if not exists public.certificates (
+  id bigint generated always as identity primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  formation_id text not null references public.formations(id) on delete cascade,
+  formation_title text not null,
+  status text not null default 'issued',
+  issued_by text not null default 'auto',
+  code text not null unique,
+  document_type text not null default 'certificat',
+  created_at timestamptz not null default now(),
+  unique (user_id, formation_id)
+);
+
+alter table public.certificates
+  drop constraint if exists certificates_status_check;
+alter table public.certificates
+  add constraint certificates_status_check
+  check (status = any (array['issued'::text, 'revoked'::text]));
+
+alter table public.certificates
+  drop constraint if exists certificates_document_type_check;
+alter table public.certificates
+  add constraint certificates_document_type_check
+  check (document_type in ('certificat', 'attestation', 'attestation_apprentissage'));
+
+-- Séquences pour la numérotation officielle des attestations (jamais
+-- Math.random() côté navigateur) — voir generate_certificate_code()
+-- et set_certificate_code() en section FONCTIONS/TRIGGERS.
+create sequence if not exists public.attestation_atf_seq;
+create sequence if not exists public.attestation_afa_seq; -- réservée au futur système d'apprentissage (36 jalons)
+
+-- ---------- Quiz (leçons de type 'quiz') ----------
+-- Accès direct verrouillé pour les utilisateurs normaux (ni lecture
+-- ni écriture) : les bonnes réponses vivent ici et ne doivent jamais
+-- être exposées au navigateur. La lecture passe exclusivement par
+-- get_quiz_questions() (jamais correct_index), la correction par
+-- grade_quiz() — voir section FONCTIONS.
+create table if not exists public.quiz_questions (
+  id bigint generated always as identity primary key,
+  lesson_id bigint not null references public.formation_lessons(id) on delete cascade,
+  question text not null,
+  choices jsonb not null,
+  correct_index integer not null,
+  ordre integer not null default 0
+);
+
+create table if not exists public.quiz_attempts (
+  id bigint generated always as identity primary key,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  lesson_id bigint not null references public.formation_lessons(id) on delete cascade,
+  score integer not null,
+  total integer not null,
+  passed boolean not null,
+  created_at timestamptz not null default now()
+);
+
 
 -- =========================================================
 -- 2. FONCTIONS
@@ -561,6 +626,171 @@ begin
 end;
 $function$;
 
+-- ---------- Certificats / Attestations ----------
+
+-- Code du CERTIFICAT (comportement historique, inchangé) : format
+-- MHT-XXXXXX-XXXXXXXX, sans signification séquentielle.
+create or replace function public.generate_certificate_code()
+returns text
+language sql
+as $$
+  select 'MHT-'
+    || upper(substr(md5(random()::text || clock_timestamp()::text), 1, 6))
+    || '-'
+    || upper(substr(md5(random()::text || clock_timestamp()::text), 1, 8));
+$$;
+
+-- Choisit le bon format de code selon document_type — jamais généré
+-- côté navigateur. 'certificat' garde le format historique ci-dessus ;
+-- 'attestation'/'attestation_apprentissage' utilisent une numérotation
+-- officielle SÉQUENTIELLE (MHA-ATF-2026-000001 / MHA-AFA-2026-000001).
+create or replace function public.set_certificate_code()
+returns trigger
+language plpgsql
+as $$
+begin
+  if new.code is null then
+    if new.document_type = 'attestation' then
+      new.code := 'MHA-ATF-' || extract(year from now())::text || '-'
+        || lpad(nextval('public.attestation_atf_seq')::text, 6, '0');
+    elsif new.document_type = 'attestation_apprentissage' then
+      new.code := 'MHA-AFA-' || extract(year from now())::text || '-'
+        || lpad(nextval('public.attestation_afa_seq')::text, 6, '0');
+    else
+      new.code := public.generate_certificate_code();
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+-- Vérification publique (accessible sans connexion, via verify.html) —
+-- ne renvoie JAMAIS de donnée sensible (jamais l'e-mail, jamais l'ID
+-- interne, jamais qui a délivré manuellement).
+create or replace function public.verify_certificate(p_code text)
+returns table (
+  formation_title text,
+  recipient_name text,
+  issued_at timestamptz,
+  status text,
+  code text,
+  document_type text
+)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select c.formation_title, coalesce(p.full_name, p.username), c.created_at, c.status, c.code, c.document_type
+  from public.certificates c
+  join public.profiles p on p.id = c.user_id
+  where c.code = p_code
+  limit 1;
+$$;
+
+-- ---------- Quiz ----------
+
+-- Renvoie les questions d'un quiz SANS jamais exposer correct_index —
+-- vérifie l'accès (achat de la formation, ou leçon en aperçu gratuit)
+-- avant de renvoyer quoi que ce soit.
+create or replace function public.get_quiz_questions(p_lesson_id bigint)
+returns table (id bigint, question text, choices jsonb, ordre integer)
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select q.id, q.question, q.choices, q.ordre
+  from public.quiz_questions q
+  join public.formation_lessons fl on fl.id = q.lesson_id
+  join public.formation_modules fm on fm.id = fl.module_id
+  where q.lesson_id = p_lesson_id
+    and (
+      fl.is_preview
+      or exists (
+        select 1 from public.purchases p
+        where p.user_id = auth.uid()
+          and p.course_id = fm.formation_id
+          and p.product_type = 'formation'
+          and p.status = 'paid'
+      )
+    )
+  order by q.ordre;
+$$;
+
+-- Correction ENTIÈREMENT côté serveur : reçoit les réponses (tableau
+-- d'index dans l'ordre de get_quiz_questions), calcule le score,
+-- enregistre la tentative, et ne marque la leçon "terminée" dans
+-- course_progress que si le seuil de 70% est atteint. Un utilisateur
+-- ne peut jamais s'attribuer une réussite directement (voir policies
+-- sur quiz_attempts et course_progress).
+create or replace function public.grade_quiz(p_lesson_id bigint, p_answers jsonb)
+returns table (score integer, total integer, passed boolean)
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_score integer := 0;
+  v_total integer := 0;
+  v_passed boolean;
+  v_question record;
+  v_index integer := 0;
+  v_has_access boolean;
+begin
+  select exists (
+    select 1
+    from public.formation_lessons fl
+    join public.formation_modules fm on fm.id = fl.module_id
+    where fl.id = p_lesson_id
+      and (
+        fl.is_preview
+        or exists (
+          select 1 from public.purchases p
+          where p.user_id = auth.uid()
+            and p.course_id = fm.formation_id
+            and p.product_type = 'formation'
+            and p.status = 'paid'
+        )
+      )
+  ) into v_has_access;
+
+  if not v_has_access then
+    raise exception 'Accès non autorisé à cette formation.';
+  end if;
+
+  for v_question in
+    select q.correct_index
+    from public.quiz_questions q
+    where q.lesson_id = p_lesson_id
+    order by q.ordre
+  loop
+    v_total := v_total + 1;
+    if (p_answers -> v_index)::text::integer = v_question.correct_index then
+      v_score := v_score + 1;
+    end if;
+    v_index := v_index + 1;
+  end loop;
+
+  if v_total = 0 then
+    raise exception 'Aucune question pour ce quiz.';
+  end if;
+
+  v_passed := (v_score::float / v_total::float) >= 0.7;
+
+  insert into public.quiz_attempts (user_id, lesson_id, score, total, passed)
+  values (auth.uid(), p_lesson_id, v_score, v_total, v_passed);
+
+  if v_passed then
+    insert into public.course_progress (user_id, lesson_id, completed)
+    values (auth.uid(), p_lesson_id, true)
+    on conflict (user_id, lesson_id) do update set completed = true, updated_at = now();
+  end if;
+
+  return query select v_score, v_total, v_passed;
+end;
+$$;
+
 
 -- =========================================================
 -- 3. TRIGGERS
@@ -575,6 +805,11 @@ drop trigger if exists trg_protect_role on public.profiles;
 create trigger trg_protect_role
   before insert or update on public.profiles
   for each row execute function public.protect_role_column();
+
+drop trigger if exists trg_set_certificate_code on public.certificates;
+create trigger trg_set_certificate_code
+  before insert on public.certificates
+  for each row execute function public.set_certificate_code();
 
 
 -- =========================================================
@@ -864,6 +1099,11 @@ drop policy if exists "Progression : lecture propre" on public.course_progress;
 create policy "Progression : lecture propre" on public.course_progress
   for select using (auth.uid() = user_id);
 
+-- Une leçon de type 'quiz' ne peut JAMAIS être marquée "terminée"
+-- directement par le client (fl.type <> 'quiz' ci-dessous) — seule la
+-- fonction grade_quiz() (SECURITY DEFINER, contourne la RLS) peut le
+-- faire, et seulement après une correction réussie à 70%. Sans ça, un
+-- utilisateur pourrait s'auto-valider un quiz sans jamais y répondre.
 drop policy if exists "Progression : écriture propre" on public.course_progress;
 create policy "Progression : écriture propre" on public.course_progress
   for insert with check (
@@ -871,6 +1111,7 @@ create policy "Progression : écriture propre" on public.course_progress
       select 1 from formation_lessons fl
       join formation_modules fm on fm.id = fl.module_id
       where fl.id = course_progress.lesson_id
+        and fl.type <> 'quiz'
         and (
           fl.is_preview or exists (
             select 1 from purchases p
@@ -906,6 +1147,7 @@ create policy "Progression : mise à jour propre" on public.course_progress
       select 1 from formation_lessons fl
       join formation_modules fm on fm.id = fl.module_id
       where fl.id = course_progress.lesson_id
+        and fl.type <> 'quiz'
         and (
           fl.is_preview or exists (
             select 1 from purchases p
@@ -917,6 +1159,119 @@ create policy "Progression : mise à jour propre" on public.course_progress
         )
     )
   );
+
+-- ---------- certificates ----------
+alter table public.certificates enable row level security;
+
+drop policy if exists "certificates_select" on public.certificates;
+create policy "certificates_select" on public.certificates
+for select to authenticated
+using (
+  user_id = auth.uid()
+  or exists (
+    select 1 from public.profiles p
+    where p.id = auth.uid() and p.role in ('admin', 'super_admin', 'founder')
+  )
+);
+
+-- Délivrance AUTOMATIQUE : uniquement 'certificat' ou 'attestation'
+-- (jamais 'attestation_apprentissage', réservée à une décision
+-- manuelle), et seulement si TOUTES les leçons de la formation sont
+-- réellement "completed" pour cet utilisateur — vérifié ici, jamais
+-- fait confiance au client seul.
+drop policy if exists "certificates_insert_auto" on public.certificates;
+create policy "certificates_insert_auto" on public.certificates
+for insert to authenticated
+with check (
+  user_id = auth.uid()
+  and issued_by = 'auto'
+  and status = 'issued'
+  and document_type in ('certificat', 'attestation')
+  and exists (
+    select 1 from public.formation_lessons fl
+    join public.formation_modules fm on fm.id = fl.module_id
+    where fm.formation_id = certificates.formation_id
+  )
+  and not exists (
+    select 1
+    from public.formation_lessons fl
+    join public.formation_modules fm on fm.id = fl.module_id
+    where fm.formation_id = certificates.formation_id
+    and not exists (
+      select 1 from public.course_progress cp
+      where cp.lesson_id = fl.id
+      and cp.user_id = auth.uid()
+      and cp.completed = true
+    )
+  )
+);
+
+-- Délivrance MANUELLE par un admin : peut délivrer n'importe quel type
+-- de document à n'importe quel utilisateur (ex: formation suivie hors
+-- plateforme, ou future attestation d'apprentissage sur 3 ans).
+drop policy if exists "certificates_insert_admin" on public.certificates;
+create policy "certificates_insert_admin" on public.certificates
+for insert to authenticated
+with check (
+  issued_by = auth.uid()::text
+  and status = 'issued'
+  and exists (
+    select 1 from public.profiles p
+    where p.id = auth.uid() and p.role in ('admin', 'super_admin', 'founder')
+  )
+);
+
+-- Un admin peut révoquer un document déjà délivré (status -> 'revoked').
+drop policy if exists "certificates_update_admin" on public.certificates;
+create policy "certificates_update_admin" on public.certificates
+for update to authenticated
+using (
+  exists (
+    select 1 from public.profiles p
+    where p.id = auth.uid() and p.role in ('admin', 'super_admin', 'founder')
+  )
+)
+with check (
+  exists (
+    select 1 from public.profiles p
+    where p.id = auth.uid() and p.role in ('admin', 'super_admin', 'founder')
+  )
+);
+
+-- ---------- quiz_questions ----------
+-- Accès direct verrouillé pour tout le monde SAUF les admins (gestion
+-- via admin/school-content.html) — la lecture des élèves passe
+-- exclusivement par get_quiz_questions(), jamais un accès direct à
+-- cette table (qui contient les bonnes réponses).
+alter table public.quiz_questions enable row level security;
+
+drop policy if exists "quiz_questions_admin_all" on public.quiz_questions;
+create policy "quiz_questions_admin_all" on public.quiz_questions
+for all to authenticated
+using (
+  exists (
+    select 1 from public.profiles p
+    where p.id = auth.uid() and p.role in ('admin', 'super_admin', 'founder')
+  )
+)
+with check (
+  exists (
+    select 1 from public.profiles p
+    where p.id = auth.uid() and p.role in ('admin', 'super_admin', 'founder')
+  )
+);
+
+-- ---------- quiz_attempts ----------
+alter table public.quiz_attempts enable row level security;
+
+drop policy if exists "quiz_attempts_select_own" on public.quiz_attempts;
+create policy "quiz_attempts_select_own" on public.quiz_attempts
+for select to authenticated
+using (user_id = auth.uid());
+
+-- Volontairement AUCUNE policy d'insertion pour 'authenticated' : un
+-- utilisateur ne peut jamais s'auto-attribuer une tentative réussie —
+-- seule grade_quiz() (SECURITY DEFINER) peut écrire ici.
 
 -- ---------- digital_products ----------
 drop policy if exists "Lecture produits disponibles" on public.digital_products;
