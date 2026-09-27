@@ -355,6 +355,7 @@
 </form>
 
 <script src="config.js"></script>
+<script src="offline-cache.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="attachments.js"></script>
 <script src="audio-player.js"></script>
@@ -604,16 +605,35 @@
   }
 
   async function loadHistory() {
-    const { data, error } = await supabase
-      .from("messages")
-      .select("*")
-      .eq("room_id", ROOM_ID)
-      .order("created_at", { ascending: true })
-      .limit(200);
+    const cacheKey = "chat-history:" + ROOM_ID;
 
-    if (error) { setStatus("Erreur de chargement des messages."); console.error(error); return; }
-    const resolvedMap = await MahoutoAttachments.resolveAttachmentUrls(supabase, "room", ROOM_ID, data);
-    data.forEach((m) => renderMessage(m, resolvedMap));
+    // Affichage instantané depuis le cache local, s'il existe. Les
+    // pièces jointes des salons payants ("authenticated") ne peuvent
+    // pas être résolues hors connexion (l'URL signée exige un aller-
+    // retour serveur) — renderMessage retente déjà automatiquement la
+    // résolution pour chaque message, donc rien de plus à faire ici ;
+    // hors connexion, cette tentative échoue simplement en silence.
+    const cached = await window.MahoutoOfflineCache.load(cacheKey);
+    if (cached && cached.data) {
+      cached.data.forEach((m) => renderMessage(m, new Map()));
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from("messages")
+        .select("*")
+        .eq("room_id", ROOM_ID)
+        .order("created_at", { ascending: true })
+        .limit(200);
+
+      if (error) throw error;
+      const resolvedMap = await MahoutoAttachments.resolveAttachmentUrls(supabase, "room", ROOM_ID, data);
+      data.forEach((m) => renderMessage(m, resolvedMap));
+      await window.MahoutoOfflineCache.save(cacheKey, data);
+    } catch (err) {
+      console.warn("[CHAT] Historique frais indisponible (hors connexion ?) :", err.message);
+      if (!cached) setStatus("📡 Hors connexion, aucun message enregistré pour ce salon sur cet appareil.");
+    }
   }
 
   function subscribeToNewMessages() {

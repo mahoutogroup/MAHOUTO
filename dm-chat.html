@@ -263,6 +263,7 @@
 </form>
 
 <script src="config.js"></script>
+<script src="offline-cache.js"></script>
 <script src="push-notifications.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="attachments.js"></script>
@@ -499,16 +500,34 @@
   }
 
   async function loadHistory() {
-    const { data, error } = await supabase
-      .from("dm_messages")
-      .select("*")
-      .eq("conversation_id", CONV_ID)
-      .order("created_at", { ascending: true })
-      .limit(300);
+    const cacheKey = "dm-history:" + CONV_ID;
 
-    if (error) { setStatus("Erreur de chargement des messages."); console.error(error); return; }
-    const resolvedMap = await MahoutoAttachments.resolveAttachmentUrls(supabase, "dm", CONV_ID, data || []);
-    (data || []).forEach((m) => renderMessage(m, resolvedMap));
+    // Affichage instantané depuis le cache local, s'il existe. Les
+    // pièces jointes exigent toujours une URL signée pour un DM (voir
+    // canAccessDm) — hors connexion, renderMessage retente déjà
+    // automatiquement la résolution par message et échoue simplement
+    // en silence, rien de plus à gérer ici.
+    const cached = await window.MahoutoOfflineCache.load(cacheKey);
+    if (cached && cached.data) {
+      cached.data.forEach((m) => renderMessage(m, new Map()));
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from("dm_messages")
+        .select("*")
+        .eq("conversation_id", CONV_ID)
+        .order("created_at", { ascending: true })
+        .limit(300);
+
+      if (error) throw error;
+      const resolvedMap = await MahoutoAttachments.resolveAttachmentUrls(supabase, "dm", CONV_ID, data || []);
+      (data || []).forEach((m) => renderMessage(m, resolvedMap));
+      await window.MahoutoOfflineCache.save(cacheKey, data || []);
+    } catch (err) {
+      console.warn("[DM] Historique frais indisponible (hors connexion ?) :", err.message);
+      if (!cached) setStatus("📡 Hors connexion, aucun message enregistré pour cette conversation sur cet appareil.");
+    }
   }
 
   function subscribeToNewMessages() {
