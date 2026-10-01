@@ -105,6 +105,9 @@
     z-index: 50;
   }
 
+  #history-overlay { display: none; }
+  #history-overlay.open { display: block; }
+
   #history-panel {
     position: fixed;
     top: 0; bottom: 0; left: 0;
@@ -116,9 +119,10 @@
     flex-direction: column;
     transform: translateX(-100%);
     transition: transform .22s ease;
+    pointer-events: none;
   }
 
-  #history-panel.open { transform: translateX(0); }
+  #history-panel.open { transform: translateX(0); pointer-events: auto; }
 
   .hist-head {
     display: flex;
@@ -188,7 +192,7 @@
 
 </div>
 
-<div id="history-overlay" class="hidden"></div>
+<div id="history-overlay"></div>
 <aside id="history-panel" aria-hidden="true">
   <div class="hist-head">
     <span>🕘 Historique</span>
@@ -408,14 +412,14 @@
   }
 
   function openHistory() {
-    historyOverlay.classList.remove("hidden");
+    historyOverlay.classList.add("open");
     historyPanel.classList.add("open");
     historyPanel.setAttribute("aria-hidden", "false");
     loadHistory();
   }
 
   function closeHistory() {
-    historyOverlay.classList.add("hidden");
+    historyOverlay.classList.remove("open");
     historyPanel.classList.remove("open");
     historyPanel.setAttribute("aria-hidden", "true");
   }
