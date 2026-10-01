@@ -335,18 +335,6 @@
   }
 
   // -------- Envoi d'un message --------
-  function extractReply(raw) {
-    let data = null;
-    try { data = JSON.parse(raw); } catch (e) { /* texte brut */ }
-    if (data === null) return raw;
-    if (typeof data === "string") return data;
-    if (data && typeof data === "object") {
-      const v = data.reply || data.response || data.message || data.answer || data.content || data.text;
-      if (typeof v === "string") return v;
-    }
-    return "";
-  }
-
   composer.addEventListener("submit", async (e) => {
     e.preventDefault();
     const text = input.value.trim();
@@ -372,9 +360,10 @@
       const newId = response.headers.get("X-Conversation-Id");
       if (newId) conversationId = newId;
 
-      const reply = extractReply(await response.text());
+      const data = await response.json();
+      if (typeof data.reply !== "string") throw new Error("Réponse invalide : reply manquant");
       thinkingEl.remove();
-      addMessage("assistant", reply || "(Réponse vide)");
+      addMessage("assistant", data.reply);
     } catch (err) {
       console.error(err);
       thinkingEl.remove();
@@ -450,12 +439,6 @@
     historyList.appendChild(div);
   }
 
-  function asArray(data, key) {
-    if (Array.isArray(data)) return data;
-    if (data && Array.isArray(data[key])) return data[key];
-    return [];
-  }
-
   async function loadHistory() {
     const token = ++historyToken;
     const { headers, hasSession } = await authHeaders({});
@@ -467,7 +450,9 @@
     try {
       const res = await fetch(API + "/api/chat/history", { headers });
       if (!res.ok) throw new Error("HTTP " + res.status);
-      const items = asArray(await res.json(), "conversations");
+      const data = await res.json();
+      if (!Array.isArray(data.conversations)) throw new Error("Réponse invalide : conversations manquant");
+      const items = data.conversations;
       if (token !== historyToken) return;
       renderHistory(items);
     } catch (err) {
@@ -493,7 +478,7 @@
       title.textContent = conv.title || "Conversation";
       const date = document.createElement("span");
       date.className = "hist-date";
-      date.textContent = formatDate(conv.updated_at || conv.updatedAt || conv.created_at || conv.createdAt);
+      date.textContent = formatDate(conv.updated_at);
       open.appendChild(title);
       open.appendChild(date);
       open.addEventListener("click", () => openConversation(conv.id));
@@ -517,11 +502,12 @@
       const { headers } = await authHeaders({});
       const res = await fetch(API + "/api/chat/history/" + encodeURIComponent(id), { headers });
       if (!res.ok) throw new Error("HTTP " + res.status);
-      const msgs = asArray(await res.json(), "messages");
+      const data = await res.json();
+      if (!Array.isArray(data.messages)) throw new Error("Réponse invalide : messages manquant");
+      const msgs = data.messages;
       conversationId = id;
       resetMessages();
       msgs.forEach((m) => {
-        if (!m || typeof m.content !== "string") return;
         addMessage(m.role === "user" ? "user" : "assistant", m.content);
       });
       if (!messagesEl.childElementCount) showGreeting();
