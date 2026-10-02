@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
 <title>MAHOUTO AI — MAHOUTO+</title>
 <meta name="theme-color" content="#0A0A0A">
 <link rel="manifest" href="manifest.json">
@@ -12,6 +12,22 @@
 <link rel="stylesheet" href="theme.css">
 <script src="theme-toggle.js"></script>
 <style>
+  html, body { overflow: hidden; }
+
+  /* #ai-app occupe la hauteur visible (hors clavier) ; son padding-bottom
+     réserve la hauteur MESURÉE de nav.bottom-nav (fixe, hors flux). */
+  #ai-app {
+    height: var(--app-h, 100dvh);
+    min-height: 0;
+    flex: none;
+    padding-bottom: var(--nav-h, 72px);
+  }
+
+  /* Clavier ouvert : la barre de navigation s'efface, le composeur
+     reste juste au-dessus du clavier. */
+  body.typing nav.bottom-nav { display: none; }
+  body.typing #ai-app { padding-bottom: 0; }
+
   header {
     display: flex;
     align-items: center;
@@ -39,6 +55,7 @@
 
   #ai-messages {
     flex: 1;
+    min-height: 0;
     overflow-y: auto;
     padding: 16px;
     display: flex;
@@ -77,6 +94,7 @@
     padding: 14px;
     background: var(--bg-elevated);
     border-top: 1px solid var(--border);
+    flex: none;
   }
 
   #ai-composer textarea {
@@ -537,6 +555,35 @@
       window.alert(ERROR_TEXT);
     }
   }
+
+  // -------- Mise en page mobile : barre de nav fixe + clavier --------
+  const navEl = document.querySelector("nav.bottom-nav");
+  const rootStyle = document.documentElement.style;
+
+  function updateNavHeight() {
+    if (navEl && !document.body.classList.contains("typing")) {
+      rootStyle.setProperty("--nav-h", navEl.offsetHeight + "px");
+    }
+  }
+
+  function updateViewportHeight() {
+    const vv = window.visualViewport;
+    if (vv) rootStyle.setProperty("--app-h", vv.height + "px");
+    window.scrollTo(0, 0);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  input.addEventListener("focus", () => document.body.classList.add("typing"));
+  input.addEventListener("blur", () => {
+    document.body.classList.remove("typing");
+    updateNavHeight();
+  });
+
+  window.addEventListener("resize", updateNavHeight);
+  if (window.ResizeObserver && navEl) new ResizeObserver(updateNavHeight).observe(navEl);
+  if (window.visualViewport) window.visualViewport.addEventListener("resize", updateViewportHeight);
+  updateNavHeight();
+  updateViewportHeight();
 
   showGreeting();
 
