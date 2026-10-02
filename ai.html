@@ -466,6 +466,71 @@
     messagesEl.appendChild(box);
   }
 
+  // -------- Lecture du flux NDJSON de /api/chat --------
+  // Ne lève jamais d'exception : tout échec affiche ERROR_TEXT dans la bulle.
+  async function streamReply(response, bubble) {
+    let gotDelta = false;
+    let outcome = null; // "done" | "error"
+
+    function showError() {
+      bubble.className = "msg assistant";
+      bubble.textContent = ERROR_TEXT;
+      outcome = "error";
+    }
+
+    function handleLine(line) {
+      line = line.trim();
+      if (!line || outcome) return;
+      const evt = JSON.parse(line);
+      if (evt.type === "delta" && typeof evt.text === "string") {
+        if (!gotDelta) {
+          // premier fragment : on quitte l'indicateur « réfléchit... »
+          gotDelta = true;
+          bubble.className = "msg assistant";
+          bubble.textContent = "";
+        }
+        // texte BRUT uniquement : un **gras** ou une URL peut être coupé entre deux fragments
+        bubble.appendChild(document.createTextNode(evt.text));
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      } else if (evt.type === "done" && typeof evt.reply === "string") {
+        bubble.className = "msg assistant";
+        bubble.textContent = "";
+        renderRich(bubble, evt.reply); // rendu final : liens cliquables + gras
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+        outcome = "done";
+      } else if (evt.type === "error") {
+        showError();
+      }
+    }
+
+    try {
+      if (!response.body) throw new Error("Flux indisponible");
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      while (!outcome) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n"); // une ligne JSON par \n (pas \n\n comme en SSE)
+        buffer = lines.pop();
+        for (const line of lines) handleLine(line);
+      }
+      if (!outcome) {
+        buffer += decoder.decode();
+        handleLine(buffer);
+      } else {
+        try { await reader.cancel(); } catch (e) { /* flux déjà terminé */ }
+      }
+    } catch (err) {
+      console.error(err);
+      if (outcome !== "done") showError();
+    }
+
+    // Flux terminé sans ligne "done" ni "error" : échec.
+    if (!outcome) showError();
+  }
+
   // -------- Envoi d'un message --------
   async function sendMessage(text) {
     text = String(text || "").trim();
@@ -485,15 +550,24 @@
         body: JSON.stringify({ message: text, conversationId: conversationId || null })
       });
 
-      if (!response.ok) throw new Error("HTTP " + response.status);
+      const contentType = response.headers.get("content-type") || "";
 
+      // X-Conversation-Id est présent dès les en-têtes, dans les deux familles de réponse.
       const newId = response.headers.get("X-Conversation-Id");
       if (newId) conversationId = newId;
 
-      const data = await response.json();
-      if (typeof data.reply !== "string") throw new Error("Réponse invalide : reply manquant");
-      thinkingEl.remove();
-      addMessage("assistant", data.reply);
+      if (contentType.indexOf("application/x-ndjson") !== -1) {
+        // Flux NDJSON : statut toujours 200, seule la dernière ligne (done/error) fait foi.
+        await streamReply(response, thinkingEl);
+      } else {
+        // application/json : échecs détectés avant l'envoi (vrai code HTTP d'erreur).
+        if (!response.ok) throw new Error("HTTP " + response.status);
+
+        const data = await response.json();
+        if (typeof data.reply !== "string") throw new Error("Réponse invalide : reply manquant");
+        thinkingEl.remove();
+        addMessage("assistant", data.reply);
+      }
     } catch (err) {
       console.error(err);
       thinkingEl.remove();
