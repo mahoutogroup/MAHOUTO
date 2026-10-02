@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
-<title>MAHOUTO AI — MAHOUTO+</title>
+<title>MAJESTÉ — MAHOUTO+</title>
 <meta name="theme-color" content="#0A0A0A">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="assets/favicon.png">
@@ -31,27 +31,36 @@
   header {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 16px 20px;
-    padding-right: 60px;
+    gap: 8px;
+    padding: 10px 12px 10px 16px;
     background: var(--bg-elevated);
     border-bottom: 1px solid var(--border);
   }
 
-  header h1 { font-size: 17px; color: var(--gold); flex: 1; }
+  .hdr-title { flex: 1; min-width: 0; }
+  header h1 { font-size: 17px; color: var(--gold); white-space: nowrap; line-height: 1.2; }
+  .hdr-sub { display: block; font-size: 11px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-  header .hdr-btn {
-    font-size: 12.5px;
+  /* 3 boutons ronds identiques (le bouton thème est déplacé dans le header) */
+  header .icon-btn,
+  header .theme-toggle-fab {
+    position: static;
+    flex: none;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
     background: var(--bg-card);
     color: var(--white);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 7px 10px;
+    font-size: 19px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
-    white-space: nowrap;
+    padding: 0;
   }
 
-  header .hdr-btn:active { transform: scale(.96); }
+  header .icon-btn:active { transform: scale(.92); }
 
   #ai-messages {
     flex: 1;
@@ -88,32 +97,97 @@
 
   .msg.thinking { color: var(--text-dim); font-style: italic; }
 
-  form#ai-composer {
+  /* ---------- Écran d'accueil (conversation vide) ---------- */
+  #ai-welcome {
+    margin: auto;
+    width: 100%;
+    max-width: 420px;
     display: flex;
+    flex-direction: column;
+    align-items: center;
     gap: 10px;
-    padding: 14px;
-    background: var(--bg-elevated);
-    border-top: 1px solid var(--border);
-    flex: none;
+    text-align: center;
   }
 
-  #ai-composer textarea {
-    flex: 1;
-    resize: none;
-    max-height: 100px;
-    padding: 12px 16px;
-    border-radius: 18px;
+  #ai-welcome .w-logo { font-size: 52px; line-height: 1; }
+  #ai-welcome .w-text { color: var(--text-muted); font-size: 14.5px; line-height: 1.5; max-width: 320px; margin-bottom: 8px; }
+
+  .w-cards { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+  .w-card {
+    min-height: 64px;
+    padding: 10px 12px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    color: var(--white);
+    font-family: inherit;
+    font-size: 13.5px;
+    line-height: 1.35;
+    cursor: pointer;
+  }
+
+  .w-card:active { transform: scale(.97); border-color: var(--gold); }
+
+  form#ai-composer {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    flex: none;
+    padding: 10px 12px;
+    background: var(--bg-elevated);
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -6px 14px rgba(0,0,0,.28);
+    position: relative;
+  }
+
+  #ai-composer .c-btn,
+  #ai-composer #ai-send-btn {
+    flex: none;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border-radius: 50%;
     border: 1px solid var(--border);
     background: var(--bg-card);
     color: var(--white);
-    font-size: 14.5px;
+    font-size: 19px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+
+  #ai-composer .c-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+  #ai-composer #ai-send-btn {
+    background: var(--gold-bright);
+    border: none;
+    color: #0A0A0A;
+    font-size: 18px;
+    font-weight: bold;
+  }
+
+  #ai-composer #ai-send-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+  #ai-composer textarea {
+    flex: 1;
+    min-width: 0;
+    resize: none;
+    height: 44px;
+    max-height: 108px; /* 4 lignes : 4 x 22px + 2 x 10px de padding */
+    padding: 10px 16px;
+    border-radius: 22px;
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    color: var(--white);
+    font-size: 16px;
+    line-height: 22px;
     font-family: inherit;
+    overflow-y: auto;
   }
 
   #ai-composer textarea:focus { outline: none; border-color: var(--gold); }
-
-  #ai-composer button { padding: 0 20px; border: none; border-radius: 18px; background: var(--gold-bright); font-weight: bold; cursor: pointer; }
-  #ai-composer button:disabled { opacity: .5; cursor: not-allowed; }
 
   /* ---------- Panneau historique ---------- */
   #history-overlay {
@@ -152,7 +226,7 @@
     font-weight: bold;
   }
 
-  .hist-head button { background: none; border: none; color: var(--text-muted); font-size: 20px; cursor: pointer; }
+  .hist-head button { background: none; border: none; color: var(--text-muted); font-size: 20px; cursor: pointer; width: 44px; height: 44px; }
 
   #history-list { flex: 1; overflow-y: auto; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
 
@@ -186,26 +260,30 @@
   .hist-title { display: block; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .hist-date { display: block; font-size: 11.5px; color: var(--text-dim); margin-top: 2px; }
 
-  .hist-del { background: none; border: none; font-size: 17px; padding: 10px; cursor: pointer; }
+  .hist-del { background: none; border: none; font-size: 17px; width: 44px; height: 44px; flex: none; cursor: pointer; }
 </style>
 </head>
 <body>
 
-<button id="theme-toggle-btn" class="theme-toggle-fab">🌙</button>
-
 <div id="ai-app" style="display:flex; flex-direction:column; flex:1;">
 
   <header>
-    <h1>🧠 MAHOUTO AI</h1>
-    <button type="button" class="hdr-btn" id="history-btn">🕘 Historique</button>
-    <button type="button" class="hdr-btn" id="new-chat-btn">+ Nouvelle conversation</button>
+    <div class="hdr-title">
+      <h1>🧠 MAJESTÉ</h1>
+      <span class="hdr-sub">Développé par MAJESTÉ PRESSE</span>
+    </div>
+    <button type="button" class="icon-btn" id="history-btn" aria-label="Historique" title="Historique">🕘</button>
+    <button type="button" class="icon-btn" id="new-chat-btn" aria-label="Nouvelle conversation" title="Nouvelle conversation">✏️</button>
+    <button id="theme-toggle-btn" class="theme-toggle-fab" aria-label="Changer de thème" title="Thème">🌙</button>
   </header>
 
   <div id="ai-messages"></div>
 
   <form id="ai-composer">
-    <textarea id="ai-input" rows="1" placeholder="Pose ta question à MAHOUTO AI..."></textarea>
-    <button type="submit" id="ai-send-btn">Envoyer</button>
+    <button type="button" class="c-btn" disabled title="Bientôt" aria-label="Joindre un fichier (bientôt)">📎</button>
+    <button type="button" class="c-btn" disabled title="Bientôt" aria-label="Dictée vocale (bientôt)">🎤</button>
+    <textarea id="ai-input" rows="1" placeholder="Écris à MAJESTÉ..."></textarea>
+    <button type="submit" id="ai-send-btn" aria-label="Envoyer" title="Envoyer" disabled>➤</button>
   </form>
 
 </div>
@@ -248,7 +326,14 @@
   const historyOverlay = document.getElementById("history-overlay");
   const historyList = document.getElementById("history-list");
 
-  const GREETING = "Bonjour 👋 Je suis MAHOUTO AI. Pose-moi une question, demande du code, ou colle un texte à analyser.";
+  const GREETING = "Bonjour 👋 Je suis MAJESTÉ. Pose-moi une question, demande du code, ou colle un texte à analyser.";
+  const SUGGESTIONS = [
+    "Écris-moi un code HTML/CSS",
+    "Explique-moi un concept",
+    "Analyse ce texte",
+    "Aide-moi à créer une affiche"
+  ];
+  let sending = false;
 
   let conversationId = null;
   let historyToken = 0; // invalide les réponses d'historique périmées
@@ -335,6 +420,8 @@
   }
 
   function addMessage(role, content) {
+    const welcome = document.getElementById("ai-welcome");
+    if (welcome) welcome.remove();
     const div = document.createElement("div");
     div.className = "msg " + role;
     const text = String(content == null ? "" : content);
@@ -353,21 +440,42 @@
   }
 
   function showGreeting() {
-    addMessage("assistant", GREETING);
+    const box = document.createElement("div");
+    box.id = "ai-welcome";
+
+    const logo = document.createElement("div");
+    logo.className = "w-logo";
+    logo.textContent = "🧠";
+    const text = document.createElement("p");
+    text.className = "w-text";
+    text.textContent = GREETING;
+    const cards = document.createElement("div");
+    cards.className = "w-cards";
+    SUGGESTIONS.forEach((label) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "w-card";
+      b.textContent = label;
+      b.addEventListener("click", () => sendMessage(label));
+      cards.appendChild(b);
+    });
+
+    box.appendChild(logo);
+    box.appendChild(text);
+    box.appendChild(cards);
+    messagesEl.appendChild(box);
   }
 
   // -------- Envoi d'un message --------
-  composer.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const text = input.value.trim();
-    if (!text || sendBtn.disabled) return;
+  async function sendMessage(text) {
+    text = String(text || "").trim();
+    if (!text || sending) return;
 
     addMessage("user", text);
-    input.value = "";
-    autoGrow();
-    sendBtn.disabled = true;
+    sending = true;
+    updateSendState();
 
-    const thinkingEl = addMessage("assistant thinking", "MAHOUTO AI réfléchit...");
+    const thinkingEl = addMessage("assistant thinking", "MAJESTÉ réfléchit...");
 
     try {
       const { headers } = await authHeaders({ "Content-Type": "application/json" });
@@ -391,23 +499,35 @@
       thinkingEl.remove();
       addMessage("assistant", ERROR_TEXT);
     } finally {
-      sendBtn.disabled = false;
+      sending = false;
+      updateSendState();
     }
+  }
+
+  composer.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const text = input.value.trim();
+    if (!text || sending) return;
+    input.value = "";
+    autoGrow();
+    updateSendState();
+    sendMessage(text);
   });
 
-  input.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      composer.dispatchEvent(new Event("submit", { cancelable: true }));
-    }
-  });
+  // Entrée = nouvelle ligne (mobile) ; seul le bouton ➤ envoie.
+  function updateSendState() {
+    sendBtn.disabled = sending || !input.value.trim();
+  }
 
   // -------- Zone de texte extensible (vers le haut, comme WhatsApp) --------
   function autoGrow() {
+    // Champ vide : on revient à la hauteur CSS (1 ligne) ; le placeholder
+    // ne doit pas gonfler scrollHeight.
+    if (!input.value) { input.style.height = ""; return; }
     input.style.height = "auto";
-    input.style.height = Math.min(input.scrollHeight, 100) + "px";
+    input.style.height = Math.min(input.scrollHeight, 108) + "px";
   }
-  input.addEventListener("input", autoGrow);
+  input.addEventListener("input", () => { autoGrow(); updateSendState(); });
 
   // -------- Nouvelle conversation --------
   newChatBtn.addEventListener("click", () => {
@@ -582,6 +702,12 @@
   window.addEventListener("resize", updateNavHeight);
   if (window.ResizeObserver && navEl) new ResizeObserver(updateNavHeight).observe(navEl);
   if (window.visualViewport) window.visualViewport.addEventListener("resize", updateViewportHeight);
+  // Le composeur est dans le flux de #ai-app : quand il grandit (jusqu'à 4 lignes),
+  // la liste des messages rétrécit seule. On garde simplement le bas visible.
+  if (window.ResizeObserver) {
+    new ResizeObserver(() => { messagesEl.scrollTop = messagesEl.scrollHeight; }).observe(composer);
+  }
+
   updateNavHeight();
   updateViewportHeight();
 
