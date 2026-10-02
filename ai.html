@@ -189,6 +189,69 @@
 
   #ai-composer textarea:focus { outline: none; border-color: var(--gold); }
 
+  /* ---------- Conversation vocale (plein écran) ---------- */
+  #voice-overlay { display: none; }
+  #voice-overlay.open {
+    display: flex;
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: var(--bg);
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 26px;
+    padding: 24px 24px max(24px, env(safe-area-inset-bottom));
+    text-align: center;
+  }
+
+  .v-title { color: var(--gold); font-weight: bold; font-size: 17px; }
+
+  .v-halo {
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 60px;
+    background: radial-gradient(circle, rgba(255,215,0,.25), rgba(255,215,0,.05) 70%);
+    border: 2px solid var(--gold);
+  }
+
+  #voice-overlay[data-state="listening"] .v-halo { animation: v-pulse 1.4s ease-in-out infinite; }
+  #voice-overlay[data-state="thinking"] .v-halo { animation: v-breathe 1.6s ease-in-out infinite; border-style: dashed; }
+  #voice-overlay[data-state="speaking"] .v-halo { animation: v-pulse .8s ease-in-out infinite; background: radial-gradient(circle, rgba(255,215,0,.45), rgba(255,215,0,.1) 70%); }
+  #voice-overlay[data-state="paused"] .v-halo { opacity: .5; }
+
+  @keyframes v-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255,215,0,.45); transform: scale(1); }
+    50% { box-shadow: 0 0 0 22px rgba(255,215,0,0); transform: scale(1.05); }
+  }
+  @keyframes v-breathe { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    #voice-overlay .v-halo { animation: none !important; }
+  }
+
+  #voice-status { color: var(--white); font-size: 18px; min-height: 26px; }
+
+  #voice-stop {
+    min-width: 170px;
+    height: 52px;
+    padding: 0 28px;
+    border: none;
+    border-radius: 26px;
+    background: var(--gold-bright);
+    color: #0A0A0A;
+    font-size: 16px;
+    font-weight: bold;
+    font-family: inherit;
+    cursor: pointer;
+  }
+
+  #voice-stop:active { transform: scale(.96); }
+
   /* ---------- Panneau historique ---------- */
   #history-overlay {
     position: fixed;
@@ -281,11 +344,18 @@
 
   <form id="ai-composer">
     <button type="button" class="c-btn" disabled title="Bientôt" aria-label="Joindre un fichier (bientôt)">📎</button>
-    <button type="button" class="c-btn" disabled title="Bientôt" aria-label="Dictée vocale (bientôt)">🎤</button>
+    <button type="button" class="c-btn" id="voice-btn" title="Conversation vocale" aria-label="Conversation vocale mains libres">🎤</button>
     <textarea id="ai-input" rows="1" placeholder="Écris à MAJESTÉ..."></textarea>
     <button type="submit" id="ai-send-btn" aria-label="Envoyer" title="Envoyer" disabled>➤</button>
   </form>
 
+</div>
+
+<div id="voice-overlay" data-state="listening" role="dialog" aria-label="Conversation vocale">
+  <div class="v-title">🧠 MAJESTÉ</div>
+  <div class="v-halo" id="voice-icon" aria-hidden="true">🎤</div>
+  <div id="voice-status" role="status" aria-live="polite">Je vous écoute...</div>
+  <button type="button" id="voice-stop">Arrêter</button>
 </div>
 
 <div id="history-overlay"></div>
@@ -471,6 +541,7 @@
   async function streamReply(response, bubble) {
     let gotDelta = false;
     let outcome = null; // "done" | "error"
+    let finalReply = null;
 
     function showError() {
       bubble.className = "msg assistant";
@@ -497,6 +568,7 @@
         bubble.textContent = "";
         renderRich(bubble, evt.reply); // rendu final : liens cliquables + gras
         messagesEl.scrollTop = messagesEl.scrollHeight;
+        finalReply = evt.reply;
         outcome = "done";
       } else if (evt.type === "error") {
         showError();
@@ -529,18 +601,23 @@
 
     // Flux terminé sans ligne "done" ni "error" : échec.
     if (!outcome) showError();
+
+    // Texte final nettoyé en cas de succès, null sinon (utilisé par le mode vocal).
+    return outcome === "done" ? finalReply : null;
   }
 
   // -------- Envoi d'un message --------
+  // Renvoie le texte final de la réponse, ou null en cas d'échec (ignoré par les envois texte).
   async function sendMessage(text) {
     text = String(text || "").trim();
-    if (!text || sending) return;
+    if (!text || sending) return null;
 
     addMessage("user", text);
     sending = true;
     updateSendState();
 
     const thinkingEl = addMessage("assistant thinking", "MAJESTÉ réfléchit...");
+    let result = null;
 
     try {
       const { headers } = await authHeaders({ "Content-Type": "application/json" });
@@ -558,7 +635,7 @@
 
       if (contentType.indexOf("application/x-ndjson") !== -1) {
         // Flux NDJSON : statut toujours 200, seule la dernière ligne (done/error) fait foi.
-        await streamReply(response, thinkingEl);
+        result = await streamReply(response, thinkingEl);
       } else {
         // application/json : échecs détectés avant l'envoi (vrai code HTTP d'erreur).
         if (!response.ok) throw new Error("HTTP " + response.status);
@@ -567,15 +644,18 @@
         if (typeof data.reply !== "string") throw new Error("Réponse invalide : reply manquant");
         thinkingEl.remove();
         addMessage("assistant", data.reply);
+        result = data.reply;
       }
     } catch (err) {
       console.error(err);
       thinkingEl.remove();
       addMessage("assistant", ERROR_TEXT);
+      result = null;
     } finally {
       sending = false;
       updateSendState();
     }
+    return result;
   }
 
   composer.addEventListener("submit", (e) => {
@@ -749,6 +829,252 @@
       window.alert(ERROR_TEXT);
     }
   }
+
+  // -------- Conversation vocale mains libres --------
+  // Un seul état actif à la fois : listening -> thinking -> speaking -> listening...
+  // Réutilise sendMessage() (donc streamReply, conversationId, historique) sans le dupliquer.
+  const voiceBtn = document.getElementById("voice-btn");
+  const voiceOverlay = document.getElementById("voice-overlay");
+  const voiceIcon = document.getElementById("voice-icon");
+  const voiceStatus = document.getElementById("voice-status");
+  const voiceStop = document.getElementById("voice-stop");
+
+  const VOICE_STATES = {
+    listening: { icon: "🎤", text: "Je vous écoute..." },
+    thinking: { icon: "🧠", text: "MAJESTÉ réfléchit..." },
+    speaking: { icon: "🔊", text: "MAJESTÉ parle..." },
+    paused: { icon: "⏸️", text: "En pause" }
+  };
+  const VOICE_ERROR_SPOKEN = "Une erreur est survenue.";
+  const SPEAK_CHUNK_MAX = 180;
+
+  let voiceActive = false;
+  let voicePhase = null;     // "listening" | "thinking" | "speaking"
+  let voicePaused = false;   // page en arrière-plan
+  let voiceRun = 0;          // invalide les callbacks d'un tour abandonné
+  let recognition = null;
+  let speakToken = 0;
+  let pendingSpeak = null;   // réponse arrivée pendant l'arrière-plan
+
+  function getSpeechRecognition() {
+    return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+  }
+
+  function setVoiceState(state) {
+    const view = VOICE_STATES[state];
+    voiceOverlay.setAttribute("data-state", state);
+    voiceIcon.textContent = view.icon;
+    voiceStatus.textContent = view.text;
+  }
+
+  function setVoicePhase(phase) {
+    voicePhase = phase;
+    if (!voicePaused) setVoiceState(phase);
+  }
+
+  // Version « parlable » du texte (jamais utilisée pour l'affichage écrit).
+  // Heuristique IMPARFAITE : le serveur ne transmet pas de marqueur de bloc de code,
+  // on repère donc une ligne de code à sa densité de symboles (accolades, ;, (), =, <>...).
+  // Elle peut se tromper dans les deux sens (code lu à voix haute, ou phrase prise pour du code).
+  function looksLikeCode(line) {
+    const compact = line.replace(/\s/g, "");
+    if (!compact) return false;
+    const symbols = (compact.match(/[{}()\[\];=<>$|&\\]/g) || []).length;
+    if (/[{}()\[\];=<>]/.test(compact) && !/[A-Za-zÀ-ÿ0-9]/.test(compact)) return true; // ex. "});" ou "}"
+    return symbols >= 3 && symbols / compact.length >= 0.12;
+  }
+
+  function toSpeakable(text) {
+    return String(text)
+      .split("\n")
+      .map((line) => {
+        if (/^\s*```/.test(line)) return "";                       // clôture de bloc : ignorée
+        if (looksLikeCode(line)) return "un extrait de code";
+        return line.replace(URL_RE, "un lien").replace(/\*\*/g, ""); // URL -> « un lien », pas d'astérisques
+      })
+      .filter((line) => line.trim())
+      .join("\n");
+  }
+
+  // Découpe en morceaux (Chrome coupe parfois les lectures longues).
+  function splitForSpeech(text) {
+    const sentences = text.split(/(?<=[.!?…\n])\s+/);
+    const chunks = [];
+    let cur = "";
+    sentences.forEach((sentence) => {
+      if (cur && (cur + " " + sentence).length > SPEAK_CHUNK_MAX) { chunks.push(cur); cur = sentence; }
+      else cur = cur ? cur + " " + sentence : sentence;
+    });
+    if (cur.trim()) chunks.push(cur);
+    return chunks;
+  }
+
+  function stopSpeaking() {
+    speakToken++; // les callbacks des utterances en cours deviennent sans effet
+    try { window.speechSynthesis.cancel(); } catch (e) { /* ignoré */ }
+  }
+
+  function stopListening() {
+    if (!recognition) return;
+    const rec = recognition;
+    recognition = null; // ses callbacks deviennent sans effet (aucune erreur visible)
+    try { rec.abort(); } catch (e) { /* déjà arrêtée */ }
+  }
+
+  function closeVoice(message) {
+    voiceActive = false;
+    voicePhase = null;
+    voicePaused = false;
+    pendingSpeak = null;
+    voiceRun++;
+    stopListening();
+    stopSpeaking();
+    voiceOverlay.classList.remove("open");
+    if (message) addMessage("assistant", message);
+  }
+
+  // PAROLE : le micro reste coupé pendant toute la lecture (pas d'interruption vocale).
+  function speakText(text) {
+    if (!voiceActive) return;
+    const run = voiceRun;
+    setVoicePhase("speaking");
+    stopListening();
+
+    const chunks = splitForSpeech(text);
+    const token = ++speakToken;
+    let i = 0;
+
+    function next() {
+      if (token !== speakToken || run !== voiceRun || !voiceActive) return;
+      if (i >= chunks.length) { startListening(); return; } // fin naturelle -> réécoute
+      const u = new SpeechSynthesisUtterance(chunks[i++]);
+      u.lang = "fr-FR";
+      u.onend = next;
+      u.onerror = (e) => {
+        if (e && (e.error === "interrupted" || e.error === "canceled")) return;
+        next();
+      };
+      try {
+        window.speechSynthesis.speak(u);
+      } catch (err) {
+        console.error(err); // synthèse indisponible : on passe au morceau suivant, puis à la réécoute
+        next();
+      }
+    }
+
+    if (!chunks.length) { startListening(); return; }
+    next();
+  }
+
+  // RÉFLEXION : micro coupé, même chemin d'envoi qu'un message tapé.
+  async function handleTranscript(text) {
+    if (!voiceActive) return;
+    const run = voiceRun;
+    setVoicePhase("thinking");
+    stopListening();
+
+    const reply = await sendMessage(text);
+    if (!voiceActive || run !== voiceRun) return;
+
+    const spoken = reply == null ? VOICE_ERROR_SPOKEN : toSpeakable(reply);
+    if (voicePaused) { pendingSpeak = spoken; return; } // lu au retour au premier plan
+    speakText(spoken);
+  }
+
+  // ÉCOUTE : un tour = une écoute (continuous:false), relancée automatiquement.
+  function startListening() {
+    if (!voiceActive || voicePaused) return;
+    const SR = getSpeechRecognition();
+    if (!SR) { closeVoice("La conversation vocale n'est pas disponible sur ce navigateur."); return; }
+
+    stopListening();
+    setVoicePhase("listening");
+
+    const rec = new SR();
+    recognition = rec;
+    rec.lang = "fr-FR";
+    rec.continuous = false;
+    rec.interimResults = false;
+
+    let transcript = "";
+    let gotFinal = false;
+    let errorCode = null;
+
+    rec.onresult = (e) => {
+      if (recognition !== rec) return;
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) { transcript += e.results[i][0].transcript; gotFinal = true; }
+      }
+      if (gotFinal) {
+        recognition = null;
+        try { rec.stop(); } catch (err) { /* ignoré */ }
+        const text = transcript.trim();
+        if (text) handleTranscript(text);
+        else startListening();
+      }
+    };
+
+    rec.onerror = (e) => {
+      if (recognition !== rec) return;
+      errorCode = (e && e.error) || "unknown";
+      if (errorCode === "no-speech" || errorCode === "aborted") return; // onend relance l'écoute
+      // Erreur grave (permission refusée, micro absent, réseau...) : on quitte le mode.
+      recognition = null;
+      const denied = errorCode === "not-allowed" || errorCode === "service-not-allowed";
+      closeVoice(denied
+        ? "Le micro n'est pas autorisé. Autorisez-le dans les réglages du navigateur pour utiliser la conversation vocale."
+        : "La reconnaissance vocale a rencontré un problème. Réessayez dans un instant.");
+    };
+
+    rec.onend = () => {
+      if (recognition !== rec) return;
+      recognition = null;
+      if (gotFinal || !voiceActive || voicePaused) return;
+      setTimeout(() => { if (voiceActive && voicePhase === "listening") startListening(); }, 250);
+    };
+
+    try {
+      rec.start();
+    } catch (err) {
+      console.error(err);
+      recognition = null;
+      closeVoice("Impossible de démarrer le micro.");
+    }
+  }
+
+  function openVoice() {
+    if (!getSpeechRecognition() || !window.speechSynthesis) {
+      window.alert("La conversation vocale n'est pas disponible sur ce navigateur.");
+      return;
+    }
+    if (sending || voiceActive) return;
+    input.blur();
+    voiceActive = true;
+    voicePaused = false;
+    pendingSpeak = null;
+    voiceRun++;
+    voiceOverlay.classList.add("open");
+    startListening();
+  }
+
+  // Arrière-plan : on coupe micro et synthèse sans erreur visible ; on ne réécoute qu'au retour.
+  document.addEventListener("visibilitychange", () => {
+    if (!voiceActive) return;
+    if (document.hidden) {
+      voicePaused = true;
+      stopListening();
+      if (voicePhase === "speaking") { stopSpeaking(); voicePhase = "listening"; } // lecture abandonnée
+      if (voicePhase !== "thinking") setVoiceState("paused");
+    } else {
+      voicePaused = false;
+      if (pendingSpeak != null) { const t = pendingSpeak; pendingSpeak = null; speakText(t); return; }
+      if (voicePhase === "thinking") { setVoiceState("thinking"); return; } // la réponse arrivera
+      startListening();
+    }
+  });
+
+  voiceBtn.addEventListener("click", openVoice);
+  voiceStop.addEventListener("click", () => closeVoice());
 
   // -------- Mise en page mobile : barre de nav fixe + clavier --------
   const navEl = document.querySelector("nav.bottom-nav");
