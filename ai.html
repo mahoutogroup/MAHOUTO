@@ -129,6 +129,17 @@
 
   .w-card:active { transform: scale(.97); border-color: var(--gold); }
 
+  /* libellé : 2 lignes maximum */
+  .w-label {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+  }
+
+  /* 5e carte : sous les deux rangées, sur toute la largeur */
+  .w-card:nth-child(5) { grid-column: 1 / -1; }
+
   form#ai-composer {
     display: flex;
     align-items: flex-end;
@@ -397,11 +408,28 @@
   const historyList = document.getElementById("history-list");
 
   const GREETING = "Bonjour 👋 Je suis MAJESTÉ. Pose-moi une question, demande du code, ou colle un texte à analyser.";
+  // label = texte affiché sur la carte ; message = texte réellement envoyé au clic.
   const SUGGESTIONS = [
-    "Écris-moi un code HTML/CSS",
-    "Explique-moi un concept",
-    "Analyse ce texte",
-    "Aide-moi à créer une affiche"
+    {
+      label: "🖨️ Je cherche un imprimeur",
+      message: "J'ai besoin d'un imprimeur. Quels services proposez-vous (flyers, affiches, cartes de visite, textile…) et comment passer commande ?"
+    },
+    {
+      label: "🎨 Découvrir la sérigraphie",
+      message: "Explique-moi ce que vous faites en sérigraphie : supports, tarifs, délais, quantités minimales."
+    },
+    {
+      label: "📲 Comment s'inscrire sur MAHOUTO+ ?",
+      message: "Comment m'inscrire sur la plateforme MAHOUTO+, étape par étape ?"
+    },
+    {
+      label: "🌐 Découvre l'écosystème MAHOUTO+",
+      message: "Explique-moi l'écosystème MAHOUTO+ : quels modules sont disponibles aujourd'hui et lesquels arrivent bientôt ?"
+    },
+    {
+      label: "🎓 Quelles formations proposez-vous ?",
+      message: "Quelles formations proposez-vous ? Présente-moi les modules disponibles (sérigraphie, imprimerie, graphisme, développement web), leurs tarifs et les documents obtenus."
+    }
   ];
   let sending = false;
 
@@ -521,12 +549,15 @@
     text.textContent = GREETING;
     const cards = document.createElement("div");
     cards.className = "w-cards";
-    SUGGESTIONS.forEach((label) => {
+    SUGGESTIONS.forEach((item) => {
       const b = document.createElement("button");
       b.type = "button";
       b.className = "w-card";
-      b.textContent = label;
-      b.addEventListener("click", () => sendMessage(label));
+      const label = document.createElement("span");
+      label.className = "w-label";
+      label.textContent = item.label;
+      b.appendChild(label);
+      b.addEventListener("click", () => sendMessage(item.message)); // le message, jamais le libellé
       cards.appendChild(b);
     });
 
