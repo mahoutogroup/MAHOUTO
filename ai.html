@@ -855,6 +855,8 @@
   let recognition = null;
   let speakToken = 0;
   let pendingSpeak = null;   // réponse arrivée pendant l'arrière-plan
+  let selectedVoice = null;  // voix choisie par pickVoice() ; null = voix par défaut du navigateur
+  let voiceSelectionStarted = false;
 
   function getSpeechRecognition() {
     return window.SpeechRecognition || window.webkitSpeechRecognition || null;
@@ -885,7 +887,16 @@
   }
 
   function toSpeakable(text) {
-    return String(text)
+    // Prononciation (lecture uniquement, l'affichage écrit garde ses majuscules) :
+    // 1) FCFA -> « francs CFA » (très fréquent, doit être fiable) ;
+    // 2) toute suite de 2 majuscules ou plus (accents compris) -> casse normale, pour que la
+    //    synthèse lise un mot (« Majesté ») et non un sigle épelé. « CFA » reste en majuscules
+    //    après « franc(s) », car il se dit bien lettre par lettre.
+    text = String(text)
+      .replace(/\bFCFA\b/gi, "francs CFA")
+      .replace(/(?<!francs? )(?<!\p{Lu})\p{Lu}{2,}/gu, (w) => w.charAt(0) + w.slice(1).toLowerCase());
+
+    return text
       .split("\n")
       .map((line) => {
         if (/^\s*```/.test(line)) return "";                       // clôture de bloc : ignorée
@@ -894,6 +905,49 @@
       })
       .filter((line) => line.trim())
       .join("\n");
+  }
+
+  // Voix : les voix se chargent de façon asynchrone sur Chrome ; filet de sécurité de 1500 ms.
+  function loadVoices() {
+    return new Promise((resolve) => {
+      const synth = window.speechSynthesis;
+      const read = () => { try { return synth.getVoices() || []; } catch (e) { return []; } };
+      const first = read();
+      if (first.length) { resolve(first); return; }
+
+      let settled = false;
+      let timer = null;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        synth.onvoiceschanged = null;
+        resolve(read()); // même vide : on ne bloque jamais
+      };
+      synth.onvoiceschanged = finish;
+      timer = setTimeout(finish, 1500);
+    });
+  }
+
+  // Cascade qui ne peut jamais « ne rien trouver » : timbre masculin -> autre voix française
+  // que la voix par défaut -> null (comportement d'origine, aucune voix précisée).
+  // Le genre n'existe pas dans l'API Web Speech : on le déduit du NOM de la voix, heuristique imparfaite.
+  const MALE_VOICE_HINT = /\b(male|masculin|homme|paul|thomas|nicolas|henri|antoine|mathieu|daniel|pierre|jean|louis|bruno|julien|olivier|guillaume)\b/i;
+
+  function pickVoice(voices) {
+    const lang = (v) => String(v.lang || "").replace("_", "-").toLowerCase(); // Android : "fr_FR"
+    const french = (voices || []).filter((v) => lang(v).indexOf("fr") === 0);
+    if (!french.length) return null;
+
+    // fr-FR d'abord, puis fr-CA, fr-BE, fr-CH...
+    const ordered = french.filter((v) => lang(v).indexOf("fr-fr") === 0)
+      .concat(french.filter((v) => lang(v).indexOf("fr-fr") !== 0));
+
+    const male = ordered.find((v) => MALE_VOICE_HINT.test(v.name || ""));
+    if (male) return male;
+
+    if (ordered.length > 1) return ordered.find((v) => !v.default) || null;
+    return null;
   }
 
   // Découpe en morceaux (Chrome coupe parfois les lectures longues).
@@ -949,6 +1003,7 @@
       if (i >= chunks.length) { startListening(); return; } // fin naturelle -> réécoute
       const u = new SpeechSynthesisUtterance(chunks[i++]);
       u.lang = "fr-FR";
+      if (selectedVoice) u.voice = selectedVoice; // sinon : voix par défaut, comme avant
       u.onend = next;
       u.onerror = (e) => {
         if (e && (e.error === "interrupted" || e.error === "canceled")) return;
@@ -1048,6 +1103,11 @@
       return;
     }
     if (sending || voiceActive) return;
+    if (!voiceSelectionStarted) {
+      // une seule fois, en arrière-plan : n'attend pas, la première lecture peut utiliser la voix par défaut
+      voiceSelectionStarted = true;
+      loadVoices().then((voices) => { selectedVoice = pickVoice(voices); }).catch((err) => console.error(err));
+    }
     input.blur();
     voiceActive = true;
     voicePaused = false;
