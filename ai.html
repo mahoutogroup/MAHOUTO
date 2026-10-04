@@ -97,12 +97,18 @@
 
   .msg.thinking { color: var(--text-dim); font-style: italic; }
 
-  /* bouton « Word » sous chaque réponse réelle de MAJESTÉ */
-  .word-btn {
+  /* boutons « Word » et « PDF » sous chaque réponse réelle de MAJESTÉ */
+  .msg-actions {
+    display: flex;
+    gap: 8px;
     align-self: flex-start;
+    margin-top: -6px;
+  }
+
+  .word-btn,
+  .pdf-btn {
     min-width: 36px;
     min-height: 36px;
-    margin-top: -6px;
     padding: 0 12px;
     background: transparent;
     border: 1px solid var(--border);
@@ -113,8 +119,10 @@
     cursor: pointer;
   }
 
-  .word-btn:active { transform: scale(.96); border-color: var(--gold); color: var(--gold); }
-  .word-btn:disabled { opacity: .5; cursor: wait; }
+  .word-btn:active,
+  .pdf-btn:active { transform: scale(.96); border-color: var(--gold); color: var(--gold); }
+  .word-btn:disabled,
+  .pdf-btn:disabled { opacity: .5; cursor: wait; }
 
   /* ---------- Écran d'accueil (conversation vide) ---------- */
   #ai-welcome {
@@ -556,11 +564,14 @@
     return div;
   }
 
-  // Conserve le texte brut sur la bulle et ajoute le bouton Word juste dessous.
+  // Conserve le texte brut sur la bulle et ajoute les boutons Word + PDF juste dessous.
   function attachWordButton(bubble, text) {
     bubble.dataset.rawText = text;
     const next = bubble.nextElementSibling;
-    if (next && next.classList.contains("word-btn")) return; // déjà présent
+    if (next && next.classList.contains("msg-actions")) return; // déjà présents
+    const row = document.createElement("div");
+    row.className = "msg-actions";
+
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "word-btn";
@@ -568,7 +579,18 @@
     btn.title = "Télécharger cette réponse en Word";
     btn.setAttribute("aria-label", "Télécharger cette réponse en Word");
     btn.addEventListener("click", () => downloadMessageAsWord(bubble, btn));
-    bubble.after(btn);
+    row.appendChild(btn);
+
+    const pdfBtn = document.createElement("button");
+    pdfBtn.type = "button";
+    pdfBtn.className = "pdf-btn";
+    pdfBtn.textContent = "📕 PDF";
+    pdfBtn.title = "Télécharger cette réponse en PDF";
+    pdfBtn.setAttribute("aria-label", "Télécharger cette réponse en PDF");
+    pdfBtn.addEventListener("click", () => downloadMessageAsPdf(bubble, pdfBtn));
+    row.appendChild(pdfBtn);
+
+    bubble.after(row);
   }
 
   // -------- Export Word (.docx) --------
@@ -599,7 +621,7 @@
   // Même esprit que renderRich/appendLinkified : **gras** et URL (vrai lien hypertexte).
   function wordRuns(docx, line) {
     const FONT = { ascii: "Arial", hAnsi: "Arial", cs: "Arial", eastAsia: "Arial" };
-    const SIZE = 22; // 11 pt
+    const SIZE = 24; // 12 pt
     const runs = [];
 
     function pushText(text, bold) {
@@ -671,7 +693,7 @@
         .map((line) => new docx.Paragraph({ children: wordRuns(docx, line), spacing: { after: 120 } }));
 
       const doc = new docx.Document({
-        styles: { default: { document: { run: { font: { ascii: "Arial", hAnsi: "Arial", cs: "Arial", eastAsia: "Arial" }, size: 22 } } } },
+        styles: { default: { document: { run: { font: { ascii: "Arial", hAnsi: "Arial", cs: "Arial", eastAsia: "Arial" }, size: 24 } } } },
         sections: [{ children: paragraphs }]
       });
 
@@ -688,6 +710,228 @@
       console.error(err);
       window.alert("Impossible de générer le document Word.");
     } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  // -------- Export PDF --------
+  // jsPDF n'est chargé qu'au premier clic sur « PDF », jamais au chargement de la page.
+  // Police : jsPDF n'embarque pas Arial ; on utilise Helvetica (police PDF standard, métriques identiques à Arial).
+  const JSPDF_URL = "https://cdn.jsdelivr.net/npm/jspdf@4.2.1/dist/jspdf.umd.min.js";
+  let jspdfPromise = null;
+  let pdfBusy = false;
+
+  function loadJsPdf() {
+    if (window.jspdf && window.jspdf.jsPDF) return Promise.resolve(window.jspdf);
+    if (jspdfPromise) return jspdfPromise;
+    jspdfPromise = new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = JSPDF_URL;
+      script.onload = () => {
+        if (window.jspdf && window.jspdf.jsPDF) resolve(window.jspdf);
+        else { jspdfPromise = null; reject(new Error("jsPDF indisponible")); }
+      };
+      script.onerror = () => {
+        script.remove();
+        jspdfPromise = null; // un clic ultérieur pourra réessayer
+        reject(new Error("jsPDF non chargé"));
+      };
+      document.head.appendChild(script);
+    });
+    return jspdfPromise;
+  }
+
+  // Helvetica (WinAnsi) n'affiche que Latin-1 + quelques signes ; tout autre caractère (emoji...)
+  // corromprait la ligne entière, on le retire ou on le remplace.
+  function pdfSafeText(text) {
+    return String(text)
+      .replace(/[    ]/g, " ")
+      .replace(/\t/g, " ")
+      .replace(/→/g, "->").replace(/←/g, "<-")
+      .replace(/≥/g, ">=").replace(/≤/g, "<=").replace(/≠/g, "!=")
+      .replace(/[^\x20-\x7E\xA1-\xFF€‚ƒ„…†‡ˆ‰Š‹ŒŽ‘’“”•–—˜™š›œžŸ]/g, "")
+      .replace(/\xAD/g, "");
+  }
+
+  // Une ligne -> mots {text, bold, url, space} (mêmes règles que wordRuns : **gras** et URL_RE).
+  function pdfAtoms(line) {
+    const atoms = [];
+    let pendingSpace = false;
+
+    function pushText(text, bold) {
+      text.replace(/\*\*/g, "").split(/(\s+)/).forEach((part) => {
+        if (!part) return;
+        if (/^\s+$/.test(part)) { pendingSpace = true; return; }
+        atoms.push({ text: part, bold: bold, url: null, space: pendingSpace && atoms.length > 0 });
+        pendingSpace = false;
+      });
+    }
+
+    function pushLinkified(text, bold) {
+      let last = 0;
+      let m;
+      URL_RE.lastIndex = 0;
+      while ((m = URL_RE.exec(text)) !== null) {
+        let url = m[0];
+        let trailing = "";
+        const t = url.match(/[.,;:!?)\]]+$/);
+        if (t) { trailing = t[0]; url = url.slice(0, -trailing.length); }
+        pushText(text.slice(last, m.index), bold);
+        if (url.length > 8) {
+          atoms.push({ text: url, bold: bold, url: url, space: pendingSpace && atoms.length > 0 });
+          pendingSpace = false;
+        } else {
+          pushText(url, bold);
+        }
+        pushText(trailing, bold);
+        last = m.index + m[0].length;
+      }
+      pushText(text.slice(last), bold);
+    }
+
+    const re = /\*\*([\s\S]+?)\*\*/g;
+    let last = 0;
+    let m;
+    while ((m = re.exec(line)) !== null) {
+      pushLinkified(line.slice(last, m.index), false);
+      pushLinkified(m[1], true);
+      last = m.index + m[0].length;
+    }
+    pushLinkified(line.slice(last), false);
+    return atoms;
+  }
+
+  function buildPdf(jsPDF, raw) {
+    const MARGIN = 20;                 // mm, 4 côtés
+    const PAGE_W = 210, PAGE_H = 297;  // A4 portrait
+    const USABLE = PAGE_W - 2 * MARGIN;
+    const FONT_PT = 12;
+    const LINE_H = 6;                  // mm (~17 pt pour du 12 pt)
+    const PARA_GAP = 2;                // mm
+    const BASELINE0 = MARGIN + 4.2;    // première ligne de base sous la marge haute
+    const LAST_BASELINE = PAGE_H - MARGIN - 1.2;
+
+    const doc = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
+    doc.setFontSize(FONT_PT);
+    doc.setTextColor(0, 0, 0);
+
+    const setStyle = (bold) => doc.setFont("helvetica", bold ? "bold" : "normal");
+    let y = BASELINE0;
+    let paragraphs = 0;
+
+    function newLineIfNeeded() {
+      if (y > LAST_BASELINE) { doc.addPage(); y = BASELINE0; }
+    }
+
+    function drawLine(runs) {
+      newLineIfNeeded();
+      let x = MARGIN;
+      runs.forEach((run) => {
+        setStyle(run.bold);
+        const w = doc.getTextWidth(run.text);
+        if (run.url) {
+          doc.setTextColor(5, 99, 193);
+          doc.textWithLink(run.text, x, y, { url: run.url });
+          doc.setDrawColor(5, 99, 193);
+          doc.setLineWidth(0.2);
+          doc.line(x, y + 0.7, x + w, y + 0.7);
+          doc.setTextColor(0, 0, 0);
+        } else {
+          doc.text(run.text, x, y);
+        }
+        x += w;
+      });
+      y += LINE_H;
+    }
+
+    pdfSafeText(raw).split("\n").filter((l) => l.trim()).forEach((line) => {
+      const atoms = pdfAtoms(line);
+      if (!atoms.length) return;
+      paragraphs++;
+
+      let runs = [];
+      let lineW = 0;
+
+      function flush() {
+        if (!runs.length) return;
+        const last = runs[runs.length - 1];
+        if (!last.url) last.text = last.text.replace(/\s+$/, ""); // pas d'espace en fin de ligne
+        drawLine(runs);
+        runs = [];
+        lineW = 0;
+      }
+
+      function place(atom, withSpace) {
+        setStyle(atom.bold);
+        const spaceW = withSpace ? doc.getTextWidth(" ") : 0;
+        const wordW = doc.getTextWidth(atom.text);
+        if (runs.length && lineW + spaceW + wordW > USABLE) { flush(); withSpace = false; }
+
+        const prev = runs[runs.length - 1];
+        if (withSpace && prev && !prev.url && !atom.url && prev.bold === atom.bold) {
+          prev.text += " " + atom.text;                       // même style : un seul bloc de texte
+        } else {
+          if (withSpace && prev && !prev.url) prev.text += " ";  // l'espace reste dans le bloc précédent
+          else if (withSpace) runs.push({ text: " ", bold: false, url: null }); // après un lien
+          runs.push({ text: atom.text, bold: atom.bold, url: atom.url });
+        }
+        lineW += (withSpace ? spaceW : 0) + wordW;
+      }
+
+      atoms.forEach((atom) => {
+        setStyle(atom.bold);
+        if (doc.getTextWidth(atom.text) <= USABLE) { place(atom, atom.space); return; }
+        // mot plus large que la ligne (longue URL) : découpé par splitTextToSize
+        doc.splitTextToSize(atom.text, USABLE - 2).forEach((piece, i) => { // -2 mm : splitTextToSize déborde parfois de ~1 mm
+          if (i > 0 || (runs.length && !atom.space)) flush();
+          place({ text: piece, bold: atom.bold, url: atom.url }, i === 0 && atom.space);
+        });
+      });
+      flush();
+      y += PARA_GAP;
+    });
+
+    return paragraphs ? doc : null;
+  }
+
+  function pdfFileName() {
+    return wordFileName().replace(/\.docx$/, ".pdf");
+  }
+
+  async function downloadMessageAsPdf(bubble, btn) {
+    const raw = bubble && bubble.dataset ? bubble.dataset.rawText : "";
+    if (!raw || !raw.trim()) return; // ignoré sans rien afficher
+    if (pdfBusy) return;             // pas de générations simultanées
+
+    pdfBusy = true;
+    if (btn) btn.disabled = true;
+    try {
+      let lib;
+      try {
+        lib = await loadJsPdf();
+      } catch (err) {
+        console.error(err);
+        window.alert("Impossible de charger le générateur PDF. Vérifiez votre connexion.");
+        return;
+      }
+
+      try {
+        const doc = buildPdf(lib.jsPDF, raw);
+        if (!doc) return; // rien d'exportable (ex. uniquement des emojis)
+        const url = URL.createObjectURL(doc.output("blob"));
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = pdfFileName();
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 10000);
+      } catch (err) {
+        console.error(err);
+        window.alert("Impossible de générer le document PDF.");
+      }
+    } finally {
+      pdfBusy = false;
       if (btn) btn.disabled = false;
     }
   }
