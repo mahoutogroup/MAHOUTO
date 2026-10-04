@@ -97,6 +97,25 @@
 
   .msg.thinking { color: var(--text-dim); font-style: italic; }
 
+  /* bouton « Word » sous chaque réponse réelle de MAJESTÉ */
+  .word-btn {
+    align-self: flex-start;
+    min-width: 36px;
+    min-height: 36px;
+    margin-top: -6px;
+    padding: 0 12px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 12.5px;
+    cursor: pointer;
+  }
+
+  .word-btn:active { transform: scale(.96); border-color: var(--gold); color: var(--gold); }
+  .word-btn:disabled { opacity: .5; cursor: wait; }
+
   /* ---------- Écran d'accueil (conversation vide) ---------- */
   #ai-welcome {
     margin: auto;
@@ -529,8 +548,148 @@
       div.textContent = text;
     }
     messagesEl.appendChild(div);
+    // Vraie réponse de MAJESTÉ uniquement : ni « réfléchit... », ni message utilisateur, ni notice d'erreur.
+    if (role.indexOf("assistant") !== -1 && role.indexOf("thinking") === -1 && role.indexOf("notice") === -1) {
+      attachWordButton(div, text);
+    }
     messagesEl.scrollTop = messagesEl.scrollHeight;
     return div;
+  }
+
+  // Conserve le texte brut sur la bulle et ajoute le bouton Word juste dessous.
+  function attachWordButton(bubble, text) {
+    bubble.dataset.rawText = text;
+    const next = bubble.nextElementSibling;
+    if (next && next.classList.contains("word-btn")) return; // déjà présent
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "word-btn";
+    btn.textContent = "📄 Word";
+    btn.title = "Télécharger cette réponse en Word";
+    btn.setAttribute("aria-label", "Télécharger cette réponse en Word");
+    btn.addEventListener("click", () => downloadMessageAsWord(bubble, btn));
+    bubble.after(btn);
+  }
+
+  // -------- Export Word (.docx) --------
+  // La bibliothèque « docx » n'est chargée qu'au premier clic, jamais au chargement de la page.
+  const DOCX_URL = "https://cdn.jsdelivr.net/npm/docx@8/build/index.umd.js"; // docx@8 : le point d'entrée est index.umd.js (pas index.js)
+  let docxPromise = null;
+
+  function loadDocx() {
+    if (window.docx) return Promise.resolve(window.docx);
+    if (docxPromise) return docxPromise;
+    docxPromise = new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = DOCX_URL;
+      script.onload = () => {
+        if (window.docx) resolve(window.docx);
+        else { docxPromise = null; reject(new Error("docx indisponible")); }
+      };
+      script.onerror = () => {
+        script.remove();
+        docxPromise = null; // un clic ultérieur pourra réessayer
+        reject(new Error("docx non chargé"));
+      };
+      document.head.appendChild(script);
+    });
+    return docxPromise;
+  }
+
+  // Même esprit que renderRich/appendLinkified : **gras** et URL (vrai lien hypertexte).
+  function wordRuns(docx, line) {
+    const FONT = { ascii: "Arial", hAnsi: "Arial", cs: "Arial", eastAsia: "Arial" };
+    const SIZE = 22; // 11 pt
+    const runs = [];
+
+    function pushText(text, bold) {
+      const clean = text.replace(/\*\*/g, "");
+      if (clean) runs.push(new docx.TextRun({ text: clean, bold: bold, font: FONT, size: SIZE }));
+    }
+
+    function pushLinkified(text, bold) {
+      let last = 0;
+      let m;
+      URL_RE.lastIndex = 0;
+      while ((m = URL_RE.exec(text)) !== null) {
+        let url = m[0];
+        let trailing = "";
+        const t = url.match(/[.,;:!?)\]]+$/);
+        if (t) { trailing = t[0]; url = url.slice(0, -trailing.length); }
+        pushText(text.slice(last, m.index), bold);
+        if (url.length > 8) {
+          runs.push(new docx.ExternalHyperlink({
+            link: url,
+            children: [new docx.TextRun({ text: url, bold: bold, font: FONT, size: SIZE, color: "0563C1", underline: {} })]
+          }));
+        } else {
+          pushText(url, bold);
+        }
+        pushText(trailing, bold);
+        last = m.index + m[0].length;
+      }
+      pushText(text.slice(last), bold);
+    }
+
+    const re = /\*\*([\s\S]+?)\*\*/g;
+    let last = 0;
+    let m;
+    while ((m = re.exec(line)) !== null) {
+      pushLinkified(line.slice(last, m.index), false);
+      pushLinkified(m[1], true);
+      last = m.index + m[0].length;
+    }
+    pushLinkified(line.slice(last), false);
+    return runs;
+  }
+
+  function wordFileName() {
+    const d = new Date();
+    const pad = (n) => String(n).padStart(2, "0");
+    return "Reponse_MAJESTE_" + pad(d.getDate()) + "-" + pad(d.getMonth() + 1) + "-" + d.getFullYear() + ".docx";
+  }
+
+  async function downloadMessageAsWord(bubble, btn) {
+    const raw = bubble && bubble.dataset ? bubble.dataset.rawText : "";
+    if (!raw || !raw.trim()) return; // ne devrait jamais arriver : on ignore sans rien afficher
+
+    if (btn) btn.disabled = true;
+    let docx;
+    try {
+      docx = await loadDocx();
+    } catch (err) {
+      console.error(err);
+      if (btn) btn.disabled = false;
+      window.alert("Impossible de charger le générateur Word. Vérifiez votre connexion.");
+      return;
+    }
+
+    try {
+      const paragraphs = raw
+        .split("\n")
+        .filter((line) => line.trim())
+        .map((line) => new docx.Paragraph({ children: wordRuns(docx, line), spacing: { after: 120 } }));
+
+      const doc = new docx.Document({
+        styles: { default: { document: { run: { font: { ascii: "Arial", hAnsi: "Arial", cs: "Arial", eastAsia: "Arial" }, size: 22 } } } },
+        sections: [{ children: paragraphs }]
+      });
+
+      const blob = await docx.Packer.toBlob(doc);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = wordFileName();
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    } catch (err) {
+      console.error(err);
+      window.alert("Impossible de générer le document Word.");
+    } finally {
+      if (btn) btn.disabled = false;
+    }
   }
 
   function resetMessages() {
@@ -598,6 +757,7 @@
         bubble.className = "msg assistant";
         bubble.textContent = "";
         renderRich(bubble, evt.reply); // rendu final : liens cliquables + gras
+        attachWordButton(bubble, evt.reply); // texte brut conservé + bouton Word (streamReply n'appelle pas addMessage)
         messagesEl.scrollTop = messagesEl.scrollHeight;
         finalReply = evt.reply;
         outcome = "done";
@@ -680,7 +840,7 @@
     } catch (err) {
       console.error(err);
       thinkingEl.remove();
-      addMessage("assistant", ERROR_TEXT);
+      addMessage("assistant notice", ERROR_TEXT);
       result = null;
     } finally {
       sending = false;
@@ -841,7 +1001,7 @@
       closeHistory();
     } catch (err) {
       console.error(err);
-      addMessage("assistant", ERROR_TEXT);
+      addMessage("assistant notice", ERROR_TEXT);
       closeHistory();
     }
   }
@@ -1015,7 +1175,7 @@
     stopListening();
     stopSpeaking();
     voiceOverlay.classList.remove("open");
-    if (message) addMessage("assistant", message);
+    if (message) addMessage("assistant notice", message);
   }
 
   // PAROLE : le micro reste coupé pendant toute la lecture (pas d'interruption vocale).
