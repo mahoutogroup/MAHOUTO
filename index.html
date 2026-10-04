@@ -81,7 +81,7 @@
 .profile-stats.stat.value { font-size: 16px; font-weight: bold; color: var(--gold); }
 .profile-stats.stat.label { font-size: 10px; color: var(--text-dim); margin-top: 2px; }
 
-  #auth-modal, #confirm-modal, #info-modal {
+  #auth-modal, #confirm-modal, #info-modal, #email-modal {
     position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.6);
     display: flex; align-items: flex-end; justify-content: center;
   }
@@ -90,9 +90,15 @@
     border-radius: 24px 24px 0 0; padding: 22px 20px 28px; max-height: 85vh; overflow-y: auto; position: relative;
     text-align: center;
   }
+  /* Fenêtre Email : mêmes valeurs que les autres « sheet », avec le bon sélecteur (.sheet est un élément enfant) */
+  #email-modal .sheet {
+    width: 100%; max-width: 480px; background: var(--bg-elevated);
+    border-radius: 24px 24px 0 0; padding: 22px 20px 28px; max-height: 85vh; overflow-y: auto; position: relative;
+    text-align: center;
+  }
 .sheet-handle { width: 40px; height: 4px; background: var(--border); border-radius: 3px; margin: 0 auto 16px; }
 
-  #auth-modal h3, #confirm-modal h3, #info-modal h3 { font-size: 18px; color: var(--gold); margin-bottom: 4px; }
+  #auth-modal h3, #confirm-modal h3, #info-modal h3, #email-modal h3 { font-size: 18px; color: var(--gold); margin-bottom: 4px; }
 
   #auth-error {
     background: rgba(239,68,68,.12); color: #F87171; border-radius: 10px; padding: 10px 12px; font-size: 12.5px; display: none;
@@ -104,6 +110,23 @@
 .modal-actions button { flex: 1; padding: 13px; border-radius: 12px; font-weight: bold; cursor: pointer; }
 .modal-btn-primary { background: var(--gold-bright); color: #0A0A0A; border: none; }
 .modal-btn-secondary { background: var(--bg-card); color: var(--white); border: 1px solid var(--border); }
+.modal-btn-primary:disabled, .modal-btn-secondary:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Fenêtre « Email » (code à 6 chiffres) */
+.modal-input {
+  width: 100%; padding: 13px 14px; margin: 0 0 14px; border-radius: 12px; border: 1px solid var(--border);
+  background: var(--bg-card); color: var(--white); font-size: 16px; font-family: inherit;
+}
+.modal-input:focus { outline: none; border-color: var(--gold); }
+.modal-input.code { text-align: center; font-size: 24px; letter-spacing: .4em; }
+.modal-error {
+  display: none; background: rgba(239,68,68,.12); color: #F87171; border-radius: 10px; padding: 10px 12px;
+  font-size: 12.5px; text-align: left; margin: 0 0 14px;
+}
+.modal-link {
+  background: none; border: none; color: var(--gold); font-size: 13.5px; padding: 12px; margin-top: 6px;
+  cursor: pointer; text-decoration: underline; font-family: inherit;
+}
 
 .module-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 0 20px; }
 .module-card { position: relative; }
@@ -362,6 +385,37 @@
   </div>
 </div>
 
+<div id="email-modal" class="hidden">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+
+    <form id="email-step1" novalidate>
+      <h3>Connexion par email</h3>
+      <p class="modal-text">Entrez votre adresse email : nous vous envoyons un code à 6 chiffres. Si vous n'avez pas encore de compte, il sera créé automatiquement.</p>
+      <input class="modal-input" id="email-input" type="email" inputmode="email" autocomplete="email"
+             autocapitalize="none" spellcheck="false" placeholder="vous@exemple.com" aria-label="Adresse email">
+      <div class="modal-error" id="email-error1" role="alert"></div>
+      <div class="modal-actions">
+        <button type="button" class="modal-btn-secondary" id="email-cancel">Annuler</button>
+        <button type="submit" class="modal-btn-primary" id="email-send">Recevoir mon code</button>
+      </div>
+    </form>
+
+    <form id="email-step2" class="hidden" novalidate>
+      <h3>Entrez votre code</h3>
+      <p class="modal-text">Code envoyé à <strong id="email-shown"></strong>. Il est valable quelques minutes.</p>
+      <input class="modal-input code" id="code-input" type="text" inputmode="numeric" pattern="[0-9]*"
+             maxlength="6" autocomplete="one-time-code" placeholder="••••••" aria-label="Code à 6 chiffres">
+      <div class="modal-error" id="email-error2" role="alert"></div>
+      <div class="modal-actions">
+        <button type="button" class="modal-btn-secondary" id="code-resend">Renvoyer le code</button>
+        <button type="submit" class="modal-btn-primary" id="code-verify">Vérifier</button>
+      </div>
+      <button type="button" class="modal-link" id="email-change">Changer d'adresse</button>
+    </form>
+  </div>
+</div>
+
 <div id="auth-modal" class="hidden">
   <div class="sheet">
     <div class="sheet-handle"></div>
@@ -447,8 +501,173 @@
     showInfo("Cette méthode de connexion n'est pas encore configurée.");
   });
 
-  document.getElementById("btn-login-email").addEventListener("click", () => {
-    showInfo("Cette méthode de connexion n'est pas encore configurée.");
+  // -------- Connexion / inscription par email (code à 6 chiffres) --------
+  // signInWithOtp crée le compte si l'email est nouveau (shouldCreateUser par défaut) ;
+  // les messages d'erreur sont génériques : ils ne révèlent jamais si un email existe déjà.
+  const emailModal = document.getElementById("email-modal");
+  const emailStep1 = document.getElementById("email-step1");
+  const emailStep2 = document.getElementById("email-step2");
+  const emailInput = document.getElementById("email-input");
+  const codeInput = document.getElementById("code-input");
+  const emailSendBtn = document.getElementById("email-send");
+  const codeVerifyBtn = document.getElementById("code-verify");
+  const codeResendBtn = document.getElementById("code-resend");
+  const emailErr1 = document.getElementById("email-error1");
+  const emailErr2 = document.getElementById("email-error2");
+  const RESEND_DELAY = 30; // secondes
+
+  let pendingEmail = "";
+  let resendTimer = null;
+
+  function setInlineError(el, message) {
+    el.textContent = message || "";
+    el.style.display = message ? "block" : "none";
+  }
+
+  function stopResendTimer() {
+    if (resendTimer) { clearInterval(resendTimer); resendTimer = null; }
+    codeResendBtn.disabled = false;
+    codeResendBtn.textContent = "Renvoyer le code";
+  }
+
+  // Bouton « Renvoyer » désactivé 30 s après chaque envoi.
+  function startResendTimer() {
+    stopResendTimer();
+    let left = RESEND_DELAY;
+    codeResendBtn.disabled = true;
+    codeResendBtn.textContent = "Renvoyer (" + left + " s)";
+    resendTimer = setInterval(() => {
+      left--;
+      if (left <= 0) stopResendTimer();
+      else codeResendBtn.textContent = "Renvoyer (" + left + " s)";
+    }, 1000);
+  }
+
+  function showEmailStep(step) {
+    emailStep1.classList.toggle("hidden", step !== 1);
+    emailStep2.classList.toggle("hidden", step !== 2);
+    setInlineError(emailErr1, "");
+    setInlineError(emailErr2, "");
+  }
+
+  function closeEmailModal() {
+    emailModal.classList.add("hidden");
+    stopResendTimer();
+    codeInput.value = ""; // le code n'est jamais conservé
+    pendingEmail = "";
+  }
+
+  function openEmailModal() {
+    if (typeof supabase === "undefined" || !supabase.auth || typeof supabase.auth.signInWithOtp !== "function") {
+      showInfo("Cette méthode de connexion n'est pas encore configurée.");
+      return;
+    }
+    emailInput.value = "";
+    codeInput.value = "";
+    showEmailStep(1);
+    emailModal.classList.remove("hidden");
+    setTimeout(() => emailInput.focus(), 50);
+  }
+
+  // Message sans aucune indication sur l'existence du compte.
+  function otpErrorMessage(error) {
+    const rate = error && (error.status === 429 || /rate_limit/i.test(error.code || "") || /rate limit/i.test(error.message || ""));
+    return rate
+      ? "Trop de demandes. Patientez un moment avant de redemander un code."
+      : "Impossible d'envoyer le code pour le moment. Vérifiez l'adresse email et réessayez.";
+  }
+
+  async function sendEmailCode(email) {
+    const { error } = await supabase.auth.signInWithOtp({ email: email });
+    if (error) throw error;
+  }
+
+  document.getElementById("btn-login-email").addEventListener("click", openEmailModal);
+  document.getElementById("email-cancel").addEventListener("click", closeEmailModal);
+  emailModal.addEventListener("click", (e) => { if (e.target === emailModal) closeEmailModal(); });
+
+  // Étape 1 : saisie de l'email
+  emailStep1.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const email = emailInput.value.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setInlineError(emailErr1, "Entrez une adresse email valide.");
+      return;
+    }
+    setInlineError(emailErr1, "");
+
+    emailSendBtn.disabled = true;
+    emailSendBtn.textContent = "Envoi en cours...";
+    try {
+      await sendEmailCode(email);
+      pendingEmail = email;
+      document.getElementById("email-shown").textContent = email;
+      codeInput.value = "";
+      showEmailStep(2);
+      startResendTimer();
+      setTimeout(() => codeInput.focus(), 50);
+    } catch (err) {
+      console.error(err);
+      showAuthError(otpErrorMessage(err));
+    } finally {
+      emailSendBtn.disabled = false;
+      emailSendBtn.textContent = "Recevoir mon code";
+    }
+  });
+
+  // Étape 2 : saisie du code
+  codeInput.addEventListener("input", () => {
+    codeInput.value = codeInput.value.replace(/\D/g, "").slice(0, 6);
+    setInlineError(emailErr2, "");
+  });
+
+  emailStep2.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const code = codeInput.value.trim();
+    if (code.length !== 6) {
+      setInlineError(emailErr2, "Entrez le code à 6 chiffres reçu par email.");
+      return;
+    }
+    setInlineError(emailErr2, "");
+
+    codeVerifyBtn.disabled = true;
+    codeVerifyBtn.textContent = "Vérification...";
+    try {
+      const { error } = await supabase.auth.verifyOtp({ email: pendingEmail, token: code, type: "email" });
+      if (error) throw error;
+      closeEmailModal();
+      await refreshIdentityUI();
+    } catch (err) {
+      console.error(err);
+      setInlineError(emailErr2, "Code incorrect ou expiré. Vérifiez le code ou demandez-en un nouveau.");
+      codeInput.focus(); // le champ reste modifiable
+    } finally {
+      codeVerifyBtn.disabled = false;
+      codeVerifyBtn.textContent = "Vérifier";
+    }
+  });
+
+  codeResendBtn.addEventListener("click", async () => {
+    if (!pendingEmail || codeResendBtn.disabled) return;
+    setInlineError(emailErr2, "");
+    codeResendBtn.disabled = true;
+    try {
+      await sendEmailCode(pendingEmail);
+      codeInput.value = "";
+      startResendTimer();
+    } catch (err) {
+      console.error(err);
+      setInlineError(emailErr2, otpErrorMessage(err));
+      stopResendTimer();
+    }
+  });
+
+  document.getElementById("email-change").addEventListener("click", () => {
+    stopResendTimer();
+    codeInput.value = "";
+    pendingEmail = "";
+    showEmailStep(1);
+    emailInput.focus();
   });
 
   function formatAnciennete(createdAt) {
