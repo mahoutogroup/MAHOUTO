@@ -1142,7 +1142,11 @@ font-family: inherit;
       const response = await fetch(API + "/api/chat", {
         method: "POST",
         headers,
-        body: JSON.stringify({ message: text, conversationId: conversationId || null })
+        // "voice: true" n'est ajouté QU'EN mode vocal : le corps d'une requête texte reste identique.
+        body: JSON.stringify(Object.assign(
+          { message: text, conversationId: conversationId || null },
+          options.voice === true ? { voice: true } : {}
+        ))
       });
       stage("headers");
 
@@ -1901,7 +1905,13 @@ font-family: inherit;
         }
         pushVoiceDelta(chunk);
       },
-      onDone: (full) => { if (!stale()) finishVoiceStream(full); }
+      onDone: (full) => {
+        if (stale()) return;
+        // streamReply vient d'ajouter la ligne Word/PDF juste après la bulle : inutile sous une réponse très courte.
+        const last = messagesEl.lastElementChild;
+        if (last && last.classList.contains("msg-actions") && String(full).length < 300) last.remove();
+        finishVoiceStream(full);
+      }
     });
 
     if (stale()) return;
