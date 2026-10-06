@@ -1377,6 +1377,11 @@ font-family: inherit;
   const VOICE_FIRST_CLAUSE_FROM = 40;  // ...on démarre à la première virgule située après ce rang
   const VOICE_TRAILING_FLUSH_MS = 300; // « phrase. » sans suite reçue : lue après ce délai
 
+  // Fiabilité TTS Android/Chrome (voir flushVoiceQueue)
+  const TTS_START_WAIT_MS = 800;   // si onstart n'arrive pas : resume(), puis après un 2e délai : relance propre
+  const TTS_MIC_RELEASE_MS = 350;  // délai mini entre l'arrêt du micro et speak() (Android libère le micro lentement)
+  const TTS_MAX_ATTEMPTS = 3;      // 1 essai normal + 2 relances (la 2e et la 3e sans voix imposée)
+
   // LOGS DE PERFORMANCE TEMPORAIRES : mettre à false (ou supprimer) une fois la latence réglée.
   const VOICE_DEBUG = true;
 
@@ -1388,7 +1393,8 @@ font-family: inherit;
   let recognition = null;
   let speakToken = 0;
   let selectedVoice = null;  // voix choisie par pickVoice() ; null = voix par défaut du navigateur
-  let voiceSelectionStarted = false;
+  let ttsInitDone = false;   // écouteur "voiceschanged" posé une seule fois
+  let voiceMicStopAt = 0;    // instant du dernier arrêt du micro
 
   // File vocale (un tour = une réponse de MAJESTÉ)
   let voiceSpeakQueue = [];      // phrases prêtes, déjà passées dans toSpeakable()
@@ -1411,6 +1417,10 @@ font-family: inherit;
   function vlog(label, extra) {
     if (!VOICE_DEBUG) return;
     console.log("[VOICE] " + label + ": " + Math.round(performance.now() - voiceT0) + " ms" + (extra ? " " + extra : ""));
+  }
+
+  function tlog(msg) {
+    if (VOICE_DEBUG) console.log("[VOICE-TTS] " + msg);
   }
 
   function getSpeechRecognition() {
@@ -1462,26 +1472,31 @@ font-family: inherit;
       .join("\n");
   }
 
-  // Voix : les voix se chargent de façon asynchrone sur Chrome ; filet de sécurité de 1500 ms.
-  function loadVoices() {
-    return new Promise((resolve) => {
-      const synth = window.speechSynthesis;
-      const read = () => { try { return synth.getVoices() || []; } catch (e) { return []; } };
-      const first = read();
-      if (first.length) { resolve(first); return; }
+  // Initialisation TTS : vérifie speechSynthesis, lit les voix, écoute "voiceschanged" (chargement
+  // tardif sur Android), choisit la voix. Ne bloque jamais : sans voix connue, selectedVoice reste null
+  // et speak() utilise la voix par défaut du système avec lang = "fr-FR".
+  function initSpeechSynthesis() {
+    const synth = window.speechSynthesis;
+    if (!synth) { tlog("speechSynthesis NOT available"); return false; }
+    tlog("speechSynthesis available");
 
-      let settled = false;
-      let timer = null;
-      const finish = () => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timer);
-        synth.onvoiceschanged = null;
-        resolve(read()); // même vide : on ne bloque jamais
-      };
-      synth.onvoiceschanged = finish;
-      timer = setTimeout(finish, 1500);
-    });
+    const refresh = () => {
+      let voices = [];
+      try { voices = synth.getVoices() || []; } catch (e) { /* ignoré */ }
+      tlog("voices loaded: " + voices.length);
+      if (!voices.length) return;
+      selectedVoice = pickVoice(voices);
+      tlog("selected voice: " + (selectedVoice
+        ? selectedVoice.name + " (" + selectedVoice.lang + ", " + (selectedVoice.localService === false ? "network" : "local") + ")"
+        : "none -> system default voice with lang fr-FR"));
+    };
+
+    if (!ttsInitDone) {
+      ttsInitDone = true;
+      try { synth.addEventListener("voiceschanged", refresh); } catch (e) { synth.onvoiceschanged = refresh; }
+    }
+    refresh();
+    return true;
   }
 
   // Cascade qui ne peut jamais « ne rien trouver » : timbre masculin -> autre voix française
@@ -1498,10 +1513,14 @@ font-family: inherit;
     const ordered = french.filter((v) => lang(v).indexOf("fr-fr") === 0)
       .concat(french.filter((v) => lang(v).indexOf("fr-fr") !== 0));
 
-    const male = ordered.find((v) => MALE_VOICE_HINT.test(v.name || ""));
+    // Voix locales d'abord : une voix « réseau » indisponible produit un silence total sur Android.
+    const local = ordered.filter((v) => v.localService !== false);
+    const pool = local.length ? local : ordered;
+
+    const male = pool.find((v) => MALE_VOICE_HINT.test(v.name || ""));
     if (male) return male;
 
-    if (ordered.length > 1) return ordered.find((v) => !v.default) || null;
+    if (pool.length > 1) return pool.find((v) => !v.default) || null;
     return null;
   }
 
@@ -1527,6 +1546,7 @@ font-family: inherit;
     if (!recognition) return;
     const rec = recognition;
     recognition = null; // ses callbacks deviennent sans effet (aucune erreur visible)
+    voiceMicStopAt = performance.now();
     try { rec.abort(); } catch (e) { /* déjà arrêtée */ }
   }
 
@@ -1655,6 +1675,10 @@ font-family: inherit;
 
   // Lit la file, une phrase à la fois. Le micro reste coupé pendant toute la lecture.
   // Quand la file est vide ET que la réponse est entièrement reçue : réécoute.
+  //
+  // Fiabilité Android : « MAJESTÉ parle » n'est affiché qu'à l'événement onstart (ou si
+  // speechSynthesis.speaking passe à true). Si rien ne démarre : resume(), puis annulation propre
+  // et relance de la MÊME phrase sans voix imposée (jamais deux utterances en même temps).
   function flushVoiceQueue() {
     if (!voiceActive || voicePaused || voiceSpeaking) return;
 
@@ -1667,52 +1691,144 @@ font-family: inherit;
       return;
     }
 
+    const synth = window.speechSynthesis;
     const run = voiceRun;
     const turn = voiceTurn;
     const token = speakToken;
     const text = voiceSpeakQueue.shift();
 
-    voiceSpeaking = true;
+    voiceSpeaking = true;   // verrouille la file dès maintenant (aucun second speak possible)
     voiceCurrentText = text;
-    setVoicePhase("speaking");
-    stopListening();
+    stopListening();        // sans effet si le micro est déjà coupé
 
-    const next = () => {
-      if (token !== speakToken || run !== voiceRun || turn !== voiceTurn || !voiceActive) return;
+    const stale = () => token !== speakToken || run !== voiceRun || turn !== voiceTurn || !voiceActive;
+    let finished = false;
+    let started = false;
+    let attempt = 0;
+    let current = null;     // utterance valide ; les callbacks des autres sont ignorés
+    let startedAt = 0;
+    let watch = null;
+    let poll = null;
+
+    const clearTimers = () => { clearTimeout(watch); clearInterval(poll); watch = null; poll = null; };
+
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      clearTimers();
+      if (stale()) return;
       voiceSpeaking = false;
       voiceCurrentText = "";
       voiceCurrentUtterance = null;
       flushVoiceQueue();
     };
 
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = "fr-FR";
-    if (selectedVoice) u.voice = selectedVoice; // sinon : voix par défaut, comme avant
-    u.onend = next;
-    u.onerror = (e) => {
-      if (e && (e.error === "interrupted" || e.error === "canceled")) return;
-      next();
-    };
-    if (VOICE_DEBUG && voiceTimings && !voiceTimings.ttsAudio) {
-      u.onstart = () => {
-        if (voiceTimings && !voiceTimings.ttsAudio) {
-          voiceTimings.ttsAudio = true;
-          vlog("First TTS audio started");
-        }
-      };
-    }
-    voiceCurrentUtterance = u;
-
-    try {
-      if (VOICE_DEBUG && voiceTimings && !voiceTimings.tts) {
-        voiceTimings.tts = true;
-        vlog("first TTS", "(speechSynthesis.speak)");
+    const markStarted = (source) => {
+      if (started || finished || stale()) return;
+      started = true;
+      startedAt = performance.now();
+      clearTimeout(watch);
+      watch = null;
+      tlog(source);
+      setVoicePhase("speaking"); // seulement maintenant : la voix a réellement démarré
+      if (VOICE_DEBUG && voiceTimings && !voiceTimings.ttsAudio) {
+        voiceTimings.ttsAudio = true;
+        vlog("First TTS audio started");
       }
-      window.speechSynthesis.speak(u);
-    } catch (err) {
-      console.error(err); // synthèse indisponible : on passe à la phrase suivante, puis à la réécoute
-      next();
+      // Filet : certains moteurs Android n'envoient jamais onend.
+      poll = setInterval(() => {
+        if (stale()) { clearTimers(); return; }
+        if (!synth.speaking && !synth.pending && performance.now() - startedAt > 800) {
+          tlog("onend never received -> considered finished");
+          finish();
+        }
+      }, 600);
+    };
+
+    const recover = (reason) => {
+      if (finished || stale()) return;
+      clearTimers();
+      tlog("recovery triggered (" + reason + "), attempt " + attempt + "/" + TTS_MAX_ATTEMPTS);
+      if (attempt >= TTS_MAX_ATTEMPTS) {
+        tlog("giving up on this sentence");
+        finish(); // on passe à la suite : la file (puis la réécoute) ne reste jamais bloquée
+        return;
+      }
+      current = null; // les callbacks de l'ancienne utterance deviennent sans effet
+      started = false;
+      try { synth.cancel(); } catch (e) { /* ignoré */ }
+      setTimeout(() => attemptSpeak(false), 150); // relance sans voix imposée (voix système par défaut)
+    };
+
+    const armWatch = () => {
+      let resumed = false;
+      const tick = () => {
+        watch = null;
+        if (finished || stale() || started) return;
+        if (synth.speaking) { markStarted("speaking=true without onstart event"); return; }
+        if (!resumed) {
+          resumed = true;
+          tlog("recovery triggered (resume), speaking=" + synth.speaking + " pending=" + synth.pending + " paused=" + synth.paused);
+          try { synth.resume(); } catch (e) { /* ignoré */ }
+          watch = setTimeout(tick, TTS_START_WAIT_MS);
+          return;
+        }
+        recover("no start");
+      };
+      watch = setTimeout(tick, TTS_START_WAIT_MS);
+    };
+
+    function attemptSpeak(useVoice) {
+      if (finished || stale()) return;
+      attempt++;
+
+      if (useVoice && !selectedVoice) { // voix chargées tardivement (Android)
+        try { selectedVoice = pickVoice(synth.getVoices() || []); } catch (e) { /* ignoré */ }
+      }
+
+      const u = new SpeechSynthesisUtterance(text);
+      current = u;
+      voiceCurrentUtterance = u; // référence gardée : Chrome peut sinon supprimer l'utterance avant onend
+      u.lang = "fr-FR";
+      if (useVoice && selectedVoice) u.voice = selectedVoice;
+      u.rate = 1;
+      u.pitch = 1;
+      u.volume = 1;
+
+      u.onstart = () => { if (current === u) markStarted("utterance onstart"); };
+      u.onend = () => {
+        if (current !== u) return;
+        tlog("utterance onend");
+        finish();
+      };
+      u.onerror = (e) => {
+        if (current !== u || finished) return;
+        tlog("utterance onerror: " + ((e && e.error) || "unknown"));
+        if (stale()) return; // annulation volontaire (pause, fermeture, nouveau tour)
+        recover("error");
+      };
+
+      try {
+        if (synth.paused) synth.resume(); // état « pause » résiduel : speak() resterait muet
+        tlog("speaking before: " + synth.speaking + " (pending=" + synth.pending + ", paused=" + synth.paused + ")");
+        if (VOICE_DEBUG && voiceTimings && !voiceTimings.tts) {
+          voiceTimings.tts = true;
+          vlog("first TTS", "(speechSynthesis.speak)");
+        }
+        tlog("speak() called (attempt " + attempt + ", voice: " + (u.voice ? u.voice.name : "default") + ")");
+        synth.speak(u);
+        armWatch();
+      } catch (err) {
+        console.error(err);
+        tlog("speak() threw: " + err);
+        recover("exception");
+      }
     }
+
+    // Laisse Android libérer le micro avant de parler.
+    const wait = Math.max(0, TTS_MIC_RELEASE_MS - (performance.now() - voiceMicStopAt));
+    if (wait > 0) setTimeout(() => attemptSpeak(true), wait);
+    else attemptSpeak(true);
   }
 
   // Fin de la réponse : vide le tampon restant dans la file, puis laisse la file se terminer.
@@ -1818,6 +1934,7 @@ font-family: inherit;
       }
       if (gotFinal) {
         recognition = null;
+        voiceMicStopAt = performance.now();
         try { rec.stop(); } catch (err) { /* ignoré */ }
         const text = transcript.trim();
         if (text) handleTranscript(text);
@@ -1860,11 +1977,7 @@ font-family: inherit;
       return;
     }
     if (sending || voiceActive) return;
-    if (!voiceSelectionStarted) {
-      // une seule fois, en arrière-plan : n'attend pas, la première lecture peut utiliser la voix par défaut
-      voiceSelectionStarted = true;
-      loadVoices().then((voices) => { selectedVoice = pickVoice(voices); }).catch((err) => console.error(err));
-    }
+    initSpeechSynthesis(); // n'attend rien : sans voix connue, la voix système par défaut est utilisée
     input.blur();
     voiceActive = true;
     voicePaused = false;
