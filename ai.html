@@ -1621,7 +1621,7 @@ font-family: inherit;
 
     if (VOICE_DEBUG && voiceTimings && !voiceTimings.sentence) {
       voiceTimings.sentence = true;
-      vlog("first sentence ready", "« " + spoken.slice(0, 60) + " »");
+      vlog("First sentence", "« " + spoken.slice(0, 60) + " »");
     }
     flushVoiceQueue();
   }
@@ -1661,7 +1661,6 @@ font-family: inherit;
     if (!voiceSpeakQueue.length) {
       if (voiceStreamDone && voiceTurnOpen) {
         voiceTurnOpen = false;
-        if (VOICE_DEBUG && voiceTimings) vlog("TTS finished");
         startListening(); // fin de toutes les phrases
       }
       return;
@@ -1706,7 +1705,7 @@ font-family: inherit;
     try {
       if (VOICE_DEBUG && voiceTimings && !voiceTimings.tts) {
         voiceTimings.tts = true;
-        vlog("first TTS", "(speechSynthesis.speak)");
+        vlog("First TTS", "(speechSynthesis.speak)");
       }
       window.speechSynthesis.speak(u);
     } catch (err) {
@@ -1726,10 +1725,10 @@ font-family: inherit;
 
     if (reply == null) {
       voiceDeltaBuffer = "";
-      if (VOICE_DEBUG && voiceTimings) vlog("stream done", "(erreur)");
+      if (VOICE_DEBUG && voiceTimings) vlog("Done", "(erreur)");
       enqueueVoiceText(VOICE_ERROR_SPOKEN);
     } else {
-      if (VOICE_DEBUG && voiceTimings) vlog("stream done");
+      if (VOICE_DEBUG && voiceTimings) vlog("Done");
       const rest = voiceDeltaBuffer.trim();
       voiceDeltaBuffer = "";
       if (rest) enqueueVoiceText(rest);
@@ -1781,7 +1780,7 @@ font-family: inherit;
         if (stale()) return;
         if (VOICE_DEBUG && voiceTimings && !voiceTimings.delta) {
           voiceTimings.delta = true;
-          vlog("first delta");
+          vlog("First delta");
         }
         pushVoiceDelta(chunk);
       },
