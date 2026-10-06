@@ -1383,7 +1383,8 @@ font-family: inherit;
 
   // Fiabilité TTS Android/Chrome (voir flushVoiceQueue)
   const TTS_START_WAIT_MS = 800;   // si onstart n'arrive pas : resume(), puis après un 2e délai : relance propre
-  const TTS_MIC_RELEASE_MS = 350;  // délai mini entre l'arrêt du micro et speak() (Android libère le micro lentement)
+  const TTS_MIC_RELEASE_MS = 500;  // délai mini entre la FIN réelle de la reconnaissance (onend) et speak()
+  const TTS_MIC_WAIT_MAX_MS = 1500; // attente maximale : si onend n'arrive jamais, on parle quand même
   const TTS_MAX_ATTEMPTS = 3;      // 1 essai normal + 2 relances (la 2e et la 3e sans voix imposée)
 
   // LOGS DE PERFORMANCE TEMPORAIRES : mettre à false (ou supprimer) une fois la latence réglée.
@@ -1398,7 +1399,8 @@ font-family: inherit;
   let speakToken = 0;
   let selectedVoice = null;  // voix choisie par pickVoice() ; null = voix par défaut du navigateur
   let ttsInitDone = false;   // écouteur "voiceschanged" posé une seule fois
-  let voiceMicStopAt = 0;    // instant du dernier arrêt du micro
+  let voiceMicStopAt = 0;    // instant du dernier arrêt (puis de la fin réelle) du micro
+  let voiceRecEnded = true;  // false entre l'arrêt demandé de la reconnaissance et son événement onend
 
   // File vocale (un tour = une réponse de MAJESTÉ)
   let voiceSpeakQueue = [];      // phrases prêtes, déjà passées dans toSpeakable()
@@ -1551,6 +1553,7 @@ font-family: inherit;
     const rec = recognition;
     recognition = null; // ses callbacks deviennent sans effet (aucune erreur visible)
     voiceMicStopAt = performance.now();
+    voiceRecEnded = false; // remis à true par onend
     try { rec.abort(); } catch (e) { /* déjà arrêtée */ }
   }
 
@@ -1829,10 +1832,21 @@ font-family: inherit;
       }
     }
 
-    // Laisse Android libérer le micro avant de parler.
-    const wait = Math.max(0, TTS_MIC_RELEASE_MS - (performance.now() - voiceMicStopAt));
-    if (wait > 0) setTimeout(() => attemptSpeak(true), wait);
-    else attemptSpeak(true);
+    // Android : tant que le micro n'est pas réellement libéré, une voix peut « démarrer » sans être
+    // entendue (surtout une réponse très courte). On attend onend + TTS_MIC_RELEASE_MS, au plus TTS_MIC_WAIT_MAX_MS.
+    const waitFrom = performance.now();
+    const waitForMic = () => {
+      if (finished || stale()) return;
+      const now = performance.now();
+      const ready = voiceRecEnded && now - voiceMicStopAt >= TTS_MIC_RELEASE_MS;
+      if (ready || now - waitFrom >= TTS_MIC_WAIT_MAX_MS) {
+        if (!ready) tlog("mic release wait timed out -> speaking anyway");
+        attemptSpeak(true);
+      } else {
+        setTimeout(waitForMic, 60);
+      }
+    };
+    waitForMic();
   }
 
   // Fin de la réponse : vide le tampon restant dans la file, puis laisse la file se terminer.
@@ -1945,6 +1959,7 @@ font-family: inherit;
       if (gotFinal) {
         recognition = null;
         voiceMicStopAt = performance.now();
+        voiceRecEnded = false; // remis à true par onend
         try { rec.stop(); } catch (err) { /* ignoré */ }
         const text = transcript.trim();
         if (text) handleTranscript(text);
@@ -1965,6 +1980,8 @@ font-family: inherit;
     };
 
     rec.onend = () => {
+      voiceRecEnded = true; // le micro est réellement libéré (mesuré AVANT la garde ci-dessous)
+      voiceMicStopAt = performance.now();
       if (recognition !== rec) return;
       recognition = null;
       if (gotFinal || !voiceActive || voicePaused) return;
