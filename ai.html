@@ -1393,6 +1393,8 @@ font-family: inherit;
   let voiceActive = false;
   let voicePhase = null;     // "listening" | "thinking" | "speaking"
   let voicePaused = false;   // page en arrière-plan
+  let voiceWakeLock = null;  // verrou d'écran (Screen Wake Lock) tenu pendant la conversation vocale
+  let voiceWakeLockPending = false;
   let voiceRun = 0;          // invalide les callbacks d'une session vocale fermée/rouverte
   let voiceTurn = 0;         // invalide les callbacks d'un tour vocal précédent
   let recognition = null;
@@ -1876,6 +1878,31 @@ font-family: inherit;
     flushVoiceQueue();
   }
 
+  // Garde l'écran allumé pendant la conversation vocale : sans cela, le verrouillage automatique du
+  // téléphone suspend micro et synthèse. Facultatif : si l'API est absente ou refusée, le mode vocal marche sans.
+  async function requestVoiceWakeLock() {
+    if (!voiceActive || voiceWakeLock || voiceWakeLockPending || document.hidden) return;
+    if (!navigator.wakeLock || typeof navigator.wakeLock.request !== "function") return;
+    voiceWakeLockPending = true;
+    try {
+      const lock = await navigator.wakeLock.request("screen");
+      if (!voiceActive) { lock.release().catch(() => {}); return; } // mode fermé pendant la demande
+      voiceWakeLock = lock;
+      // Le navigateur le libère seul quand la page passe en arrière-plan : on le redemandera au retour.
+      lock.addEventListener("release", () => { if (voiceWakeLock === lock) voiceWakeLock = null; });
+    } catch (err) {
+      console.error(err);
+    } finally {
+      voiceWakeLockPending = false;
+    }
+  }
+
+  function releaseVoiceWakeLock() {
+    const lock = voiceWakeLock;
+    voiceWakeLock = null;
+    if (lock) { try { lock.release().catch(() => {}); } catch (err) { /* déjà libéré */ } }
+  }
+
   function closeVoice(message) {
     voiceActive = false;
     voicePhase = null;
@@ -1885,6 +1912,7 @@ font-family: inherit;
     resetVoiceQueue();
     stopListening();
     stopSpeaking();
+    releaseVoiceWakeLock();
     voiceOverlay.classList.remove("open");
     if (message) addMessage("assistant notice", message);
   }
@@ -2012,6 +2040,7 @@ font-family: inherit;
     voiceTurn++;
     resetVoiceQueue();
     voiceOverlay.classList.add("open");
+    requestVoiceWakeLock();
     startListening();
   }
 
@@ -2033,6 +2062,7 @@ font-family: inherit;
       if (voicePhase !== "thinking") setVoiceState("paused");
     } else {
       voicePaused = false;
+      requestVoiceWakeLock(); // le verrou est perdu en arrière-plan : on le reprend
       if (voiceTurnOpen) {
         setVoiceState(voicePhase || "thinking");
         flushVoiceQueue(); // lit ce qui attend, ou réécoute si tout est déjà lu et reçu

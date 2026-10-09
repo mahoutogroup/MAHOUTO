@@ -161,8 +161,15 @@
     return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
   }
 
+  // escapeHtml() n'échappe pas les guillemets : une valeur d'attribut a besoin de cet échappement-ci.
+  function escapeAttr(value) {
+    return String(value)
+      .replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/'/g, "&#39;")
+      .replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
   function avatarHtml(user) {
-    if (user && user.avatar_url) return `<img src="${user.avatar_url}" alt="">`;
+    if (user && user.avatar_url) return `<img src="${escapeAttr(user.avatar_url)}" alt="">`;
     const initial = user && user.username ? user.username.trim()[0].toUpperCase() : "?";
     return initial;
   }

@@ -107,7 +107,18 @@ if (window.__MAHOUTO_AUTH_LOADED__) {
             // Mettre à jour le profil dans index.html
             if(typeof refreshIdentityUI === 'function') {
                 const avatarEl = document.getElementById("profile-avatar");
-                if(avatarEl) avatarEl.innerHTML = userPhoto? `<img src="${userPhoto}" alt="">` : userName.trim()[0].toUpperCase();
+                if(avatarEl) {
+                    avatarEl.textContent = "";
+                    if (userPhoto) {
+                        // DOM (pas innerHTML) : l'URL ne doit jamais être injectée dans du HTML
+                        const photoImg = document.createElement("img");
+                        photoImg.alt = "";
+                        photoImg.src = userPhoto;
+                        avatarEl.appendChild(photoImg);
+                    } else {
+                        avatarEl.textContent = userName.trim()[0].toUpperCase();
+                    }
+                }
                 document.getElementById("profile-name").textContent = userName;
                 document.getElementById("auth-methods").classList.add("hidden-by-auth");
                 document.getElementById("auth-guest-note").classList.add("hidden");

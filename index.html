@@ -723,7 +723,16 @@
 
       const avatarEl = document.getElementById("profile-avatar");
       const photo = (profile && profile.avatar_url) || (user.user_metadata && user.user_metadata.avatar_url);
-      avatarEl.innerHTML = photo? '<img src="' + photo + '" alt="">' : name.trim()[0].toUpperCase();
+      avatarEl.textContent = "";
+      if (photo) {
+        // DOM (pas innerHTML) : l'URL ne doit jamais être injectée dans du HTML
+        const avatarImg = document.createElement("img");
+        avatarImg.alt = "";
+        avatarImg.src = photo;
+        avatarEl.appendChild(avatarImg);
+      } else {
+        avatarEl.textContent = name.trim()[0].toUpperCase();
+      }
 
       // ID MAHOUTO+ : dérivé de l'identifiant Supabase de l'utilisateur
       // (8 premiers caractères, en majuscules) — aucun champ dédié
