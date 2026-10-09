@@ -193,7 +193,12 @@
       : "Ouvre Messages pour créer ton profil";
 
     if (currentAvatarUrl) {
-      avatarEl.innerHTML = `<img src="${currentAvatarUrl}" alt="">`;
+      // DOM (pas innerHTML) : l'URL ne doit jamais être injectée dans du HTML
+      const avatarImg = document.createElement("img");
+      avatarImg.alt = "";
+      avatarImg.src = currentAvatarUrl;
+      avatarEl.textContent = "";
+      avatarEl.appendChild(avatarImg);
     } else {
       avatarEl.textContent = currentUsername ? currentUsername.trim()[0].toUpperCase() : "?";
     }

@@ -561,7 +561,12 @@
     }
     const avatarEl = document.getElementById("peer-avatar");
     if (peerAvatarUrl) {
-      avatarEl.innerHTML = `<img src="${peerAvatarUrl}" alt="">`;
+      // DOM (pas innerHTML) : avatar_url est modifiable par son propriétaire, jamais injecté dans du HTML
+      const peerImg = document.createElement("img");
+      peerImg.alt = "";
+      peerImg.src = peerAvatarUrl;
+      avatarEl.textContent = "";
+      avatarEl.appendChild(peerImg);
       avatarEl.classList.add("has-photo");
     } else {
       const name = document.getElementById("peer-name").textContent;
