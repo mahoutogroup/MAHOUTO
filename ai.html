@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
-<title>MAJESTÉ — MAHOUTO+</title>
+<title>MAJESTÉ Pro — MAHOUTO+</title>
 <meta name="theme-color" content="#0A0A0A">
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="assets/favicon.png">
@@ -367,8 +367,8 @@ font-family: inherit;
 <div id="ai-app" style="display:flex; flex-direction:column; flex:1;">
   <header>
     <div class="hdr-title">
-      <h1>🧠 MAJESTÉ</h1>
-      <span class="hdr-sub">Développé par MAJESTÉ PRESSE</span>
+      <h1>🧠 MAJESTÉ Pro</h1>
+      <span class="hdr-sub">L'IA des professionnels</span>
     </div>
     <button type="button" class="icon-btn" id="history-btn" aria-label="Historique" title="Historique">🕘</button>
     <button type="button" class="icon-btn" id="new-chat-btn" aria-label="Nouvelle conversation" title="Nouvelle conversation">✏️</button>
@@ -380,13 +380,13 @@ font-family: inherit;
   <form id="ai-composer">
     <button type="button" class="c-btn" disabled title="Bientôt" aria-label="Joindre un fichier (bientôt)">📎</button>
     <button type="button" class="c-btn" id="voice-btn" title="Conversation vocale" aria-label="Conversation vocale mains libres">🎤</button>
-    <textarea id="ai-input" rows="1" placeholder="Écris à MAJESTÉ..."></textarea>
+    <textarea id="ai-input" rows="1" placeholder="Écris à MAJESTÉ Pro..."></textarea>
     <button type="submit" id="ai-send-btn" aria-label="Envoyer" title="Envoyer" disabled>➤</button>
   </form>
 </div>
 
 <div id="voice-overlay" data-state="listening" role="dialog" aria-label="Conversation vocale">
-  <div class="v-title">🧠 MAJESTÉ</div>
+  <div class="v-title">🧠 MAJESTÉ Pro</div>
   <div class="v-halo" id="voice-icon" aria-hidden="true">🎤</div>
   <div id="voice-status" role="status" aria-live="polite">Je vous écoute...</div>
   <button type="button" id="voice-stop">Arrêter</button>
@@ -432,7 +432,7 @@ font-family: inherit;
   const historyOverlay = document.getElementById("history-overlay");
   const historyList = document.getElementById("history-list");
 
-  const GREETING = "Bonjour 👋 Je suis MAJESTÉ. Pose-moi une question, demande du code, ou colle un texte à analyser.";
+  const GREETING = "Bonjour 👋 Je suis MAJESTÉ Pro, l'IA des professionnels. Pose-moi une question, demande du code, ou colle un texte à analyser.";
   // label = texte affiché sur la carte ; message = texte réellement envoyé au clic.
   const SUGGESTIONS = [
     {
@@ -680,7 +680,7 @@ font-family: inherit;
     const d = new Date();
     const pad = (n) => String(n).padStart(2, "0");
     const date = pad(d.getDate()) + "/" + pad(d.getMonth() + 1) + "/" + d.getFullYear();
-    return "Document généré automatiquement par MAJESTÉ AI le " + date +
+    return "Document généré automatiquement par MAJESTÉ Pro le " + date +
       " — à titre informatif, ne constitue pas un engagement contractuel de Majesté Presse.";
   }
 
@@ -1132,7 +1132,7 @@ font-family: inherit;
     sending = true;
     updateSendState();
 
-    const thinkingEl = addMessage("assistant thinking", "MAJESTÉ réfléchit...");
+    const thinkingEl = addMessage("assistant thinking", "MAJESTÉ Pro réfléchit...");
     let result = null;
 
     try {
@@ -1368,8 +1368,8 @@ font-family: inherit;
 
   const VOICE_STATES = {
     listening: { icon: "🎤", text: "Je vous écoute..." },
-    thinking: { icon: "🧠", text: "MAJESTÉ réfléchit..." },
-    speaking: { icon: "🔊", text: "MAJESTÉ parle..." },
+    thinking: { icon: "🧠", text: "MAJESTÉ Pro réfléchit..." },
+    speaking: { icon: "🔊", text: "MAJESTÉ Pro parle..." },
     paused: { icon: "⏸️", text: "En pause" }
   };
   const VOICE_ERROR_SPOKEN = "Une erreur est survenue.";
