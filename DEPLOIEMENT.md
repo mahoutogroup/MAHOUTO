@@ -271,3 +271,10 @@ Le dépôt utilise des **valeurs de repli** (voir `brand.js`, objet `BRANDS.maje
 - [ ] **Captures d'écran** de l'application pour l'installation (retirées du manifest Majesté : celles du dépôt montrent MAHOUTO+).
 - [ ] **Slogan et sous-titre** : propositions actuelles « Informer • Former • Inspirer » et
       « La presse qui éclaire, le savoir qui élève. » (à valider ou remplacer).
+
+### 12.11 Voir la marque MAJESTÉ PRESSE dans un aperçu Vercel
+Pour tester la marque MAJESTÉ PRESSE **avant** de brancher `majestepresse.com`, ouvrez l'URL d'aperçu Vercel (`https://….vercel.app`) ou `localhost` avec :
+- `?brand=majeste` (ex. `https://mon-apercu.vercel.app/?brand=majeste`) : affiche la marque MAJESTÉ PRESSE. Le choix est mémorisé pour l'onglet courant (`sessionStorage`) : les pages suivantes restent en MAJESTÉ PRESSE sans repasser le paramètre. Fermer l'onglet l'oublie.
+- `?brand=mahouto` : revient à MAHOUTO+ (et efface la mémorisation).
+
+Ce mode n'existe que sur `localhost` et les hôtes se terminant exactement par `.vercel.app`. Il n'a **aucun effet** sur `mahouto.com`, `majestepresse.com` (avec ou sans `www`) ni sur aucun autre domaine ; toute autre valeur du paramètre est ignorée. Il ne change que l'affichage dans le navigateur : le serveur (`api/_brand.js`) et le service worker continuent de choisir la marque d'après le nom d'hôte réel.
