@@ -19,6 +19,7 @@
 // =========================================================
 
 import webpush from "web-push";
+import { brandForRequest } from "./_brand.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -170,7 +171,7 @@ async function handleSend(res, supabaseAdmin, callerId, body) {
   }
   webpush.setVapidDetails("mailto:contact@mahouto.com", vapidPublic, vapidPrivate);
 
-  const title = String(body.title || "MAHOUTO+").trim().slice(0, 100);
+  const title = String(body.title || brandForRequest(req).name).trim().slice(0, 100);
   const notifBody = String(body.body || "").trim().slice(0, 200);
   const url = String(body.url || "/messages-prives.html").trim().slice(0, 300);
 

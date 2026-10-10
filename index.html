@@ -12,6 +12,7 @@
 <meta name="apple-mobile-web-app-title" content="MAHOUTO+">
 
 <link rel="manifest" href="/manifest.json">
+<script src="brand.js"></script>
 <link rel="icon" href="assets/favicon.png">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <link rel="preload" as="image" href="assets/logo-mahouto-plus.png">
@@ -732,7 +733,7 @@
       // ID MAHOUTO+ : dérivé de l'identifiant Supabase de l'utilisateur
       // (8 premiers caractères, en majuscules) — aucun champ dédié
       // n'existe encore en base pour un identifiant public séparé.
-      document.getElementById("mahouto-id").textContent = "ID MAHOUTO+ : " + user.id.slice(0, 8).toUpperCase();
+      document.getElementById("mahouto-id").textContent = "ID " + MAHOUTO_BRAND.name + " : " + user.id.slice(0, 8).toUpperCase();
 
       document.getElementById("stat-anciennete").textContent = formatAnciennete(profile && profile.created_at);
 

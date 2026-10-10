@@ -208,7 +208,7 @@ window.MahoutoAudioPlayer = (function () {
     if (!("mediaSession" in navigator) || !current) return;
     navigator.mediaSession.metadata = new MediaMetadata({
       title: current.title || "Message vocal",
-      artist: "MAHOUTO+",
+      artist: MAHOUTO_BRAND.name,
       album: current.contextLabel || ""
     });
     navigator.mediaSession.setActionHandler("play", () => play(current));

@@ -62,7 +62,7 @@
     el.className = "hidden";
     el.innerHTML = `
       <div class="pwa-install-text">
-        <strong>Installer MAHOUTO+</strong>
+        <strong>Installer ${MAHOUTO_BRAND.name}</strong>
         <span>Accès rapide depuis ton écran d'accueil, même hors ligne.</span>
       </div>
       <button id="btn-pwa-install">📲 Installer</button>

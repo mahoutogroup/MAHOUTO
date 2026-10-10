@@ -35,3 +35,26 @@ logs/
 # Misc
 .cache/
 .env.*.local
+
+# Secrets : ne JAMAIS committer (le modèle .env.example, lui, est versionné)
+.env*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
+id_rsa*
+id_ed25519*
+*service-account*.json
+*serviceAccount*.json
+secrets.json
+secrets.*.json
+
+# Sauvegardes et copies de travail
+backup/
+backups/
+backup-*/
+*.bak
+*.orig
+*.rej

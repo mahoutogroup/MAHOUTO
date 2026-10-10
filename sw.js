@@ -1,4 +1,8 @@
-const CACHE_NAME = "mahoutoplus-shell-v60";
+// Marque (nom affiché dans les notifications) choisie par nom d'hôte : voir brand.js.
+// Hors-ligne ou fichier absent : on retombe sur la marque par défaut, le service worker ne doit jamais échouer ici.
+try { importScripts("/brand.js"); } catch (e) { /* repli : marque par défaut */ }
+
+const CACHE_NAME = "mahoutoplus-shell-v61";
 const SHARE_CACHE_NAME = "mahoutoplus-share-v1";
 
 const APP_SHELL = [
@@ -19,6 +23,7 @@ const APP_SHELL = [
   "/share.html",
   "/manifest.json",
   "/config.js",
+  "/brand.js",
   "/theme.css",
   "/theme-toggle.js",
   "/pwa-install.js",
@@ -41,7 +46,7 @@ self.addEventListener("push", (event) => {
   let data = {};
   try { data = event.data ? event.data.json() : {}; } catch (e) { /* payload non-JSON, ignoré */ }
 
-  const title = data.title || "MAHOUTO+";
+  const title = data.title || (self.MAHOUTO_BRAND && self.MAHOUTO_BRAND.name) || "MAHOUTO+";
   const options = {
     body: data.body || "",
     icon: "/assets/icon-192.png",

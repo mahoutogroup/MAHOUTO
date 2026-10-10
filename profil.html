@@ -6,6 +6,7 @@
 <title>Profil — MAHOUTO+</title>
 <meta name="theme-color" content="#0A0A0A">
 <link rel="manifest" href="manifest.json">
+<script src="brand.js"></script>
 <link rel="icon" href="assets/favicon.png">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <link rel="preload" as="image" href="assets/logo-mahouto-plus.png">
@@ -280,7 +281,7 @@
   });
 
   document.getElementById("logout-btn").addEventListener("click", async () => {
-    if (!confirm("Se déconnecter de MAHOUTO+ ?")) return;
+    if (!confirm("Se déconnecter de " + MAHOUTO_BRAND.name + " ?")) return;
     await supabase.auth.signOut();
     window.location.href = "index.html";
   });

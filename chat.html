@@ -6,6 +6,7 @@
 <title>Chat — MAHOUTO+</title>
 <meta name="theme-color" content="#0A0A0A">
 <link rel="manifest" href="manifest.json">
+<script src="brand.js"></script>
 <link rel="icon" href="assets/favicon.png">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <link rel="preload" as="image" href="assets/logo-mahouto-plus.png">
@@ -1070,7 +1071,7 @@
         const file = new File([blob], filename, { type: blob.type });
 
         if (navigator.canShare && navigator.canShare({ files: [file] })) {
-          await navigator.share({ files: [file], title: "MAHOUTO+" });
+          await navigator.share({ files: [file], title: MAHOUTO_BRAND.name });
           return;
         }
       } catch (err) {
@@ -1080,7 +1081,7 @@
 
     const text = msg.content || msg.attachment_url || "";
     if (navigator.share) {
-      try { await navigator.share({ text: text, title: "MAHOUTO+" }); } catch (err) { /* annulé par l'utilisateur */ }
+      try { await navigator.share({ text: text, title: MAHOUTO_BRAND.name }); } catch (err) { /* annulé par l'utilisateur */ }
     } else if (text) {
       try { await navigator.clipboard.writeText(text); setStatus("Copié — le partage direct n'est pas supporté ici."); } catch (err) { console.error(err); }
     }
