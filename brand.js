@@ -34,6 +34,9 @@
       subtitle: "Construire l'Afrique numérique de demain.",
       schoolName: "MAHOUTO School",        // nom affiché du produit formation
       schoolNavLabel: "School",            // libellé court (barre de navigation du bas)
+      marketName: "MAHOUTO Market",
+      payName: "MAHOUTO Pay",
+      hideSelectors: [],                   // éléments masqués sur cette marque (aucun)
       domain: "mahouto.com",
       logo: "assets/logo-mahouto-plus.png",
       themeColor: "#FFC107",
@@ -47,6 +50,10 @@
       subtitle: "La presse qui éclaire, le savoir qui élève.",       // PROPOSITION à valider
       schoolName: "Académie MAJESTÉ",
       schoolNavLabel: "Académie",
+      marketName: "MAJESTÉ Market",
+      payName: "MAJESTÉ Pay",
+      // Accueil simplifié : cartes masquées (display:none, HTML conservé) — « Académie Majesté Presse » et « Majesté Presse »
+      hideSelectors: ['.module-card[href="academie-majestepresse.html"]', "#card-majeste-presse"],
       domain: "majestepresse.com",
       logo: "assets/logo-majeste-presse.png",                        // fichier existant, à confirmer comme logo officiel
       themeColor: "#FFC107",                                         // REPLI = valeur de « mahouto » (couleur à fournir)
@@ -164,15 +171,21 @@
   //    jusqu'à la fin de la passe pour éviter tout clignotement.
   var TOKEN = /MAHOUTO\+/g;
   var SCHOOL_TOKEN = /MAHOUTO School/g;     // texte source du produit formation
+  var MARKET_TOKEN = /MAHOUTO Market/g;
+  var PAY_TOKEN = /MAHOUTO Pay/g;
   var LOGO_FILE = "assets/logo-mahouto-plus.png";
   var SKIP_TAGS = { SCRIPT: 1, STYLE: 1, TEXTAREA: 1, NOSCRIPT: 1 };
 
   document.documentElement.style.visibility = "hidden";
 
   function swap(value) {
-    return String(value).replace(TOKEN, brand.name).replace(SCHOOL_TOKEN, brand.schoolName);
+    return String(value).replace(TOKEN, brand.name).replace(SCHOOL_TOKEN, brand.schoolName)
+      .replace(MARKET_TOKEN, brand.marketName).replace(PAY_TOKEN, brand.payName);
   }
-  function hasToken(value) { return value.indexOf("MAHOUTO+") !== -1 || value.indexOf("MAHOUTO School") !== -1; }
+  function hasToken(value) {
+    return value.indexOf("MAHOUTO+") !== -1 || value.indexOf("MAHOUTO School") !== -1 ||
+           value.indexOf("MAHOUTO Market") !== -1 || value.indexOf("MAHOUTO Pay") !== -1;
+  }
 
   function applyBrand() {
     try {
@@ -243,6 +256,12 @@
           el.textContent = brand.schoolName;
           en.remove();
         }
+      }
+
+      // Éléments masqués par la marque (jamais supprimés du HTML)
+      for (var hs = 0; hs < (brand.hideSelectors || []).length; hs++) {
+        var hidden = document.querySelectorAll(brand.hideSelectors[hs]);
+        for (var hh = 0; hh < hidden.length; hh++) hidden[hh].style.setProperty("display", "none", "important");
       }
 
       // Libellé court de l'onglet formation (barre du bas) : « School » -> « Académie »
