@@ -32,6 +32,8 @@
       shortName: "MAHOUTO+",
       tagline: "Apprendre • Créer • Entreprendre",
       subtitle: "Construire l'Afrique numérique de demain.",
+      schoolName: "MAHOUTO School",        // nom affiché du produit formation
+      schoolNavLabel: "School",            // libellé court (barre de navigation du bas)
       domain: "mahouto.com",
       logo: "assets/logo-mahouto-plus.png",
       themeColor: "#FFC107",
@@ -43,6 +45,8 @@
       shortName: "MAJESTÉ",
       tagline: "Informer • Former • Inspirer",                       // PROPOSITION à valider
       subtitle: "La presse qui éclaire, le savoir qui élève.",       // PROPOSITION à valider
+      schoolName: "Académie MAJESTÉ",
+      schoolNavLabel: "Académie",
       domain: "majestepresse.com",
       logo: "assets/logo-majeste-presse.png",                        // fichier existant, à confirmer comme logo officiel
       themeColor: "#FFC107",                                         // REPLI = valeur de « mahouto » (couleur à fournir)
@@ -159,12 +163,16 @@
   //    Le HTML garde la marque par défaut comme texte source ; la page est masquée
   //    jusqu'à la fin de la passe pour éviter tout clignotement.
   var TOKEN = /MAHOUTO\+/g;
+  var SCHOOL_TOKEN = /MAHOUTO School/g;     // texte source du produit formation
   var LOGO_FILE = "assets/logo-mahouto-plus.png";
   var SKIP_TAGS = { SCRIPT: 1, STYLE: 1, TEXTAREA: 1, NOSCRIPT: 1 };
 
   document.documentElement.style.visibility = "hidden";
 
-  function swap(value) { return String(value).replace(TOKEN, brand.name); }
+  function swap(value) {
+    return String(value).replace(TOKEN, brand.name).replace(SCHOOL_TOKEN, brand.schoolName);
+  }
+  function hasToken(value) { return value.indexOf("MAHOUTO+") !== -1 || value.indexOf("MAHOUTO School") !== -1; }
 
   function applyBrand() {
     try {
@@ -178,7 +186,7 @@
       for (var a = 0; a < attrNodes.length; a++) {
         for (var k = 0; k < ATTRS.length; k++) {
           var v = attrNodes[a].getAttribute(ATTRS[k]);
-          if (v && v.indexOf("MAHOUTO+") !== -1) attrNodes[a].setAttribute(ATTRS[k], swap(v));
+          if (v && hasToken(v)) attrNodes[a].setAttribute(ATTRS[k], swap(v));
         }
       }
 
@@ -202,6 +210,48 @@
         splitNodes[sp].nextSibling.remove();
         splitNodes[sp].nodeValue = splitNodes[sp].nodeValue.replace("MAHOUTO", brand.name);
       }
+
+      // « MAHOUTO School » coupé en deux nœuds : « MAHOUTO » + <balise>School</balise>,
+      // <balise>MAHOUTO</balise> + « School », ou deux nœuds texte voisins.
+      var sw = document.createTreeWalker(document.body || document.documentElement, NodeFilter.SHOW_TEXT);
+      var schoolSplits = [];
+      while (sw.nextNode()) {
+        var cn = sw.currentNode, cp = cn.parentNode, cnx = cn.nextSibling;
+        if (!cnx || (cp && SKIP_TAGS[cp.nodeName])) continue;
+        if (/MAHOUTO\s*$/.test(cn.nodeValue) &&
+            ((cnx.nodeType === 1 && cnx.textContent.trim() === "School") ||
+             (cnx.nodeType === 3 && /^\s*School\b/.test(cnx.nodeValue)))) schoolSplits.push({ a: cn, b: cnx, kind: "left" });
+        else if (cn.nodeValue.trim() === "MAHOUTO" && cnx.nodeType === 3 && /^\s*School\b/.test(cnx.nodeValue)) schoolSplits.push({ a: cn, b: cnx, kind: "right" });
+      }
+      for (var ss = 0; ss < schoolSplits.length; ss++) {
+        var sp2 = schoolSplits[ss];
+        sp2.a.nodeValue = sp2.a.nodeValue.replace(/MAHOUTO\s*$/, brand.schoolName);
+        if (sp2.b.nodeType === 1) sp2.b.remove();
+        else sp2.b.nodeValue = sp2.b.nodeValue.replace(/^\s*School\b/, "");
+      }
+      var elSplit = document.querySelectorAll("body *");
+      for (var es = 0; es < elSplit.length; es++) {
+        var el = elSplit[es], en = el.nextSibling;
+        if (!el.parentNode || SKIP_TAGS[el.nodeName] || el.children.length || el.textContent.trim() !== "MAHOUTO") continue;
+        if (en && en.nodeType === 3 && /^\s*School\b/.test(en.nodeValue)) {
+          el.textContent = brand.schoolName;
+          en.nodeValue = en.nodeValue.replace(/^\s*School\b/, "");
+          continue;
+        }
+        while (en && en.nodeType === 3 && !en.nodeValue.trim()) en = en.nextSibling;   // espaces entre deux balises
+        if (en && en.nodeType === 1 && !en.children.length && en.textContent.trim() === "School") {
+          el.textContent = brand.schoolName;
+          en.remove();
+        }
+      }
+
+      // Libellé court de l'onglet formation (barre du bas) : « School » -> « Académie »
+      var schoolNav = document.querySelectorAll('.nav-item[href="school.html"]');
+      for (var sn2 = 0; sn2 < schoolNav.length; sn2++) {
+        for (var c = schoolNav[sn2].firstChild; c; c = c.nextSibling) {
+          if (c.nodeType === 3 && c.nodeValue.trim() === "School") c.nodeValue = c.nodeValue.replace("School", brand.schoolNavLabel);
+        }
+      }
       var tag = document.querySelector(".hero .tagline");
       if (tag && brand.tagline) tag.textContent = brand.tagline;
       var sub = document.querySelector(".hero .subtagline");
@@ -212,7 +262,7 @@
         acceptNode: function (n) {
           var p = n.parentNode;
           if (p && SKIP_TAGS[p.nodeName]) return NodeFilter.FILTER_REJECT;
-          return n.nodeValue.indexOf("MAHOUTO+") !== -1 ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+          return hasToken(n.nodeValue) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
         }
       });
       var nodes = [];

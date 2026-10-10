@@ -128,7 +128,8 @@ export default async function handler(req, res) {
     }
 
     // Marque d'après le domaine de la requête (brand.js) : « MAHOUTO+ » sur mahouto.com, identique à avant.
-    const brandName = brandForRequest(req).name;
+    const requestBrand = brandForRequest(req);
+    const brandName = requestBrand.name;
     const articleName = productType === "salon"
       ? (article.name || `Salon ${brandName}`)
       : (article.nom || (productType === "digital_product" ? `Produit ${brandName}` : `Formation ${brandName.replace(/\+$/, "")}`));
@@ -183,7 +184,7 @@ export default async function handler(req, res) {
       platformLabel = `${brandName} Salons`;
     } else {
       returnPage = article.provider === "academie_majestepresse" ? "academie-majestepresse.html" : "school.html";
-      platformLabel = article.provider === "academie_majestepresse" ? "Académie Majesté Presse" : "MAHOUTO School";
+      platformLabel = article.provider === "academie_majestepresse" ? "Académie Majesté Presse" : requestBrand.schoolName;
     }
 
     // -----------------------------------------------------

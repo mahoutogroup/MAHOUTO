@@ -41,8 +41,8 @@
       ]
     },
     {
-      "name": "School",
-      "short_name": "School",
+      "name": "Académie MAJESTÉ",
+      "short_name": "Académie",
       "description": "Accéder à mes formations",
       "url": "/school.html",
       "icons": [

@@ -614,7 +614,7 @@
     const { error } = await supabase.from("certificates").insert({
       user_id: currentUser.id,
       formation_id: courseId,
-      formation_title: formationTitle || "Formation MAHOUTO School",
+      formation_title: formationTitle || ("Formation " + MAHOUTO_BRAND.schoolName),
       issued_by: "auto",
       status: "issued",
       document_type: documentType
