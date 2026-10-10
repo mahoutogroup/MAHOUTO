@@ -9,6 +9,9 @@
    Fonctionne aussi dans le service worker (importScripts) : aucun accès à
    `document` hors de la section « DOM » ci-dessous.
 
+   Aperçus (localhost et *.vercel.app uniquement) : ?brand=majeste / ?brand=mahouto force la
+   marque pour tester avant de brancher le vrai domaine (voir « MODE DE TEST » plus bas).
+
    Pour la marque « mahouto » (défaut), ce fichier n'a AUCUN effet sur la page :
    il expose seulement window.MAHOUTO_BRAND. Rien n'est réécrit, rien n'est masqué.
 
@@ -61,9 +64,8 @@
     return Object.prototype.hasOwnProperty.call(HOSTS, h) ? HOSTS[h] : DEFAULT_BRAND;
   }
 
-  // Configuration complète (copie) pour un nom d'hôte donné.
-  function brandForHost(hostname) {
-    var id = brandIdFor(hostname);
+  // Configuration complète (copie) pour un identifiant de marque.
+  function buildBrand(id) {
     var b = {};
     Object.keys(BRANDS[id]).forEach(function (k) { b[k] = BRANDS[id][k]; });
     b.id = id;
@@ -71,7 +73,66 @@
     return b;
   }
 
-  var brand = brandForHost(root.location && root.location.hostname);
+  // Configuration complète (copie) pour un nom d'hôte donné. Le serveur (api/_brand.js)
+  // n'utilise QUE ceci : le mode de test ci-dessous n'a aucun effet côté serveur.
+  function brandForHost(hostname) {
+    return buildBrand(brandIdFor(hostname));
+  }
+
+  /* ---------------------------------------------------------
+     MODE DE TEST (aperçus uniquement) : ?brand=majeste / ?brand=mahouto
+
+     Actif UNIQUEMENT sur « localhost » et sur les hôtes qui se terminent exactement par
+     « .vercel.app » (aperçus Vercel). Jamais sur mahouto.com, majestepresse.com ni aucun
+     autre hôte. Le paramètre n'est comparé qu'à deux valeurs fixes (rien n'est injecté
+     dans la page) ; toute autre valeur est ignorée. Le choix est mémorisé dans
+     sessionStorage (onglet courant) pour survivre aux changements de page ; sans stockage,
+     il n'est simplement pas mémorisé.
+     --------------------------------------------------------- */
+  var PREVIEW_PARAM = "brand";
+  var PREVIEW_KEY = "mahouto_brand_preview";
+  var PREVIEW_SUFFIX = ".vercel.app";
+
+  function isPreviewHost(hostname) {
+    var h = String(hostname || "").toLowerCase().replace(/\.$/, "");
+    if (h === "localhost") return true;
+    if (h.length <= PREVIEW_SUFFIX.length || h.slice(-PREVIEW_SUFFIX.length) !== PREVIEW_SUFFIX) return false;
+    // partie avant « .vercel.app » : étiquettes DNS valides, sans point en tête ni en queue
+    return /^[a-z0-9]([a-z0-9.-]*[a-z0-9])?$/.test(h.slice(0, -PREVIEW_SUFFIX.length));
+  }
+
+  // Valeur du paramètre ?brand= : « majeste », « mahouto » ou null (valeur inconnue, absente, illisible).
+  function previewParam(search) {
+    var m = /(?:^|[?&])brand=([^&#]*)/.exec(String(search || ""));
+    if (!m) return null;
+    var v;
+    try { v = decodeURIComponent(m[1].replace(/\+/g, " ")); } catch (e) { return null; }
+    return v === "majeste" || v === "mahouto" ? v : null;
+  }
+
+  // Identifiant imposé par le mode de test, ou null (aucun effet).
+  function previewBrandId(loc) {
+    if (!loc || !isPreviewHost(loc.hostname)) return null;
+
+    var fromUrl = previewParam(loc.search);
+    if (fromUrl) {
+      try {
+        if (fromUrl === DEFAULT_BRAND) root.sessionStorage.removeItem(PREVIEW_KEY); // remise à zéro
+        else root.sessionStorage.setItem(PREVIEW_KEY, fromUrl);
+      } catch (e) { /* pas de stockage : le choix n'est pas mémorisé */ }
+      return fromUrl;
+    }
+
+    try {
+      var saved = root.sessionStorage.getItem(PREVIEW_KEY);
+      if (saved === "majeste") return saved;   // seule une valeur connue est relue
+    } catch (e) { /* pas de stockage */ }
+    return null;
+  }
+
+  var pageHost = root.location && root.location.hostname;
+  var override = previewBrandId(root.location);
+  var brand = override ? buildBrand(override) : brandForHost(pageHost);
   var id = brand.id;
 
   root.MAHOUTO_BRAND = brand;
