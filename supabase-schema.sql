@@ -853,6 +853,25 @@ drop policy if exists "profiles_update_own" on public.profiles;
 create policy "profiles_update_own" on public.profiles
   for update using (auth.uid() = id) with check (auth.uid() = id);
 
+-- ---------- profiles.avatar_url : URL https:// uniquement ----------
+-- Défense en profondeur contre l'injection HTML (le client n'insère plus avatar_url dans du HTML,
+-- mais la base ne doit de toute façon accepter que de vraies URL https).
+--
+-- 1) (facultatif) voir ce qui serait neutralisé AVANT de lancer la suite :
+--    select id, avatar_url from public.profiles
+--     where avatar_url is not null and avatar_url !~* '^https://[^[:space:]"''<>]+$';
+
+-- 2) neutralise les valeurs existantes non conformes (la photo repasse à « aucune »)
+update public.profiles
+   set avatar_url = null
+ where avatar_url is not null
+   and avatar_url !~* '^https://[^[:space:]"''<>]+$';
+
+-- 3) contrainte : NULL ou URL https sans espace, guillemet ni chevron
+alter table public.profiles drop constraint if exists profiles_avatar_url_https_check;
+alter table public.profiles add constraint profiles_avatar_url_https_check
+  check (avatar_url is null or avatar_url ~* '^https://[^[:space:]"''<>]+$');
+
 -- ---------- rooms ----------
 -- Anciens doublons FR ("Allow public read rooms", "Lecture salons")
 -- supprimés le 20/09/2026 — rooms_public_read couvrait déjà le même

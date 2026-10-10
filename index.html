@@ -85,13 +85,8 @@
     position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.6);
     display: flex; align-items: flex-end; justify-content: center;
   }
-  #auth-modal.sheet, #confirm-modal.sheet, #info-modal.sheet {
-    width: 100%; max-width: 480px; background: var(--bg-elevated);
-    border-radius: 24px 24px 0 0; padding: 22px 20px 28px; max-height: 85vh; overflow-y: auto; position: relative;
-    text-align: center;
-  }
-  /* Fenêtre Email : mêmes valeurs que les autres « sheet », avec le bon sélecteur (.sheet est un élément enfant) */
-  #email-modal .sheet {
+  /* .sheet est l'élément ENFANT de chaque fenêtre : sélecteur descendant (« #x .sheet »), pas « #x.sheet » */
+  #auth-modal .sheet, #confirm-modal .sheet, #info-modal .sheet, #email-modal .sheet {
     width: 100%; max-width: 480px; background: var(--bg-elevated);
     border-radius: 24px 24px 0 0; padding: 22px 20px 28px; max-height: 85vh; overflow-y: auto; position: relative;
     text-align: center;
