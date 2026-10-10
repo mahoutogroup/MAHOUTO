@@ -29,6 +29,7 @@
 // =========================================================
 
 import { createClient } from "@supabase/supabase-js";
+import { brandForRequest } from "./_brand.js";
 
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
@@ -126,9 +127,11 @@ export default async function handler(req, res) {
       return res.status(500).json({ error: "Le prix de cet article est invalide." });
     }
 
+    // Marque d'après le domaine de la requête (brand.js) : « MAHOUTO+ » sur mahouto.com, identique à avant.
+    const brandName = brandForRequest(req).name;
     const articleName = productType === "salon"
-      ? (article.name || "Salon MAHOUTO+")
-      : (article.nom || (productType === "digital_product" ? "Produit MAHOUTO+" : "Formation MAHOUTO"));
+      ? (article.name || `Salon ${brandName}`)
+      : (article.nom || (productType === "digital_product" ? `Produit ${brandName}` : `Formation ${brandName.replace(/\+$/, "")}`));
 
     // -----------------------------------------------------
     // 4. Empêcher un paiement inutile si déjà acheté (défense
@@ -174,10 +177,10 @@ export default async function handler(req, res) {
     let platformLabel;
     if (productType === "digital_product") {
       returnPage = "produits.html";
-      platformLabel = "MAHOUTO+ Boutique";
+      platformLabel = `${brandName} Boutique`;
     } else if (productType === "salon") {
       returnPage = "discussions.html";
-      platformLabel = "MAHOUTO+ Salons";
+      platformLabel = `${brandName} Salons`;
     } else {
       returnPage = article.provider === "academie_majestepresse" ? "academie-majestepresse.html" : "school.html";
       platformLabel = article.provider === "academie_majestepresse" ? "Académie Majesté Presse" : "MAHOUTO School";

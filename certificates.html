@@ -6,6 +6,7 @@
 <title>Certificats — MAHOUTO+</title>
 <meta name="theme-color" content="#0A0A0A">
 <link rel="manifest" href="manifest.json">
+<script src="brand.js"></script>
 <link rel="icon" href="assets/favicon.png">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <link rel="stylesheet" href="theme.css">
@@ -191,7 +192,7 @@
       // sur les certificats — c'est exactement ce à quoi il sert. Repli
       // sur le pseudo puis l'e-mail si l'utilisateur ne l'a pas encore
       // renseigné.
-      const userName = (profile && profile.full_name) || (profile && profile.username) || user.email || "Utilisateur MAHOUTO+";
+      const userName = (profile && profile.full_name) || (profile && profile.username) || user.email || ("Utilisateur " + MAHOUTO_BRAND.name);
       const certsList = certs || [];
 
       // Pour le texte complet de l'Attestation ("s'est déroulée du ... au

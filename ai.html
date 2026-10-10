@@ -6,6 +6,7 @@
 <title>MAJESTÉ Pro — MAHOUTO+</title>
 <meta name="theme-color" content="#0A0A0A">
 <link rel="manifest" href="manifest.json">
+<script src="brand.js"></script>
 <link rel="icon" href="assets/favicon.png">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <link rel="preload" as="image" href="assets/logo-mahouto-plus.png">
@@ -417,7 +418,7 @@ font-family: inherit;
 (function () {
   "use strict";
 
-  const API = "https://ai.majestepresse.com";
+  const API = MAHOUTO_BRAND.aiOrigin; // origine de l'API MAJESTÉ Pro (brand.js)
   const ERROR_TEXT = "Une erreur est survenue, veuillez réessayer";
   const LOGIN_URL = "index.html"; // la connexion (modal Google) vit sur la page d'accueil
 
@@ -445,11 +446,11 @@ font-family: inherit;
     },
     {
       label: "📲 S'inscrire sur MAHOUTO+",
-      message: "Comment m'inscrire sur la plateforme MAHOUTO+, étape par étape ?"
+      message: "Comment m'inscrire sur la plateforme " + MAHOUTO_BRAND.name + ", étape par étape ?"
     },
     {
       label: "🌐 L'écosystème MAHOUTO+",
-      message: "Explique-moi l'écosystème MAHOUTO+ : quels modules sont disponibles aujourd'hui et lesquels arrivent bientôt ?"
+      message: "Explique-moi l'écosystème " + MAHOUTO_BRAND.name + " : quels modules sont disponibles aujourd'hui et lesquels arrivent bientôt ?"
     },
     {
       label: "🎓 Quelles formations proposez-vous ?",

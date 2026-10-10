@@ -188,3 +188,86 @@ publique par conception, protégée par les policies RLS ci-dessus.
 - [ ] **MAHOUTO AI** : avec une clé OpenRouter valide, une question renvoie une vraie réponse
 - [ ] **Profil** : modification du pseudo est bien sauvegardée après rechargement
 - [ ] Mode hors-ligne : couper le réseau puis rouvrir l'app → la coquille (Accueil, nav) s'affiche quand même
+
+
+---
+
+## 12. Second domaine : MAJESTÉ PRESSE (majestepresse.com)
+
+Le **même dépôt** sert deux sites. La marque est choisie **dans le navigateur d'après le nom d'hôte**
+(`brand.js`) : `majestepresse.com` / `www.majestepresse.com` → « MAJESTÉ PRESSE » ; `mahouto.com`,
+`www.mahouto.com`, `localhost` et tout hôte inconnu (aperçus Vercel…) → « MAHOUTO+ » (défaut).
+Les deux sites partagent **le même projet Supabase** (mêmes comptes, mêmes tables).
+
+> Tout ce qui suit se fait **hors du code**, dans les consoles concernées. Rien de cela n'est fait ni testé par le dépôt.
+
+### 12.1 Organisation de l'hébergement
+- [ ] **Recommandé : un second projet Vercel** relié au **même dépôt** GitHub (même branche `main`), avec le domaine `majestepresse.com`.
+      Avantage : variables d'environnement et domaine propres à chaque site.
+- [ ] Alternative : un seul projet Vercel avec les deux domaines. Dans ce cas, **ne définissez pas** `PUBLIC_SITE_URL`
+      (le code retombe alors sur l'hôte de la requête, ce qui est correct pour les deux domaines).
+
+### 12.2 Domaine chez l'hébergeur (Vercel → Settings → Domains)
+- [ ] Ajouter `majestepresse.com` **et** `www.majestepresse.com` ; choisir lequel redirige vers l'autre.
+- [ ] Chez le registrar, créer les enregistrements DNS demandés par Vercel (en général : `A` apex → valeur affichée par Vercel,
+      `CNAME` de `www` → valeur affichée par Vercel). **Recopier les valeurs exactes affichées dans Vercel.**
+- [ ] Attendre l'émission automatique du certificat HTTPS, puis ouvrir `https://majestepresse.com`.
+
+### 12.3 Variables d'environnement du second projet Vercel (section 8 de ce guide)
+- [ ] Mêmes valeurs que le premier projet : `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
+      `FEDAPAY_SECRET_KEY`, `FEDAPAY_WEBHOOK_SECRET`, `FEDAPAY_ENVIRONMENT`, `CLOUDINARY_*`, `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`.
+- [ ] `PUBLIC_SITE_URL` = `https://majestepresse.com` (second projet uniquement).
+- [ ] Ne jamais mettre ces valeurs dans le dépôt (voir `.gitignore` et `.env.example`).
+
+### 12.4 Supabase → Authentication → URL Configuration
+- [ ] **Redirect URLs** : ajouter `https://majestepresse.com/**` et `https://www.majestepresse.com/**`
+      (en gardant celles de mahouto.com). Le code redirige vers l'origine courante (`window.location.origin`).
+- [ ] **Site URL** : il n'y en a **qu'une seule** par projet Supabase. Laissez celle de mahouto.com (ou choisissez-en une)
+      ; l'autre domaine fonctionne grâce aux Redirect URLs.
+- [ ] **Connexion par email (code à 6 chiffres)** : le modèle d'email doit afficher le code (`{{ .Token }}`) et ne pas
+      dépendre de `{{ .SiteURL }}` : sinon les liens du mail pointeraient toujours vers le Site URL. Les emails portent
+      la marque configurée dans Supabase (une seule par projet).
+
+### 12.5 Connexion Google (Google Cloud Console → API et services → Identifiants)
+- [ ] Client OAuth « Application Web » → **Origines JavaScript autorisées** : ajouter `https://majestepresse.com` et
+      `https://www.majestepresse.com`.
+- [ ] L'**URI de redirection autorisée** reste celle de Supabase (`https://<projet>.supabase.co/auth/v1/callback`) : inchangée.
+- [ ] Écran de consentement OAuth → **Domaines autorisés** : ajouter `majestepresse.com`.
+      Le nom d'application affiché par Google reste unique (celui de l'écran de consentement).
+
+### 12.6 Paiements (FedaPay)
+- [ ] Même compte FedaPay et même base : **un seul endpoint de webhook suffit** (`https://<domaine>/api/fedapay-webhook`).
+      Évitez d'en déclarer deux : chaque paiement serait notifié deux fois (le traitement est idempotent, mais inutile).
+- [ ] Les pages de retour de paiement utilisent le domaine de la requête (ou `PUBLIC_SITE_URL`) : tester un paiement
+      **sandbox** depuis `majestepresse.com` (voir 12.9).
+
+### 12.7 API MAJESTÉ Pro (serveur séparé : `ai.majestepresse.com`)
+- [ ] Ajouter `https://majestepresse.com` et `https://www.majestepresse.com` aux **origines autorisées (CORS)** de ce serveur
+      (aujourd'hui : `mahouto.com` et `www.mahouto.com`). Sans cela, le navigateur bloque les réponses du chat.
+- [ ] Vérifier que ce serveur accepte les jetons Supabase émis depuis le second domaine (même projet Supabase).
+
+### 12.8 Autres services
+- [ ] **Cloudinary** : si des restrictions de domaines (Security → allowed fetch domains / referrers) sont actives, y ajouter
+      `majestepresse.com`.
+- [ ] **Notifications push** : les abonnements sont **propres à chaque domaine** ; l'utilisateur doit les réactiver sur
+      `majestepresse.com`. Le sujet VAPID (`api/push.js`) reste `mailto:contact@mahouto.com` : à changer si besoin.
+- [ ] Les sessions, caches et données locales sont **séparés par domaine** (origines distinctes) : l'utilisateur se reconnecte
+      sur chaque site, et le service worker de chaque domaine a son propre cache.
+
+### 12.9 Vérifications après mise en ligne (à faire à la main)
+- [ ] `https://majestepresse.com` : nom « MAJESTÉ PRESSE », logo, onglets, aucun « MAHOUTO+ » visible.
+- [ ] `https://mahouto.com` : **strictement inchangé** (apparence, textes, installation PWA).
+- [ ] Installation PWA depuis `majestepresse.com` (nom, icône, couleur) ; vérifier que `manifest-majeste.json` est bien chargé
+      (DevTools → Application → Manifest).
+- [ ] Connexion Google et connexion par email (code) depuis `majestepresse.com`.
+- [ ] Chat MAJESTÉ Pro depuis `majestepresse.com` (CORS, 12.7).
+- [ ] Paiement sandbox, puis lien de partage `/p/<id>` (aperçu : nom du site = « MAJESTÉ PRESSE »).
+
+### 12.10 À fournir pour finaliser la marque « MAJESTÉ PRESSE »
+Le dépôt utilise des **valeurs de repli** (voir `brand.js`, objet `BRANDS.majeste`, et `manifest-majeste.json`) :
+- [ ] **Logo officiel** (aujourd'hui : `assets/logo-majeste-presse.png`, déjà dans le dépôt, à confirmer).
+- [ ] **Couleurs de marque** (aujourd'hui : mêmes valeurs que MAHOUTO+ : `theme_color` `#FFC107`, fond `#0A0A0A`).
+- [ ] **Icônes** 192 / 512 / maskable, favicon, apple-touch-icon, écran de démarrage (aujourd'hui : ceux de MAHOUTO+).
+- [ ] **Captures d'écran** de l'application pour l'installation (retirées du manifest Majesté : celles du dépôt montrent MAHOUTO+).
+- [ ] **Slogan et sous-titre** : propositions actuelles « Informer • Former • Inspirer » et
+      « La presse qui éclaire, le savoir qui élève. » (à valider ou remplacer).

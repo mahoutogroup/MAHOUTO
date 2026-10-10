@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Vérification de certificat — MAHOUTO+</title>
+<script src="/brand.js"></script>
 <meta name="theme-color" content="#0A0A0A">
 <link rel="icon" href="/assets/favicon.png">
 <link rel="stylesheet" href="/theme.css">
@@ -70,7 +71,7 @@
   }
 
   function showState(kind, title, fields) {
-    const logo = el("img", { class: "logo", src: "assets/logo-mahouto-plus.png", alt: "MAHOUTO+" });
+    const logo = el("img", { class: "logo", src: MAHOUTO_BRAND.logo, alt: MAHOUTO_BRAND.name });
     const state = el("div", { class: "state " + kind, text: title });
     const children = [logo, state];
     (fields || []).forEach(([k, v]) => {
@@ -79,7 +80,7 @@
         el("div", { class: "v", text: v })
       ]));
     });
-    children.push(el("div", { class: "footer-note", text: "Vérification officielle MAHOUTO+" }));
+    children.push(el("div", { class: "footer-note", text: "Vérification officielle " + MAHOUTO_BRAND.name }));
     render(el("div", {}, children));
   }
 
@@ -131,7 +132,7 @@
       ["Formation", cert.formation_title || "—"],
       ["Date d'obtention", dateStr],
       [codeFieldLabel, cert.code || code],
-      ["Délivré par", "MAHOUTO+"],
+      ["Délivré par", MAHOUTO_BRAND.name],
       ["Développé par", "MAJESTÉ PRESSE"]
     ]);
   }

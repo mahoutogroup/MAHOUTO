@@ -180,7 +180,7 @@ window.MahoutoVideoPlayer = (function () {
 
     const mediaInfo = new chrome.cast.media.MediaInfo(track.url, "video/mp4");
     mediaInfo.metadata = new chrome.cast.media.GenericMediaMetadata();
-    mediaInfo.metadata.title = track.title || "Vidéo MAHOUTO+";
+    mediaInfo.metadata.title = track.title || ("Vidéo " + MAHOUTO_BRAND.name);
 
     const request = new chrome.cast.media.LoadRequest(mediaInfo);
     session.loadMedia(request).then(
@@ -351,7 +351,7 @@ window.MahoutoVideoPlayer = (function () {
     if (!("mediaSession" in navigator) || !current) return;
     navigator.mediaSession.metadata = new MediaMetadata({
       title: current.title || "Vidéo",
-      artist: "MAHOUTO+"
+      artist: MAHOUTO_BRAND.name
     });
     navigator.mediaSession.setActionHandler("play", () => play(current));
     navigator.mediaSession.setActionHandler("pause", () => pause());

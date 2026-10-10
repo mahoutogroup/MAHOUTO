@@ -41,6 +41,7 @@
 // =========================================================
 
 import { createClient } from "@supabase/supabase-js";
+import { brandForRequest } from "./_brand.js";
 
 function escapeHtml(str) {
   return String(str || "")
@@ -60,7 +61,7 @@ function money(xof) {
   return Number(xof || 0).toLocaleString("fr-FR") + " FCFA";
 }
 
-function renderRedirectPage({ title, description, image, canonicalUrl, targetUrl }) {
+function renderRedirectPage({ title, description, image, canonicalUrl, targetUrl, siteName }) {
   return `<!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -73,7 +74,7 @@ function renderRedirectPage({ title, description, image, canonicalUrl, targetUrl
 <meta property="og:description" content="${escapeHtml(description)}">
 ${image ? `<meta property="og:image" content="${escapeHtml(image)}">` : ""}
 <meta property="og:url" content="${escapeHtml(canonicalUrl)}">
-<meta property="og:site_name" content="MAHOUTO+">
+<meta property="og:site_name" content="${escapeHtml(siteName)}">
 
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="${escapeHtml(title)}">
@@ -84,13 +85,14 @@ ${image ? `<meta name="twitter:image" content="${escapeHtml(image)}">` : ""}
 <script>window.location.replace(${JSON.stringify(targetUrl)});</script>
 </head>
 <body style="background:#0A0A0A;color:#fff;font-family:sans-serif;text-align:center;padding:60px 20px;">
-  <p>Redirection vers la boutique MAHOUTO+…</p>
+  <p>Redirection vers la boutique ${escapeHtml(siteName)}…</p>
   <p><a href="${escapeHtml(targetUrl)}" style="color:#FFC107;">Cliquez ici si rien ne se passe</a></p>
 </body>
 </html>`;
 }
 
 async function handleProduit(req, res, base) {
+  const brandName = brandForRequest(req).name;
   const productId = (req.query && req.query.id) || "";
 
   if (!productId) {
@@ -113,7 +115,8 @@ async function handleProduit(req, res, base) {
     if (error || !product || !product.disponible) {
       return res.status(200).send(
         renderRedirectPage({
-          title: "MAHOUTO+ — Boutique",
+          siteName: brandName,
+          title: `${brandName} — Boutique`,
           description: "Découvrez nos produits numériques.",
           image: "",
           canonicalUrl: `${base}/produits.html`,
@@ -124,17 +127,18 @@ async function handleProduit(req, res, base) {
 
     const amount = product.promotion ?? product.prix;
     const title = product.nom;
-    const description = `${money(amount)} — ${product.description || "Produit numérique MAHOUTO+"}`;
+    const description = `${money(amount)} — ${product.description || `Produit numérique ${brandName}`}`;
     const image = product.image_url ? optimizedImageUrl(product.image_url, 1200) : "";
 
     return res.status(200).send(
-      renderRedirectPage({ title, description, image, canonicalUrl: targetUrl, targetUrl })
+      renderRedirectPage({ title, description, image, canonicalUrl: targetUrl, targetUrl, siteName: brandName })
     );
   } catch (err) {
     console.error(err);
     return res.status(200).send(
       renderRedirectPage({
-        title: "MAHOUTO+ — Boutique",
+        siteName: brandName,
+        title: `${brandName} — Boutique`,
         description: "Découvrez nos produits numériques.",
         image: "",
         canonicalUrl: `${base}/produits.html`,
@@ -145,6 +149,7 @@ async function handleProduit(req, res, base) {
 }
 
 async function handleFormation(req, res, base) {
+  const brandName = brandForRequest(req).name;
   const formationId = (req.query && req.query.id) || "";
   const fallbackUrl = `${base}/school.html`;
 
@@ -171,7 +176,8 @@ async function handleFormation(req, res, base) {
         : fallbackUrl;
       return res.status(200).send(
         renderRedirectPage({
-          title: "MAHOUTO+ — Formations",
+          siteName: brandName,
+          title: `${brandName} — Formations`,
           description: "Découvrez nos formations professionnelles.",
           image: "",
           canonicalUrl: catalogUrl,
@@ -182,17 +188,18 @@ async function handleFormation(req, res, base) {
 
     const amount = formation.promotion ?? formation.prix;
     const title = formation.nom;
-    const description = `${money(amount)} — ${formation.description || "Formation MAHOUTO+"}`;
+    const description = `${money(amount)} — ${formation.description || `Formation ${brandName}`}`;
     const image = formation.image_url ? optimizedImageUrl(formation.image_url, 1200) : "";
 
     return res.status(200).send(
-      renderRedirectPage({ title, description, image, canonicalUrl: targetUrl, targetUrl })
+      renderRedirectPage({ title, description, image, canonicalUrl: targetUrl, targetUrl, siteName: brandName })
     );
   } catch (err) {
     console.error(err);
     return res.status(200).send(
       renderRedirectPage({
-        title: "MAHOUTO+ — Formations",
+        siteName: brandName,
+        title: `${brandName} — Formations`,
         description: "Découvrez nos formations professionnelles.",
         image: "",
         canonicalUrl: fallbackUrl,
