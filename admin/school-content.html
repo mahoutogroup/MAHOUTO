@@ -117,6 +117,13 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
 (function () {
+  // Toute valeur issue de la base ou d'un message d'erreur est échappée avant d'entrer dans du HTML.
+  function escapeHtml(value) {
+    return String(value == null ? "" : value)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+
   const cfg = window.MAHOUTO_CONFIG;
   const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
 
@@ -167,7 +174,7 @@
       .order("ordre", { ascending: true });
 
     if (error) {
-      modulesListEl.innerHTML = `<div class="msg error">Erreur de chargement : ${error.message}</div>`;
+      modulesListEl.innerHTML = `<div class="msg error">Erreur de chargement : ${escapeHtml(error.message)}</div>`;
       return;
     }
 
@@ -177,7 +184,7 @@
       card.className = "module-card";
       card.innerHTML = `
         <div class="module-head">
-          <h3>${mod.titre}</h3>
+          <h3>${escapeHtml(mod.titre)}</h3>
           <span class="ordre">ordre ${mod.ordre}</span>
         </div>
         <div class="lessons-container" data-module-id="${mod.id}"></div>
@@ -216,7 +223,7 @@
       .order("ordre", { ascending: true });
 
     if (error) {
-      containerEl2.innerHTML = `<div class="msg error">${error.message}</div>`;
+      containerEl2.innerHTML = `<div class="msg error">${escapeHtml(error.message)}</div>`;
       return;
     }
 
@@ -233,7 +240,7 @@
 
         row.innerHTML = `
           <div class="top-line">
-            <span class="titre">📝 ${lesson.titre}</span>
+            <span class="titre">📝 ${escapeHtml(lesson.titre)}</span>
             ${lesson.is_preview ? '<span class="preview-tag">APERÇU GRATUIT</span>' : ""}
           </div>
           <div class="status ${count ? "ok" : "none"}">
@@ -260,7 +267,7 @@
 
       row.innerHTML = `
         <div class="top-line">
-          <span class="titre">${lesson.titre}</span>
+          <span class="titre">${escapeHtml(lesson.titre)}</span>
           ${lesson.is_preview ? '<span class="preview-tag">APERÇU GRATUIT</span>' : ""}
         </div>
         <div class="status ${hasVideo ? "ok" : "none"}">
@@ -309,7 +316,7 @@
       .order("ordre", { ascending: true });
 
     if (error) {
-      panel.innerHTML = `<div class="msg error">${error.message}</div>`;
+      panel.innerHTML = `<div class="msg error">${escapeHtml(error.message)}</div>`;
       return;
     }
 
@@ -322,8 +329,8 @@
         ? q.choices.map((c, i) => (i === q.correct_index ? "✓ " : "— ") + c).join(" | ")
         : "";
       qRow.innerHTML = `
-        <div class="qq-text"><strong>${q.ordre}.</strong> ${q.question}</div>
-        <div class="qq-choices">${choicesText}</div>
+        <div class="qq-text"><strong>${q.ordre}.</strong> ${escapeHtml(q.question)}</div>
+        <div class="qq-choices">${escapeHtml(choicesText)}</div>
         <button class="btn-sm danger delete-question-btn" data-id="${q.id}" data-lesson-id="${lessonId}">🗑️ Supprimer cette question</button>
       `;
       panel.appendChild(qRow);
