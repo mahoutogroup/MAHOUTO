@@ -33,6 +33,7 @@
 
   .action-link { align-self: flex-start; font-size: 13px; font-weight: bold; padding: 11px 18px; border-radius: 12px; background: var(--gold-bright); color: #0A0A0A; }
   .action-link.wa { background: #25D366; color: #fff; }
+  button.action-link { border: none; cursor: pointer; font-family: inherit; }
 
   #vendor-form label { font-size: 11.5px; color: var(--text-dim); display: block; margin-bottom: 4px; }
   #vendor-form input, #vendor-form textarea {
@@ -127,30 +128,45 @@
     );
     if (status === "approved") {
       panel.append(el("a", { class: "action-link", href: "admin/serigraphie-produits.html", text: "Gérer mes produits" }));
-    } else if (status === "rejected" || status === "suspended") {
+    } else if (status === "rejected") {
+      // Demande refusée : le propriétaire peut redéposer (rejected -> pending, seule transition permise par la base)
+      const again = el("button", { class: "action-link", type: "button", id: "resubmit-btn", text: "Déposer une nouvelle demande" });
+      again.addEventListener("click", () => renderForm(currentUser, vendor));
+      panel.append(again, waLink("Écrire sur WhatsApp"));
+    } else if (status === "suspended") {
       panel.append(waLink("Écrire sur WhatsApp"));
     }
     panel.append(el("div", { class: "shop-recap", text: "Boutique : " + vendor.shop_name + " · " + vendor.city + " · WhatsApp : " + vendor.whatsapp }));
     setView(panel);
   }
 
-  function renderForm(user) {
+  let currentUser = null;
+
+  // vendor = null : première demande (insertion) ; vendor refusé : nouvelle demande (mise à jour -> pending)
+  function renderForm(user, vendor) {
+    const resubmit = !!vendor;
     const statusEl = el("div", { id: "form-status", role: "status" });
     const shopName = el("input", { type: "text", id: "f-shop", required: "required", minlength: "2", maxlength: "80", placeholder: "Ex : Atelier Sérigraphie Cotonou", autocomplete: "organization" });
     const whatsapp = el("input", { type: "tel", id: "f-wa", required: "required", maxlength: "25", placeholder: "Ex : +229 01 02 03 04", autocomplete: "tel" });
     const city = el("input", { type: "text", id: "f-city", required: "required", minlength: "2", maxlength: "80", placeholder: "Ex : Cotonou", autocomplete: "address-level2" });
     const desc = el("textarea", { id: "f-desc", maxlength: "1000", placeholder: "Présentez votre atelier, votre expérience, vos produits..." });
-    const submit = el("button", { type: "submit", text: "Envoyer ma demande" });
+    const submit = el("button", { type: "submit", text: resubmit ? "Envoyer ma nouvelle demande" : "Envoyer ma demande" });
+    if (resubmit) {
+      shopName.value = vendor.shop_name || ""; whatsapp.value = vendor.whatsapp || "";
+      city.value = vendor.city || ""; desc.value = vendor.description || "";
+    }
 
     const form = el("form", { id: "vendor-form", class: "card panel", novalidate: "novalidate" },
-      el("h2", { text: "Votre boutique" }),
+      el("h2", { text: resubmit ? "Nouvelle demande" : "Votre boutique" }),
       el("div", {}, el("label", { for: "f-shop", text: "Nom de la boutique" }), shopName),
       el("div", {}, el("label", { for: "f-wa", text: "Numéro WhatsApp" }), whatsapp, el("div", { class: "hint", text: "Avec l'indicatif du pays, par exemple +229." })),
       el("div", {}, el("label", { for: "f-city", text: "Ville" }), city),
       el("div", {}, el("label", { for: "f-desc", text: "Description" }), desc),
       submit,
+      resubmit ? el("button", { type: "button", class: "action-link", id: "cancel-resubmit", text: "Annuler", style: "background:var(--bg);color:var(--text-muted);border:1px solid var(--border);" }) : null,
       statusEl
     );
+    if (resubmit) form.querySelector("#cancel-resubmit").addEventListener("click", () => renderStatus(vendor));
 
     function fail(msg) { statusEl.className = "error"; statusEl.id = "form-status"; statusEl.textContent = msg; }
 
@@ -159,7 +175,6 @@
       statusEl.className = ""; statusEl.textContent = "";
 
       const payload = {
-        user_id: user.id, // la base impose user_id = utilisateur connecté et status = 'pending'
         shop_name: shopName.value.trim(),
         whatsapp: whatsapp.value.trim(),
         city: city.value.trim(),
@@ -171,7 +186,16 @@
 
       submit.disabled = true;
       statusEl.textContent = "Envoi en cours...";
-      const { data, error } = await supabase.from("serigraphie_vendors").insert(payload).select().single();
+      let data, error;
+      if (resubmit) {
+        // Seul champ « sensible » envoyé : status = 'pending' (le trigger n'autorise que rejected -> pending)
+        ({ data, error } = await supabase.from("serigraphie_vendors")
+          .update(Object.assign({ status: "pending" }, payload)).eq("id", vendor.id).select().single());
+      } else {
+        // la base impose user_id = utilisateur connecté et status = 'pending'
+        ({ data, error } = await supabase.from("serigraphie_vendors")
+          .insert(Object.assign({ user_id: user.id }, payload)).select().single());
+      }
       submit.disabled = false;
 
       if (error) {
@@ -197,7 +221,8 @@
       setView(el("div", { class: "card panel" }, el("p", { text: "Impossible de charger votre dossier. Réessayez dans un instant." })));
       return;
     }
-    if (vendor) renderStatus(vendor); else renderForm(user);
+    currentUser = user;
+    if (vendor) renderStatus(vendor); else renderForm(user, null);
   }
 
   load();

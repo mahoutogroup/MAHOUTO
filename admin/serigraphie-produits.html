@@ -204,8 +204,9 @@
   }
   function money(xof) { return Number(xof).toLocaleString("fr-FR") + " FCFA"; }
   function safeImageUrl(url, width) {
-    if (typeof url !== "string" || !/^https:\/\/[^\s"'<>]+$/i.test(url)) return null;
-    return url.includes("res.cloudinary.com") && url.includes("/upload/")
+    // Même règle que la base : https + hôte Cloudinary uniquement (« / » juste après .com)
+    if (typeof url !== "string" || !/^https:\/\/res\.cloudinary\.com\/[^\s"'<>]+$/i.test(url)) return null;
+    return url.includes("/upload/")
       ? url.replace("/upload/", `/upload/f_auto,q_auto,w_${width},c_limit/`)
       : url;
   }
@@ -244,7 +245,7 @@
     const uploadResp = await fetch(sign.uploadUrl, { method: "POST", body: formData });
     const uploadData = await uploadResp.json();
     if (!uploadResp.ok) throw new Error((uploadData.error && uploadData.error.message) || "Envoi échoué");
-    if (!/^https:\/\/[^\s"'<>]+$/i.test(uploadData.secure_url || "")) throw new Error("URL d'image invalide.");
+    if (!/^https:\/\/res\.cloudinary\.com\/[^\s"'<>]+$/i.test(uploadData.secure_url || "")) throw new Error("URL d'image invalide.");
     return uploadData.secure_url;
   }
 

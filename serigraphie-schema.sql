@@ -33,8 +33,25 @@ end $$;
 
 -- =========================================================
 -- 1. FONCTION DE VALIDATION DES URL D'IMAGES
---    Même regex que profiles_avatar_url_https_check :
---    ^https://[^\s"'<>]+$  (insensible à la casse, comme ~*)
+--    Seules les URL https de l'hôte Cloudinary sont acceptées, avec la
+--    même liste de caractères interdits que profiles_avatar_url_https_check
+--    (espace, guillemets, chevrons) :
+--        ^https://res\.cloudinary\.com/[^\s"'<>]+$   (insensible à la casse)
+--    Le « / » juste après « .com » écarte les astuces du type
+--    https://res.cloudinary.com@pirate.com/ ou res.cloudinary.com.pirate.com.
+--
+--    Le nom du « cloud » (https://res.cloudinary.com/<cloud_name>/...) vient
+--    de la variable Vercel CLOUDINARY_CLOUD_NAME, lue par api/attachment.js :
+--    il n'est pas dans le dépôt, donc le motif reste volontairement générique.
+--    Pour le verrouiller sur VOTRE compte, remplacez le motif ci-dessous par
+--        '^https://res\.cloudinary\.com/<votre_cloud_name>/[^[:space:]"''<>]+$'
+--    puis relancez ce fichier.
+--
+--    ⚠ Si une version précédente de ce fichier a déjà été exécutée ET que des
+--    produits contiennent des images hors Cloudinary, la contrainte du §2
+--    échouera au rechargement. Pour les repérer avant :
+--        select id, images from public.serigraphie_products
+--         where not public.serigraphie_https_only(images);
 -- =========================================================
 create or replace function public.serigraphie_https_only(urls text[])
  returns boolean
@@ -42,7 +59,7 @@ create or replace function public.serigraphie_https_only(urls text[])
  immutable
 as $function$
   select coalesce(
-    bool_and(coalesce(u ~* '^https://[^[:space:]"''<>]+$', false)),
+    bool_and(coalesce(u ~* '^https://res\.cloudinary\.com/[^[:space:]"''<>]+$', false)),
     true
   )
   from unnest(urls) as u;
@@ -319,6 +336,7 @@ $function$;
 -- =========================================================
 
 -- Vendeurs : un utilisateur ne peut ni choisir son statut, ni sa commission
+-- (seule transition permise au propriétaire : rejected -> pending, pour redéposer)
 create or replace function public.serigraphie_vendors_guard()
  returns trigger
  language plpgsql
@@ -339,7 +357,12 @@ begin
   end if;
 
   if new.status is distinct from old.status then
-    raise exception 'Modification du statut vendeur réservée aux administrateurs.';
+    -- Seule exception : le propriétaire d'une demande REFUSÉE peut la redéposer
+    -- (rejected -> pending). Jamais vers approved / suspended, jamais depuis un
+    -- autre statut.
+    if not (old.status = 'rejected' and new.status = 'pending' and old.user_id = auth.uid()) then
+      raise exception 'Modification du statut vendeur réservée aux administrateurs.';
+    end if;
   end if;
   if new.commission_rate is distinct from old.commission_rate then
     raise exception 'Modification de la commission réservée aux administrateurs.';
@@ -423,7 +446,8 @@ create policy "serigraphie_vendors_own_insert" on public.serigraphie_vendors
   with check (user_id = auth.uid() and status = 'pending');
 
 -- Le vendeur peut corriger ses coordonnées ; le trigger interdit tout
--- changement de status / commission_rate / user_id sauf is_admin().
+-- changement de status / commission_rate / user_id sauf is_admin(), à
+-- l'exception de rejected -> pending (nouvelle demande du propriétaire).
 drop policy if exists "serigraphie_vendors_own_update" on public.serigraphie_vendors;
 create policy "serigraphie_vendors_own_update" on public.serigraphie_vendors
   for update to authenticated
