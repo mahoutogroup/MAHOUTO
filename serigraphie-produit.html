@@ -52,6 +52,7 @@
 
   .order-btn { width: 100%; font-size: 15px; font-weight: bold; background: var(--gold-bright); color: #0A0A0A; border: none; border-radius: 12px; padding: 15px; cursor: pointer; }
   .order-btn:disabled { background: var(--bg-card); color: var(--text-dim); border: 1px solid var(--border); cursor: not-allowed; }
+  a.order-btn { display: block; text-align: center; }
   .ask-link { text-align: center; font-size: 12.5px; color: var(--text-muted); }
   .ask-link a { color: var(--gold); font-weight: bold; }
 
@@ -160,6 +161,8 @@
       return n;
     }
     function refresh() {
+      orderBtn.href = "serigraphie-commande.html?product=" + encodeURIComponent(p.id) + "&qty=" + qty +
+        (color ? "&color=" + encodeURIComponent(color) : "");
       qtyLine.textContent = String(qty);
       totalEl.textContent = money(p.price * qty);
     }
@@ -184,6 +187,7 @@
         const chip = el("button", { class: "color-chip" + (i === 0 ? " active" : ""), type: "button", role: "radio", "aria-checked": i === 0 ? "true" : "false", text: c });
         chip.addEventListener("click", () => {
           color = c;
+          refresh();
           row.querySelectorAll(".color-chip").forEach((x) => { x.classList.remove("active"); x.setAttribute("aria-checked", "false"); });
           chip.classList.add("active");
           chip.setAttribute("aria-checked", "true");
@@ -193,8 +197,8 @@
       colorBlock = el("div", { class: "section-block" }, el("h2", { text: "Couleur" }), row);
     }
 
-    // ---- Bouton Commander : désactivé jusqu'à la PR 2 (paiement) ----
-    const orderBtn = el("button", { class: "order-btn", type: "button", disabled: "disabled", text: "Bientôt disponible" });
+    // ---- Bouton Commander : lien vers la page de commande (produit, quantité, couleur) ; le prix est recalculé par le serveur ----
+    const orderBtn = el("a", { class: "order-btn", href: "#", text: "Commander" });
 
     const waText = "Bonjour, une question sur le produit « " + (p.name || "") + " » (Le Sérigraphe by MAJESTÉ PRESSE).";
     const askLink = el("div", { class: "ask-link" }, "Une question ? ",

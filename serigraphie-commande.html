@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Commander — Le Sérigraphe by MAJESTÉ PRESSE</title>
+<meta name="theme-color" content="#0A0A0A">
+<link rel="manifest" href="manifest.json">
+<script src="brand.js"></script>
+<link rel="icon" href="assets/favicon.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="stylesheet" href="theme.css">
+<script src="theme-toggle.js"></script>
+<style>
+  header { padding: 20px; background: var(--bg-elevated); border-bottom: 1px solid var(--border); }
+  header h1 { font-size: 20px; color: var(--gold); }
+  header p { font-size: 12.5px; color: var(--text-muted); margin-top: 6px; line-height: 1.5; }
+
+  .top-bar { display: flex; align-items: center; padding: 14px 20px 0; }
+  .back-link { font-size: 12.5px; font-weight: 700; color: var(--gold); }
+
+  #loading-state { text-align: center; color: var(--text-dim); padding: 60px 24px; font-size: 14px; }
+
+  .panel { margin: 16px 20px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .panel h2 { font-size: 15px; color: var(--gold); }
+  .panel p { font-size: 13.5px; color: var(--text-muted); line-height: 1.7; }
+  .action-link { align-self: flex-start; font-size: 13px; font-weight: bold; padding: 11px 18px; border-radius: 12px; background: var(--gold-bright); color: #0A0A0A; border: none; cursor: pointer; font-family: inherit; }
+
+  .recap { display: flex; gap: 12px; align-items: center; }
+  .recap img, .recap .ph { width: 72px; height: 72px; border-radius: 12px; object-fit: contain; background: var(--bg-card); flex: none; border: 1px solid var(--border); }
+  .recap .ph { display: flex; align-items: center; justify-content: center; font-size: 28px; }
+  .recap .name { font-weight: bold; font-size: 15px; overflow-wrap: anywhere; }
+  .recap .meta { font-size: 12px; color: var(--text-muted); margin-top: 4px; line-height: 1.5; }
+
+  #order-form label { font-size: 11.5px; color: var(--text-dim); display: block; margin-bottom: 4px; }
+  #order-form input, #order-form select, #order-form textarea {
+    width: 100%; padding: 11px 12px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--white); font-size: 14px; font-family: inherit;
+  }
+  #order-form textarea { resize: vertical; min-height: 80px; }
+  #order-form .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .hint { font-size: 11px; color: var(--text-dim); margin-top: 3px; line-height: 1.5; }
+
+  .total-box { padding: 14px; border-radius: 14px; background: var(--bg); border: 1px solid var(--border); display: flex; flex-direction: column; gap: 6px; }
+  .total-box .line { display: flex; justify-content: space-between; font-size: 13px; color: var(--text-muted); gap: 10px; }
+  .total-box .total { font-size: 19px; font-weight: bold; color: var(--gold); }
+  .total-box .indicative { font-size: 11px; color: var(--text-dim); line-height: 1.5; }
+
+  .pay-btn { width: 100%; font-size: 15px; font-weight: bold; background: var(--gold-bright); color: #0A0A0A; border: none; border-radius: 12px; padding: 15px; cursor: pointer; }
+  .pay-btn:disabled { opacity: .55; cursor: wait; }
+  #form-status { font-size: 12.5px; min-height: 16px; color: var(--accent-green); line-height: 1.5; }
+  #form-status.error { color: #F87171; }
+
+  .sg-footer { text-align: center; color: var(--text-dim); font-size: 11.5px; padding: 18px 20px 20px; }
+</style>
+</head>
+<body>
+
+<button id="theme-toggle-btn" class="theme-toggle-fab">🌙</button>
+
+<div class="page-content">
+
+  <div class="top-bar"><a class="back-link" id="back-link" href="serigraphie.html">← Catalogue</a></div>
+
+  <header>
+    <h1>🛒 Votre commande</h1>
+    <p>Paiement sécurisé par FedaPay (Mobile Money, carte).</p>
+  </header>
+
+  <div id="loading-state">Chargement...</div>
+  <div id="view" class="hidden"></div>
+
+  <footer class="sg-footer">© 2026 Le Sérigraphe by MAJESTÉ PRESSE</footer>
+
+</div>
+
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+(function () {
+  const cfg = window.MAHOUTO_CONFIG;
+  const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+
+  const MAX_QTY = 1000;
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const PHONE_RE = /^\+?[0-9 ().-]{6,25}$/;
+
+  const loadingEl = document.getElementById("loading-state");
+  const viewEl = document.getElementById("view");
+
+  function el(tag, props, ...kids) {
+    const n = document.createElement(tag);
+    if (props) for (const [k, v] of Object.entries(props)) {
+      if (k === "class") n.className = v;
+      else if (k === "text") n.textContent = v;
+      else n.setAttribute(k, v);
+    }
+    kids.flat().forEach((c) => { if (c != null) n.append(c); });
+    return n;
+  }
+  function money(xof) { return Number(xof).toLocaleString("fr-FR") + " FCFA"; }
+  function safeImageUrl(url, width) {
+    if (typeof url !== "string" || !/^https:\/\/res\.cloudinary\.com\/[^\s"'<>]+$/i.test(url)) return null;
+    return url.includes("/upload/") ? url.replace("/upload/", `/upload/f_auto,q_auto,w_${width},c_limit/`) : url;
+  }
+  function show(...nodes) {
+    viewEl.textContent = "";
+    nodes.forEach((n) => viewEl.append(n));
+    loadingEl.classList.add("hidden");
+    viewEl.classList.remove("hidden");
+  }
+  function messagePanel(title, text, linkLabel, href) {
+    return el("div", { class: "card panel" },
+      el("h2", { text: title }), el("p", { text }),
+      linkLabel ? el("a", { class: "action-link", href, text: linkLabel }) : null);
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const productId = params.get("product") || "";
+  const wantedQty = parseInt(params.get("qty"), 10);
+  const wantedColor = params.get("color") || "";
+
+  if (UUID_RE.test(productId)) document.getElementById("back-link").href = "serigraphie-produit.html?id=" + encodeURIComponent(productId);
+
+  async function init() {
+    if (!UUID_RE.test(productId)) { show(messagePanel("Produit introuvable", "Le lien de commande est incomplet.", "Retour au catalogue", "serigraphie.html")); return; }
+
+    // Connexion obligatoire : sinon message puis redirection vers l'accueil
+    const { data: sessionData } = await supabase.auth.getSession();
+    const session = sessionData && sessionData.session ? sessionData.session : null;
+    if (!session || !session.user) {
+      show(messagePanel("Connexion requise", "Connectez-vous pour commander. Vous allez être redirigé vers l'accueil...", "Aller à l'accueil", "index.html"));
+      setTimeout(() => { window.location.href = "index.html"; }, 3000);
+      return;
+    }
+
+    const [prodRes, zoneRes] = await Promise.all([
+      supabase.from("serigraphie_products").select("*").eq("id", productId).eq("status", "active").maybeSingle(),
+      supabase.from("serigraphie_delivery_zones").select("*").eq("active", true).order("name", { ascending: true })
+    ]);
+    const product = prodRes.data;
+    if (prodRes.error || !product) { show(messagePanel("Produit introuvable", "Ce produit n'est plus disponible.", "Retour au catalogue", "serigraphie.html")); return; }
+    const zones = zoneRes.data || [];
+    const { data: shop } = await supabase.from("serigraphie_vendors_public").select("id, shop_name, city").eq("id", product.vendor_id).maybeSingle();
+
+    renderForm(session, product, zones, shop || null);
+  }
+
+  function renderForm(session, product, zones, shop) {
+    const minQty = Math.max(1, parseInt(product.min_qty, 10) || 1);
+    const colors = Array.isArray(product.colors) ? product.colors : [];
+    let submitting = false;
+
+    const imgUrl = safeImageUrl((product.images || [])[0], 200);
+    let thumb;
+    if (imgUrl) { thumb = document.createElement("img"); thumb.alt = product.name || ""; thumb.src = imgUrl; }
+    else thumb = el("div", { class: "ph", text: "🎨" });
+
+    // ---- Champs ----
+    const qtyInput = el("input", { type: "number", id: "f-qty", min: String(minQty), max: String(MAX_QTY), step: "1", inputmode: "numeric",
+      value: String(Number.isInteger(wantedQty) ? Math.min(Math.max(wantedQty, minQty), MAX_QTY) : minQty) });
+    const colorSelect = colors.length
+      ? el("select", { id: "f-color" }, colors.map((c) => el("option", { value: c, text: c })))
+      : null;
+    if (colorSelect) colorSelect.value = colors.includes(wantedColor) ? wantedColor : colors[0];
+
+    const meta = (session.user.user_metadata || {});
+    const nameInput = el("input", { type: "text", id: "f-name", maxlength: "80", autocomplete: "name", placeholder: "Votre nom complet", value: String(meta.full_name || meta.name || "").slice(0, 80) });
+    const phoneInput = el("input", { type: "tel", id: "f-phone", maxlength: "25", autocomplete: "tel", placeholder: "Ex : +229 01 02 03 04" });
+    const zoneSelect = el("select", { id: "f-zone" },
+      el("option", { value: "", text: "Choisir une zone de livraison" }),
+      zones.map((z) => el("option", { value: z.id, text: z.name + (z.city ? " (" + z.city + ")" : "") + " — " + money(z.fee) })));
+    const addressInput = el("textarea", { id: "f-address", maxlength: "300", autocomplete: "street-address", placeholder: "Quartier, rue, repère (ex. près du marché)…" });
+    const notesInput = el("textarea", { id: "f-notes", maxlength: "500", placeholder: "Précisions pour le sérigraphe (facultatif)" });
+
+    // ---- Totaux en direct (indicatifs : le serveur recalcule tout) ----
+    const subLine = el("span", { text: "" }), feeLine = el("span", { text: "—" }), totalEl = el("span", { class: "total", text: "" });
+    function currentQty() { const n = parseInt(qtyInput.value, 10); return Number.isFinite(n) ? n : 0; }
+    function currentZone() { return zones.find((z) => z.id === zoneSelect.value) || null; }
+    function refresh() {
+      const q = currentQty(), z = currentZone();
+      const sub = product.price * Math.max(q, 0);
+      subLine.textContent = money(sub);
+      feeLine.textContent = z ? money(z.fee) : "—";
+      totalEl.textContent = z ? money(sub + z.fee) : money(sub) + " + livraison";
+    }
+    qtyInput.addEventListener("input", refresh);
+    qtyInput.addEventListener("change", () => { const n = Math.min(Math.max(currentQty() || minQty, minQty), MAX_QTY); qtyInput.value = String(n); refresh(); });
+    zoneSelect.addEventListener("change", refresh);
+
+    const statusEl = el("div", { id: "form-status", role: "status" });
+    const payBtn = el("button", { type: "submit", class: "pay-btn", text: "Payer" });
+    function fail(msg) { statusEl.className = "error"; statusEl.textContent = msg; }
+
+    const form = el("form", { id: "order-form", class: "card panel", novalidate: "novalidate" },
+      el("h2", { text: "Votre commande" }),
+      el("div", { class: "recap" }, thumb, el("div", {},
+        el("div", { class: "name", text: product.name }),
+        el("div", { class: "meta", text: (shop ? "Vendu par " + shop.shop_name + " · " : "") + money(product.price) + " l'unité" + (minQty > 1 ? " · min. " + minQty + " pièces" : "") })
+      )),
+      el("div", { class: "row-2" },
+        el("div", {}, el("label", { for: "f-qty", text: "Quantité" }), qtyInput),
+        colorSelect ? el("div", {}, el("label", { for: "f-color", text: "Couleur" }), colorSelect) : null
+      ),
+      el("h2", { text: "Livraison" }),
+      el("div", {}, el("label", { for: "f-name", text: "Nom" }), nameInput),
+      el("div", {}, el("label", { for: "f-phone", text: "Téléphone" }), phoneInput),
+      el("div", {}, el("label", { for: "f-zone", text: "Zone de livraison" }), zoneSelect),
+      el("div", {}, el("label", { for: "f-address", text: "Adresse de livraison" }), addressInput),
+      el("div", {}, el("label", { for: "f-notes", text: "Notes" }), notesInput),
+      el("div", { class: "total-box" },
+        el("div", { class: "line" }, el("span", { text: "Sous-total" }), subLine),
+        el("div", { class: "line" }, el("span", { text: "Livraison" }), feeLine),
+        el("div", { class: "line" }, el("span", { text: "Total à payer" }), totalEl),
+        el("div", { class: "indicative", text: "Montant indicatif : le prix définitif est recalculé et vérifié par nos serveurs au moment du paiement." })
+      ),
+      payBtn,
+      statusEl
+    );
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (submitting) return;                              // anti double-clic
+      statusEl.className = ""; statusEl.textContent = "";
+
+      const qty = currentQty();
+      const name = nameInput.value.trim(), phone = phoneInput.value.trim(), address = addressInput.value.trim(), notes = notesInput.value.trim();
+      if (!Number.isInteger(qty) || qty < minQty || qty > MAX_QTY) return fail("Quantité : entre " + minQty + " et " + MAX_QTY + " pièces.");
+      if (name.length < 2 || name.length > 80) return fail("Indiquez votre nom (2 à 80 caractères).");
+      if (!PHONE_RE.test(phone)) return fail("Numéro de téléphone invalide. Exemple : +229 01 02 03 04.");
+      if (!zoneSelect.value) return fail("Choisissez une zone de livraison.");
+      if (address.length < 5 || address.length > 300) return fail("Indiquez votre adresse de livraison (5 à 300 caractères).");
+      if (notes.length > 500) return fail("Les notes sont limitées à 500 caractères.");
+
+      submitting = true;
+      payBtn.disabled = true;
+      payBtn.textContent = "Redirection vers le paiement...";
+      statusEl.textContent = "Création de votre commande...";
+
+      try {
+        const { data: fresh } = await supabase.auth.getSession();
+        const accessToken = fresh && fresh.session ? fresh.session.access_token : null;
+        if (!accessToken) throw new Error("Session expirée, reconnectez-vous.");
+
+        // Aucun prix, total ni statut n'est envoyé : le serveur recalcule tout.
+        const resp = await fetch("/api/fedapay-checkout", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": "Bearer " + accessToken },
+          body: JSON.stringify({
+            productType: "serigraphie", productId: product.id, qty,
+            color: colorSelect ? colorSelect.value : undefined,
+            zoneId: zoneSelect.value, name, phone, address, notes: notes || undefined
+          })
+        });
+        let data = null;
+        try { data = await resp.json(); } catch (_) { /* réponse non JSON */ }
+        if (!resp.ok || !data || typeof data.checkoutUrl !== "string" || !/^https:\/\//i.test(data.checkoutUrl)) {
+          throw new Error((data && data.error) || "Paiement indisponible. Réessayez dans un instant.");
+        }
+        statusEl.textContent = "Redirection...";
+        window.location.href = data.checkoutUrl;
+      } catch (err) {
+        console.error(err);
+        submitting = false;
+        payBtn.disabled = false;
+        payBtn.textContent = "Payer";
+        fail(err.message);
+      }
+    });
+
+    // Retour arrière depuis la page de paiement (cache du navigateur) : bouton de nouveau utilisable
+    window.addEventListener("pageshow", (ev) => {
+      if (ev.persisted) { submitting = false; payBtn.disabled = false; payBtn.textContent = "Payer"; statusEl.textContent = ""; }
+    });
+
+    show(form);
+    refresh();
+  }
+
+  init();
+})();
+</script>
+<script src="pwa-install.js"></script>
+
+</body>
+</html>

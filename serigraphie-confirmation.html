@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Confirmation — Le Sérigraphe by MAJESTÉ PRESSE</title>
+<meta name="theme-color" content="#0A0A0A">
+<link rel="manifest" href="manifest.json">
+<script src="brand.js"></script>
+<link rel="icon" href="assets/favicon.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="stylesheet" href="theme.css">
+<script src="theme-toggle.js"></script>
+<style>
+  header { padding: 20px; background: var(--bg-elevated); border-bottom: 1px solid var(--border); }
+  header h1 { font-size: 20px; color: var(--gold); }
+
+  #loading-state { text-align: center; color: var(--text-dim); padding: 60px 24px; font-size: 14px; }
+
+  .panel { margin: 16px 20px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .panel h2 { font-size: 15px; color: var(--gold); }
+  .panel p { font-size: 13.5px; color: var(--text-muted); line-height: 1.7; }
+  .state-pill { align-self: flex-start; font-size: 11px; font-weight: 700; padding: 4px 12px; border-radius: 999px; text-transform: uppercase; letter-spacing: .03em; }
+  .state-pill.ok { background: rgba(34,197,94,.15); color: var(--accent-green); }
+  .state-pill.wait { background: rgba(212,175,55,.15); color: var(--gold); }
+  .state-pill.ko { background: rgba(239,68,68,.15); color: #F87171; }
+
+  .action-link { align-self: flex-start; font-size: 13px; font-weight: bold; padding: 12px 18px; border-radius: 12px; background: var(--gold-bright); color: #0A0A0A; border: none; cursor: pointer; font-family: inherit; text-align: center; }
+  .action-link.wa { background: #25D366; color: #fff; }
+  .action-link.ghost { background: var(--bg); color: var(--text-muted); border: 1px solid var(--border); }
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+  .lines { display: flex; flex-direction: column; gap: 6px; }
+  .line { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--text-muted); }
+  .line.total { font-size: 16px; font-weight: bold; color: var(--gold); border-top: 1px solid var(--border); padding-top: 8px; margin-top: 4px; }
+  .line .v { text-align: right; overflow-wrap: anywhere; }
+  .info { font-size: 12.5px; color: var(--text-muted); line-height: 1.7; overflow-wrap: anywhere; white-space: pre-line; }
+  .small { font-size: 11.5px; color: var(--text-dim); line-height: 1.6; }
+
+  .sg-footer { text-align: center; color: var(--text-dim); font-size: 11.5px; padding: 18px 20px 20px; }
+</style>
+</head>
+<body>
+
+<button id="theme-toggle-btn" class="theme-toggle-fab">🌙</button>
+
+<div class="page-content">
+
+  <header><h1>🎨 Votre commande</h1></header>
+
+  <div id="loading-state">Chargement...</div>
+  <div id="view" class="hidden"></div>
+
+  <footer class="sg-footer">© 2026 Le Sérigraphe by MAJESTÉ PRESSE</footer>
+
+</div>
+
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+(function () {
+  const cfg = window.MAHOUTO_CONFIG;
+  const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+
+  const WA_NUMBER = "22996097644"; // +229 96 09 76 44
+  const POLL_EVERY_MS = 3000;
+  const POLL_MAX_MS = 60000;
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const PAID_STATES = ["paid", "preparing", "shipped", "delivered"];
+  const STATUS_LABELS = { paid: "Payée", preparing: "En préparation", shipped: "Expédiée", delivered: "Livrée" };
+
+  const loadingEl = document.getElementById("loading-state");
+  const viewEl = document.getElementById("view");
+
+  function el(tag, props, ...kids) {
+    const n = document.createElement(tag);
+    if (props) for (const [k, v] of Object.entries(props)) {
+      if (k === "class") n.className = v;
+      else if (k === "text") n.textContent = v;
+      else n.setAttribute(k, v);
+    }
+    kids.flat().forEach((c) => { if (c != null) n.append(c); });
+    return n;
+  }
+  function money(xof) { return Number(xof).toLocaleString("fr-FR") + " FCFA"; }
+  function show(...nodes) {
+    viewEl.textContent = "";
+    nodes.forEach((n) => viewEl.append(n));
+    loadingEl.classList.add("hidden");
+    viewEl.classList.remove("hidden");
+  }
+  function panel(title, text, ...extra) {
+    return el("div", { class: "card panel" }, el("h2", { text: title }), text ? el("p", { text }) : null, extra);
+  }
+  function waLink(label, text, cls) {
+    return el("a", { class: "action-link " + (cls || "wa"), href: "https://wa.me/" + WA_NUMBER + (text ? "?text=" + encodeURIComponent(text) : ""),
+      target: "_blank", rel: "noopener noreferrer", text: label });
+  }
+
+  const orderId = new URLSearchParams(window.location.search).get("order") || "";
+  const shortId = orderId.slice(0, 8).toUpperCase();
+
+  async function fetchOrder() {
+    const [o, i] = await Promise.all([
+      supabase.from("serigraphie_my_orders").select("*").eq("id", orderId).maybeSingle(),
+      supabase.from("serigraphie_my_order_items").select("*").eq("order_id", orderId)
+    ]);
+    return { order: o.data || null, items: i.data || [], error: o.error || null };
+  }
+
+  function lineRows(order, items) {
+    const rows = [];
+    items.forEach((it) => {
+      rows.push(el("div", { class: "line" },
+        el("span", { text: it.product_name + (it.color ? " · " + it.color : "") + " × " + it.qty }),
+        el("span", { class: "v", text: money(it.unit_price * it.qty) })));
+    });
+    rows.push(el("div", { class: "line" }, el("span", { text: "Livraison" + (order.delivery_zone ? " (" + order.delivery_zone + ")" : "") }), el("span", { class: "v", text: money(order.delivery_fee) })));
+    rows.push(el("div", { class: "line total" }, el("span", { text: "Total payé" }), el("span", { class: "v", text: money(order.total) })));
+    return el("div", { class: "lines" }, rows);
+  }
+
+  function whatsappText(order, items) {
+    const lines = ["Bonjour, je viens de commander sur Le Sérigraphe by MAJESTÉ PRESSE.", "Commande n° " + shortId];
+    items.forEach((it) => lines.push("Produit : " + it.product_name + (it.color ? " (" + it.color + ")" : "") + " × " + it.qty));
+    lines.push("Total payé : " + money(order.total));
+    if (order.client_name) lines.push("Nom : " + order.client_name);
+    if (order.client_phone) lines.push("Téléphone : " + order.client_phone);
+    if (order.delivery_address) lines.push("Adresse : " + order.delivery_address);
+    return lines.join("\n");
+  }
+
+  function renderPaid(order, items) {
+    show(el("div", { class: "card panel" },
+      el("span", { class: "state-pill ok", text: "✅ " + (STATUS_LABELS[order.status] || "Payée") }),
+      el("h2", { text: "Merci, votre paiement est confirmé !" }),
+      el("p", { text: "Commande n° " + shortId + (order.shop_name ? " · " + order.shop_name : "") }),
+      lineRows(order, items),
+      el("div", { class: "info", text: "Livraison à : " + (order.client_name || "") + (order.client_phone ? " · " + order.client_phone : "") + "\n" + (order.delivery_address || "") + (order.notes ? "\nNotes : " + order.notes : "") }),
+      el("div", { class: "actions" },
+        waLink("Envoyer ma commande sur WhatsApp", whatsappText(order, items)),
+        el("a", { class: "action-link ghost", href: "serigraphie.html", text: "Retour au catalogue" })),
+      el("div", { class: "small", text: "Envoyez le message WhatsApp pour que MAJESTÉ PRESSE puisse suivre votre commande et vous contacter pour la livraison." })
+    ));
+  }
+
+  function renderFailed(order, items) {
+    const first = items[0];
+    const retryHref = first && first.product_id
+      ? "serigraphie-commande.html?product=" + encodeURIComponent(first.product_id) + "&qty=" + encodeURIComponent(first.qty) + (first.color ? "&color=" + encodeURIComponent(first.color) : "")
+      : "serigraphie.html";
+    show(el("div", { class: "card panel" },
+      el("span", { class: "state-pill ko", text: "❌ Paiement non abouti" }),
+      el("h2", { text: "Le paiement a échoué ou a été annulé" }),
+      el("p", { text: "Aucun montant n'a été débité pour la commande n° " + shortId + ". Vous pouvez réessayer." }),
+      el("div", { class: "actions" }, el("a", { class: "action-link", href: retryHref, text: "Réessayer" }), waLink("Besoin d'aide ? WhatsApp", "Bonjour, mon paiement pour la commande n° " + shortId + " n'a pas abouti.", "wa"))
+    ));
+  }
+
+  function renderCancelled() {
+    show(el("div", { class: "card panel" },
+      el("span", { class: "state-pill ko", text: "Commande annulée" }),
+      el("h2", { text: "Cette commande a été annulée" }),
+      el("p", { text: "Commande n° " + shortId + ". Pour toute question, contactez-nous sur WhatsApp." }),
+      el("div", { class: "actions" }, waLink("Écrire sur WhatsApp", "Bonjour, une question sur ma commande n° " + shortId + "."))
+    ));
+  }
+
+  function renderPending(reload, timedOut) {
+    const nodes = [el("span", { class: "state-pill wait", text: "⏳ En attente" }),
+      el("h2", { text: timedOut ? "Paiement en attente de confirmation" : "Vérification du paiement en cours..." }),
+      el("p", { text: timedOut
+        ? "Nous n'avons pas encore reçu la confirmation de FedaPay pour la commande n° " + shortId + ". Si vous avez payé, elle arrivera dans quelques instants : actualisez cette page. Ne payez pas une deuxième fois."
+        : "Merci de patienter quelques secondes, ne fermez pas cette page. Commande n° " + shortId + "." })];
+    if (timedOut) {
+      const again = el("button", { type: "button", class: "action-link", text: "Actualiser" });
+      again.addEventListener("click", reload);
+      nodes.push(el("div", { class: "actions" }, again, waLink("Écrire sur WhatsApp", "Bonjour, j'ai payé la commande n° " + shortId + " mais elle n'est pas encore confirmée.")));
+    }
+    show(el("div", { class: "card panel" }, nodes));
+  }
+
+  let pollTimer = null;
+  function stopPolling() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null; } }
+
+  function renderState(r, startPolling) {
+    const { order, items } = r;
+    if (PAID_STATES.includes(order.status)) { stopPolling(); renderPaid(order, items); return true; }
+    if (order.status === "failed") { stopPolling(); renderFailed(order, items); return true; }
+    if (order.status === "cancelled") { stopPolling(); renderCancelled(); return true; }
+    return false;                                          // pending
+  }
+
+  async function start() {
+    if (!UUID_RE.test(orderId)) { show(panel("Commande introuvable", "Le lien de confirmation est incomplet.", el("a", { class: "action-link", href: "serigraphie.html", text: "Retour au catalogue" }))); return; }
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData || !sessionData.session || !sessionData.session.user) {
+      show(panel("Connexion requise", "Connectez-vous avec le compte utilisé pour la commande afin de voir son état.", el("a", { class: "action-link", href: "index.html", text: "Se connecter" })));
+      return;
+    }
+
+    let r = await fetchOrder();
+    if (r.error || !r.order) {
+      show(panel("Commande introuvable", "Cette commande n'existe pas ou n'appartient pas à ce compte.", el("a", { class: "action-link", href: "serigraphie.html", text: "Retour au catalogue" })));
+      return;
+    }
+    if (renderState(r)) return;
+
+    // Le webhook FedaPay peut arriver après le retour du client : on interroge toutes les 3 s, 60 s au maximum.
+    const reload = () => { stopPolling(); show(panel("Actualisation...", "")); start(); };
+    renderPending(reload, false);
+    const startedAt = Date.now();
+    let busy = false;
+    pollTimer = setInterval(async () => {
+      if (busy) return;
+      busy = true;
+      try {
+        const next = await fetchOrder();
+        if (next.order && renderState(next)) return;
+      } finally { busy = false; }
+      if (Date.now() - startedAt >= POLL_MAX_MS) { stopPolling(); renderPending(reload, true); }
+    }, POLL_EVERY_MS);
+  }
+
+  start();
+})();
+</script>
+<script src="pwa-install.js"></script>
+
+</body>
+</html>

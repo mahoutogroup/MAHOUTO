@@ -145,6 +145,14 @@ export default async function handler(req, res) {
     .eq("fedapay_transaction_id", String(transactionId))
     .maybeSingle();
 
+  // Sérigraphe : aucune ligne "purchases" -> chercher une commande serigraphie_orders (helper
+  // api/_serigraphie.js). Sans commande correspondante non plus, on retombe sur le 404 ci-dessous.
+  if (!purchaseError && !purchase) {
+    const { handleSerigraphieWebhook } = await import("./_serigraphie.js");
+    const serigraphieResult = await handleSerigraphieWebhook(supabaseAdmin, { transactionId, officialStatus, officialAmount, log });
+    if (serigraphieResult) return res.status(serigraphieResult.status).json(serigraphieResult.body);
+  }
+
   if (purchaseError || !purchase) {
     log("error", "Transaction FedaPay valide mais introuvable dans purchases — rejetée", {
       transactionId, error: purchaseError && purchaseError.message
