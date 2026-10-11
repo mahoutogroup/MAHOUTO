@@ -219,7 +219,11 @@
     const accessToken = sessionData && sessionData.session ? sessionData.session.access_token : null;
     statusEl.textContent = "Envoi de l'image...";
 
-    const signResp = await fetch("../api/cloudinary-sign", {
+    // La route /api/cloudinary-sign a été fusionnée dans /api/attachment (GET = signature d'upload).
+    // context=avatar : seule exigence = session valide (comme l'ancienne route), aucun salon ni
+    // conversation à désigner ; image uniquement, envoi public (dossier mahoutoplus/avatars).
+    const signQuery = new URLSearchParams({ filename: file.name || "image.jpg", context: "avatar" });
+    const signResp = await fetch("../api/attachment?" + signQuery.toString(), {
       headers: accessToken ? { "Authorization": "Bearer " + accessToken } : {}
     });
     const sign = await signResp.json();
