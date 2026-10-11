@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Devenir vendeur — Le Sérigraphe by MAJESTÉ PRESSE</title>
+<meta name="theme-color" content="#0A0A0A">
+<link rel="manifest" href="manifest.json">
+<script src="brand.js"></script>
+<link rel="icon" href="assets/favicon.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="stylesheet" href="theme.css">
+<script src="theme-toggle.js"></script>
+<style>
+  header { padding: 20px; background: var(--bg-elevated); border-bottom: 1px solid var(--border); }
+  header h1 { font-size: 20px; color: var(--gold); }
+  header p { font-size: 12.5px; color: var(--text-muted); margin-top: 6px; line-height: 1.5; }
+
+  .top-bar { display: flex; align-items: center; padding: 14px 20px 0; }
+  .back-link { font-size: 12.5px; font-weight: 700; color: var(--gold); }
+
+  #loading-state { text-align: center; color: var(--text-dim); padding: 60px 24px; font-size: 14px; }
+
+  .panel { margin: 18px 20px; padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+  .panel h2 { font-size: 15px; color: var(--gold); }
+  .panel p { font-size: 13.5px; color: var(--text-muted); line-height: 1.7; }
+  .panel .shop-recap { font-size: 12.5px; color: var(--text-dim); border-top: 1px solid var(--border); padding-top: 10px; line-height: 1.6; }
+
+  .status-pill { align-self: flex-start; font-size: 11px; font-weight: 700; padding: 4px 12px; border-radius: 999px; text-transform: uppercase; letter-spacing: .03em; }
+  .status-pill.pending { background: rgba(212,175,55,.15); color: var(--gold); }
+  .status-pill.approved { background: rgba(34,197,94,.15); color: var(--accent-green); }
+  .status-pill.rejected, .status-pill.suspended { background: rgba(239,68,68,.15); color: #F87171; }
+
+  .action-link { align-self: flex-start; font-size: 13px; font-weight: bold; padding: 11px 18px; border-radius: 12px; background: var(--gold-bright); color: #0A0A0A; }
+  .action-link.wa { background: #25D366; color: #fff; }
+
+  #vendor-form label { font-size: 11.5px; color: var(--text-dim); display: block; margin-bottom: 4px; }
+  #vendor-form input, #vendor-form textarea {
+    width: 100%; padding: 11px 12px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--white); font-size: 14px; font-family: inherit;
+  }
+  #vendor-form textarea { resize: vertical; min-height: 90px; }
+  #vendor-form button[type="submit"] { margin-top: 4px; background: var(--gold-bright); color: #0A0A0A; border: none; border-radius: 12px; padding: 13px; font-weight: bold; font-size: 14.5px; cursor: pointer; }
+  #vendor-form button[type="submit"]:disabled { opacity: .5; cursor: wait; }
+  #form-status { font-size: 12.5px; min-height: 16px; color: var(--accent-green); }
+  #form-status.error { color: #F87171; }
+  .hint { font-size: 11px; color: var(--text-dim); }
+
+  .sg-footer { text-align: center; color: var(--text-dim); font-size: 11.5px; padding: 18px 20px 20px; }
+</style>
+</head>
+<body>
+
+<button id="theme-toggle-btn" class="theme-toggle-fab">🌙</button>
+
+<div class="page-content">
+
+  <div class="top-bar"><a class="back-link" href="serigraphie.html">← Catalogue</a></div>
+
+  <header>
+    <h1>🎨 Devenir vendeur</h1>
+    <p>Rejoignez Le Sérigraphe by MAJESTÉ PRESSE : publiez vos produits et recevez des commandes.</p>
+  </header>
+
+  <div id="loading-state">Chargement...</div>
+  <div id="view" class="hidden"></div>
+
+  <footer class="sg-footer">© 2026 Le Sérigraphe by MAJESTÉ PRESSE</footer>
+
+</div>
+
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+(function () {
+  const cfg = window.MAHOUTO_CONFIG;
+  const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+
+  const WA_NUMBER = "22996097644"; // +229 96 09 76 44
+
+  // Messages exacts (validés)
+  const MESSAGES = {
+    pending: "Merci pour votre demande. L'équipe MAJESTÉ PRESSE étudie votre dossier et vous répond sous 48 heures par WhatsApp.",
+    rejected: "Merci de votre intérêt pour Le Sérigraphe by MAJESTÉ PRESSE. Après étude, nous ne pouvons pas valider votre demande pour le moment. Vous pouvez nous contacter sur WhatsApp au +229 96 09 76 44 pour en savoir plus ou déposer une nouvelle demande plus tard.",
+    suspended: "Votre boutique est temporairement suspendue. Contactez-nous sur WhatsApp au +229 96 09 76 44 pour régler la situation.",
+    approved: "Votre boutique est approuvée. Vous pouvez publier vos produits."
+  };
+  const STATUS_LABELS = { pending: "En cours d'étude", approved: "Approuvée", rejected: "Refusée", suspended: "Suspendue" };
+
+  const loadingEl = document.getElementById("loading-state");
+  const viewEl = document.getElementById("view");
+
+  function el(tag, props, ...kids) {
+    const n = document.createElement(tag);
+    if (props) for (const [k, v] of Object.entries(props)) {
+      if (k === "class") n.className = v;
+      else if (k === "text") n.textContent = v;
+      else n.setAttribute(k, v);
+    }
+    kids.flat().forEach((c) => { if (c != null) n.append(c); });
+    return n;
+  }
+  function setView(...nodes) {
+    viewEl.textContent = "";
+    nodes.forEach((n) => viewEl.append(n));
+    loadingEl.classList.add("hidden");
+    viewEl.classList.remove("hidden");
+  }
+  function waLink(label) {
+    return el("a", { class: "action-link wa", href: "https://wa.me/" + WA_NUMBER, target: "_blank", rel: "noopener noreferrer", text: label });
+  }
+
+  function renderLoggedOut() {
+    setView(el("div", { class: "card panel" },
+      el("h2", { text: "Connexion requise" }),
+      el("p", { text: "Connectez-vous à votre compte pour déposer une demande de vendeur." }),
+      el("a", { class: "action-link", href: "index.html", text: "Se connecter" })
+    ));
+  }
+
+  function renderStatus(vendor) {
+    const status = MESSAGES[vendor.status] ? vendor.status : "pending";
+    const panel = el("div", { class: "card panel" },
+      el("span", { class: "status-pill " + status, text: STATUS_LABELS[status] }),
+      el("h2", { text: vendor.shop_name }),
+      el("p", { text: MESSAGES[status] })
+    );
+    if (status === "approved") {
+      panel.append(el("a", { class: "action-link", href: "admin/serigraphie-produits.html", text: "Gérer mes produits" }));
+    } else if (status === "rejected" || status === "suspended") {
+      panel.append(waLink("Écrire sur WhatsApp"));
+    }
+    panel.append(el("div", { class: "shop-recap", text: "Boutique : " + vendor.shop_name + " · " + vendor.city + " · WhatsApp : " + vendor.whatsapp }));
+    setView(panel);
+  }
+
+  function renderForm(user) {
+    const statusEl = el("div", { id: "form-status", role: "status" });
+    const shopName = el("input", { type: "text", id: "f-shop", required: "required", minlength: "2", maxlength: "80", placeholder: "Ex : Atelier Sérigraphie Cotonou", autocomplete: "organization" });
+    const whatsapp = el("input", { type: "tel", id: "f-wa", required: "required", maxlength: "25", placeholder: "Ex : +229 01 02 03 04", autocomplete: "tel" });
+    const city = el("input", { type: "text", id: "f-city", required: "required", minlength: "2", maxlength: "80", placeholder: "Ex : Cotonou", autocomplete: "address-level2" });
+    const desc = el("textarea", { id: "f-desc", maxlength: "1000", placeholder: "Présentez votre atelier, votre expérience, vos produits..." });
+    const submit = el("button", { type: "submit", text: "Envoyer ma demande" });
+
+    const form = el("form", { id: "vendor-form", class: "card panel", novalidate: "novalidate" },
+      el("h2", { text: "Votre boutique" }),
+      el("div", {}, el("label", { for: "f-shop", text: "Nom de la boutique" }), shopName),
+      el("div", {}, el("label", { for: "f-wa", text: "Numéro WhatsApp" }), whatsapp, el("div", { class: "hint", text: "Avec l'indicatif du pays, par exemple +229." })),
+      el("div", {}, el("label", { for: "f-city", text: "Ville" }), city),
+      el("div", {}, el("label", { for: "f-desc", text: "Description" }), desc),
+      submit,
+      statusEl
+    );
+
+    function fail(msg) { statusEl.className = "error"; statusEl.id = "form-status"; statusEl.textContent = msg; }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      statusEl.className = ""; statusEl.textContent = "";
+
+      const payload = {
+        user_id: user.id, // la base impose user_id = utilisateur connecté et status = 'pending'
+        shop_name: shopName.value.trim(),
+        whatsapp: whatsapp.value.trim(),
+        city: city.value.trim(),
+        description: desc.value.trim() || null
+      };
+      if (payload.shop_name.length < 2 || payload.shop_name.length > 80) return fail("Indiquez le nom de votre boutique (2 à 80 caractères).");
+      if (!/^\+?[0-9 ().-]{6,25}$/.test(payload.whatsapp)) return fail("Numéro WhatsApp invalide. Exemple : +229 01 02 03 04.");
+      if (payload.city.length < 2 || payload.city.length > 80) return fail("Indiquez votre ville.");
+
+      submit.disabled = true;
+      statusEl.textContent = "Envoi en cours...";
+      const { data, error } = await supabase.from("serigraphie_vendors").insert(payload).select().single();
+      submit.disabled = false;
+
+      if (error) {
+        console.error(error);
+        if (error.code === "23505") { await load(); return; } // demande déjà déposée : on affiche son état
+        return fail("Impossible d'envoyer la demande : " + error.message);
+      }
+      renderStatus(data);
+    });
+
+    setView(form);
+  }
+
+  async function load() {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const user = sessionData && sessionData.session ? sessionData.session.user : null;
+    if (!user) { renderLoggedOut(); return; }
+
+    const { data: vendor, error } = await supabase
+      .from("serigraphie_vendors").select("*").eq("user_id", user.id).maybeSingle();
+    if (error) {
+      console.error(error);
+      setView(el("div", { class: "card panel" }, el("p", { text: "Impossible de charger votre dossier. Réessayez dans un instant." })));
+      return;
+    }
+    if (vendor) renderStatus(vendor); else renderForm(user);
+  }
+
+  load();
+})();
+</script>
+<script src="pwa-install.js"></script>
+
+</body>
+</html>

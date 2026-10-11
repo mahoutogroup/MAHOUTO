@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Produit — Le Sérigraphe by MAJESTÉ PRESSE</title>
+<meta name="theme-color" content="#0A0A0A">
+<link rel="manifest" href="manifest.json">
+<script src="brand.js"></script>
+<link rel="icon" href="assets/favicon.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="stylesheet" href="theme.css">
+<script src="theme-toggle.js"></script>
+<style>
+  #loading-state, #error-state { text-align: center; color: var(--text-dim); padding: 80px 24px; font-size: 14px; }
+  #error-state a { color: var(--gold); font-weight: bold; }
+
+  .top-bar { display: flex; align-items: center; padding: 14px 20px 0; }
+  .back-link { font-size: 12.5px; font-weight: 700; color: var(--gold); }
+
+  .gallery { padding: 12px 20px 0; }
+  .gallery-main { width: 100%; aspect-ratio: 4/3; object-fit: cover; border-radius: 18px; background: linear-gradient(135deg, rgba(212,175,55,.25), rgba(0,0,0,.4)); display: flex; align-items: center; justify-content: center; font-size: 60px; }
+  .thumbs { display: flex; gap: 8px; margin-top: 10px; overflow-x: auto; }
+  .thumb { flex: none; width: 62px; height: 62px; border-radius: 10px; object-fit: cover; border: 2px solid transparent; cursor: pointer; background: var(--bg-card); }
+  .thumb.active { border-color: var(--gold-bright); }
+
+  .detail-body { padding: 16px 20px 40px; display: flex; flex-direction: column; gap: 14px; }
+  .badge { align-self: flex-start; font-size: 11px; font-weight: 700; color: #0A0A0A; background: var(--gold-bright); padding: 4px 12px; border-radius: 999px; text-transform: uppercase; letter-spacing: .03em; }
+  .detail-body h1 { font-size: 22px; line-height: 1.3; }
+  .shop-line { font-size: 12.5px; color: var(--text-muted); }
+  .unit-price { font-size: 22px; font-weight: bold; color: var(--gold); }
+  .unit-price small { font-size: 12px; color: var(--text-dim); font-weight: normal; }
+
+  .section-block { display: flex; flex-direction: column; gap: 8px; }
+  .section-block h2 { font-size: 14.5px; color: var(--gold); }
+  .section-block p { font-size: 13.5px; color: var(--text-muted); line-height: 1.7; white-space: pre-line; }
+
+  .color-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .color-chip { padding: 9px 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-muted); font-size: 12.5px; font-weight: 600; cursor: pointer; }
+  .color-chip.active { background: var(--gold-bright); color: #0A0A0A; border-color: var(--gold-bright); }
+
+  .qty-row { display: flex; align-items: center; gap: 10px; }
+  .qty-btn { width: 42px; height: 42px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg-card); color: var(--white); font-size: 20px; font-weight: bold; cursor: pointer; }
+  .qty-input { width: 90px; height: 42px; text-align: center; border-radius: 12px; border: 1px solid var(--border); background: var(--bg-card); color: var(--white); font-size: 16px; font-weight: bold; }
+  .qty-hint { font-size: 11.5px; color: var(--text-dim); }
+
+  .total-box { padding: 16px; border-radius: 16px; background: var(--bg-card); border: 1px solid var(--border); display: flex; flex-direction: column; gap: 6px; }
+  .total-box .line { display: flex; justify-content: space-between; font-size: 13px; color: var(--text-muted); }
+  .total-box .total { font-size: 20px; font-weight: bold; color: var(--gold); }
+  .total-box .indicative { font-size: 11px; color: var(--text-dim); line-height: 1.5; }
+
+  .order-btn { width: 100%; font-size: 15px; font-weight: bold; background: var(--gold-bright); color: #0A0A0A; border: none; border-radius: 12px; padding: 15px; cursor: pointer; }
+  .order-btn:disabled { background: var(--bg-card); color: var(--text-dim); border: 1px solid var(--border); cursor: not-allowed; }
+  .ask-link { text-align: center; font-size: 12.5px; color: var(--text-muted); }
+  .ask-link a { color: var(--gold); font-weight: bold; }
+
+  .sg-footer { text-align: center; color: var(--text-dim); font-size: 11.5px; padding: 10px 20px 20px; }
+</style>
+</head>
+<body>
+
+<button id="theme-toggle-btn" class="theme-toggle-fab">🌙</button>
+
+<div class="page-content">
+
+  <div class="top-bar"><a class="back-link" href="serigraphie.html">← Catalogue</a></div>
+
+  <div id="loading-state">Chargement du produit...</div>
+  <div id="error-state" class="hidden">Produit introuvable. <a href="serigraphie.html">Retour au catalogue</a></div>
+  <div id="detail-content" class="hidden"></div>
+
+  <footer class="sg-footer">© 2026 Le Sérigraphe by MAJESTÉ PRESSE</footer>
+
+</div>
+
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+(function () {
+  const cfg = window.MAHOUTO_CONFIG;
+  const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+
+  const WA_NUMBER = "22996097644"; // +229 96 09 76 44
+  const MAX_QTY = 100000;
+
+  const loadingEl = document.getElementById("loading-state");
+  const errorEl = document.getElementById("error-state");
+  const contentEl = document.getElementById("detail-content");
+
+  function el(tag, props, ...kids) {
+    const n = document.createElement(tag);
+    if (props) for (const [k, v] of Object.entries(props)) {
+      if (k === "class") n.className = v;
+      else if (k === "text") n.textContent = v;
+      else n.setAttribute(k, v);
+    }
+    kids.flat().forEach((c) => { if (c != null) n.append(c); });
+    return n;
+  }
+  function money(xof) { return Number(xof).toLocaleString("fr-FR") + " FCFA"; }
+  function safeImageUrl(url, width) {
+    if (typeof url !== "string" || !/^https:\/\/[^\s"'<>]+$/i.test(url)) return null;
+    return url.includes("res.cloudinary.com") && url.includes("/upload/")
+      ? url.replace("/upload/", `/upload/f_auto,q_auto,w_${width},c_limit/`)
+      : url;
+  }
+  function showError() { loadingEl.classList.add("hidden"); errorEl.classList.remove("hidden"); }
+
+  function buildGallery(p) {
+    const urls = (p.images || []).map((u) => ({ big: safeImageUrl(u, 1000), small: safeImageUrl(u, 150) })).filter((u) => u.big);
+    const wrap = el("div", { class: "gallery" });
+    if (!urls.length) { wrap.append(el("div", { class: "gallery-main", text: "🎨" })); return wrap; }
+
+    const main = document.createElement("img");
+    main.className = "gallery-main";
+    main.alt = p.name || "";
+    main.src = urls[0].big;
+    wrap.append(main);
+
+    if (urls.length > 1) {
+      const row = el("div", { class: "thumbs" });
+      urls.forEach((u, i) => {
+        const t = document.createElement("img");
+        t.className = "thumb" + (i === 0 ? " active" : "");
+        t.alt = "Photo " + (i + 1);
+        t.src = u.small;
+        t.addEventListener("click", () => {
+          main.src = u.big;
+          row.querySelectorAll(".thumb").forEach((x) => x.classList.remove("active"));
+          t.classList.add("active");
+        });
+        row.append(t);
+      });
+      wrap.append(row);
+    }
+    return wrap;
+  }
+
+  function render(p, shop) {
+    const minQty = Math.max(1, parseInt(p.min_qty, 10) || 1);
+    let qty = minQty;
+    let color = (p.colors && p.colors.length) ? p.colors[0] : "";
+
+    document.title = (p.name || "Produit") + " — Le Sérigraphe by MAJESTÉ PRESSE";
+
+    // ---- Quantité + prix total en direct ----
+    const qtyInput = el("input", { class: "qty-input", type: "number", inputmode: "numeric", min: String(minQty), max: String(MAX_QTY), step: "1", value: String(qty), "aria-label": "Quantité" });
+    const minus = el("button", { class: "qty-btn", type: "button", "aria-label": "Diminuer", text: "−" });
+    const plus = el("button", { class: "qty-btn", type: "button", "aria-label": "Augmenter", text: "+" });
+    const unitLine = el("span", { text: money(p.price) });
+    const qtyLine = el("span", { text: String(qty) });
+    const totalEl = el("div", { class: "total", text: "" });
+
+    function clamp(n) {
+      n = parseInt(n, 10);
+      if (!Number.isFinite(n) || n < minQty) n = minQty;
+      if (n > MAX_QTY) n = MAX_QTY;
+      return n;
+    }
+    function refresh() {
+      qtyLine.textContent = String(qty);
+      totalEl.textContent = money(p.price * qty);
+    }
+    function setQty(n, writeInput) {
+      qty = clamp(n);
+      if (writeInput) qtyInput.value = String(qty);
+      refresh();
+    }
+    minus.addEventListener("click", () => setQty(qty - 1, true));
+    plus.addEventListener("click", () => setQty(qty + 1, true));
+    qtyInput.addEventListener("input", () => { // total en direct pendant la saisie
+      const n = parseInt(qtyInput.value, 10);
+      if (Number.isFinite(n) && n >= minQty) { qty = clamp(n); refresh(); }
+    });
+    qtyInput.addEventListener("change", () => setQty(qtyInput.value, true)); // quantité minimale imposée à la sortie du champ
+
+    // ---- Couleurs ----
+    let colorBlock = null;
+    if (p.colors && p.colors.length) {
+      const row = el("div", { class: "color-row", role: "radiogroup", "aria-label": "Couleur" });
+      p.colors.forEach((c, i) => {
+        const chip = el("button", { class: "color-chip" + (i === 0 ? " active" : ""), type: "button", role: "radio", "aria-checked": i === 0 ? "true" : "false", text: c });
+        chip.addEventListener("click", () => {
+          color = c;
+          row.querySelectorAll(".color-chip").forEach((x) => { x.classList.remove("active"); x.setAttribute("aria-checked", "false"); });
+          chip.classList.add("active");
+          chip.setAttribute("aria-checked", "true");
+        });
+        row.append(chip);
+      });
+      colorBlock = el("div", { class: "section-block" }, el("h2", { text: "Couleur" }), row);
+    }
+
+    // ---- Bouton Commander : désactivé jusqu'à la PR 2 (paiement) ----
+    const orderBtn = el("button", { class: "order-btn", type: "button", disabled: "disabled", text: "Bientôt disponible" });
+
+    const waText = "Bonjour, une question sur le produit « " + (p.name || "") + " » (Le Sérigraphe by MAJESTÉ PRESSE).";
+    const askLink = el("div", { class: "ask-link" }, "Une question ? ",
+      el("a", { href: "https://wa.me/" + WA_NUMBER + "?text=" + encodeURIComponent(waText), target: "_blank", rel: "noopener noreferrer", text: "Écrivez-nous sur WhatsApp" }));
+
+    const body = el("div", { class: "detail-body" },
+      p.category ? el("span", { class: "badge", text: p.category }) : null,
+      el("h1", { text: p.name }),
+      shop ? el("div", { class: "shop-line", text: "Vendu par " + shop.shop_name + (shop.city ? " · " + shop.city : "") }) : null,
+      el("div", { class: "unit-price" }, money(p.price), " ", el("small", { text: "l'unité" })),
+      p.description ? el("div", { class: "section-block" }, el("h2", { text: "Description" }), el("p", { text: p.description })) : null,
+      colorBlock,
+      el("div", { class: "section-block" },
+        el("h2", { text: "Quantité" }),
+        el("div", { class: "qty-row" }, minus, qtyInput, plus),
+        minQty > 1 ? el("div", { class: "qty-hint", text: "Quantité minimale : " + minQty + " pièces." }) : null
+      ),
+      el("div", { class: "total-box" },
+        el("div", { class: "line" }, el("span", { text: "Prix unitaire" }), unitLine),
+        el("div", { class: "line" }, el("span", { text: "Quantité" }), qtyLine),
+        el("div", { class: "line" }, el("span", { text: "Total" }), totalEl),
+        el("div", { class: "indicative", text: "Prix indicatif, hors livraison. Le montant définitif est calculé et confirmé au moment de la commande." })
+      ),
+      orderBtn,
+      askLink
+    );
+
+    contentEl.textContent = "";
+    contentEl.append(buildGallery(p), body);
+    refresh();
+    loadingEl.classList.add("hidden");
+    contentEl.classList.remove("hidden");
+  }
+
+  (async function init() {
+    const id = new URLSearchParams(window.location.search).get("id") || "";
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) { showError(); return; }
+
+    const { data: product, error } = await supabase
+      .from("serigraphie_products").select("*").eq("id", id).eq("status", "active").maybeSingle();
+    if (error || !product) { if (error) console.error(error); showError(); return; }
+
+    const { data: shop } = await supabase
+      .from("serigraphie_vendors_public").select("id, shop_name, city").eq("id", product.vendor_id).maybeSingle();
+
+    render(product, shop || null);
+  })();
+})();
+</script>
+<script src="pwa-install.js"></script>
+
+</body>
+</html>

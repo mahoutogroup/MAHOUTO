@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Administration — Produits Sérigraphe — Le Sérigraphe by MAJESTÉ PRESSE</title>
+<meta name="theme-color" content="#0A0A0A">
+<link rel="manifest" href="../manifest.json">
+<script src="../brand.js"></script>
+<link rel="icon" href="../assets/favicon.png">
+<link rel="stylesheet" href="../theme.css">
+<script src="../theme-toggle.js"></script>
+<style>
+  header { padding: 20px; background: var(--bg-elevated); border-bottom: 1px solid var(--border); }
+  header h1 { font-size: 20px; color: var(--gold); }
+  header p { font-size: 12.5px; color: var(--text-muted); margin-top: 6px; }
+
+  .nav-pills { display: flex; gap: 10px; padding: 14px 20px 0; flex-wrap: wrap; }
+  .nav-pills a { font-size: 12.5px; font-weight: bold; color: var(--text-muted); background: var(--bg-card); border-radius: 999px; padding: 8px 16px; }
+  .nav-pills a.current { color: #0A0A0A; background: var(--gold-bright); }
+
+  #access-denied, #loading-state { text-align: center; color: var(--text-dim); padding: 60px 24px; font-size: 14px; }
+  #access-denied .action-link { display: inline-block; margin-top: 14px; font-size: 13px; font-weight: bold; padding: 11px 18px; border-radius: 12px; background: var(--gold-bright); color: #0A0A0A; }
+  #access-denied p { max-width: 460px; margin: 0 auto; line-height: 1.7; color: var(--text-muted); }
+
+  .product-row { display: flex; flex-direction: column; gap: 8px; margin: 12px 20px; padding: 14px; }
+  .product-row .top-line { display: flex; align-items: center; gap: 10px; }
+  .product-row .thumb { width: 48px; height: 48px; border-radius: 10px; object-fit: cover; flex: none; background: var(--bg); border: 1px solid var(--border); }
+  .product-row .emoji { width: 48px; height: 48px; border-radius: 10px; flex: none; display: flex; align-items: center; justify-content: center; font-size: 22px; background: rgba(212,175,55,.12); }
+  .product-row .nom { font-weight: bold; font-size: 14.5px; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .pill { font-size: 10px; font-weight: 700; padding: 3px 9px; border-radius: 999px; text-transform: uppercase; flex: none; }
+  .pill.active { background: rgba(34,197,94,.15); color: var(--accent-green); }
+  .pill.draft { background: rgba(212,175,55,.15); color: var(--gold); }
+  .pill.archived { background: rgba(255,255,255,.08); color: var(--text-dim); }
+  .product-row .meta { font-size: 12px; color: var(--text-muted); }
+  .product-row .actions { display: flex; gap: 8px; margin-top: 4px; }
+  .product-row .actions button { font-size: 12.5px; font-weight: bold; border: none; border-radius: 8px; padding: 9px 14px; cursor: pointer; }
+  .btn-edit { flex: 1; background: var(--gold-bright); color: #0A0A0A; }
+  .btn-delete { background: rgba(239,68,68,.15); color: #F87171; }
+  .empty { padding: 30px 20px; text-align: center; color: var(--text-dim); font-size: 13px; }
+
+  #product-form { margin: 20px 20px 40px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+  #product-form h3 { color: var(--gold); font-size: 15px; margin-bottom: 4px; }
+  #product-form label { font-size: 11px; color: var(--text-dim); display: block; margin-bottom: 3px; }
+  #product-form input[type="text"], #product-form input[type="number"], #product-form select, #product-form textarea {
+    width: 100%; padding: 9px 10px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--white); font-size: 13.5px; font-family: inherit;
+  }
+  #product-form textarea { resize: vertical; min-height: 80px; }
+  #product-form .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  #product-form .hint { font-size: 11px; color: var(--text-dim); margin-top: 3px; }
+  #product-form .toggle-row { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-muted); }
+  #product-form .form-actions { display: flex; gap: 8px; margin-top: 6px; }
+  #product-form button[type="submit"] { flex: 1; background: var(--gold-bright); color: #0A0A0A; border: none; border-radius: 10px; padding: 12px; font-weight: bold; font-size: 14px; cursor: pointer; }
+  #product-form button[type="submit"]:disabled { opacity: .5; cursor: wait; }
+  #product-form .cancel-btn { background: var(--bg); color: var(--text-muted); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; font-weight: bold; font-size: 13px; cursor: pointer; }
+  #form-status { font-size: 12.5px; min-height: 16px; color: var(--accent-green); }
+  #form-status.error { color: #F87171; }
+
+  .image-box { border: 1.5px dashed var(--border); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+  .image-grid { display: flex; flex-wrap: wrap; gap: 10px; }
+  .image-item { position: relative; width: 78px; height: 78px; }
+  .image-item img { width: 100%; height: 100%; object-fit: cover; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); }
+  .image-item button { position: absolute; top: -6px; right: -6px; width: 22px; height: 22px; border-radius: 50%; border: none; background: #EF4444; color: #fff; font-size: 12px; font-weight: bold; cursor: pointer; line-height: 22px; padding: 0; }
+  .image-box .pick-btn { align-self: flex-start; font-size: 12px; font-weight: bold; border: none; border-radius: 8px; padding: 8px 14px; cursor: pointer; background: var(--gold-bright); color: #0A0A0A; }
+  .image-box .pick-btn:disabled { opacity: .5; cursor: wait; }
+  .upload-status { font-size: 11.5px; color: var(--text-dim); }
+  .upload-status.error { color: #F87171; }
+  .placeholder { font-size: 12.5px; color: var(--text-dim); }
+</style>
+</head>
+<body>
+
+<button id="theme-toggle-btn" class="theme-toggle-fab">🌙</button>
+
+<div class="page-content">
+
+  <header>
+    <h1>🎨 Administration — Produits Sérigraphe</h1>
+    <p id="header-sub">Produits du Sérigraphe by MAJESTÉ PRESSE.</p>
+  </header>
+
+  <div class="nav-pills" id="nav-pills">
+    <a href="serigraphie-produits.html" class="current">Produits Sérigraphe</a>
+    <a href="serigraphie-vendeurs.html" id="nav-vendors" class="hidden">Vendeurs Sérigraphe</a>
+    <a href="../serigraphie.html">Voir le catalogue</a>
+  </div>
+
+  <div id="loading-state">Vérification des droits...</div>
+  <div id="access-denied" class="hidden"></div>
+
+  <div id="products-container" class="hidden"></div>
+
+  <form id="product-form" class="card hidden" novalidate>
+    <h3 id="form-title">➕ Ajouter un produit</h3>
+
+    <div id="vendor-field" class="hidden">
+      <label for="f-vendor">Vendeur</label>
+      <select id="f-vendor"></select>
+    </div>
+
+    <div>
+      <label for="f-name">Nom du produit</label>
+      <input type="text" id="f-name" maxlength="120" placeholder="Ex : T-shirt coton sérigraphié" required>
+    </div>
+
+    <div class="row-2">
+      <div>
+        <label for="f-category">Catégorie</label>
+        <select id="f-category"></select>
+      </div>
+      <div>
+        <label for="f-status">Statut</label>
+        <select id="f-status">
+          <option value="draft">Brouillon (non visible)</option>
+          <option value="active">Actif (visible au catalogue)</option>
+          <option value="archived">Archivé</option>
+        </select>
+      </div>
+    </div>
+
+    <div>
+      <label for="f-description">Description</label>
+      <textarea id="f-description" maxlength="4000" placeholder="Matière, format, techniques d'impression, délais..."></textarea>
+    </div>
+
+    <div class="row-2">
+      <div>
+        <label for="f-price">Prix unitaire (FCFA)</label>
+        <input type="number" id="f-price" min="0" max="100000000" step="1" inputmode="numeric" required>
+      </div>
+      <div>
+        <label for="f-minqty">Quantité minimale</label>
+        <input type="number" id="f-minqty" min="1" max="100000" step="1" inputmode="numeric" value="1" required>
+      </div>
+    </div>
+
+    <div>
+      <label for="f-colors">Couleurs disponibles</label>
+      <input type="text" id="f-colors" placeholder="Ex : Noir, Blanc, Rouge">
+      <div class="hint">Séparez les couleurs par des virgules (20 maximum).</div>
+    </div>
+
+    <div>
+      <label>Photos (6 maximum, la première est la photo principale)</label>
+      <div class="image-box">
+        <div class="placeholder" id="images-placeholder">Aucune photo</div>
+        <div class="image-grid" id="image-grid"></div>
+        <button type="button" class="pick-btn" id="pick-image">📷 Ajouter une photo</button>
+        <div class="upload-status" id="upload-status"></div>
+        <input type="file" id="image-input" accept="image/*" class="hidden">
+      </div>
+    </div>
+
+    <label class="toggle-row hidden" id="featured-row"><input type="checkbox" id="f-featured"> Mettre en avant dans le catalogue</label>
+
+    <div class="form-actions">
+      <button type="submit" id="submit-btn">Créer le produit</button>
+      <button type="button" class="cancel-btn hidden" id="cancel-btn">Annuler</button>
+    </div>
+    <div id="form-status" role="status"></div>
+  </form>
+
+  <footer style="text-align:center;color:var(--text-dim);font-size:11.5px;padding:6px 20px 20px;">© 2026 Le Sérigraphe by MAJESTÉ PRESSE</footer>
+
+</div>
+
+<script src="../config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+(function () {
+  const cfg = window.MAHOUTO_CONFIG;
+  const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+
+  const WA_NUMBER = "22996097644"; // +229 96 09 76 44
+  const MAX_IMAGES = 6;
+  const MAX_IMAGE_SIZE = 8 * 1024 * 1024; // 8 Mo
+  const MAX_COLORS = 20;
+  const PRESET_CATEGORIES = ["T-shirts", "Casquettes", "Sacs", "Affiches", "Tampons", "Autre"];
+  const STATUS_LABELS = { draft: "Brouillon", active: "Actif", archived: "Archivé" };
+
+  // Messages exacts (validés)
+  const MESSAGES = {
+    pending: "Merci pour votre demande. L'équipe MAJESTÉ PRESSE étudie votre dossier et vous répond sous 48 heures par WhatsApp.",
+    rejected: "Merci de votre intérêt pour Le Sérigraphe by MAJESTÉ PRESSE. Après étude, nous ne pouvons pas valider votre demande pour le moment. Vous pouvez nous contacter sur WhatsApp au +229 96 09 76 44 pour en savoir plus ou déposer une nouvelle demande plus tard.",
+    suspended: "Votre boutique est temporairement suspendue. Contactez-nous sur WhatsApp au +229 96 09 76 44 pour régler la situation."
+  };
+
+  const $ = (id) => document.getElementById(id);
+  const loadingEl = $("loading-state");
+  const deniedEl = $("access-denied");
+  const containerEl = $("products-container");
+  const formEl = $("product-form");
+
+  function el(tag, props, ...kids) {
+    const n = document.createElement(tag);
+    if (props) for (const [k, v] of Object.entries(props)) {
+      if (k === "class") n.className = v;
+      else if (k === "text") n.textContent = v;
+      else n.setAttribute(k, v);
+    }
+    kids.flat().forEach((c) => { if (c != null) n.append(c); });
+    return n;
+  }
+  function money(xof) { return Number(xof).toLocaleString("fr-FR") + " FCFA"; }
+  function safeImageUrl(url, width) {
+    if (typeof url !== "string" || !/^https:\/\/[^\s"'<>]+$/i.test(url)) return null;
+    return url.includes("res.cloudinary.com") && url.includes("/upload/")
+      ? url.replace("/upload/", `/upload/f_auto,q_auto,w_${width},c_limit/`)
+      : url;
+  }
+
+  // ---- État ----
+  let isAdmin = false;
+  let myVendor = null;              // boutique du vendeur connecté (approuvée)
+  let VENDORS = new Map();          // id -> { id, shop_name } (admin : tous les vendeurs approuvés)
+  let PRODUCTS = [];
+  let editingId = null;             // null = création
+  let formImages = [];              // URL https des photos du formulaire
+
+  // =====================================================
+  // Upload Cloudinary (même mécanisme signé que profil.html :
+  // signature via /api/attachment, puis envoi direct à Cloudinary)
+  // =====================================================
+  async function uploadImage(file) {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData && sessionData.session ? sessionData.session.access_token : null;
+    if (!accessToken) throw new Error("Session expirée, reconnecte-toi.");
+
+    const signQuery = new URLSearchParams({ filename: file.name || "photo.jpg", context: "avatar" });
+    const signResp = await fetch("/api/attachment?" + signQuery.toString(), {
+      headers: { "Authorization": "Bearer " + accessToken }
+    });
+    const sign = await signResp.json();
+    if (!signResp.ok) throw new Error(sign.error || "Signature indisponible");
+
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("api_key", sign.apiKey);
+    formData.append("timestamp", sign.timestamp);
+    formData.append("signature", sign.signature);
+    formData.append("folder", sign.folder);
+
+    const uploadResp = await fetch(sign.uploadUrl, { method: "POST", body: formData });
+    const uploadData = await uploadResp.json();
+    if (!uploadResp.ok) throw new Error((uploadData.error && uploadData.error.message) || "Envoi échoué");
+    if (!/^https:\/\/[^\s"'<>]+$/i.test(uploadData.secure_url || "")) throw new Error("URL d'image invalide.");
+    return uploadData.secure_url;
+  }
+
+  function renderImages() {
+    const grid = $("image-grid");
+    grid.textContent = "";
+    $("images-placeholder").classList.toggle("hidden", formImages.length > 0);
+    formImages.forEach((url, i) => {
+      const img = document.createElement("img");
+      img.alt = "Photo " + (i + 1);
+      img.src = safeImageUrl(url, 160) || "";
+      const rm = el("button", { type: "button", "aria-label": "Retirer la photo " + (i + 1), text: "×" });
+      rm.addEventListener("click", () => { formImages.splice(i, 1); renderImages(); });
+      grid.append(el("div", { class: "image-item" }, img, rm));
+    });
+    $("pick-image").disabled = formImages.length >= MAX_IMAGES;
+  }
+
+  $("pick-image").addEventListener("click", () => $("image-input").click());
+  $("image-input").addEventListener("change", async () => {
+    const input = $("image-input");
+    const file = input.files[0];
+    input.value = "";
+    const status = $("upload-status");
+    status.className = "upload-status";
+    if (!file) return;
+    if (!/^image\//.test(file.type)) { status.className = "upload-status error"; status.textContent = "Ce fichier n'est pas une image."; return; }
+    if (file.size > MAX_IMAGE_SIZE) { status.className = "upload-status error"; status.textContent = "Image trop volumineuse (8 Mo maximum)."; return; }
+    if (formImages.length >= MAX_IMAGES) return;
+
+    $("pick-image").disabled = true;
+    status.textContent = "Envoi de la photo...";
+    try {
+      formImages.push(await uploadImage(file));
+      status.textContent = "";
+      renderImages();
+    } catch (err) {
+      console.error(err);
+      status.className = "upload-status error";
+      status.textContent = "Erreur : " + err.message;
+      renderImages();
+    }
+  });
+
+  // =====================================================
+  // Formulaire
+  // =====================================================
+  function fillCategories(selected) {
+    const sel = $("f-category");
+    sel.textContent = "";
+    const list = PRESET_CATEGORIES.slice();
+    if (selected && !list.includes(selected)) list.unshift(selected); // catégorie existante hors liste
+    list.forEach((c) => sel.append(el("option", { value: c, text: c })));
+    sel.value = selected || PRESET_CATEGORIES[0];
+  }
+
+  function resetForm() {
+    editingId = null;
+    formEl.reset();
+    $("f-minqty").value = "1";
+    $("f-status").value = "draft";
+    fillCategories("");
+    formImages = [];
+    renderImages();
+    $("form-title").textContent = "➕ Ajouter un produit";
+    $("submit-btn").textContent = "Créer le produit";
+    $("cancel-btn").classList.add("hidden");
+    $("upload-status").textContent = "";
+    if (isAdmin && VENDORS.size) $("f-vendor").disabled = false;
+  }
+
+  function startEdit(p) {
+    editingId = p.id;
+    $("f-name").value = p.name || "";
+    fillCategories(p.category || "");
+    $("f-status").value = p.status;
+    $("f-description").value = p.description || "";
+    $("f-price").value = String(p.price);
+    $("f-minqty").value = String(p.min_qty);
+    $("f-colors").value = (p.colors || []).join(", ");
+    formImages = (p.images || []).slice();
+    renderImages();
+    $("f-featured").checked = !!p.featured;
+    if (isAdmin) {
+      ensureVendorOption(p.vendor_id);
+      $("f-vendor").value = p.vendor_id;
+      $("f-vendor").disabled = true; // un produit ne change pas de boutique
+    }
+    $("form-title").textContent = "✏️ Modifier le produit";
+    $("submit-btn").textContent = "Enregistrer les modifications";
+    $("cancel-btn").classList.remove("hidden");
+    setFormStatus("", false);
+    formEl.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function ensureVendorOption(vendorId) {
+    const sel = $("f-vendor");
+    if (!Array.from(sel.options).some((o) => o.value === vendorId)) {
+      const v = VENDORS.get(vendorId);
+      sel.append(el("option", { value: vendorId, text: v ? v.shop_name : "Boutique " + vendorId.slice(0, 8) }));
+    }
+  }
+
+  function setFormStatus(msg, isError) {
+    const s = $("form-status");
+    s.className = isError ? "error" : "";
+    s.textContent = msg;
+  }
+
+  function parseColors(raw) {
+    const seen = new Set();
+    const out = [];
+    raw.split(",").map((c) => c.trim()).filter(Boolean).forEach((c) => {
+      const key = c.toLowerCase();
+      if (!seen.has(key)) { seen.add(key); out.push(c.slice(0, 30)); }
+    });
+    return out.slice(0, MAX_COLORS);
+  }
+
+  $("cancel-btn").addEventListener("click", () => { resetForm(); setFormStatus("", false); });
+
+  formEl.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const submitBtn = $("submit-btn");
+
+    const name = $("f-name").value.trim();
+    const price = parseInt($("f-price").value, 10);
+    const minQty = parseInt($("f-minqty").value, 10);
+    if (name.length < 2 || name.length > 120) return setFormStatus("Indiquez le nom du produit (2 à 120 caractères).", true);
+    if (!Number.isInteger(price) || price < 0 || price > 100000000) return setFormStatus("Le prix doit être un nombre entier de FCFA (0 ou plus).", true);
+    if (!Number.isInteger(minQty) || minQty < 1 || minQty > 100000) return setFormStatus("La quantité minimale doit être d'au moins 1.", true);
+
+    const payload = {
+      name,
+      category: $("f-category").value || null,
+      description: $("f-description").value.trim() || null,
+      price,
+      min_qty: minQty,
+      colors: parseColors($("f-colors").value),
+      images: formImages.slice(0, MAX_IMAGES),
+      status: $("f-status").value
+    };
+    if (isAdmin) payload.featured = $("f-featured").checked; // réservé aux admins (aussi imposé par la base)
+
+    submitBtn.disabled = true;
+    setFormStatus(editingId ? "Enregistrement..." : "Création en cours...", false);
+
+    let error;
+    if (editingId) {
+      ({ error } = await supabase.from("serigraphie_products").update(payload).eq("id", editingId));
+    } else {
+      const vendorId = isAdmin ? $("f-vendor").value : (myVendor && myVendor.id);
+      if (!vendorId) { submitBtn.disabled = false; return setFormStatus("Aucune boutique sélectionnée.", true); }
+      ({ error } = await supabase.from("serigraphie_products").insert(Object.assign({ vendor_id: vendorId }, payload)));
+    }
+    submitBtn.disabled = false;
+
+    if (error) {
+      console.error(error);
+      return setFormStatus("Erreur : " + error.message, true);
+    }
+    const wasEdit = !!editingId;
+    resetForm();
+    setFormStatus(wasEdit ? "✓ Produit modifié." : "✓ Produit créé.", false);
+    await loadProducts();
+  });
+
+  // =====================================================
+  // Liste des produits
+  // =====================================================
+  function productRow(p) {
+    const imgUrl = safeImageUrl((p.images || [])[0], 150);
+    let thumb;
+    if (imgUrl) { thumb = document.createElement("img"); thumb.className = "thumb"; thumb.alt = ""; thumb.src = imgUrl; }
+    else thumb = el("span", { class: "emoji", text: "🎨" });
+
+    const vendor = VENDORS.get(p.vendor_id);
+    const meta = money(p.price) + " · min. " + p.min_qty + (p.category ? " · " + p.category : "")
+      + (isAdmin && vendor ? " · " + vendor.shop_name : "") + (p.featured ? " · ⭐ mis en avant" : "");
+
+    const editBtn = el("button", { type: "button", class: "btn-edit", text: "Modifier" });
+    editBtn.addEventListener("click", () => startEdit(p));
+
+    const delBtn = el("button", { type: "button", class: "btn-delete", "aria-label": "Supprimer", text: "🗑️" });
+    delBtn.addEventListener("click", async () => {
+      if (!confirm("Supprimer définitivement « " + p.name + " » ?")) return;
+      delBtn.disabled = true;
+      const { error } = await supabase.from("serigraphie_products").delete().eq("id", p.id);
+      if (error) { console.error(error); alert("Erreur : " + error.message); delBtn.disabled = false; return; }
+      if (editingId === p.id) resetForm();
+      await loadProducts();
+    });
+
+    return el("div", { class: "card product-row" },
+      el("div", { class: "top-line" },
+        thumb,
+        el("span", { class: "nom", text: p.name }),
+        el("span", { class: "pill " + p.status, text: STATUS_LABELS[p.status] || p.status })
+      ),
+      el("div", { class: "meta", text: meta }),
+      el("div", { class: "actions" }, editBtn, delBtn)
+    );
+  }
+
+  function renderProducts() {
+    containerEl.textContent = "";
+    if (!PRODUCTS.length) {
+      containerEl.append(el("div", { class: "empty", text: isAdmin ? "Aucun produit pour le moment." : "Vous n'avez pas encore de produit. Ajoutez le premier ci-dessous." }));
+      return;
+    }
+    PRODUCTS.forEach((p) => containerEl.append(productRow(p)));
+  }
+
+  async function loadProducts() {
+    let q = supabase.from("serigraphie_products").select("*").order("created_at", { ascending: false });
+    if (!isAdmin) q = q.eq("vendor_id", myVendor.id); // un vendeur ne voit que ses produits (aussi imposé par la RLS)
+    const { data, error } = await q;
+    if (error) {
+      console.error(error);
+      containerEl.textContent = "";
+      containerEl.append(el("div", { class: "empty", text: "Erreur de chargement. Le schéma serigraphie-schema.sql a-t-il été exécuté ?" }));
+      return;
+    }
+    PRODUCTS = data || [];
+    renderProducts();
+  }
+
+  // =====================================================
+  // Accès : admin/super_admin/founder, ou vendeur approuvé
+  // =====================================================
+  function deny(...nodes) {
+    loadingEl.classList.add("hidden");
+    deniedEl.textContent = "";
+    nodes.filter(Boolean).forEach((n) => deniedEl.append(n));
+    deniedEl.classList.remove("hidden");
+  }
+  function waLink() {
+    return el("a", { class: "action-link", href: "https://wa.me/" + WA_NUMBER, target: "_blank", rel: "noopener noreferrer", text: "Écrire sur WhatsApp" });
+  }
+
+  async function init() {
+    const { data } = await supabase.auth.getSession();
+    const user = data && data.session ? data.session.user : null;
+    if (!user) {
+      deny(el("p", { text: "🔒 Connectez-vous pour accéder à la gestion des produits." }), el("a", { class: "action-link", href: "../index.html", text: "Se connecter" }));
+      return;
+    }
+
+    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
+    const role = profile ? profile.role : "user";
+    isAdmin = role === "admin" || role === "super_admin" || role === "founder";
+
+    if (isAdmin) {
+      $("nav-vendors").classList.remove("hidden");
+      $("header-sub").textContent = "Tous les produits de la place de marché.";
+      const { data: vendors } = await supabase.from("serigraphie_vendors").select("id, shop_name, status").order("shop_name");
+      (vendors || []).forEach((v) => VENDORS.set(v.id, v));
+      const sel = $("f-vendor");
+      (vendors || []).filter((v) => v.status === "approved").forEach((v) => sel.append(el("option", { value: v.id, text: v.shop_name })));
+      $("vendor-field").classList.remove("hidden");
+      $("featured-row").classList.remove("hidden");
+    } else {
+      const { data: vendor, error } = await supabase.from("serigraphie_vendors").select("id, shop_name, status").eq("user_id", user.id).maybeSingle();
+      if (error) { console.error(error); deny(el("p", { text: "Impossible de vérifier votre boutique. Réessayez dans un instant." })); return; }
+      if (!vendor) {
+        deny(el("p", { text: "Vous n'avez pas encore de boutique sur Le Sérigraphe by MAJESTÉ PRESSE." }), el("a", { class: "action-link", href: "../serigraphie-vendeur.html", text: "Devenir vendeur" }));
+        return;
+      }
+      if (vendor.status !== "approved") {
+        const msg = MESSAGES[vendor.status] || MESSAGES.pending;
+        deny(el("p", { text: msg }), vendor.status === "pending" ? null : waLink());
+        return;
+      }
+      myVendor = vendor;
+      VENDORS.set(vendor.id, vendor);
+      $("header-sub").textContent = "Boutique : " + vendor.shop_name;
+    }
+
+    loadingEl.classList.add("hidden");
+    containerEl.classList.remove("hidden");
+    formEl.classList.remove("hidden");
+    resetForm();
+    await loadProducts();
+  }
+
+  init();
+})();
+</script>
+<script src="../pwa-install.js"></script>
+
+</body>
+</html>
