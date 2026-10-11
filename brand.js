@@ -36,6 +36,7 @@
       schoolNavLabel: "School",            // libellé court (barre de navigation du bas)
       marketName: "MAHOUTO Market",
       payName: "MAHOUTO Pay",
+      planPrefix: "MAHOUTO",               // préfixe affiché des noms d'abonnement (FREE, PREMIUM...)
       hideSelectors: [],                   // éléments masqués sur cette marque (aucun)
       domain: "mahouto.com",
       logo: "assets/logo-mahouto-plus.png",
@@ -52,6 +53,7 @@
       schoolNavLabel: "Académie",
       marketName: "MAJESTÉ Market",
       payName: "MAJESTÉ Pay",
+      planPrefix: "MAJESTÉ",
       // Accueil simplifié : cartes masquées (display:none, HTML conservé) — « Académie Majesté Presse » et « Majesté Presse »
       hideSelectors: ['.module-card[href="academie-majestepresse.html"]', "#card-majeste-presse"],
       domain: "majestepresse.com",
@@ -173,6 +175,7 @@
   var SCHOOL_TOKEN = /MAHOUTO School/g;     // texte source du produit formation
   var MARKET_TOKEN = /MAHOUTO Market/g;
   var PAY_TOKEN = /MAHOUTO Pay/g;
+  var PLAN_TOKEN = /MAHOUTO (FREE|PREMIUM|BUSINESS|ENTERPRISE|ORGANISATION)\b/g;   // affichage seulement
   var LOGO_FILE = "assets/logo-mahouto-plus.png";
   var SKIP_TAGS = { SCRIPT: 1, STYLE: 1, TEXTAREA: 1, NOSCRIPT: 1 };
 
@@ -180,11 +183,13 @@
 
   function swap(value) {
     return String(value).replace(TOKEN, brand.name).replace(SCHOOL_TOKEN, brand.schoolName)
-      .replace(MARKET_TOKEN, brand.marketName).replace(PAY_TOKEN, brand.payName);
+      .replace(MARKET_TOKEN, brand.marketName).replace(PAY_TOKEN, brand.payName)
+      .replace(PLAN_TOKEN, function (m, plan) { return brand.planPrefix + " " + plan; });
   }
   function hasToken(value) {
     return value.indexOf("MAHOUTO+") !== -1 || value.indexOf("MAHOUTO School") !== -1 ||
-           value.indexOf("MAHOUTO Market") !== -1 || value.indexOf("MAHOUTO Pay") !== -1;
+           value.indexOf("MAHOUTO Market") !== -1 || value.indexOf("MAHOUTO Pay") !== -1 ||
+           value.indexOf("MAHOUTO ") !== -1 && new RegExp(PLAN_TOKEN.source).test(value);
   }
 
   function applyBrand() {
