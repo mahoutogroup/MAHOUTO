@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Le Sérigraphe by MAJESTÉ PRESSE</title>
+<meta name="description" content="La place de marché des sérigraphes : t-shirts, casquettes, sacs, affiches et plus, imprimés par des artisans de confiance.">
+<meta name="theme-color" content="#0A0A0A">
+<link rel="manifest" href="manifest.json">
+<script src="brand.js"></script>
+<link rel="icon" href="assets/favicon.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="stylesheet" href="theme.css">
+<script src="theme-toggle.js"></script>
+<style>
+  .hero-sg { padding: 28px 20px 22px; background: var(--bg-elevated); border-bottom: 1px solid var(--border); text-align: center; }
+  .hero-sg h1 { font-size: 26px; color: var(--gold); letter-spacing: .01em; }
+  .hero-sg .by { font-size: 12.5px; color: var(--gold-bright); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; margin-top: 4px; }
+  .hero-sg p.lead { font-size: 13.5px; color: var(--text-muted); line-height: 1.6; margin: 12px auto 0; max-width: 420px; }
+  .hero-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 16px; }
+  .hero-actions a { font-size: 13px; font-weight: bold; padding: 11px 18px; border-radius: 12px; }
+  .hero-actions .primary { background: var(--gold-bright); color: #0A0A0A; }
+  .hero-actions .secondary { border: 1px solid var(--border); color: var(--text-muted); }
+
+  .filters-bar { padding: 16px 20px 0; display: flex; flex-direction: column; gap: 10px; }
+  .search-input { width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg-card); color: var(--white); font-size: 14px; }
+  .chip-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
+  .chip { flex: none; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-muted); font-size: 12.5px; font-weight: 600; cursor: pointer; }
+  .chip.active { background: var(--gold-bright); color: #0A0A0A; border-color: var(--gold-bright); }
+
+  .product-list { padding: 16px 20px; display: grid; grid-template-columns: 1fr; gap: 16px; }
+  @media (min-width: 560px) { .product-list { grid-template-columns: 1fr 1fr; } }
+  @media (min-width: 900px) { .product-list { grid-template-columns: repeat(3, 1fr); } }
+
+  .product-card { border-radius: 18px; overflow: hidden; background: var(--bg-card); border: 1px solid var(--border); display: flex; flex-direction: column; box-shadow: 0 4px 18px rgba(0,0,0,.18); transition: transform .15s ease, box-shadow .15s ease; }
+  .product-card:active { transform: scale(.98); }
+  @media (hover: hover) { .product-card:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(0,0,0,.28); border-color: var(--gold); } }
+  .product-cover { width: 100%; aspect-ratio: 4/3; object-fit: cover; background: linear-gradient(135deg, rgba(212,175,55,.25), rgba(0,0,0,.4)); display: flex; align-items: center; justify-content: center; font-size: 44px; }
+  .product-body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 6px; }
+  .product-badge { align-self: flex-start; font-size: 10.5px; font-weight: 700; color: #0A0A0A; background: var(--gold-bright); padding: 3px 10px; border-radius: 999px; text-transform: uppercase; letter-spacing: .03em; }
+  .product-card h3 { font-size: 16px; margin-top: 2px; }
+  .product-card .shop { font-size: 11.5px; color: var(--text-dim); }
+  .product-card .desc { font-size: 12.5px; color: var(--text-muted); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .product-price-row { display: flex; align-items: baseline; justify-content: space-between; margin-top: 4px; gap: 8px; }
+  .product-card .price { font-size: 15px; color: var(--gold); font-weight: bold; }
+  .product-card .minq { font-size: 11px; color: var(--text-dim); }
+
+  .empty-state { grid-column: 1 / -1; padding: 30px 20px; text-align: center; color: var(--text-dim); font-size: 13px; }
+
+  .vendor-cta { margin: 6px 20px 0; padding: 18px; text-align: center; }
+  .vendor-cta h2 { font-size: 15px; color: var(--gold); }
+  .vendor-cta p { font-size: 12.5px; color: var(--text-muted); margin: 8px 0 14px; line-height: 1.6; }
+
+  .sg-footer { text-align: center; color: var(--text-dim); font-size: 11.5px; padding: 26px 20px 20px; }
+
+  .wa-fab { position: fixed; right: 16px; bottom: 18px; z-index: 40; width: 56px; height: 56px; border-radius: 50%; background: #25D366; color: #fff; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 20px rgba(0,0,0,.4); }
+  .wa-fab svg { width: 30px; height: 30px; fill: currentColor; }
+  .wa-fab:active { transform: scale(.94); }
+</style>
+</head>
+<body>
+
+<button id="theme-toggle-btn" class="theme-toggle-fab">🌙</button>
+
+<div class="page-content">
+
+  <header class="hero-sg">
+    <h1>🎨 Le Sérigraphe</h1>
+    <div class="by">by MAJESTÉ PRESSE</div>
+    <p class="lead">Des sérigraphes de confiance, des produits imprimés sur mesure : choisissez, commandez, soyez livré.</p>
+    <div class="hero-actions">
+      <a class="primary" href="#catalogue">Voir le catalogue</a>
+      <a class="secondary" href="serigraphie-vendeur.html">Devenir vendeur</a>
+    </div>
+  </header>
+
+  <div class="filters-bar" id="catalogue">
+    <input type="search" id="search-input" class="search-input" placeholder="🔍 Rechercher un produit..." maxlength="80" autocomplete="off">
+    <div class="chip-row" id="category-row"></div>
+  </div>
+
+  <div class="product-list" id="product-list">
+    <div class="empty-state">Chargement du catalogue...</div>
+  </div>
+
+  <div class="card vendor-cta">
+    <h2>Vous êtes sérigraphe ?</h2>
+    <p>Publiez vos produits sur Le Sérigraphe by MAJESTÉ PRESSE et touchez de nouveaux clients.</p>
+    <a class="btn-gold" href="serigraphie-vendeur.html">Devenir vendeur</a>
+  </div>
+
+  <footer class="sg-footer">© 2026 Le Sérigraphe by MAJESTÉ PRESSE</footer>
+
+</div>
+
+<a class="wa-fab" id="wa-fab" href="https://wa.me/22996097644" target="_blank" rel="noopener noreferrer" aria-label="Nous écrire sur WhatsApp">
+  <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16.04 3C9.4 3 4 8.4 4 15.03c0 2.12.55 4.19 1.6 6.01L4 29l8.14-1.56a12.04 12.04 0 0 0 3.9.65h.01C22.68 28.09 28 22.7 28 16.07 28 9.4 22.69 3 16.04 3zm0 22.04h-.01c-1.2 0-2.38-.32-3.4-.93l-.24-.15-4.83.93.98-4.7-.16-.25a9.95 9.95 0 0 1-1.54-5.3c0-5.5 4.5-9.97 10.03-9.97 5.52 0 10 4.47 10 9.97 0 5.5-4.49 10.4-10.83 10.4zm5.5-7.47c-.3-.15-1.78-.88-2.05-.98-.28-.1-.48-.15-.68.15-.2.3-.78.98-.95 1.18-.18.2-.35.22-.65.08-.3-.15-1.27-.47-2.42-1.5-.9-.8-1.5-1.78-1.67-2.08-.18-.3-.02-.46.13-.6.13-.14.3-.35.45-.52.15-.18.2-.3.3-.5.1-.2.05-.38-.02-.53-.08-.15-.68-1.64-.93-2.25-.25-.58-.5-.5-.68-.5h-.58c-.2 0-.53.08-.8.38-.28.3-1.05 1.02-1.05 2.5s1.08 2.9 1.23 3.1c.15.2 2.12 3.23 5.13 4.53.72.3 1.28.5 1.72.64.72.23 1.37.2 1.89.12.58-.08 1.78-.73 2.03-1.43.25-.7.25-1.3.18-1.43-.08-.12-.28-.2-.58-.35z"/></svg>
+</a>
+
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+(function () {
+  const cfg = window.MAHOUTO_CONFIG;
+  const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+
+  const WA_NUMBER = "22996097644"; // +229 96 09 76 44
+  const PRESET_CATEGORIES = ["T-shirts", "Casquettes", "Sacs", "Affiches", "Tampons", "Autre"];
+
+  // ---- Utilitaires : tout est construit en DOM (textContent), jamais en innerHTML ----
+  function el(tag, props, ...kids) {
+    const n = document.createElement(tag);
+    if (props) for (const [k, v] of Object.entries(props)) {
+      if (k === "class") n.className = v;
+      else if (k === "text") n.textContent = v;
+      else n.setAttribute(k, v);
+    }
+    kids.flat().forEach((c) => { if (c != null) n.append(c); });
+    return n;
+  }
+  function money(xof) { return Number(xof).toLocaleString("fr-FR") + " FCFA"; }
+  // Seules les URL https sont affichées (la base les contraint déjà, on revérifie côté affichage).
+  function safeImageUrl(url, width) {
+    // Même règle que la base : https + hôte Cloudinary uniquement (« / » juste après .com)
+    if (typeof url !== "string" || !/^https:\/\/res\.cloudinary\.com\/[^\s"'<>]+$/i.test(url)) return null;
+    return url.includes("/upload/")
+      ? url.replace("/upload/", `/upload/f_auto,q_auto,w_${width},c_limit/`)
+      : url;
+  }
+
+  document.getElementById("wa-fab").href =
+    "https://wa.me/" + WA_NUMBER + "?text=" + encodeURIComponent("Bonjour, je vous contacte depuis Le Sérigraphe by MAJESTÉ PRESSE.");
+
+  const listEl = document.getElementById("product-list");
+  const searchInput = document.getElementById("search-input");
+  const categoryRow = document.getElementById("category-row");
+
+  let PRODUCTS = [];
+  let SHOPS = new Map();
+  let currentCategory = "";
+
+  async function loadCatalog() {
+    const [prodRes, shopRes] = await Promise.all([
+      supabase.from("serigraphie_products").select("*").eq("status", "active")
+        .order("featured", { ascending: false }).order("created_at", { ascending: false }).limit(300),
+      supabase.from("serigraphie_vendors_public").select("id, shop_name, city")
+    ]);
+    if (prodRes.error) { console.error(prodRes.error); PRODUCTS = []; return false; }
+    PRODUCTS = prodRes.data || [];
+    SHOPS = new Map(((shopRes && shopRes.data) || []).map((s) => [s.id, s]));
+    return true;
+  }
+
+  function renderCategories() {
+    const found = Array.from(new Set(PRODUCTS.map((p) => p.category).filter(Boolean)));
+    const ordered = PRESET_CATEGORIES.filter((c) => found.includes(c))
+      .concat(found.filter((c) => !PRESET_CATEGORIES.includes(c)).sort());
+    categoryRow.textContent = "";
+    ["", ...ordered].forEach((cat) => {
+      const chip = el("button", { class: "chip" + (cat === currentCategory ? " active" : ""), type: "button", text: cat || "Tous" });
+      chip.addEventListener("click", () => { currentCategory = cat; renderCategories(); render(); });
+      categoryRow.append(chip);
+    });
+  }
+
+  function getFiltered() {
+    const q = searchInput.value.trim().toLowerCase();
+    return PRODUCTS.filter((p) => {
+      if (currentCategory && p.category !== currentCategory) return false;
+      if (q && !((p.name || "").toLowerCase().includes(q) || (p.description || "").toLowerCase().includes(q) || (p.category || "").toLowerCase().includes(q))) return false;
+      return true;
+    });
+  }
+
+  function productCard(p) {
+    const imgUrl = safeImageUrl((p.images || [])[0], 600);
+    let cover;
+    if (imgUrl) {
+      cover = document.createElement("img");
+      cover.className = "product-cover";
+      cover.src = imgUrl;
+      cover.alt = p.name || "";
+      cover.loading = "lazy";
+    } else {
+      cover = el("div", { class: "product-cover", text: "🎨" });
+    }
+    const shop = SHOPS.get(p.vendor_id);
+    const body = el("div", { class: "product-body" },
+      p.category ? el("span", { class: "product-badge", text: p.category }) : null,
+      el("h3", { text: p.name }),
+      shop ? el("div", { class: "shop", text: "par " + shop.shop_name + (shop.city ? " · " + shop.city : "") }) : null,
+      p.description ? el("p", { class: "desc", text: p.description }) : null,
+      el("div", { class: "product-price-row" },
+        el("div", { class: "price", text: money(p.price) }),
+        p.min_qty > 1 ? el("div", { class: "minq", text: "Min. " + p.min_qty + " pièces" }) : null
+      )
+    );
+    const card = el("a", { class: "product-card", href: "serigraphie-produit.html?id=" + encodeURIComponent(p.id) }, cover, body);
+    return card;
+  }
+
+  function render() {
+    const filtered = getFiltered();
+    listEl.textContent = "";
+    if (!filtered.length) {
+      listEl.append(el("div", { class: "empty-state", text: PRODUCTS.length ? "Aucun produit ne correspond à votre recherche." : "Le catalogue est vide pour le moment. Revenez bientôt !" }));
+      return;
+    }
+    filtered.forEach((p) => listEl.append(productCard(p)));
+  }
+
+  searchInput.addEventListener("input", render);
+
+  (async function init() {
+    const ok = await loadCatalog();
+    if (!ok) {
+      listEl.textContent = "";
+      listEl.append(el("div", { class: "empty-state", text: "Impossible de charger le catalogue. Réessayez dans un instant." }));
+      return;
+    }
+    renderCategories();
+    render();
+  })();
+})();
+</script>
+<script src="pwa-install.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Administration — Vendeurs Sérigraphe — Le Sérigraphe by MAJESTÉ PRESSE</title>
+<meta name="theme-color" content="#0A0A0A">
+<link rel="manifest" href="../manifest.json">
+<script src="../brand.js"></script>
+<link rel="icon" href="../assets/favicon.png">
+<link rel="stylesheet" href="../theme.css">
+<script src="../theme-toggle.js"></script>
+<style>
+  header { padding: 20px; background: var(--bg-elevated); border-bottom: 1px solid var(--border); }
+  header h1 { font-size: 20px; color: var(--gold); }
+  header p { font-size: 12.5px; color: var(--text-muted); margin-top: 6px; }
+
+  .nav-pills { display: flex; gap: 10px; padding: 14px 20px 0; flex-wrap: wrap; }
+  .nav-pills a { font-size: 12.5px; font-weight: bold; color: var(--text-muted); background: var(--bg-card); border-radius: 999px; padding: 8px 16px; }
+  .nav-pills a.current { color: #0A0A0A; background: var(--gold-bright); }
+
+  #access-denied, #loading-state { text-align: center; color: var(--text-dim); padding: 60px 24px; font-size: 14px; }
+
+  .tabs { display: flex; gap: 8px; padding: 14px 20px 0; overflow-x: auto; }
+  .tab { flex: none; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-muted); font-size: 12.5px; font-weight: 600; cursor: pointer; }
+  .tab.active { background: var(--gold-bright); color: #0A0A0A; border-color: var(--gold-bright); }
+
+  .vendor-row { display: flex; flex-direction: column; gap: 10px; margin: 12px 20px; padding: 14px; }
+  .vendor-row .top-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .vendor-row .shop { font-weight: bold; font-size: 15px; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .pill { font-size: 10px; font-weight: 700; padding: 3px 9px; border-radius: 999px; text-transform: uppercase; }
+  .pill.pending { background: rgba(212,175,55,.15); color: var(--gold); }
+  .pill.approved { background: rgba(34,197,94,.15); color: var(--accent-green); }
+  .pill.rejected, .pill.suspended { background: rgba(239,68,68,.15); color: #F87171; }
+  .vendor-row .meta { font-size: 12px; color: var(--text-muted); line-height: 1.6; overflow-wrap: anywhere; }
+  .vendor-row .meta a { color: var(--gold); font-weight: 600; }
+  .vendor-row .about { font-size: 12.5px; color: var(--text-muted); line-height: 1.6; white-space: pre-line; overflow-wrap: anywhere; }
+  .vendor-row .date { font-size: 11px; color: var(--text-dim); }
+
+  .commission-row { display: flex; align-items: flex-end; gap: 8px; }
+  .commission-row label { font-size: 10.5px; color: var(--text-dim); display: block; margin-bottom: 3px; }
+  .commission-row input { width: 100px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--white); font-size: 13.5px; }
+  .commission-row button { font-size: 12.5px; font-weight: bold; background: var(--bg); color: var(--gold); border: 1px solid var(--gold); border-radius: 8px; padding: 9px 14px; cursor: pointer; }
+
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .actions button { font-size: 12.5px; font-weight: bold; border: none; border-radius: 8px; padding: 9px 14px; cursor: pointer; }
+  .actions button:disabled, .commission-row button:disabled { opacity: .5; cursor: wait; }
+  .btn-approve { background: var(--gold-bright); color: #0A0A0A; }
+  .btn-reject, .btn-suspend { background: rgba(239,68,68,.15); color: #F87171; }
+  .row-status { font-size: 11.5px; color: var(--accent-green); min-height: 14px; }
+  .row-status.error { color: #F87171; }
+  .empty { padding: 30px 20px; text-align: center; color: var(--text-dim); font-size: 13px; }
+</style>
+</head>
+<body>
+
+<button id="theme-toggle-btn" class="theme-toggle-fab">🌙</button>
+
+<div class="page-content">
+
+  <header>
+    <h1>🎨 Administration — Vendeurs du Sérigraphe</h1>
+    <p>Demandes de vendeurs : approuver, refuser, suspendre, régler la commission.</p>
+  </header>
+
+  <div class="nav-pills">
+    <a href="serigraphie-produits.html">Produits Sérigraphe</a>
+    <a href="serigraphie-vendeurs.html" class="current">Vendeurs Sérigraphe</a>
+    <a href="formations.html">Formations</a>
+    <a href="produits.html">Produits numériques</a>
+  </div>
+
+  <div id="loading-state">Vérification des droits...</div>
+  <div id="access-denied" class="hidden">🔒 Accès réservé aux administrateurs.</div>
+
+  <div id="tabs" class="tabs hidden"></div>
+  <div id="vendors-container" class="hidden"></div>
+
+  <footer style="text-align:center;color:var(--text-dim);font-size:11.5px;padding:26px 20px 20px;">© 2026 Le Sérigraphe by MAJESTÉ PRESSE</footer>
+
+</div>
+
+<script src="../config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+(function () {
+  const cfg = window.MAHOUTO_CONFIG;
+  const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+
+  const STATUS_LABELS = { pending: "En attente", approved: "Approuvés", rejected: "Refusés", suspended: "Suspendus" };
+  const PILL_LABELS = { pending: "En attente", approved: "Approuvé", rejected: "Refusé", suspended: "Suspendu" };
+  const TAB_ORDER = ["pending", "approved", "suspended", "rejected", "all"];
+
+  const loadingEl = document.getElementById("loading-state");
+  const deniedEl = document.getElementById("access-denied");
+  const tabsEl = document.getElementById("tabs");
+  const containerEl = document.getElementById("vendors-container");
+
+  let VENDORS = [];
+  let currentTab = "pending";
+
+  function el(tag, props, ...kids) {
+    const n = document.createElement(tag);
+    if (props) for (const [k, v] of Object.entries(props)) {
+      if (k === "class") n.className = v;
+      else if (k === "text") n.textContent = v;
+      else n.setAttribute(k, v);
+    }
+    kids.flat().forEach((c) => { if (c != null) n.append(c); });
+    return n;
+  }
+  function formatDate(iso) {
+    const d = new Date(iso);
+    return isNaN(d) ? "" : d.toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" });
+  }
+
+  function renderTabs() {
+    tabsEl.textContent = "";
+    TAB_ORDER.forEach((key) => {
+      const count = key === "all" ? VENDORS.length : VENDORS.filter((v) => v.status === key).length;
+      const label = (key === "all" ? "Tous" : STATUS_LABELS[key]) + " (" + count + ")";
+      const tab = el("button", { class: "tab" + (key === currentTab ? " active" : ""), type: "button", text: label });
+      tab.addEventListener("click", () => { currentTab = key; renderTabs(); renderVendors(); });
+      tabsEl.append(tab);
+    });
+  }
+
+  async function setStatus(vendor, status, statusEl, buttons) {
+    buttons.forEach((b) => { b.disabled = true; });
+    statusEl.className = "row-status"; statusEl.textContent = "Enregistrement...";
+    const { data, error } = await supabase.from("serigraphie_vendors")
+      .update({ status }).eq("id", vendor.id).select().single();
+    if (error) {
+      console.error(error);
+      buttons.forEach((b) => { b.disabled = false; });
+      statusEl.className = "row-status error"; statusEl.textContent = "Erreur : " + error.message;
+      return;
+    }
+    Object.assign(vendor, data);
+    renderTabs(); renderVendors();
+  }
+
+  function vendorRow(v) {
+    const statusEl = el("div", { class: "row-status", role: "status" });
+
+    const commInput = el("input", { type: "number", min: "0", max: "50", step: "0.5", value: String(v.commission_rate), id: "c-" + v.id, "aria-label": "Commission en pourcentage" });
+    const commBtn = el("button", { type: "button", text: "Enregistrer" });
+    commBtn.addEventListener("click", async () => {
+      const rate = Number(commInput.value);
+      if (!Number.isFinite(rate) || rate < 0 || rate > 50) {
+        statusEl.className = "row-status error"; statusEl.textContent = "La commission doit être comprise entre 0 et 50 %.";
+        return;
+      }
+      commBtn.disabled = true;
+      statusEl.className = "row-status"; statusEl.textContent = "Enregistrement...";
+      const { data, error } = await supabase.from("serigraphie_vendors")
+        .update({ commission_rate: rate }).eq("id", v.id).select().single();
+      commBtn.disabled = false;
+      if (error) { console.error(error); statusEl.className = "row-status error"; statusEl.textContent = "Erreur : " + error.message; return; }
+      Object.assign(v, data);
+      commInput.value = String(v.commission_rate);
+      statusEl.textContent = "✓ Commission enregistrée";
+      setTimeout(() => { if (statusEl.textContent.startsWith("✓")) statusEl.textContent = ""; }, 2500);
+    });
+
+    const actions = el("div", { class: "actions" });
+    const buttons = [commBtn];
+    function addAction(label, cls, target, confirmMsg) {
+      const b = el("button", { type: "button", class: cls, text: label });
+      b.addEventListener("click", () => {
+        if (confirmMsg && !confirm(confirmMsg)) return;
+        setStatus(v, target, statusEl, buttons);
+      });
+      buttons.push(b); actions.append(b);
+    }
+    if (v.status === "pending") {
+      addAction("✅ Approuver", "btn-approve", "approved");
+      addAction("Refuser", "btn-reject", "rejected", "Refuser la demande de « " + v.shop_name + " » ?");
+    } else if (v.status === "approved") {
+      addAction("Suspendre", "btn-suspend", "suspended", "Suspendre la boutique « " + v.shop_name + " » ? Ses produits disparaîtront du catalogue.");
+    } else if (v.status === "suspended") {
+      addAction("✅ Réactiver", "btn-approve", "approved");
+    } else if (v.status === "rejected") {
+      addAction("✅ Approuver", "btn-approve", "approved");
+    }
+
+    const waDigits = String(v.whatsapp || "").replace(/[^0-9]/g, "");
+    const waNode = waDigits
+      ? el("a", { href: "https://wa.me/" + waDigits, target: "_blank", rel: "noopener noreferrer", text: v.whatsapp })
+      : document.createTextNode(v.whatsapp || "");
+
+    return el("div", { class: "card vendor-row" },
+      el("div", { class: "top-line" },
+        el("span", { class: "shop", text: v.shop_name }),
+        el("span", { class: "pill " + v.status, text: PILL_LABELS[v.status] || v.status })
+      ),
+      el("div", { class: "meta" }, "📍 " + v.city + " · 📱 ", waNode),
+      v.description ? el("div", { class: "about", text: v.description }) : null,
+      el("div", { class: "date", text: "Demande du " + formatDate(v.created_at) }),
+      el("div", { class: "commission-row" },
+        el("div", {}, el("label", { for: "c-" + v.id, text: "Commission (%)" }), commInput),
+        commBtn
+      ),
+      actions,
+      statusEl
+    );
+  }
+
+  function renderVendors() {
+    containerEl.textContent = "";
+    const list = currentTab === "all" ? VENDORS : VENDORS.filter((v) => v.status === currentTab);
+    if (!list.length) { containerEl.append(el("div", { class: "empty", text: "Aucun vendeur dans cette catégorie." })); return; }
+    list.forEach((v) => containerEl.append(vendorRow(v)));
+  }
+
+  async function loadVendors() {
+    const { data, error } = await supabase.from("serigraphie_vendors").select("*").order("created_at", { ascending: false });
+    if (error) {
+      console.error(error);
+      containerEl.textContent = "";
+      containerEl.append(el("div", { class: "empty", text: "Erreur de chargement. Le schéma serigraphie-schema.sql a-t-il été exécuté ?" }));
+      return;
+    }
+    VENDORS = data || [];
+    renderTabs();
+    renderVendors();
+  }
+
+  async function init() {
+    const { data } = await supabase.auth.getSession();
+    if (!data || !data.session || !data.session.user) {
+      loadingEl.classList.add("hidden");
+      deniedEl.classList.remove("hidden");
+      deniedEl.textContent = "🔒 Connecte-toi avec un compte administrateur.";
+      return;
+    }
+
+    const { data: profile } = await supabase.from("profiles").select("role").eq("id", data.session.user.id).maybeSingle();
+    const role = profile ? profile.role : "user";
+    if (role !== "admin" && role !== "super_admin" && role !== "founder") {
+      loadingEl.classList.add("hidden");
+      deniedEl.classList.remove("hidden");
+      return;
+    }
+
+    loadingEl.classList.add("hidden");
+    tabsEl.classList.remove("hidden");
+    containerEl.classList.remove("hidden");
+    await loadVendors();
+  }
+
+  init();
+})();
+</script>
+<script src="../pwa-install.js"></script>
+
+</body>
+</html>
