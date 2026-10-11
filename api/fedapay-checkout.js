@@ -40,6 +40,13 @@ export default async function handler(req, res) {
   }
 
   try {
+    // Sérigraphe (productType "serigraphie") : branche déléguée au helper api/_serigraphie.js
+    // (pas de nouveau fichier de route : limite de 12 fonctions Vercel Hobby).
+    if (req.body && req.body.productType === "serigraphie") {
+      const { handleSerigraphieCheckout } = await import("./_serigraphie.js");
+      return handleSerigraphieCheckout(req, res);
+    }
+
     // -----------------------------------------------------
     // 1. Le navigateur ne fournit QUE courseId (+ productType
     //    facultatif) — tout le reste (montant, nom, identité)

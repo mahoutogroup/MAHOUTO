@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Administration — Commandes Sérigraphe — Le Sérigraphe by MAJESTÉ PRESSE</title>
+<meta name="theme-color" content="#0A0A0A">
+<link rel="manifest" href="../manifest.json">
+<script src="../brand.js"></script>
+<link rel="icon" href="../assets/favicon.png">
+<link rel="stylesheet" href="../theme.css">
+<script src="../theme-toggle.js"></script>
+<style>
+  header { padding: 20px; background: var(--bg-elevated); border-bottom: 1px solid var(--border); }
+  header h1 { font-size: 20px; color: var(--gold); }
+  header p { font-size: 12.5px; color: var(--text-muted); margin-top: 6px; }
+
+  .nav-pills { display: flex; gap: 10px; padding: 14px 20px 0; flex-wrap: wrap; }
+  .nav-pills a { font-size: 12.5px; font-weight: bold; color: var(--text-muted); background: var(--bg-card); border-radius: 999px; padding: 8px 16px; }
+  .nav-pills a.current { color: #0A0A0A; background: var(--gold-bright); }
+
+  #access-denied, #loading-state { text-align: center; color: var(--text-dim); padding: 60px 24px; font-size: 14px; }
+  #access-denied p { max-width: 460px; margin: 0 auto; line-height: 1.7; color: var(--text-muted); }
+
+  .tabs { display: flex; gap: 8px; padding: 14px 20px 0; overflow-x: auto; }
+  .tab { flex: none; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-muted); font-size: 12.5px; font-weight: 600; cursor: pointer; }
+  .tab.active { background: var(--gold-bright); color: #0A0A0A; border-color: var(--gold-bright); }
+  .tabs.sub .tab { padding: 6px 12px; font-size: 12px; }
+
+  .order-row { display: flex; flex-direction: column; gap: 8px; margin: 12px 20px; padding: 14px; }
+  .order-row .top-line { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .order-row .ref { font-weight: bold; font-size: 14.5px; flex: 1; min-width: 0; }
+  .pill { font-size: 10px; font-weight: 700; padding: 3px 9px; border-radius: 999px; text-transform: uppercase; flex: none; }
+  .pill.pending { background: rgba(212,175,55,.15); color: var(--gold); }
+  .pill.paid, .pill.preparing, .pill.shipped { background: rgba(59,130,246,.15); color: #60A5FA; }
+  .pill.delivered { background: rgba(34,197,94,.15); color: var(--accent-green); }
+  .pill.cancelled, .pill.failed { background: rgba(239,68,68,.15); color: #F87171; }
+  .pill.due { background: rgba(212,175,55,.15); color: var(--gold); }
+  .pill.payout-paid { background: rgba(34,197,94,.15); color: var(--accent-green); }
+  .order-row .meta { font-size: 12px; color: var(--text-muted); line-height: 1.7; overflow-wrap: anywhere; white-space: pre-line; }
+  .order-row .meta a { color: var(--gold); font-weight: 600; }
+  .order-row .money { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 12px; font-size: 12px; color: var(--text-muted); background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px; }
+  .order-row .money b { color: var(--gold); }
+  .order-row .date { font-size: 11px; color: var(--text-dim); }
+
+  .status-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .status-row select { flex: 1; min-width: 150px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--white); font-size: 13px; }
+  .btn { font-size: 12.5px; font-weight: bold; border: none; border-radius: 8px; padding: 9px 14px; cursor: pointer; background: var(--gold-bright); color: #0A0A0A; font-family: inherit; }
+  .btn:disabled { opacity: .5; cursor: wait; }
+  .row-status { font-size: 11.5px; color: var(--accent-green); min-height: 14px; }
+  .row-status.error { color: #F87171; }
+  .empty { padding: 30px 20px; text-align: center; color: var(--text-dim); font-size: 13px; }
+
+  .vendor-block { margin: 12px 20px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  .vendor-block h3 { font-size: 15px; color: var(--gold); overflow-wrap: anywhere; }
+  .due-line { display: flex; gap: 10px; align-items: center; font-size: 12.5px; color: var(--text-muted); }
+  .due-line label { display: flex; gap: 8px; align-items: center; flex: 1; min-width: 0; }
+  .due-line .amt { font-weight: bold; color: var(--gold); flex: none; }
+  .payout-form { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; border-top: 1px solid var(--border); padding-top: 10px; }
+  .payout-form select, .payout-form input { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--white); font-size: 13px; font-family: inherit; min-width: 0; }
+  .payout-form input { flex: 1; min-width: 120px; }
+  .hist-line { display: flex; justify-content: space-between; gap: 10px; font-size: 12.5px; color: var(--text-muted); padding: 6px 0; border-bottom: 1px solid var(--border); }
+  .hist-line:last-child { border-bottom: none; }
+  .section-h { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--gold); font-weight: bold; margin: 22px 20px 4px; }
+</style>
+</head>
+<body>
+
+<button id="theme-toggle-btn" class="theme-toggle-fab">🌙</button>
+
+<div class="page-content">
+
+  <header>
+    <h1>🎨 Commandes du Sérigraphe</h1>
+    <p id="header-sub">Suivi des commandes et des reversements aux vendeurs.</p>
+  </header>
+
+  <div class="nav-pills">
+    <a href="serigraphie-produits.html">Produits Sérigraphe</a>
+    <a href="serigraphie-commandes.html" class="current">Commandes Sérigraphe</a>
+    <a href="serigraphie-vendeurs.html" id="nav-vendors" class="hidden">Vendeurs Sérigraphe</a>
+  </div>
+
+  <div id="loading-state">Vérification des droits...</div>
+  <div id="access-denied" class="hidden"></div>
+
+  <div id="main-tabs" class="tabs hidden"></div>
+  <div id="status-tabs" class="tabs sub hidden"></div>
+  <div id="content" class="hidden"></div>
+
+  <footer style="text-align:center;color:var(--text-dim);font-size:11.5px;padding:26px 20px 20px;">© 2026 Le Sérigraphe by MAJESTÉ PRESSE</footer>
+
+</div>
+
+<script src="../config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+(function () {
+  const cfg = window.MAHOUTO_CONFIG;
+  const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+
+  const WA_NUMBER = "22996097644"; // +229 96 09 76 44
+  const STATUS_LABELS = { pending: "En attente de paiement", paid: "Payée", preparing: "En préparation", shipped: "Expédiée", delivered: "Livrée", cancelled: "Annulée", failed: "Échec" };
+  // Transitions proposées (la base les impose aussi : trigger serigraphie_orders_guard). « paid » n'est jamais posé à la main ici.
+  const NEXT = { pending: ["cancelled"], paid: ["preparing", "cancelled"], preparing: ["shipped", "cancelled"], shipped: ["delivered"] };
+  const FILTERS = [["all", "Toutes"], ["pending", "En attente"], ["paid", "Payées"], ["preparing", "En préparation"], ["shipped", "Expédiées"], ["delivered", "Livrées"], ["cancelled", "Annulées"], ["failed", "Échecs"]];
+  const PAYOUT_METHODS = ["Mobile Money", "Virement", "Espèces", "Autre"];
+  const PAYOUT_LABELS = { pending: "Reversement : en attente", due: "Reversement : à payer", paid: "Reversement : effectué" };
+
+  const $ = (id) => document.getElementById(id);
+  const loadingEl = $("loading-state"), deniedEl = $("access-denied"), mainTabsEl = $("main-tabs"), statusTabsEl = $("status-tabs"), contentEl = $("content");
+
+  function el(tag, props, ...kids) {
+    const n = document.createElement(tag);
+    if (props) for (const [k, v] of Object.entries(props)) {
+      if (k === "class") n.className = v;
+      else if (k === "text") n.textContent = v;
+      else n.setAttribute(k, v);
+    }
+    kids.flat().forEach((c) => { if (c != null) n.append(c); });
+    return n;
+  }
+  function money(xof) { return Number(xof).toLocaleString("fr-FR") + " FCFA"; }
+  function formatDate(iso) { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleString("fr-FR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }); }
+  const shortId = (id) => String(id).slice(0, 8).toUpperCase();
+
+  let isAdmin = false, myVendor = null;
+  let ORDERS = [], ITEMS = new Map(), VENDORS = new Map(), PAYOUTS = [];
+  let mainTab = "orders", statusFilter = "all";
+
+  // ---------------------------------------------------------
+  // Données
+  // ---------------------------------------------------------
+  async function loadAll() {
+    const oq = supabase.from("serigraphie_orders").select("*").order("created_at", { ascending: false }).limit(500);
+    const [oRes, iRes, pRes] = await Promise.all([
+      oq,
+      supabase.from("serigraphie_order_items").select("*").limit(2000),
+      supabase.from("serigraphie_payouts").select("*").order("paid_at", { ascending: false }).limit(200)
+    ]);
+    if (oRes.error) {
+      console.error(oRes.error);
+      contentEl.textContent = "";
+      contentEl.append(el("div", { class: "empty", text: "Erreur de chargement. Le schéma serigraphie-schema-pr2.sql a-t-il été exécuté ?" }));
+      return false;
+    }
+    ORDERS = oRes.data || [];
+    ITEMS = new Map();
+    (iRes.data || []).forEach((it) => { if (!ITEMS.has(it.order_id)) ITEMS.set(it.order_id, []); ITEMS.get(it.order_id).push(it); });
+    PAYOUTS = pRes.data || [];
+    return true;
+  }
+
+  // ---------------------------------------------------------
+  // Onglets
+  // ---------------------------------------------------------
+  function renderMainTabs() {
+    mainTabsEl.textContent = "";
+    const due = ORDERS.filter((o) => o.status === "delivered" && o.payout_status === "due").length;
+    const defs = isAdmin ? [["orders", "Commandes (" + ORDERS.length + ")"], ["payouts", "Reversements" + (due ? " (" + due + " à payer)" : "")]] : [["orders", "Mes commandes (" + ORDERS.length + ")"], ["payouts", "Mes reversements"]];
+    defs.forEach(([key, label]) => {
+      const t = el("button", { class: "tab" + (key === mainTab ? " active" : ""), type: "button", text: label });
+      t.addEventListener("click", () => { mainTab = key; render(); });
+      mainTabsEl.append(t);
+    });
+  }
+  function renderStatusTabs() {
+    statusTabsEl.textContent = "";
+    statusTabsEl.classList.toggle("hidden", mainTab !== "orders");
+    FILTERS.forEach(([key, label]) => {
+      const n = key === "all" ? ORDERS.length : ORDERS.filter((o) => o.status === key).length;
+      const t = el("button", { class: "tab" + (key === statusFilter ? " active" : ""), type: "button", text: label + " (" + n + ")" });
+      t.addEventListener("click", () => { statusFilter = key; render(); });
+      statusTabsEl.append(t);
+    });
+  }
+
+  // ---------------------------------------------------------
+  // Une commande
+  // ---------------------------------------------------------
+  function orderRow(o) {
+    const items = ITEMS.get(o.id) || [];
+    const vendor = VENDORS.get(o.vendor_id);
+    const statusEl = el("div", { class: "row-status", role: "status" });
+
+    const lines = items.map((it) => it.product_name + (it.color ? " (" + it.color + ")" : "") + " × " + it.qty + " à " + money(it.unit_price)).join("\n");
+    const waDigits = String(o.client_phone || "").replace(/[^0-9]/g, "");
+    const phoneNode = waDigits
+      ? el("a", { href: "https://wa.me/" + waDigits + "?text=" + encodeURIComponent("Bonjour " + (o.client_name || "") + ", au sujet de votre commande n° " + shortId(o.id) + " sur Le Sérigraphe by MAJESTÉ PRESSE."), target: "_blank", rel: "noopener noreferrer", text: o.client_phone })
+      : document.createTextNode(o.client_phone || "");
+
+    const money_ = el("div", { class: "money" },
+      el("span", { text: "Total payé" }), el("b", { text: money(o.total) }),
+      el("span", { text: "Livraison (" + (o.delivery_zone || "—") + ")" }), el("b", { text: money(o.delivery_fee) }),
+      isAdmin ? el("span", { text: "Commission (" + o.commission_rate + " %)" }) : el("span", { text: "Commission MAJESTÉ (" + o.commission_rate + " %)" }), el("b", { text: money(o.commission_amount) }),
+      el("span", { text: "Montant vendeur" }), el("b", { text: money(o.vendor_amount) })
+    );
+
+    const row = el("div", { class: "card order-row" },
+      el("div", { class: "top-line" },
+        el("span", { class: "ref", text: "Commande " + shortId(o.id) }),
+        el("span", { class: "pill " + o.status, text: STATUS_LABELS[o.status] || o.status }),
+        o.status === "delivered" ? el("span", { class: "pill " + (o.payout_status === "paid" ? "payout-paid" : "due"), text: PAYOUT_LABELS[o.payout_status] || o.payout_status }) : null
+      ),
+      el("div", { class: "date", text: formatDate(o.created_at) + (o.paid_at ? " · payée le " + formatDate(o.paid_at) : "") + (isAdmin && vendor ? " · " + vendor.shop_name : "") }),
+      el("div", { class: "meta", text: lines || "—" }),
+      el("div", { class: "meta" }, "👤 " + (o.client_name || "—") + " · ", phoneNode),
+      el("div", { class: "meta", text: "📍 " + (o.delivery_address || "—") + (o.notes ? "\n📝 " + o.notes : "") }),
+      money_
+    );
+
+    const options = NEXT[o.status] || [];
+    if (isAdmin && options.length) {
+      const select = el("select", { "aria-label": "Nouveau statut" }, options.map((s) => el("option", { value: s, text: STATUS_LABELS[s] })));
+      const btn = el("button", { type: "button", class: "btn", text: "Appliquer" });
+      btn.addEventListener("click", async () => {
+        const target = select.value;
+        if (target === "cancelled" && !confirm("Annuler la commande " + shortId(o.id) + " ? (un remboursement éventuel se fait à la main dans FedaPay)")) return;
+        btn.disabled = true; statusEl.className = "row-status"; statusEl.textContent = "Enregistrement...";
+        const { data, error } = await supabase.from("serigraphie_orders").update({ status: target }).eq("id", o.id).select().single();
+        if (error) { console.error(error); btn.disabled = false; statusEl.className = "row-status error"; statusEl.textContent = "Erreur : " + error.message; return; }
+        Object.assign(o, data);
+        render();
+      });
+      row.append(el("div", { class: "status-row" }, select, btn));
+    }
+    row.append(statusEl);
+    return row;
+  }
+
+  function renderOrders() {
+    contentEl.textContent = "";
+    const list = statusFilter === "all" ? ORDERS : ORDERS.filter((o) => o.status === statusFilter);
+    if (!list.length) { contentEl.append(el("div", { class: "empty", text: "Aucune commande dans cette catégorie." })); return; }
+    list.forEach((o) => contentEl.append(orderRow(o)));
+  }
+
+  // ---------------------------------------------------------
+  // Reversements
+  // ---------------------------------------------------------
+  function historyBlock(list, withVendor) {
+    const wrap = el("div", { class: "card vendor-block" }, el("h3", { text: "Historique des reversements" }));
+    if (!list.length) wrap.append(el("div", { class: "empty", text: "Aucun reversement enregistré." }));
+    list.slice(0, 30).forEach((p) => wrap.append(el("div", { class: "hist-line" },
+      el("span", { text: formatDate(p.paid_at) + (withVendor ? " · " + ((VENDORS.get(p.vendor_id) || {}).shop_name || "Vendeur") : "") + " · " + (p.method || "") + (p.reference ? " · " + p.reference : "") }),
+      el("b", { text: money(p.amount) }))));
+    return wrap;
+  }
+
+  function vendorPayoutBlock(vendorId, dueOrders) {
+    const vendor = VENDORS.get(vendorId);
+    const checks = [];
+    const sumEl = el("span", { class: "amt", text: "" });
+    const statusEl = el("div", { class: "row-status", role: "status" });
+    const block = el("div", { class: "card vendor-block" }, el("h3", { text: vendor ? vendor.shop_name : "Vendeur " + shortId(vendorId) }));
+
+    dueOrders.forEach((o) => {
+      const cb = el("input", { type: "checkbox", checked: "checked", "aria-label": "Inclure la commande " + shortId(o.id) });
+      cb.dataset.id = o.id; cb.dataset.amount = String(o.vendor_amount); checks.push(cb);
+      cb.addEventListener("change", refreshSum);
+      block.append(el("div", { class: "due-line" }, el("label", {}, cb, "Commande " + shortId(o.id) + " · " + formatDate(o.created_at)), el("span", { class: "amt", text: money(o.vendor_amount) })));
+    });
+    function selected() { return checks.filter((c) => c.checked); }
+    function refreshSum() { const s = selected(); sumEl.textContent = "Total à reverser : " + money(s.reduce((a, c) => a + Number(c.dataset.amount), 0)) + " (" + s.length + " commande" + (s.length > 1 ? "s" : "") + ")"; }
+
+    const method = el("select", { "aria-label": "Méthode de reversement" }, PAYOUT_METHODS.map((m) => el("option", { value: m, text: m })));
+    const reference = el("input", { type: "text", maxlength: "120", placeholder: "Référence (n° de transaction)", "aria-label": "Référence du reversement" });
+    const btn = el("button", { type: "button", class: "btn", text: "Enregistrer un reversement" });
+    btn.addEventListener("click", async () => {
+      const sel = selected();
+      if (!sel.length) { statusEl.className = "row-status error"; statusEl.textContent = "Sélectionnez au moins une commande."; return; }
+      const total = sel.reduce((a, c) => a + Number(c.dataset.amount), 0);
+      if (!confirm("Enregistrer un reversement de " + money(total) + " à « " + (vendor ? vendor.shop_name : "ce vendeur") + " » pour " + sel.length + " commande(s) ?\n\nÀ faire APRÈS avoir réellement envoyé l'argent.")) return;
+      btn.disabled = true; statusEl.className = "row-status"; statusEl.textContent = "Enregistrement...";
+      const { error } = await supabase.rpc("serigraphie_record_payout", {
+        p_vendor_id: vendorId, p_order_ids: sel.map((c) => c.dataset.id), p_method: method.value, p_reference: reference.value.trim() || null
+      });
+      if (error) { console.error(error); btn.disabled = false; statusEl.className = "row-status error"; statusEl.textContent = "Erreur : " + error.message; return; }
+      await refreshData();
+    });
+    block.append(sumEl, el("div", { class: "payout-form" }, method, reference, btn), statusEl);
+    refreshSum();
+    return block;
+  }
+
+  function renderPayouts() {
+    contentEl.textContent = "";
+    if (isAdmin) {
+      const due = ORDERS.filter((o) => o.status === "delivered" && o.payout_status === "due");
+      contentEl.append(el("div", { class: "section-h", text: "À reverser (commandes livrées)" }));
+      if (!due.length) contentEl.append(el("div", { class: "empty", text: "Aucun reversement en attente." }));
+      const byVendor = new Map();
+      due.forEach((o) => { if (!byVendor.has(o.vendor_id)) byVendor.set(o.vendor_id, []); byVendor.get(o.vendor_id).push(o); });
+      byVendor.forEach((orders, vid) => contentEl.append(vendorPayoutBlock(vid, orders)));
+      contentEl.append(historyBlock(PAYOUTS, true));
+    } else {
+      const due = ORDERS.filter((o) => o.status === "delivered" && o.payout_status === "due");
+      const total = due.reduce((a, o) => a + Number(o.vendor_amount), 0);
+      contentEl.append(el("div", { class: "card vendor-block" },
+        el("h3", { text: "À recevoir" }),
+        el("div", { class: "due-line" }, el("span", { text: due.length + " commande(s) livrée(s) en attente de reversement" }), el("span", { class: "amt", text: money(total) }))));
+      contentEl.append(historyBlock(PAYOUTS, false));
+    }
+  }
+
+  function render() {
+    renderMainTabs(); renderStatusTabs();
+    if (mainTab === "orders") renderOrders(); else renderPayouts();
+  }
+  async function refreshData() { if (await loadAll()) render(); }
+
+  // ---------------------------------------------------------
+  // Accès : admins (tout) ou vendeur approuvé (ses commandes, lecture seule)
+  // ---------------------------------------------------------
+  function deny(...nodes) {
+    loadingEl.classList.add("hidden");
+    deniedEl.textContent = "";
+    nodes.filter(Boolean).forEach((n) => deniedEl.append(n));
+    deniedEl.classList.remove("hidden");
+  }
+
+  async function init() {
+    const { data } = await supabase.auth.getSession();
+    const user = data && data.session ? data.session.user : null;
+    if (!user) { deny(el("p", { text: "🔒 Connectez-vous pour accéder aux commandes." })); return; }
+
+    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
+    const role = profile ? profile.role : "user";
+    isAdmin = role === "admin" || role === "super_admin" || role === "founder";
+
+    if (isAdmin) {
+      $("nav-vendors").classList.remove("hidden");
+      const { data: vendors } = await supabase.from("serigraphie_vendors").select("id, shop_name, status");
+      (vendors || []).forEach((v) => VENDORS.set(v.id, v));
+    } else {
+      const { data: vendor, error } = await supabase.from("serigraphie_vendors").select("id, shop_name, status").eq("user_id", user.id).maybeSingle();
+      if (error) { console.error(error); deny(el("p", { text: "Impossible de vérifier votre boutique. Réessayez dans un instant." })); return; }
+      if (!vendor || vendor.status !== "approved") {
+        deny(el("p", { text: "🔒 Cette page est réservée aux administrateurs et aux vendeurs approuvés du Sérigraphe." }));
+        return;
+      }
+      myVendor = vendor;
+      VENDORS.set(vendor.id, vendor);
+      $("header-sub").textContent = "Boutique : " + vendor.shop_name + " — vos commandes payées (lecture seule).";
+    }
+
+    loadingEl.classList.add("hidden");
+    mainTabsEl.classList.remove("hidden");
+    contentEl.classList.remove("hidden");
+    if (await loadAll()) render();
+  }
+
+  init();
+})();
+</script>
+<script src="../pwa-install.js"></script>
+
+</body>
+</html>
