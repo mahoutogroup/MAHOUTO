@@ -19,9 +19,10 @@
   .back-link { font-size: 12.5px; font-weight: 700; color: var(--gold); }
 
   .gallery { padding: 12px 20px 0; }
-  .gallery-main { width: 100%; aspect-ratio: 4/3; object-fit: cover; border-radius: 18px; background: linear-gradient(135deg, rgba(212,175,55,.25), rgba(0,0,0,.4)); display: flex; align-items: center; justify-content: center; font-size: 60px; }
+  .gallery-main { width: 100%; aspect-ratio: 1/1; max-height: 70vh; object-fit: contain; border-radius: 18px; background: linear-gradient(135deg, rgba(212,175,55,.25), rgba(0,0,0,.4)); display: flex; align-items: center; justify-content: center; font-size: 60px; }
+  img.gallery-main { background: var(--bg-card); }
   .thumbs { display: flex; gap: 8px; margin-top: 10px; overflow-x: auto; }
-  .thumb { flex: none; width: 62px; height: 62px; border-radius: 10px; object-fit: cover; border: 2px solid transparent; cursor: pointer; background: var(--bg-card); }
+  .thumb { flex: none; width: 62px; height: 62px; border-radius: 10px; object-fit: contain; border: 2px solid transparent; cursor: pointer; background: var(--bg-card); }
   .thumb.active { border-color: var(--gold-bright); }
 
   .detail-body { padding: 16px 20px 40px; display: flex; flex-direction: column; gap: 14px; }
