@@ -256,8 +256,7 @@ background: radial-gradient(circle, rgba(255,215,0,.25), rgba(255,215,0,.05) 70%
 border: 2px solid var(--gold);
 }
 
-#voice-overlay[data-state="listening"] .v-halo,
-#voice-overlay[data-state="interrupting"] .v-halo { animation: v-pulse 1.4s ease-in-out infinite; }
+#voice-overlay[data-state="listening"] .v-halo { animation: v-pulse 1.4s ease-in-out infinite; }
 #voice-overlay[data-state="thinking"] .v-halo { animation: v-breathe 1.6s ease-in-out infinite; border-style: dashed; }
 #voice-overlay[data-state="speaking"] .v-halo { animation: v-pulse .8s ease-in-out infinite; background: radial-gradient(circle, rgba(255,215,0,.45), rgba(255,215,0,.1) 70%); }
 #voice-overlay[data-state="paused"] .v-halo { opacity: .5; }
@@ -289,38 +288,6 @@ cursor: pointer;
 }
 
 #voice-stop:active { transform: scale(.96); }
-
-/* Bouton « Couper » : interrompt la réponse en cours sans fermer le mode vocal (visible pendant la réflexion et la lecture). */
-#voice-cut {
-display: none;
-min-width: 170px;
-height: 48px;
-padding: 0 24px;
-border: 2px solid var(--gold);
-border-radius: 26px;
-background: transparent;
-color: var(--gold);
-font-size: 16px;
-font-weight: bold;
-font-family: inherit;
-cursor: pointer;
-}
-#voice-overlay[data-state="thinking"] #voice-cut,
-#voice-overlay[data-state="speaking"] #voice-cut { display: inline-block; }
-#voice-cut:active { transform: scale(.96); }
-
-/* Bascule « Interruption à la voix » (repli manuel si la voix est coupée par le micro sur certains Android). */
-#voice-barge {
-background: none;
-border: none;
-padding: 6px 10px;
-color: var(--white);
-opacity: .75;
-font-size: 14px;
-font-family: inherit;
-text-decoration: underline;
-cursor: pointer;
-}
 
 /* ---------- Panneau historique ---------- */
 #history-overlay {
@@ -423,9 +390,7 @@ font-family: inherit;
   <div class="v-title">🧠 MAJESTÉ Pro</div>
   <div class="v-halo" id="voice-icon" aria-hidden="true">🎤</div>
   <div id="voice-status" role="status" aria-live="polite">Je vous écoute...</div>
-  <button type="button" id="voice-cut">Couper</button>
   <button type="button" id="voice-stop">Arrêter</button>
-  <button type="button" id="voice-barge" aria-pressed="true">Interruption à la voix : activée</button>
 </div>
 
 <div id="history-overlay"></div>
@@ -493,7 +458,6 @@ font-family: inherit;
     }
   ];
   let sending = false;
-  let sendSeq = 0; // identifie le dernier sendMessage : seul le dernier peut remettre `sending` à false
 
   let conversationId = null;
   let historyToken = 0; // invalide les réponses d'historique périmées
@@ -1076,8 +1040,6 @@ font-family: inherit;
     let gotDelta = false;
     let outcome = null; // "done" | "error"
     let finalReply = null;
-    let aborted = false; // annulation VOLONTAIRE (hooks.signal) : jamais traitée comme une erreur réseau
-    const wasAborted = () => !!(hooks.signal && hooks.signal.aborted);
 
     function showError() {
       bubble.className = "msg assistant";
@@ -1087,7 +1049,7 @@ font-family: inherit;
 
     function handleLine(line) {
       line = line.trim();
-      if (!line || outcome || wasAborted()) return; // un flux annulé ne modifie plus ni l'écran ni la voix
+      if (!line || outcome) return;
       const evt = JSON.parse(line);
       if (evt.type === "delta" && typeof evt.text === "string") {
         if (!gotDelta) {
@@ -1121,40 +1083,29 @@ font-family: inherit;
     try {
       if (!response.body) throw new Error("Flux indisponible");
       const reader = response.body.getReader();
-      if (hooks.onReader) {
-        try { hooks.onReader(reader); } catch (e) { console.error(e); }
-      }
       const decoder = new TextDecoder();
       let buffer = "";
       while (!outcome) {
-        if (wasAborted()) { aborted = true; break; }
         const { value, done } = await reader.read();
-        if (wasAborted()) { aborted = true; break; }
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n"); // une ligne JSON par \n (pas \n\n comme en SSE)
         buffer = lines.pop();
         for (const line of lines) handleLine(line);
       }
-      if (aborted) {
-        try { await reader.cancel(); } catch (e) { /* flux déjà fermé */ }
-      } else if (!outcome) {
+      if (!outcome) {
         buffer += decoder.decode();
         handleLine(buffer);
       } else {
         try { await reader.cancel(); } catch (e) { /* flux déjà terminé */ }
       }
     } catch (err) {
-      if (wasAborted()) {
-        aborted = true; // lecture interrompue volontairement : le texte partiel déjà affiché est conservé
-      } else {
-        console.error(err);
-        if (outcome !== "done") showError();
-      }
+      console.error(err);
+      if (outcome !== "done") showError();
     }
 
     // Flux terminé sans ligne "done" ni "error" : échec.
-    if (!outcome && !aborted) showError();
+    if (!outcome) showError();
 
     // Texte final nettoyé en cas de succès, null sinon (utilisé par le mode vocal).
     return outcome === "done" ? finalReply : null;
@@ -1178,7 +1129,6 @@ font-family: inherit;
       try { options.onStage(name); } catch (e) { console.error(e); }
     };
 
-    const mySeq = ++sendSeq;
     addMessage("user", text);
     sending = true;
     updateSendState();
@@ -1193,7 +1143,6 @@ font-family: inherit;
       const response = await fetch(API + "/api/chat", {
         method: "POST",
         headers,
-        signal: options.signal || undefined, // annulation (mode vocal uniquement) ; sans effet pour un envoi texte
         // "voice: true" n'est ajouté QU'EN mode vocal : le corps d'une requête texte reste identique.
         body: JSON.stringify(Object.assign(
           { message: text, conversationId: conversationId || null },
@@ -1217,33 +1166,18 @@ font-family: inherit;
 
         const data = await response.json();
         if (typeof data.reply !== "string") throw new Error("Réponse invalide : reply manquant");
-        if (options.signal && options.signal.aborted) {
-          thinkingEl.remove(); // réponse arrivée après une interruption volontaire : non affichée
-        } else {
-          thinkingEl.remove();
-          addMessage("assistant", data.reply);
-          result = data.reply;
-        }
+        thinkingEl.remove();
+        addMessage("assistant", data.reply);
+        result = data.reply;
       }
     } catch (err) {
+      console.error(err);
+      thinkingEl.remove();
+      addMessage("assistant notice", ERROR_TEXT);
       result = null;
-      if (options.signal && options.signal.aborted) {
-        // Annulation volontaire (interruption) : ni notice d'erreur à l'écran, ni erreur parlée.
-        if (thinkingEl.classList.contains("thinking")) thinkingEl.remove();
-      } else {
-        console.error(err);
-        thinkingEl.remove();
-        addMessage("assistant notice", ERROR_TEXT);
-      }
     } finally {
-      if (options.signal && options.signal.aborted && thinkingEl.parentNode && thinkingEl.classList.contains("thinking")) {
-        thinkingEl.remove(); // indicateur « réfléchit... » orphelin après annulation
-      }
-      // Un envoi plus récent (nouveau tour vocal) possède désormais `sending` : l'ancien n'y touche plus.
-      if (mySeq === sendSeq) {
-        sending = false;
-        updateSendState();
-      }
+      sending = false;
+      updateSendState();
     }
     return result;
   }
@@ -1432,8 +1366,6 @@ font-family: inherit;
   const voiceIcon = document.getElementById("voice-icon");
   const voiceStatus = document.getElementById("voice-status");
   const voiceStop = document.getElementById("voice-stop");
-  const voiceCut = document.getElementById("voice-cut");
-  const voiceBarge = document.getElementById("voice-barge");
 
   const VOICE_STATES = {
     listening: { icon: "🎤", text: "Je vous écoute..." },
@@ -1442,7 +1374,6 @@ font-family: inherit;
     paused: { icon: "⏸️", text: "En pause" }
   };
   const VOICE_ERROR_SPOKEN = "Une erreur est survenue.";
-  VOICE_STATES.interrupting = VOICE_STATES.listening; // transitoire : même affichage que l'écoute
   const SPEAK_CHUNK_MAX = 180; // découpe d'une réponse entière reçue sans streaming (voir finishVoiceStream)
 
   // Découpage en phrases pendant le streaming.
@@ -1455,29 +1386,6 @@ font-family: inherit;
   const TTS_START_WAIT_MS = 800;   // si onstart n'arrive pas : resume(), puis après un 2e délai : relance propre
   const TTS_MIC_RELEASE_MS = 500;  // délai mini entre la FIN réelle de la reconnaissance (onend) et speak()
   const TTS_MIC_WAIT_MAX_MS = 1500; // attente maximale : si onend n'arrive jamais, on parle quand même
-  // ---- Interruption vocale (« barge-in ») ---------------------------------------------------
-  // STRATÉGIE : pendant que MAJESTÉ parle, une session de reconnaissance parallèle (résultats
-  // intermédiaires) est ouverte APRÈS le début réel de la voix. Un texte capté n'interrompt que s'il
-  // contient assez de mots « nouveaux » (absents du texte récemment lu) : c'est le filtre anti-écho.
-  // Il est HEURISTIQUE et n'élimine pas l'écho (un casque reste la vraie solution). L'API Web Speech
-  // ne donne accès ni au flux audio ni à l'annulation d'écho : on ne peut comparer que des textes.
-  // Toutes ces valeurs peuvent être surchargées, sans toucher au code, avec
-  // window.MAJESTE_VOICE_CONFIG = { bargeMinWords: 3, ... } défini AVANT ce script.
-  const VOICE_CFG = Object.assign({
-    bargeIn: true,             // interrupteur général (l'utilisateur peut aussi le couper : bouton de l'écran vocal)
-    bargeStartDelayMs: 350,    // délai entre le début réel de la voix et l'ouverture du micro (Android : ne pas couper la voix qui démarre)
-    bargeRestartDelayMs: 200,  // délai avant de rouvrir le micro quand une session se termine seule pendant la lecture
-    bargeQuickFailMs: 500,     // session plus courte que ça, sans aucun résultat = échec
-    bargeMaxQuickFails: 3,     // échecs consécutifs avant repli (interruption à la voix désactivée pour la session)
-    bargeMinWords: 2,          // mots « nouveaux » (absents du texte lu) nécessaires pour déclarer une intervention
-    bargeEchoRatio: 0.6,       // au-delà de cette part de mots déjà lus récemment, le texte capté est de l'écho
-    bargeEchoWindowChars: 700, // taille de la fenêtre de texte récemment lu comparée au texte capté
-    resumeWaitMaxMs: 700       // attente maximale de la fin d'une session avant d'en rouvrir une
-  }, window.MAJESTE_VOICE_CONFIG || {});
-  // Mots-commandes : ils déclenchent l'interruption seuls, et ne sont PAS envoyés à l'IA s'ils sont dits seuls.
-  const VOICE_COMMAND_WORDS = new Set(["stop", "arrete", "arretes", "pause", "silence", "attends", "attend", "chut"]);
-  const BARGE_PREF_KEY = "majeste.voice.bargein"; // "off" = désactivé par l'utilisateur (conservé entre les sessions)
-
   const TTS_MAX_ATTEMPTS = 3;      // 1 essai normal + 2 relances (la 2e et la 3e sans voix imposée)
 
   // LOGS DE PERFORMANCE TEMPORAIRES : mettre à false (ou supprimer) une fois la latence réglée.
@@ -1509,15 +1417,6 @@ font-family: inherit;
   let voiceLastEnqueued = "";
   let voiceFlushTimer = null;
 
-  // Interruption vocale
-  let recognitionMode = null;     // "listen" | "barge" : mode de la session de reconnaissance en cours
-  let voiceRequest = null;        // requête /api/chat du tour vocal : { controller, reader, done, aborted, turn }
-  let voiceSpokenLog = [];        // dernières phrases lues (référence du filtre anti-écho)
-  let voiceTurnSpoke = false;     // la voix a réellement démarré dans ce tour
-  let bargeTimer = null;          // minuteur d'ouverture / de réouverture du micro pendant la lecture
-  let bargeInRuntimeOff = false;  // repli automatique pour la session vocale en cours
-  let bargeQuickFails = 0;        // sessions d'écoute consécutives mortes-nées pendant la lecture
-
   // Mesures de performance
   let voiceT0 = 0;               // instant du texte final de la reconnaissance vocale
   let voiceListenStartedAt = 0;  // instant du début de l'écoute
@@ -1544,28 +1443,7 @@ font-family: inherit;
     voiceStatus.textContent = view.text;
   }
 
-  // Machine à états du mode vocal (voicePhase ; null = fermé) :
-  //   listening -> thinking -> speaking -> listening                 (tour normal)
-  //   thinking | speaking -> interrupting -> listening               (interruption : voix ou bouton « Couper »)
-  //   n'importe quel état -> fermé                                    (closeVoice)
-  // Les transitions inattendues sont journalisées (VOICE_DEBUG) mais JAMAIS refusées : refuser une
-  // transition pourrait figer le mode vocal. Les jetons voiceRun / voiceTurn / speakToken invalident
-  // les callbacks périmés.
-  const VOICE_PHASE_FLOW = {
-    closed: ["listening"],
-    listening: ["listening", "thinking", "closed"],
-    thinking: ["thinking", "speaking", "listening", "interrupting", "closed"],
-    speaking: ["speaking", "listening", "interrupting", "closed"],
-    interrupting: ["listening", "closed"]
-  };
-
   function setVoicePhase(phase) {
-    if (VOICE_DEBUG) {
-      const from = voicePhase || "closed";
-      if (from !== phase && (VOICE_PHASE_FLOW[from] || []).indexOf(phase) === -1) {
-        tlog("unexpected phase transition " + from + " -> " + phase);
-      }
-    }
     voicePhase = phase;
     if (!voicePaused) setVoiceState(phase);
   }
@@ -1688,10 +1566,6 @@ font-family: inherit;
   function resetVoiceQueue() {
     clearTimeout(voiceFlushTimer);
     voiceFlushTimer = null;
-    clearTimeout(bargeTimer);
-    bargeTimer = null;
-    voiceSpokenLog = [];
-    voiceTurnSpoke = false;
     voiceSpeakQueue = [];
     voiceDeltaBuffer = "";
     voiceSpeaking = false;
@@ -1706,7 +1580,7 @@ font-family: inherit;
   // Nouveau tour vocal : tout callback d'un tour précédent devient sans effet.
   function beginVoiceTurn() {
     voiceTurn++;
-    stopSpeaking(); // speakToken++ ET speechSynthesis.cancel() : aucune voix du tour précédent ne survit
+    speakToken++;
     resetVoiceQueue();
     voiceTurnOpen = true;
   }
@@ -1777,7 +1651,7 @@ font-family: inherit;
 
     if (VOICE_DEBUG && voiceTimings && !voiceTimings.sentence) {
       voiceTimings.sentence = true;
-      vlog("first sentence ready");
+      vlog("first sentence ready", "« " + spoken.slice(0, 60) + " »");
     }
     flushVoiceQueue();
   }
@@ -1822,7 +1696,7 @@ font-family: inherit;
       if (voiceStreamDone && voiceTurnOpen) {
         voiceTurnOpen = false;
         if (VOICE_DEBUG && voiceTimings) vlog("TTS finished");
-        resumeListening(); // fin de toutes les phrases (referme aussi la session d'interruption)
+        startListening(); // fin de toutes les phrases
       }
       return;
     }
@@ -1832,14 +1706,10 @@ font-family: inherit;
     const turn = voiceTurn;
     const token = speakToken;
     const text = voiceSpeakQueue.shift();
-    voiceSpokenLog.push(text); // référence du filtre anti-écho
-    if (voiceSpokenLog.length > 6) voiceSpokenLog.shift();
 
     voiceSpeaking = true;   // verrouille la file dès maintenant (aucun second speak possible)
     voiceCurrentText = text;
-    // Mode interruption : la session d'écoute reste ouverte entre deux phrases (sinon elle serait
-    // fermée puis rouverte à chaque phrase).
-    if (!(recognition && recognitionMode === "barge")) stopListening(); // sans effet si le micro est déjà coupé
+    stopListening();        // sans effet si le micro est déjà coupé
 
     const stale = () => token !== speakToken || run !== voiceRun || turn !== voiceTurn || !voiceActive;
     let finished = false;
@@ -1871,8 +1741,6 @@ font-family: inherit;
       watch = null;
       tlog(source);
       setVoicePhase("speaking"); // seulement maintenant : la voix a réellement démarré
-      voiceTurnSpoke = true;
-      scheduleBargeIn(); // micro d'interruption : APRÈS le début réel de la voix (jamais avant)
       if (VOICE_DEBUG && voiceTimings && !voiceTimings.ttsAudio) {
         voiceTimings.ttsAudio = true;
         vlog("First TTS audio started");
@@ -1969,10 +1837,6 @@ font-family: inherit;
 
     // Android : tant que le micro n'est pas réellement libéré, une voix peut « démarrer » sans être
     // entendue (surtout une réponse très courte). On attend onend + TTS_MIC_RELEASE_MS, au plus TTS_MIC_WAIT_MAX_MS.
-    // Voix déjà démarrée dans ce tour avec l'interruption active : le micro n'a plus à être « libéré »
-    // avant chaque phrase (l'attente ne sert qu'avant la toute première phrase).
-    if (voiceTurnSpoke && bargeInEnabled()) { attemptSpeak(true); return; }
-
     const waitFrom = performance.now();
     const waitForMic = () => {
       if (finished || stale()) return;
@@ -2040,164 +1904,6 @@ font-family: inherit;
     if (lock) { try { lock.release().catch(() => {}); } catch (err) { /* déjà libéré */ } }
   }
 
-  // ---- Interruption vocale -----------------------------------------------------------------
-
-  function bargeInPref() {
-    try { return window.localStorage.getItem(BARGE_PREF_KEY) !== "off"; } catch (e) { return true; }
-  }
-
-  function setBargeInPref(on) {
-    try { window.localStorage.setItem(BARGE_PREF_KEY, on ? "on" : "off"); } catch (e) { /* stockage indisponible */ }
-  }
-
-  function bargeInEnabled() {
-    return !!VOICE_CFG.bargeIn && bargeInPref() && !bargeInRuntimeOff;
-  }
-
-  function updateBargeToggle() {
-    const on = bargeInEnabled();
-    voiceBarge.textContent = bargeInRuntimeOff
-      ? "Interruption à la voix : indisponible"
-      : "Interruption à la voix : " + (on ? "activée" : "désactivée");
-    voiceBarge.setAttribute("aria-pressed", on ? "true" : "false");
-  }
-
-  // Repli propre : plus aucune session d'interruption pour cette session vocale. La lecture en cours
-  // continue ; les phrases suivantes reprennent le fonctionnement d'origine (micro coupé pendant la
-  // lecture, écoute à la fin) et le bouton « Couper » reste disponible.
-  function disableBargeIn(reason) {
-    bargeInRuntimeOff = true;
-    tlog("barge-in disabled (" + reason + ")");
-    clearTimeout(bargeTimer);
-    bargeTimer = null;
-    if (recognition && recognitionMode === "barge") stopListening();
-    updateBargeToggle();
-  }
-
-  // Ouvre (ou rouvre) la session d'interruption pendant la lecture.
-  function scheduleBargeIn(delay) {
-    if (!bargeInEnabled() || !voiceActive || voicePaused || recognition) return;
-    clearTimeout(bargeTimer);
-    const run = voiceRun;
-    const turn = voiceTurn;
-    bargeTimer = setTimeout(() => {
-      bargeTimer = null;
-      if (!bargeInEnabled() || !voiceActive || voicePaused || recognition) return;
-      if (run !== voiceRun || turn !== voiceTurn || voicePhase !== "speaking") return;
-      startListening("barge");
-    }, delay == null ? VOICE_CFG.bargeStartDelayMs : delay);
-  }
-
-  // Une session d'interruption qui se termine d'elle-même (silence prolongé) est rouverte ; si elles
-  // meurent toutes aussitôt sans rien capter, le moteur refuse probablement de capter pendant la voix.
-  function scheduleBargeRestart(startedAt, heardAny) {
-    if (!heardAny && performance.now() - startedAt < VOICE_CFG.bargeQuickFailMs) {
-      bargeQuickFails++;
-      if (bargeQuickFails >= VOICE_CFG.bargeMaxQuickFails) { disableBargeIn("sessions too short"); return; }
-    } else {
-      bargeQuickFails = 0;
-    }
-    scheduleBargeIn(VOICE_CFG.bargeRestartDelayMs);
-  }
-
-  // ---- Filtre anti-écho (heuristique textuelle) ----
-  function bargeWords(s) {
-    return String(s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z0-9]+/g, " ").trim().split(" ").filter(Boolean);
-  }
-
-  // Texte récemment lu (+ phrases à venir) : ce que le micro peut légitimement recapter par écho.
-  function bargeEchoReference() {
-    const parts = voiceSpokenLog.slice(-4).concat(voiceSpeakQueue.slice(0, 2));
-    if (voiceCurrentText) parts.push(voiceCurrentText);
-    return parts.join(" ").slice(-VOICE_CFG.bargeEchoWindowChars);
-  }
-
-  // words : mots captés ; fresh : mots absents du texte lu ; ratio : part des mots (>= 3 lettres) déjà lus.
-  function analyzeBarge(heard, ref) {
-    const words = bargeWords(heard);
-    const refSet = new Set(bargeWords(ref));
-    const significant = words.filter((w) => w.length >= 3);
-    const base = significant.length ? significant : words;
-    const known = base.filter((w) => refSet.has(w)).length;
-    const joined = words.join(" ");
-    return {
-      words: words,
-      fresh: words.filter((w) => w.length >= 2 && !refSet.has(w)),
-      ratio: base.length ? known / base.length : 0,
-      commandOnly: words.length > 0 && words.length <= 2 &&
-        (words.every((w) => VOICE_COMMAND_WORDS.has(w)) || joined === "tais toi" || joined === "ca suffit")
-    };
-  }
-
-  // Vraie intervention ? Assez de mots nouveaux (ou un mot-commande) ET texte qui ne ressemble pas à l'écho.
-  function shouldInterrupt(v) {
-    if (v.ratio >= VOICE_CFG.bargeEchoRatio) return false;
-    const command = v.fresh.some((w) => VOICE_COMMAND_WORDS.has(w)) || v.fresh.join(" ").indexOf("tais toi") !== -1;
-    return v.fresh.length >= VOICE_CFG.bargeMinWords || command;
-  }
-
-  // Phrase finale d'une session d'interruption à ne PAS envoyer : mot-commande seul (« stop ») ou écho pur.
-  function discardBargeTranscript(text, ref) {
-    const v = analyzeBarge(text, ref);
-    return v.commandOnly || v.ratio >= VOICE_CFG.bargeEchoRatio;
-  }
-
-  function joinResults(results) {
-    let s = "";
-    for (let i = 0; i < results.length; i++) s += " " + results[i][0].transcript;
-    return s.trim();
-  }
-
-  // ---- Annulation du tour en cours ----
-
-  // Annule la requête du tour vocal (fetch + lecture du flux). Ne garantit PAS que le serveur arrête de
-  // générer ni qu'il n'enregistre pas la réponse. Retourne true si une requête était réellement en cours.
-  function abortVoiceRequest() {
-    const req = voiceRequest;
-    voiceRequest = null;
-    if (!req || req.done) return false;
-    req.aborted = true;
-    try { req.controller.abort(); } catch (e) { /* déjà annulée */ }
-    if (req.reader) {
-      try { req.reader.cancel().catch(() => {}); } catch (e) { /* déjà fermé */ }
-    }
-    // L'ancien sendMessage ne touchera plus à `sending` (voir sendSeq) : le prochain tour peut partir.
-    sending = false;
-    updateSendState();
-    return true;
-  }
-
-  // Interrompt le tour en cours (réflexion ou lecture), SANS toucher à la reconnaissance : l'appelant
-  // décide de la suite (garder la session qui a détecté la voix, ou rouvrir l'écoute pour le bouton).
-  function interruptVoiceTurn(reason) {
-    if (!voiceActive || (voicePhase !== "thinking" && voicePhase !== "speaking")) return false;
-    tlog("interrupt (" + reason + ")");
-    setVoicePhase("interrupting");
-    voiceTurn++;           // invalide tout callback du tour : flux, minuteurs, file, utterances
-    abortVoiceRequest();
-    resetVoiceQueue();     // file, tampon, minuteurs (dont celui du micro d'interruption)
-    stopSpeaking();        // speakToken++ puis speechSynthesis.cancel()
-    return true;
-  }
-
-  // Rouvre l'écoute normale : ferme la session en cours, attend sa fin réelle (au plus resumeWaitMaxMs),
-  // puis écoute. Remplace l'appel direct à startListening() en fin de tour et après « Couper ».
-  function resumeListening() {
-    if (!voiceActive || voicePaused) return;
-    const run = voiceRun;
-    stopListening();
-    setVoicePhase("listening");
-    const t0 = performance.now();
-    const go = () => {
-      if (!voiceActive || voicePaused || run !== voiceRun || recognition) return;
-      if (voicePhase !== "listening") return; // l'état a changé entre-temps
-      if (voiceRecEnded || performance.now() - t0 >= VOICE_CFG.resumeWaitMaxMs) startListening();
-      else setTimeout(go, 50);
-    };
-    go();
-  }
-
   function closeVoice(message) {
     voiceActive = false;
     voicePhase = null;
@@ -2205,9 +1911,6 @@ font-family: inherit;
     voiceRun++;
     voiceTurn++;
     resetVoiceQueue();
-    // La requête en cours n'est PAS annulée à la fermeture : la réponse écrite continue d'arriver dans le
-    // chat (comportement existant). Seule la référence vocale est oubliée.
-    voiceRequest = null;
     stopListening();
     stopSpeaking();
     releaseVoiceWakeLock();
@@ -2216,11 +1919,9 @@ font-family: inherit;
   }
 
   // RÉFLEXION + PAROLE : micro coupé ; même chemin d'envoi qu'un message tapé, mais les fragments
-  // reçus alimentent la file vocale dès leur arrivée. La requête est annulable (voiceRequest) :
-  // interruptVoiceTurn() l'annule quand l'utilisateur reprend la parole ou appuie sur « Couper ».
+  // reçus alimentent la file vocale dès leur arrivée.
   async function handleTranscript(text) {
     if (!voiceActive) return;
-    if (voicePhase === "thinking") return; // transcription en double : un seul envoi par tour
     const run = voiceRun;
     setVoicePhase("thinking");
     stopListening();
@@ -2228,23 +1929,16 @@ font-family: inherit;
     const turn = voiceTurn;
     const stale = () => !voiceActive || run !== voiceRun || turn !== voiceTurn;
 
-    const controller = new AbortController();
-    const request = { controller: controller, reader: null, done: false, aborted: false, turn: turn };
-    voiceRequest = request;
-
     if (VOICE_DEBUG) {
       const now = performance.now();
       voiceTimings = { delta: false, sentence: false, tts: false, ttsAudio: false };
-      // Le contenu de la phrase n'est volontairement PAS journalisé (donnée vocale).
       console.log("[VOICE] STT final: " + Math.round(now - voiceListenStartedAt) +
-        " ms (début d'écoute -> texte final)");
+        " ms (début d'écoute -> texte final) « " + text + " »");
       voiceT0 = now; // les mesures suivantes sont comptées depuis le texte final
     }
 
     const reply = await sendMessage(text, {
       voice: true,
-      signal: controller.signal,
-      onReader: (reader) => { if (voiceRequest === request) request.reader = reader; },
       onStage: (name) => { if (!stale()) vlog(VOICE_STAGE_LABELS[name] || name); },
       onDelta: (chunk) => {
         if (stale()) return;
@@ -2263,58 +1957,31 @@ font-family: inherit;
       }
     });
 
-    request.done = true;
-    if (voiceRequest === request) voiceRequest = null;
-
-    if (stale()) return; // tour interrompu ou mode fermé : rien à lire, aucune erreur parlée
+    if (stale()) return;
     finishVoiceStream(reply); // sans effet si la ligne "done" a déjà été traitée
   }
 
   // ÉCOUTE : un tour = une écoute (continuous:false), relancée automatiquement.
-  // mode "barge" : session ouverte PENDANT la lecture (résultats intermédiaires). Elle ne fait rien tant
-  // que le texte capté ressemble à l'écho de MAJESTÉ ; dès qu'une vraie intervention est détectée, le tour
-  // est interrompu et CETTE MÊME session devient l'écoute normale : le début de la phrase n'est pas perdu.
-  function startListening(mode) {
-    const isBarge = mode === "barge";
+  function startListening() {
     if (!voiceActive || voicePaused) return;
     const SR = getSpeechRecognition();
     if (!SR) { closeVoice("La conversation vocale n'est pas disponible sur ce navigateur."); return; }
 
     stopListening();
-    if (!isBarge) setVoicePhase("listening");
+    setVoicePhase("listening");
 
     const rec = new SR();
     recognition = rec;
-    recognitionMode = isBarge ? "barge" : "listen";
     rec.lang = "fr-FR";
     rec.continuous = false;
-    rec.interimResults = isBarge; // intermédiaires : uniquement pour détecter le début d'une intervention
+    rec.interimResults = false;
 
-    const startedAt = performance.now();
-    const startTurn = voiceTurn;
-    let adopted = !isBarge;  // session « barge » : devient une écoute normale à la première vraie intervention
-    let refSnapshot = "";    // texte lu au moment de l'interruption (pour écarter un écho pur en fin de phrase)
-    let heardAny = false;
     let transcript = "";
     let gotFinal = false;
     let errorCode = null;
 
     rec.onresult = (e) => {
       if (recognition !== rec) return;
-      heardAny = true;
-
-      if (!adopted) {
-        // Résultat périmé (tour fini, interrompu, mode fermé) : ignoré.
-        if (voicePhase !== "speaking" || startTurn !== voiceTurn) return;
-        const ref = bargeEchoReference();
-        if (!shouldInterrupt(analyzeBarge(joinResults(e.results), ref))) return; // écho, bruit ou parole trop courte
-        refSnapshot = ref;
-        tlog("barge-in detected (voice)");
-        interruptVoiceTurn("voice");
-        adopted = true;
-        setVoicePhase("listening");
-      }
-
       for (let i = e.resultIndex; i < e.results.length; i++) {
         if (e.results[i].isFinal) { transcript += e.results[i][0].transcript; gotFinal = true; }
       }
@@ -2324,8 +1991,7 @@ font-family: inherit;
         voiceRecEnded = false; // remis à true par onend
         try { rec.stop(); } catch (err) { /* ignoré */ }
         const text = transcript.trim();
-        if (text && !(isBarge && discardBargeTranscript(text, refSnapshot))) handleTranscript(text);
-        else if (isBarge) resumeListening(); // « stop » seul ou écho pur : rien à envoyer, on réécoute
+        if (text) handleTranscript(text);
         else startListening();
       }
     };
@@ -2334,12 +2000,6 @@ font-family: inherit;
       if (recognition !== rec) return;
       errorCode = (e && e.error) || "unknown";
       if (errorCode === "no-speech" || errorCode === "aborted") return; // onend relance l'écoute
-      if (isBarge && !adopted) {
-        // Pendant la lecture, une erreur du micro ne ferme JAMAIS le mode vocal : repli propre.
-        recognition = null;
-        disableBargeIn("recognition error " + errorCode);
-        return;
-      }
       // Erreur grave (permission refusée, micro absent, réseau...) : on quitte le mode.
       recognition = null;
       const denied = errorCode === "not-allowed" || errorCode === "service-not-allowed";
@@ -2353,18 +2013,16 @@ font-family: inherit;
       voiceMicStopAt = performance.now();
       if (recognition !== rec) return;
       recognition = null;
-      if (isBarge && !adopted) { scheduleBargeRestart(startedAt, heardAny); return; }
       if (gotFinal || !voiceActive || voicePaused) return;
       setTimeout(() => { if (voiceActive && voicePhase === "listening") startListening(); }, 250);
     };
 
     try {
-      if (!isBarge) voiceListenStartedAt = performance.now();
+      voiceListenStartedAt = performance.now();
       rec.start();
     } catch (err) {
       console.error(err);
       recognition = null;
-      if (isBarge) { disableBargeIn("start failed"); return; }
       closeVoice("Impossible de démarrer le micro.");
     }
   }
@@ -2382,10 +2040,6 @@ font-family: inherit;
     voiceRun++;
     voiceTurn++;
     resetVoiceQueue();
-    voiceRequest = null;
-    bargeInRuntimeOff = false; // nouvel essai à chaque ouverture du mode vocal
-    bargeQuickFails = 0;
-    updateBargeToggle();
     voiceOverlay.classList.add("open");
     requestVoiceWakeLock();
     startListening();
@@ -2421,29 +2075,6 @@ font-family: inherit;
 
   voiceBtn.addEventListener("click", openVoice);
   voiceStop.addEventListener("click", () => closeVoice());
-
-  // « Couper » : arrête la réponse en cours (voix + requête) SANS fermer le mode vocal, puis réécoute.
-  voiceCut.addEventListener("click", () => {
-    if (interruptVoiceTurn("manual")) resumeListening();
-  });
-
-  // Bascule de l'interruption à la voix (préférence conservée) : repli manuel si la voix est coupée
-  // par le micro sur certains appareils Android.
-  voiceBarge.addEventListener("click", () => {
-    if (bargeInEnabled()) {
-      setBargeInPref(false);
-      clearTimeout(bargeTimer);
-      bargeTimer = null;
-      if (recognition && recognitionMode === "barge") stopListening();
-    } else {
-      setBargeInPref(true);
-      bargeInRuntimeOff = false;
-      bargeQuickFails = 0;
-      if (voicePhase === "speaking") scheduleBargeIn();
-    }
-    updateBargeToggle();
-  });
-  updateBargeToggle();
 
   // -------- Mise en page mobile : barre de nav fixe + clavier --------
   const navEl = document.querySelector("nav.bottom-nav");
