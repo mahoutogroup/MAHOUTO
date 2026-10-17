@@ -2042,8 +2042,11 @@ font-family: inherit;
 
   // ---- Interruption vocale -----------------------------------------------------------------
 
+  // Désactivée par défaut : la session de micro parallèle ouverte pendant que MAJESTÉ parle
+  // déclenche les sons système de début/fin d'écoute (Android/Chrome) en plein milieu de la
+  // parole. Elle reste activable par l'utilisateur avec le bouton « Interruption à la voix ».
   function bargeInPref() {
-    try { return window.localStorage.getItem(BARGE_PREF_KEY) !== "off"; } catch (e) { return true; }
+    try { return window.localStorage.getItem(BARGE_PREF_KEY) === "on"; } catch (e) { return false; }
   }
 
   function setBargeInPref(on) {
