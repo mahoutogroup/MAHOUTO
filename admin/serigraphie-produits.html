@@ -338,7 +338,12 @@
     $("submit-btn").textContent = "Enregistrer les modifications";
     $("cancel-btn").classList.remove("hidden");
     setFormStatus("", false);
-    formEl.scrollIntoView({ behavior: "smooth", block: "start" });
+    // Défilement instantané vers le formulaire, après le rendu des images
+    // (le défilement « smooth » pouvait rester sans effet sur certains téléphones).
+    requestAnimationFrame(() => {
+      const top = formEl.getBoundingClientRect().top + (window.pageYOffset || 0) - 12;
+      window.scrollTo({ top: Math.max(top, 0), behavior: "auto" });
+    });
   }
 
   function ensureVendorOption(vendorId) {
