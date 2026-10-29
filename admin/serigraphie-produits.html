@@ -83,6 +83,7 @@
   <div class="nav-pills" id="nav-pills">
     <a href="serigraphie-produits.html" class="current">Produits Sérigraphe</a>
     <a href="serigraphie-vendeurs.html" id="nav-vendors" class="hidden">Vendeurs Sérigraphe</a>
+    <a href="serigraphie-calculateur.html" id="nav-calc" class="hidden">Calculateur de devis</a>
     <a href="../serigraphie.html">Voir le catalogue</a>
   </div>
 
@@ -338,11 +339,15 @@
     $("submit-btn").textContent = "Enregistrer les modifications";
     $("cancel-btn").classList.remove("hidden");
     setFormStatus("", false);
-    // Défilement instantané vers le formulaire, après le rendu des images
-    // (le défilement « smooth » pouvait rester sans effet sur certains téléphones).
+    // Amène le formulaire en haut de l'écran. Dans MAHOUTO+, c'est le bloc .page-content
+    // qui défile (pas la fenêtre) : on règle donc son défilement directement, sans animation.
     requestAnimationFrame(() => {
-      const top = formEl.getBoundingClientRect().top + (window.pageYOffset || 0) - 12;
-      window.scrollTo({ top: Math.max(top, 0), behavior: "auto" });
+      const sc = formEl.closest(".page-content");
+      if (sc && sc.scrollHeight > sc.clientHeight) {
+        sc.scrollTop += formEl.getBoundingClientRect().top - sc.getBoundingClientRect().top - 12;
+      } else {
+        window.scrollTo(0, Math.max(0, formEl.getBoundingClientRect().top + (window.pageYOffset || 0) - 12));
+      }
     });
   }
 
@@ -505,6 +510,7 @@
 
     if (isAdmin) {
       $("nav-vendors").classList.remove("hidden");
+      $("nav-calc").classList.remove("hidden");
       $("header-sub").textContent = "Tous les produits de la place de marché.";
       const { data: vendors } = await supabase.from("serigraphie_vendors").select("id, shop_name, status").order("shop_name");
       (vendors || []).forEach((v) => VENDORS.set(v.id, v));

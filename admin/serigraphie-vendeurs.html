@@ -66,6 +66,7 @@
   <div class="nav-pills">
     <a href="serigraphie-produits.html">Produits Sérigraphe</a>
     <a href="serigraphie-vendeurs.html" class="current">Vendeurs Sérigraphe</a>
+    <a href="serigraphie-calculateur.html" id="nav-calc" class="hidden">Calculateur de devis</a>
     <a href="formations.html">Formations</a>
     <a href="produits.html">Produits numériques</a>
   </div>
@@ -245,6 +246,7 @@
 
     loadingEl.classList.add("hidden");
     tabsEl.classList.remove("hidden");
+    document.getElementById("nav-calc").classList.remove("hidden");
     containerEl.classList.remove("hidden");
     await loadVendors();
   }

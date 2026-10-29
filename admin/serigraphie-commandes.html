@@ -79,6 +79,7 @@
     <a href="serigraphie-produits.html">Produits Sérigraphe</a>
     <a href="serigraphie-commandes.html" class="current">Commandes Sérigraphe</a>
     <a href="serigraphie-vendeurs.html" id="nav-vendors" class="hidden">Vendeurs Sérigraphe</a>
+    <a href="serigraphie-calculateur.html" id="nav-calc" class="hidden">Calculateur de devis</a>
   </div>
 
   <div id="loading-state">Vérification des droits...</div>
@@ -330,6 +331,7 @@
 
     if (isAdmin) {
       $("nav-vendors").classList.remove("hidden");
+      $("nav-calc").classList.remove("hidden");
       const { data: vendors } = await supabase.from("serigraphie_vendors").select("id, shop_name, status");
       (vendors || []).forEach((v) => VENDORS.set(v.id, v));
     } else {
