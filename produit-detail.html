@@ -199,7 +199,7 @@
     }
 
     const { data: product, error } = await supabase
-      .from("digital_products").select("*").eq("id", productId).maybeSingle();
+      .from("digital_products_public").select("*").eq("id", productId).maybeSingle();
 
     if (error || !product) {
       loadingEl.classList.add("hidden");

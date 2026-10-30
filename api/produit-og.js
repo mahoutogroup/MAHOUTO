@@ -107,7 +107,7 @@ async function handleProduit(req, res, base) {
     const supabase = createClient(supabaseUrl, anonKey);
 
     const { data: product, error } = await supabase
-      .from("digital_products")
+      .from("digital_products_public")
       .select("nom, description, image_url, prix, promotion, disponible")
       .eq("id", productId)
       .maybeSingle();
@@ -213,9 +213,11 @@ export default async function handler(req, res) {
   res.setHeader("Cache-Control", "public, max-age=120, s-maxage=300");
   res.setHeader("Content-Type", "text/html; charset=utf-8");
 
+  // URL de base : PUBLIC_SITE_URL en priorité (l'en-tête Host est contrôlable
+  // par le client) ; repli sur l'en-tête Host seulement si la variable est absente.
+  const configuredSite = (process.env.PUBLIC_SITE_URL || "").trim().replace(/\/+$/, "");
   const proto = req.headers["x-forwarded-proto"] || "https";
-  const host = req.headers.host;
-  const base = `${proto}://${host}`;
+  const base = configuredSite || `${proto}://${req.headers.host}`;
 
   const type = (req.query && req.query.type) || "produit";
 

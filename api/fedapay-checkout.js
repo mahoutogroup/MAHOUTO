@@ -159,6 +159,30 @@ export default async function handler(req, res) {
     }
 
     // -----------------------------------------------------
+    // 4 bis. Limite de débit : au plus 5 achats "pending" par
+    //    utilisateur sur la dernière heure, pour éviter de
+    //    saturer FedaPay de transactions jamais payées. En cas
+    //    d'erreur de comptage on laisse passer (et on journalise)
+    //    plutôt que de bloquer un vrai paiement.
+    // -----------------------------------------------------
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const { count: pendingCount, error: pendingCountError } = await supabaseAdmin
+      .from("purchases")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", authenticatedUser.id)
+      .eq("status", "pending")
+      .gte("created_at", oneHourAgo);
+
+    if (pendingCountError) {
+      console.error("Erreur comptage achats pending :", pendingCountError);
+    } else if ((pendingCount || 0) >= 5) {
+      res.setHeader("Retry-After", "3600");
+      return res.status(429).json({
+        error: "Trop de tentatives de paiement en attente. Merci de patienter environ une heure avant de réessayer, ou de terminer un paiement déjà commencé."
+      });
+    }
+
+    // -----------------------------------------------------
     // 5. Identité du client FedaPay — depuis Supabase, jamais
     //    depuis un champ libre envoyé par le navigateur.
     // -----------------------------------------------------

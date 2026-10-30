@@ -5,8 +5,48 @@
     }
   },
   "rewrites": [
-    { "source": "/p/:id", "destination": "/api/produit-og?type=produit&id=:id" },
-    { "source": "/f/:id", "destination": "/api/produit-og?type=formation&id=:id" },
-    { "source": "/verify/:code", "destination": "/verify.html?code=:code" }
+    {
+      "source": "/p/:id",
+      "destination": "/api/produit-og?type=produit&id=:id"
+    },
+    {
+      "source": "/f/:id",
+      "destination": "/api/produit-og?type=formation&id=:id"
+    },
+    {
+      "source": "/verify/:code",
+      "destination": "/verify.html?code=:code"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "Strict-Transport-Security",
+          "value": "max-age=31536000"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(self), geolocation=()"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "SAMEORIGIN"
+        },
+        {
+          "key": "Content-Security-Policy-Report-Only",
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com https://www.gstatic.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' blob: https://res.cloudinary.com; font-src 'self' data:; connect-src 'self' https://kbnhmddwiimkjaehiwyi.supabase.co wss://kbnhmddwiimkjaehiwyi.supabase.co https://api.cloudinary.com https://res.cloudinary.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com https://ai.majestepresse.com; frame-src 'self' blob: https://res.cloudinary.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'"
+        }
+      ]
+    }
   ]
 }
