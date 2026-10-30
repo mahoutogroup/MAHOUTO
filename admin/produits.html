@@ -447,7 +447,7 @@
 
   async function loadProducts() {
     const { data, error } = await supabase
-      .from("digital_products").select("*").order("created_at", { ascending: false });
+      .rpc("admin_list_digital_products");
     if (error) {
       containerEl.innerHTML = '<div style="padding:20px;color:var(--text-dim);">Erreur de chargement.</div>';
       return;

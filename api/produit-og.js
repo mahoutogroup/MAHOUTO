@@ -107,7 +107,7 @@ async function handleProduit(req, res, base) {
     const supabase = createClient(supabaseUrl, anonKey);
 
     const { data: product, error } = await supabase
-      .from("digital_products")
+      .from("digital_products_public")
       .select("nom, description, image_url, prix, promotion, disponible")
       .eq("id", productId)
       .maybeSingle();

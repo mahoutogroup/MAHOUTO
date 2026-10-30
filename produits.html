@@ -121,7 +121,7 @@
 
   async function loadCatalog() {
     const { data, error } = await supabase
-      .from("digital_products")
+      .from("digital_products_public")
       .select("*")
       .eq("disponible", true)
       .order("created_at", { ascending: false });
