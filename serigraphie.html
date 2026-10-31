@@ -99,6 +99,7 @@
 </a>
 
 <script src="config.js"></script>
+<script src="serigraphie-share.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
 (function () {
@@ -197,7 +198,8 @@
       )
     );
     const card = el("a", { class: "product-card", href: "serigraphie-produit.html?id=" + encodeURIComponent(p.id) }, cover, body);
-    return card;
+    // Bouton « Partager » (marque MAJESTÉ uniquement ; sinon la carte est renvoyée telle quelle)
+    return window.MahoutoSerigraphieShare ? window.MahoutoSerigraphieShare.wrapCard(card, p, shop ? shop.shop_name : "") : card;
   }
 
   function render() {

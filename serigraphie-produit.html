@@ -76,6 +76,7 @@
 </div>
 
 <script src="config.js"></script>
+<script src="serigraphie-share.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
 (function () {
@@ -209,6 +210,7 @@
       el("h1", { text: p.name }),
       shop ? el("div", { class: "shop-line", text: "Vendu par " + shop.shop_name + (shop.city ? " · " + shop.city : "") }) : null,
       el("div", { class: "unit-price" }, money(p.price), " ", el("small", { text: "l'unité" })),
+      window.MahoutoSerigraphieShare ? window.MahoutoSerigraphieShare.createButton(p, shop ? shop.shop_name : "", { row: true }) : null,
       p.description ? el("div", { class: "section-block" }, el("h2", { text: "Description" }), el("p", { text: p.description })) : null,
       colorBlock,
       el("div", { class: "section-block" },
