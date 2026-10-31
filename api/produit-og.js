@@ -8,6 +8,9 @@
 //   /p/:id -> /api/produit-og?type=produit&id=:id   (défaut)
 //   /f/:id -> /api/produit-og?type=formation&id=:id
 //
+// Troisième cas : les produits du Sérigraphe (type=serigraphie, lien court
+//   /s/:id -> /api/produit-og?type=serigraphie&id=:id), voir handleSerigraphie.
+//
 // Une seule fonction gère les deux cas exprès : le plan Vercel
 // Hobby est limité à 12 fonctions serverless, déjà toutes
 // utilisées. Ajouter "formation-og.js" séparément aurait
@@ -61,7 +64,7 @@ function money(xof) {
   return Number(xof || 0).toLocaleString("fr-FR") + " FCFA";
 }
 
-function renderRedirectPage({ title, description, image, canonicalUrl, targetUrl, siteName }) {
+function renderRedirectPage({ title, description, image, imageWidth, imageHeight, canonicalUrl, targetUrl, siteName }) {
   return `<!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -72,7 +75,9 @@ function renderRedirectPage({ title, description, image, canonicalUrl, targetUrl
 <meta property="og:type" content="product">
 <meta property="og:title" content="${escapeHtml(title)}">
 <meta property="og:description" content="${escapeHtml(description)}">
-${image ? `<meta property="og:image" content="${escapeHtml(image)}">` : ""}
+${image ? `<meta property="og:image" content="${escapeHtml(image)}">` : ""}${image && imageWidth && imageHeight ? `
+<meta property="og:image:width" content="${escapeHtml(imageWidth)}">
+<meta property="og:image:height" content="${escapeHtml(imageHeight)}">` : ""}
 <meta property="og:url" content="${escapeHtml(canonicalUrl)}">
 <meta property="og:site_name" content="${escapeHtml(siteName)}">
 
@@ -209,6 +214,99 @@ async function handleFormation(req, res, base) {
   }
 }
 
+// ---------------------------------------------------------
+// Produits du Sérigraphe (marketplace des sérigraphes)
+// Lecture avec la clé publique (anon) : la RLS ne renvoie que les produits
+// « active » dont le vendeur est approuvé, et la vue serigraphie_vendors_public
+// n'expose que le nom de l'atelier et la ville (jamais le WhatsApp ni la commission).
+// Tout cas « introuvable / masqué / invalide » aboutit à la même redirection
+// vers le catalogue, sans révéler lequel.
+// ---------------------------------------------------------
+const SERIGRAPHIE_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Nom du « cloud » Cloudinary du projet (public) : variable Vercel si définie, sinon la valeur de config.js.
+const CLOUDINARY_CLOUD = (process.env.CLOUDINARY_CLOUD_NAME || "hefa5gqf").trim();
+
+// Image d'aperçu 1200x630. Seule une image du compte Cloudinary du projet est utilisée ;
+// toute autre origine (ou image absente) -> image par défaut MAJESTÉ (URL absolue).
+// « c_pad » + fond #0A0A0A : l'image entière est conservée (pas de rognage), qu'elle soit
+// verticale ou un collage de plusieurs vues ; des bandes sombres comblent l'espace restant.
+// f_auto / q_auto : format et qualité automatiques (poids réduit).
+function serigraphieOgImage(images, base) {
+  const fallback = { url: `${base}/assets/og-majeste.png`, width: "1200", height: "630" };
+  const first = Array.isArray(images) ? images[0] : null;
+  if (typeof first !== "string") return fallback;
+
+  const prefix = `https://res.cloudinary.com/${CLOUDINARY_CLOUD}/image/upload/`;
+  if (!first.startsWith(prefix) || first.length > 500 || /[\s"'<>]/.test(first)) return fallback;
+
+  const rest = first.slice(prefix.length);
+  if (!rest || rest.includes("..")) return fallback;
+  return {
+    url: `${prefix}f_auto,q_auto,w_1200,h_630,c_pad,b_rgb:0A0A0A/${rest}`,
+    width: "1200",
+    height: "630"
+  };
+}
+
+async function handleSerigraphie(req, res, base) {
+  const catalogUrl = `${base}/serigraphie.html`;
+  const toCatalog = () => {
+    res.setHeader("Cache-Control", "public, s-maxage=60");
+    return res.status(302).setHeader("Location", catalogUrl).end();
+  };
+
+  const productId = String((req.query && req.query.id) || "").trim();
+  if (!SERIGRAPHIE_ID_RE.test(productId)) return toCatalog();
+
+  try {
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const anonKey = process.env.SUPABASE_ANON_KEY;
+    const supabase = createClient(supabaseUrl, anonKey);
+
+    const { data: product, error } = await supabase
+      .from("serigraphie_products")
+      .select("id, name, price, min_qty, images, vendor_id")
+      .eq("id", productId)
+      .eq("status", "active")
+      .maybeSingle();
+    if (error || !product) return toCatalog();
+
+    const { data: shop, error: shopError } = await supabase
+      .from("serigraphie_vendors_public")
+      .select("shop_name, city")
+      .eq("id", product.vendor_id)
+      .maybeSingle();
+    if (shopError || !shop) return toCatalog();   // vendeur non approuvé : même réponse qu'un produit absent
+
+    const minQty = Math.max(1, parseInt(product.min_qty, 10) || 1);
+    const description = [
+      money(product.price),
+      minQty > 1 ? `Minimum ${minQty} pièces` : "Dès 1 pièce",
+      shop.city ? `${shop.shop_name}, ${shop.city}` : shop.shop_name
+    ].join(" · ");
+
+    const image = serigraphieOgImage(product.images, base);
+
+    res.setHeader("Cache-Control", "public, max-age=60, s-maxage=120, stale-while-revalidate=600");
+    return res.status(200).send(
+      renderRedirectPage({
+        title: product.name,
+        description,
+        image: image.url,
+        imageWidth: image.width,
+        imageHeight: image.height,
+        canonicalUrl: `${base}/s/${productId}`,
+        targetUrl: `${base}/serigraphie-produit.html?id=${encodeURIComponent(productId)}`,
+        siteName: "MAJESTÉ PRESSE",
+      })
+    );
+  } catch (err) {
+    console.error(err);
+    return toCatalog();
+  }
+}
+
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "public, max-age=120, s-maxage=300");
   res.setHeader("Content-Type", "text/html; charset=utf-8");
@@ -223,6 +321,9 @@ export default async function handler(req, res) {
 
   if (type === "formation") {
     return handleFormation(req, res, base);
+  }
+  if (type === "serigraphie") {
+    return handleSerigraphie(req, res, base);
   }
   return handleProduit(req, res, base);
 }
