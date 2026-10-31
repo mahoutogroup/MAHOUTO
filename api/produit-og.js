@@ -229,8 +229,10 @@ const CLOUDINARY_CLOUD = (process.env.CLOUDINARY_CLOUD_NAME || "hefa5gqf").trim(
 
 // Image d'aperçu 1200x630. Seule une image du compte Cloudinary du projet est utilisée ;
 // toute autre origine (ou image absente) -> image par défaut MAJESTÉ (URL absolue).
-// « c_pad » + fond #0A0A0A : l'image entière est conservée (pas de rognage), qu'elle soit
-// verticale ou un collage de plusieurs vues ; des bandes sombres comblent l'espace restant.
+// « c_pad » + « b_blurred:400:15 » : l'image entière est conservée (pas de rognage), qu'elle soit
+// carrée, verticale ou un collage de plusieurs vues ; l'espace restant est comblé par une version
+// floue et assombrie de la même image (intensité 400, luminosité 15) au lieu de bandes unies.
+// Repli possible si b_blurred n'est pas pris en charge : « b_auto:predominant » (couleur dominante).
 // f_auto / q_auto : format et qualité automatiques (poids réduit).
 function serigraphieOgImage(images, base) {
   const fallback = { url: `${base}/assets/og-majeste.png`, width: "1200", height: "630" };
@@ -243,7 +245,7 @@ function serigraphieOgImage(images, base) {
   const rest = first.slice(prefix.length);
   if (!rest || rest.includes("..")) return fallback;
   return {
-    url: `${prefix}f_auto,q_auto,w_1200,h_630,c_pad,b_rgb:0A0A0A/${rest}`,
+    url: `${prefix}f_auto,q_auto,w_1200,h_630,c_pad,b_blurred:400:15/${rest}`,
     width: "1200",
     height: "630"
   };
