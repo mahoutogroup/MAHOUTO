@@ -224,9 +224,29 @@ async function handleFormation(req, res, base) {
 // ---------------------------------------------------------
 const SERIGRAPHIE_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// Image d'aperçu : image par défaut MAJESTÉ (1200x630, URL absolue).
+// Nom du « cloud » Cloudinary du projet (public) : variable Vercel si définie, sinon la valeur de config.js.
+const CLOUDINARY_CLOUD = (process.env.CLOUDINARY_CLOUD_NAME || "hefa5gqf").trim();
+
+// Image d'aperçu 1200x630. Seule une image du compte Cloudinary du projet est utilisée ;
+// toute autre origine (ou image absente) -> image par défaut MAJESTÉ (URL absolue).
+// « c_pad » + fond #0A0A0A : l'image entière est conservée (pas de rognage), qu'elle soit
+// verticale ou un collage de plusieurs vues ; des bandes sombres comblent l'espace restant.
+// f_auto / q_auto : format et qualité automatiques (poids réduit).
 function serigraphieOgImage(images, base) {
-  return { url: `${base}/assets/og-majeste.png`, width: "1200", height: "630" };
+  const fallback = { url: `${base}/assets/og-majeste.png`, width: "1200", height: "630" };
+  const first = Array.isArray(images) ? images[0] : null;
+  if (typeof first !== "string") return fallback;
+
+  const prefix = `https://res.cloudinary.com/${CLOUDINARY_CLOUD}/image/upload/`;
+  if (!first.startsWith(prefix) || first.length > 500 || /[\s"'<>]/.test(first)) return fallback;
+
+  const rest = first.slice(prefix.length);
+  if (!rest || rest.includes("..")) return fallback;
+  return {
+    url: `${prefix}f_auto,q_auto,w_1200,h_630,c_pad,b_rgb:0A0A0A/${rest}`,
+    width: "1200",
+    height: "630"
+  };
 }
 
 async function handleSerigraphie(req, res, base) {
