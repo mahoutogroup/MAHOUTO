@@ -1282,6 +1282,12 @@ let localShareId = null;
 
 let sharedFiles = [];
 
+// Partage de TEXTE seul (aucun fichier) : le texte devient le message à publier.
+let textOnlyShare = false;
+
+// Longueur maximale d'un message (identique à messages.content / dm_messages.content en base).
+const MAX_TEXT_MESSAGE = 20000;
+
 let activeFileIndex = 0;
 
 let currentDestination = "room"; // "room" | "dm"
@@ -2162,6 +2168,35 @@ function updateFileInformation(
 
 
 /* ============================================================
+   TEXTE PARTAGÉ (titre + texte + lien, sans doublons)
+   ============================================================ */
+
+// Retire les caractères de contrôle (sauf retour à la ligne et tabulation) et les
+// caractères de contrôle bidirectionnels. Le texte est ensuite placé via .value
+// (jamais interprété comme du HTML) et les chats l'affichent avec escapeHtml().
+function cleanSharedText(value) {
+  return String(value == null ? "" : value)
+    .replace(/\r\n?/g, "\n")
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u202A-\u202E\u2066-\u2069]/g, "")
+    .trim();
+}
+
+function buildSharedText(metadata) {
+  const kept = [];
+  [metadata.title, metadata.text, metadata.url].forEach((raw) => {
+    const part = cleanSharedText(raw);
+    if (!part) return;
+    const lower = part.toLowerCase();
+    if (kept.some((k) => k.toLowerCase().includes(lower))) return;       // déjà contenu : doublon
+    const idx = kept.findIndex((k) => lower.includes(k.toLowerCase()));  // contient une partie déjà gardée
+    if (idx !== -1) kept[idx] = part;
+    else kept.push(part);
+  });
+  return kept.join("\n\n").slice(0, MAX_TEXT_MESSAGE);
+}
+
+
+/* ============================================================
    CHARGER LE PARTAGE LOCAL
    ============================================================ */
 
@@ -2220,6 +2255,30 @@ async function loadLocalShare() {
     if (file) {
       sharedFiles.push(file);
     }
+  }
+
+  /*
+    Partage de TEXTE seul : aucun fichier déclaré, mais du texte, un titre
+    ou un lien. Le texte pré-remplit la zone de message (jamais en HTML).
+  */
+  if (fileCount === 0 && !sharedFiles.length) {
+
+    const sharedText = buildSharedText(metadata);
+
+    if (sharedText) {
+
+      textOnlyShare = true;
+
+      captionInput.maxLength = MAX_TEXT_MESSAGE;
+      captionInput.placeholder = "Message à publier…";
+      captionInput.value = sharedText;
+
+      fileIcon.textContent = "💬";
+
+      return;
+
+    }
+
   }
 
   if (!sharedFiles.length) {
@@ -3204,6 +3263,77 @@ async function deleteLocalShare() {
 
 
 /* ============================================================
+   PUBLIER UN MESSAGE TEXTE (partage sans fichier)
+   Mêmes insertions que chat.html (salon) et dm-chat.html (discussion
+   privée) : la base impose les règles (RLS, 20 000 caractères max).
+   ============================================================ */
+
+async function publishTextMessage(destination, roomId, convId, content) {
+
+  const session = await getSession();
+
+  if (!session) {
+    throw new Error("Votre session a expiré. Veuillez vous reconnecter.");
+  }
+
+  if (!content) {
+    throw new Error("Le message est vide.");
+  }
+
+  const user = session.user;
+
+  if (destination === "dm") {
+
+    const { error } = await supabaseClient
+      .from("dm_messages")
+      .insert({
+        conversation_id: convId,
+        sender_id: user.id,
+        content: content
+      });
+
+    if (error) {
+      console.error("Erreur envoi DM (texte):", error);
+      throw new Error("Impossible d'envoyer ce message dans la conversation.");
+    }
+
+    return;
+
+  }
+
+  let username =
+    (user.user_metadata && (user.user_metadata.full_name || user.user_metadata.name)) ||
+    (user.email ? user.email.split("@")[0] : "") ||
+    "Utilisateur MAHOUTO+";
+
+  const { data: profileRows } = await supabaseClient
+    .from("profiles")
+    .select("username")
+    .eq("id", user.id)
+    .limit(1);
+
+  if (profileRows && profileRows[0] && profileRows[0].username) {
+    username = profileRows[0].username;
+  }
+
+  const { error } = await supabaseClient
+    .from("messages")
+    .insert({
+      room_id: roomId,
+      user_id: user.id,
+      username: username,
+      content: content
+    });
+
+  if (error) {
+    console.error("Erreur envoi message (texte):", error);
+    throw new Error("Impossible de publier ce message dans le salon.");
+  }
+
+}
+
+
+/* ============================================================
    PUBLIER UN FICHIER DANS UNE DISCUSSION PRIVÉE
    ============================================================ */
 
@@ -3314,8 +3444,14 @@ async function publishShare() {
     return;
   }
 
-  if (!sharedFiles.length) {
+  if (!sharedFiles.length && !textOnlyShare) {
     setStatus("Aucun fichier n'est disponible.", "error");
+    return;
+  }
+
+  if (textOnlyShare && !cleanSharedText(captionInput.value)) {
+    setStatus("Le message est vide.", "error");
+    captionInput.focus();
     return;
   }
 
@@ -3327,6 +3463,28 @@ async function publishShare() {
     destBtnRoom.disabled = true;
     destBtnDm.disabled = true;
     captionInput.disabled = true;
+
+    // Texte seul : publication directe du message (RLS identique à chat.html / dm-chat.html)
+    if (textOnlyShare) {
+
+      setStatus("Publication du message…", "info");
+
+      await publishTextMessage(
+        destination,
+        roomId,
+        convId,
+        cleanSharedText(captionInput.value).slice(0, MAX_TEXT_MESSAGE)
+      );
+
+      await deleteLocalShare();
+
+      published = true;
+
+      showSuccess("Votre message a été publié avec succès.");
+
+      return;
+
+    }
 
     showProgress();
     updateProgress(0);
