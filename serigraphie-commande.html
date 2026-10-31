@@ -48,6 +48,8 @@
 
   .pay-btn { width: 100%; font-size: 15px; font-weight: bold; background: var(--gold-bright); color: #0A0A0A; border: none; border-radius: 12px; padding: 15px; cursor: pointer; }
   .pay-btn:disabled { opacity: .55; cursor: wait; }
+  .cgv-line { font-size: 12px; color: var(--text-dim); text-align: center; line-height: 1.5; }
+  .cgv-line a { color: var(--gold); text-decoration: underline; }
   #form-status { font-size: 12.5px; min-height: 16px; color: var(--accent-green); line-height: 1.5; }
   #form-status.error { color: #F87171; }
 
@@ -214,6 +216,7 @@
         el("div", { class: "line" }, el("span", { text: "Total à payer" }), totalEl),
         el("div", { class: "indicative", text: "Montant indicatif : le prix définitif est recalculé et vérifié par nos serveurs au moment du paiement." })
       ),
+      window.MAHOUTO_BRAND && window.MAHOUTO_BRAND.id === "majeste" ? el("p", { class: "cgv-line" }, "En payant, vous acceptez les ", el("a", { href: "conditions-vente.html", target: "_blank", rel: "noopener noreferrer", text: "conditions de vente et retours" }), ".") : null,
       payBtn,
       statusEl
     );
