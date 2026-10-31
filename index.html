@@ -136,6 +136,8 @@
 .plan-chip { flex: none; background: var(--bg-card); border: 1px solid var(--border); border-radius: 999px; padding: 8px 16px; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
 
   footer { text-align: center; padding: 24px 20px 10px; color: var(--text-dim); font-size: 11px; line-height: 1.7; }
+  footer .legal-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 16px; margin-bottom: 8px; }
+  footer .legal-links a { color: var(--text-muted); text-decoration: underline; }
 
 .admin-fab {
     position: fixed;
@@ -351,6 +353,12 @@
   </div>
 
   <footer>
+    <nav class="legal-links hidden" id="legal-links" aria-label="Informations légales">
+      <a href="accueil-majeste.html">Présentation</a>
+      <a href="conditions-vente.html">Conditions de vente et retours</a>
+      <a href="conditions-vendeurs.html">Conditions vendeurs</a>
+      <a href="mentions-legales.html">Mentions légales</a>
+    </nav>
     © 2026 MAHOUTO+ — Tous droits réservés.
   </footer>
 </div>
@@ -785,6 +793,10 @@
 
   refreshIdentityUI();
 })();
+</script>
+<script>
+  // Liens légaux : affichés uniquement pour la marque MAJESTÉ PRESSE (brand.js).
+  if (window.MAHOUTO_BRAND && window.MAHOUTO_BRAND.id === "majeste") document.getElementById("legal-links").classList.remove("hidden");
 </script>
 <script src="pwa-install.js"></script>
 </body>
