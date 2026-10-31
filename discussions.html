@@ -445,6 +445,8 @@
     <div id="loading-state">Chargement des discussions...</div>
   </div>
 
+  <p class="hidden" id="cgv-line" style="text-align:center;font-size:12px;color:var(--text-dim);padding:0 20px 16px;padding-top:12px;">En payant, vous acceptez les <a href="conditions-vente.html" target="_blank" rel="noopener noreferrer" style="color:var(--gold);text-decoration:underline;">conditions de vente et retours</a>.</p>
+
   <button id="fab" title="Nouvelle discussion">＋</button>
 
   <!-- Menu d'actions sur un salon (créateur ou admin uniquement) -->
@@ -1161,6 +1163,10 @@
   trySilentResume();
 
 })();
+</script>
+<script>
+  // Mention des conditions de vente : uniquement pour la marque MAJESTÉ PRESSE (brand.js).
+  if (window.MAHOUTO_BRAND && window.MAHOUTO_BRAND.id === "majeste") document.getElementById("cgv-line").classList.remove("hidden");
 </script>
 <script src="pwa-install.js"></script>
 

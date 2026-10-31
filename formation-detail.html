@@ -66,6 +66,9 @@
     background: var(--bg-elevated); border-top: 1px solid var(--border);
     display: flex; gap: 12px; align-items: center;
   }
+  .sticky-buy.has-cgv { flex-wrap: wrap; }
+  .sticky-buy .cgv-line { flex-basis: 100%; order: -1; margin: 0; font-size: 11.5px; color: var(--text-dim); text-align: center; }
+  .sticky-buy .cgv-line a { color: var(--gold); text-decoration: underline; }
   .sticky-buy .sticky-price { font-size: 15px; font-weight: bold; color: var(--gold); flex: none; }
   .sticky-buy button {
     flex: 1; font-size: 14.5px; font-weight: bold; background: var(--gold-bright);
@@ -314,6 +317,19 @@
         ${owned ? "✓ Formation acquise" : (formation.disponible ? "S'inscrire maintenant" : "Indisponible")}
       </button>
     `;
+    if (window.MAHOUTO_BRAND && window.MAHOUTO_BRAND.id === "majeste") {
+      sticky.classList.add("has-cgv");
+      const cgv = document.createElement("p");
+      cgv.className = "cgv-line";
+      cgv.append("En payant, vous acceptez les ");
+      const cgvLink = document.createElement("a");
+      cgvLink.href = "conditions-vente.html";
+      cgvLink.target = "_blank";
+      cgvLink.rel = "noopener noreferrer";
+      cgvLink.textContent = "conditions de vente et retours";
+      cgv.append(cgvLink, ".");
+      sticky.append(cgv);
+    }
     document.body.appendChild(sticky);
 
     if (owned) {

@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MAJESTÉ PRESSE — La référence des métiers de l'impression</title>
+<meta name="description" content="MAJESTÉ PRESSE, la référence des métiers de l'impression, de la création et du numérique : une plateforme qui réunit des sérigraphes, des imprimeurs, des créateurs et une boutique.">
+<meta name="theme-color" content="#FFC107">
+<link rel="manifest" href="manifest.json">
+<script src="brand.js"></script>
+<link rel="icon" href="assets/favicon-majeste.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon-majeste.png">
+<link rel="preload" as="image" href="assets/logo-majeste-presse-complet.png">
+
+<meta property="og:title" content="MAJESTÉ PRESSE">
+<meta property="og:description" content="Apprendre. Créer. Gagner.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="https://majestepresse.com/assets/og-majeste.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:url" content="https://majestepresse.com/accueil-majeste.html">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="theme.css">
+<script src="theme-toggle.js"></script>
+<style>
+  .wrap { max-width: 720px; margin: 0 auto; }
+
+  .hero { padding: 28px 20px 24px; text-align: center; background: var(--bg-elevated); border-bottom: 1px solid var(--border); }
+  .hero img { width: 100%; max-width: 280px; height: auto; display: block; margin: 0 auto 12px; }
+  .hero .brand { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+  .hero h1 { font-size: 22px; line-height: 1.3; margin-top: 8px; }
+  .hero p.lead { font-size: 14px; color: var(--text-muted); line-height: 1.6; margin: 10px auto 0; max-width: 460px; }
+
+  .hero .open-app { margin-top: 18px; padding: 14px 28px; font-size: 15px; }
+
+  h2.section { font-size: 17px; color: var(--gold); margin: 30px 20px 14px; }
+
+  .who { padding: 0 20px; display: grid; grid-template-columns: 1fr; gap: 14px; }
+  @media (min-width: 640px) { .who { grid-template-columns: repeat(3, 1fr); } }
+  .who .card { display: flex; flex-direction: column; gap: 8px; }
+  .who .icon { font-size: 28px; }
+  .who h3 { font-size: 16px; }
+  .who p { font-size: 13px; color: var(--text-muted); line-height: 1.55; flex: 1; }
+  .who .actions { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+  .who .actions a { font-size: 13px; padding: 11px 14px; text-align: center; }
+
+  .steps { list-style: none; padding: 0 20px; display: flex; flex-direction: column; gap: 12px; counter-reset: step; }
+  .steps li { counter-increment: step; display: flex; gap: 14px; align-items: flex-start; }
+  .steps li::before { content: counter(step); flex: none; width: 32px; height: 32px; border-radius: 50%; background: var(--gold-bright); color: #0A0A0A; font-weight: bold; display: flex; align-items: center; justify-content: center; }
+  .steps strong { display: block; font-size: 15px; }
+  .steps span { display: block; font-size: 13px; color: var(--text-muted); line-height: 1.55; margin-top: 2px; }
+
+  .trust { margin: 0 20px; }
+  .trust ul { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+  .trust li { font-size: 13.5px; line-height: 1.55; padding-left: 26px; position: relative; color: var(--text-muted); }
+  .trust li::before { content: "✓"; position: absolute; left: 0; color: var(--accent-green); font-weight: bold; }
+  .trust li strong { color: var(--white); }
+  .trust .wa { margin-top: 16px; display: inline-flex; background: #25D366; color: #fff; font-weight: bold; font-size: 14px; padding: 12px 18px; border-radius: var(--radius-md); }
+
+  .vendor { margin: 30px 20px 0; text-align: center; }
+  .vendor h2 { font-size: 17px; color: var(--gold); }
+  .vendor p { font-size: 13px; color: var(--text-muted); line-height: 1.6; margin: 8px 0 14px; }
+
+  .vendor .vendor-links { margin: 12px 0 0; }
+  .vendor .vendor-links a { color: var(--gold); text-decoration: underline; }
+  footer { text-align: center; padding: 30px 20px 20px; color: var(--text-dim); font-size: 12px; line-height: 1.8; }
+  footer nav { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 16px; margin-bottom: 8px; }
+  footer nav a { color: var(--text-muted); }
+</style>
+</head>
+<body>
+
+<button id="theme-toggle-btn" class="theme-toggle-fab">🌙</button>
+
+<div class="page-content">
+<div class="wrap">
+
+  <!-- a) En-tête -->
+  <header class="hero">
+    <img src="assets/logo-majeste-presse-complet.png" alt="MAJESTÉ PRESSE – Apprendre. Créer. Gagner." width="830" height="660">
+    <div class="brand">MAJESTÉ PRESSE</div>
+    <h1>La référence des métiers de l'impression, de la création et du numérique</h1>
+    <p class="lead">Une plateforme qui réunit au même endroit des sérigraphes, des imprimeurs, des créateurs et une boutique de produits numériques.</p>
+    <a class="btn-gold open-app" href="/">Ouvrir l'application</a>
+  </header>
+
+  <!-- b) Qui trouve-t-on ici ? -->
+  <h2 class="section">Qui trouve-t-on ici ?</h2>
+  <section class="who">
+    <article class="card">
+      <div class="icon" aria-hidden="true">🎨</div>
+      <h3>Sérigraphes</h3>
+      <p>T-shirts, casquettes, sacs, affiches et plus, imprimés par des sérigraphes de la plateforme. Commandez, ou proposez vos propres produits.</p>
+      <div class="actions">
+        <a class="btn-gold" href="serigraphie.html">Commander</a>
+        <a class="btn-outline" href="serigraphie-vendeur.html">Devenir vendeur</a>
+      </div>
+    </article>
+
+    <article class="card">
+      <div class="icon" aria-hidden="true">🎓</div>
+      <h3>Académie</h3>
+      <p>Les formations de l'Académie.</p>
+      <div class="actions">
+        <a class="btn-gold" href="school.html">Découvrir l'Académie</a>
+      </div>
+    </article>
+
+    <article class="card">
+      <div class="icon" aria-hidden="true">🛍️</div>
+      <h3>Boutique</h3>
+      <p>Des produits numériques prêts à l'emploi : PDF, ebooks, vidéos, templates et autres fichiers.</p>
+      <div class="actions">
+        <a class="btn-gold" href="produits.html">Voir la boutique</a>
+      </div>
+    </article>
+  </section>
+
+  <!-- c) Comment ça marche -->
+  <h2 class="section">Comment ça marche</h2>
+  <ol class="steps">
+    <li>
+      <div>
+        <strong>Choisissez</strong>
+        <span>Parcourez le catalogue des sérigraphes ou la boutique de produits numériques.</span>
+      </div>
+    </li>
+    <li>
+      <div>
+        <strong>Commandez ou contactez</strong>
+        <span>Une connexion est nécessaire pour commander. Une question sur un produit ? Chaque fiche sérigraphie propose un lien WhatsApp.</span>
+      </div>
+    </li>
+    <li>
+      <div>
+        <strong>Payez et suivez</strong>
+        <span>Le paiement se fait en ligne via FedaPay. Une page de confirmation affiche l'état de votre commande sérigraphie ; vos achats numériques sont dans « Mes achats ».</span>
+      </div>
+    </li>
+  </ol>
+
+  <!-- d) Pourquoi nous faire confiance -->
+  <h2 class="section">Pourquoi nous faire confiance</h2>
+  <section class="trust card">
+    <ul>
+      <li><strong>Vendeurs approuvés manuellement.</strong> Chaque demande de vendeur est étudiée par l'équipe MAJESTÉ PRESSE avant d'être approuvée.</li>
+      <li><strong>Paiement par FedaPay.</strong> Mobile Money et carte bancaire.</li>
+      <li>Le prix est calculé et vérifié au moment du paiement.</li>
+    </ul>
+    <a class="wa" href="https://wa.me/22996097644?text=Bonjour%2C%20je%20vous%20contacte%20depuis%20la%20page%20d'accueil%20de%20MAJEST%C3%89%20PRESSE." target="_blank" rel="noopener noreferrer">Écrire à l'équipe sur WhatsApp</a>
+  </section>
+
+  <!-- e) Appel aux sérigraphes et imprimeurs -->
+  <section class="vendor card">
+    <h2>Vous êtes sérigraphe ou imprimeur ?</h2>
+    <p>Sérigraphe : déposez votre demande pour publier vos produits sur la plateforme. L'équipe étudie chaque dossier et répond par WhatsApp.</p>
+    <a class="btn-gold" href="serigraphie-vendeur.html">Devenir vendeur</a>
+    <p class="vendor-links"><a href="conditions-vendeurs.html">Conditions vendeurs</a></p>
+    <p class="vendor-links">Imprimeur ? <a href="https://wa.me/22996097644" target="_blank" rel="noopener noreferrer">Contactez-nous sur WhatsApp</a>, nous ouvrons bientôt cette catégorie.</p>
+  </section>
+
+  <!-- f) Pied de page -->
+  <footer>
+    <nav aria-label="Pages de la plateforme">
+      <a href="serigraphie.html">Sérigraphes</a>
+      <a href="school.html">Académie</a>
+      <a href="produits.html">Boutique</a>
+      <a href="serigraphie-vendeur.html">Devenir vendeur</a>
+      <a href="conditions-vente.html">Conditions de vente et retours</a>
+      <a href="conditions-vendeurs.html">Conditions vendeurs</a>
+      <a href="mentions-legales.html">Mentions légales</a>
+    </nav>
+    <div>© 2026 MAJESTÉ PRESSE</div>
+    <div>Contact : WhatsApp +229 96 09 76 44</div>
+  </footer>
+
+</div>
+</div>
+
+<script src="config.js"></script>
+<script src="pwa-install.js"></script>
+</body>
+</html>
