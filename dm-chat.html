@@ -269,6 +269,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="attachments.js"></script>
 <script src="message-editor.js"></script>
+<script src="link-preview.js"></script>
 <script src="audio-player.js"></script>
 <script src="video-player.js"></script>
 <script src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1"></script>
@@ -475,6 +476,9 @@
         editedTag.textContent = "modifié";
         bubble.appendChild(editedTag);
       }
+
+      // Carte d'aperçu sous le message si le texte contient un lien vers un produit de notre site
+      if (msg.content && window.MahoutoLinkPreview) MahoutoLinkPreview.attach(bubble, msg.content, messagesEl);
     }
 
     bubble.addEventListener("click", (e) => {
