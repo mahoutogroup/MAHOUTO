@@ -58,9 +58,9 @@
       hideSelectors: ['.module-card[href="academie-majestepresse.html"]', "#card-majeste-presse"],
       domain: "majestepresse.com",
       logo: "assets/logo-majeste-presse.png",                        // fichier existant, à confirmer comme logo officiel
-      favicon: "assets/favicon-majeste.png",
-      appleTouchIcon: "assets/apple-touch-icon-majeste.png",
-      splash: "assets/majeste-splash-q88.jpg",
+      favicon: "assets/favicon-majeste.png?v=2",
+      appleTouchIcon: "assets/apple-touch-icon-majeste.png?v=2",
+      splash: "assets/majeste-splash-q88.jpg?v=2",
       themeColor: "#FFC107",                                         // REPLI = valeur de « mahouto » (couleur à fournir)
       aiOrigin: "https://ai.majestepresse.com",
       manifest: "manifest-majeste.json"
