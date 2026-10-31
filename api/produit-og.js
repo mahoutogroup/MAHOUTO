@@ -241,16 +241,17 @@ const CLOUDINARY_CLOUD = (process.env.CLOUDINARY_CLOUD_NAME || "hefa5gqf").trim(
 // Tout segment de transformation inconnu ou multiple -> image par défaut (on ne devine pas).
 const KNOWN_TRANSFORM_TOKEN = /^(?:f|q|w|h|c|dpr|ar|g)_[A-Za-z0-9:._-]+$/;
 
-function serigraphieOgImage(images, base) {
-  const fallback = { url: `${base}/assets/og-majeste.png`, width: "1200", height: "630" };
-  const first = Array.isArray(images) ? images[0] : null;
-  if (typeof first !== "string") return fallback;
+// Adresse d'image Cloudinary du projet, sans transformation : { prefix, rest } ou null.
+// (validation du domaine, de /image/upload/, de « .. », des caractères interdits, et
+// retrait d'UN segment de transformation connu — voir le commentaire ci-dessus.)
+function cloudinaryImageParts(first) {
+  if (typeof first !== "string") return null;
 
   const prefix = `https://res.cloudinary.com/${CLOUDINARY_CLOUD}/image/upload/`;
-  if (!first.startsWith(prefix) || first.length > 500 || /[\s"'<>]/.test(first)) return fallback;
+  if (!first.startsWith(prefix) || first.length > 500 || /[\s"'<>]/.test(first)) return null;
 
   let rest = first.slice(prefix.length);
-  if (!rest || rest.includes("..")) return fallback;
+  if (!rest || rest.includes("..")) return null;
 
   const slash = rest.indexOf("/");
   if (slash > 0) {
@@ -261,14 +262,21 @@ function serigraphieOgImage(images, base) {
         const known = firstSegment.split(",").every((t) => KNOWN_TRANSFORM_TOKEN.test(t));
         const afterSegment = rest.slice(slash + 1);
         const next = afterSegment.split("/")[0];
-        if (!known || !/^v\d+$/.test(next) || !afterSegment.includes("/")) return fallback;
+        if (!known || !/^v\d+$/.test(next) || !afterSegment.includes("/")) return null;
         rest = afterSegment;   // transformation existante retirée
       }
       // sinon : simple dossier (public_id sans version) -> conservé tel quel
     }
   }
+  return { prefix, rest };
+}
+
+function serigraphieOgImage(images, base) {
+  const fallback = { url: `${base}/assets/og-majeste.png`, width: "1200", height: "630" };
+  const parts = cloudinaryImageParts(Array.isArray(images) ? images[0] : null);
+  if (!parts) return fallback;
   return {
-    url: `${prefix}f_auto,q_auto,w_1200,h_630,c_pad,b_auto:predominant/${rest}`,
+    url: `${parts.prefix}f_auto,q_auto,w_1200,h_630,c_pad,b_auto:predominant/${parts.rest}`,
     width: "1200",
     height: "630"
   };
@@ -332,6 +340,110 @@ async function handleSerigraphie(req, res, base) {
   }
 }
 
+// ---------------------------------------------------------
+// Mode ?format=json : aperçu de lien pour le chat (carte sous un message).
+// Uniquement les routes /p/<id> (produit numérique) et /s/<id> (sérigraphie) :
+// le serveur ne reçoit qu'un type et un identifiant validé, jamais une adresse à
+// télécharger (pas de SSRF). Image : miniature Cloudinary du projet, sinon vide.
+// Le mode HTML (WhatsApp, Facebook) n'est pas concerné.
+// ---------------------------------------------------------
+const PRODUCT_ID_RE = /^[A-Za-z0-9_-]{1,100}$/;
+const ALLOWED_ORIGIN_RE = /^https:\/\/(?:www\.)?(?:mahouto\.com|majestepresse\.com)$/;
+
+function cardImage(url) {
+  const parts = cloudinaryImageParts(url);
+  return parts ? `${parts.prefix}f_auto,q_auto,w_480,c_limit/${parts.rest}` : "";
+}
+
+function cut(text, max) {
+  const t = String(text || "").replace(/\s+/g, " ").trim();
+  return t.length > max ? t.slice(0, max - 1).trimEnd() + "…" : t;
+}
+
+async function handleJson(req, res, base, type) {
+  // CORS : seulement nos deux sites (jamais « * »)
+  const origin = String(req.headers.origin || "");
+  res.setHeader("Vary", "Origin");
+  if (ALLOWED_ORIGIN_RE.test(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+  }
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
+
+  if (req.method === "OPTIONS") return res.status(204).end();
+  if (req.method !== "GET" && req.method !== "HEAD") return res.status(405).json({ error: "method_not_allowed" });
+
+  const notFound = () => {
+    res.setHeader("Cache-Control", "public, max-age=60, s-maxage=60");
+    return res.status(404).json({ error: "not_found" });
+  };
+
+  const id = String((req.query && req.query.id) || "").trim();
+
+  try {
+    const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
+
+    if (type === "serigraphie") {
+      if (!SERIGRAPHIE_ID_RE.test(id)) return notFound();
+
+      const { data: product, error } = await supabase
+        .from("serigraphie_products")
+        .select("id, name, price, min_qty, images, vendor_id")
+        .eq("id", id)
+        .eq("status", "active")
+        .maybeSingle();
+      if (error || !product) return notFound();
+
+      const { data: shop, error: shopError } = await supabase
+        .from("serigraphie_vendors_public")
+        .select("shop_name, city")
+        .eq("id", product.vendor_id)
+        .maybeSingle();
+      if (shopError || !shop) return notFound();
+
+      const minQty = Math.max(1, parseInt(product.min_qty, 10) || 1);
+      res.setHeader("Cache-Control", "public, max-age=300, s-maxage=600, stale-while-revalidate=3600");
+      return res.status(200).json({
+        title: cut(product.name, 120),
+        description: cut([
+          money(product.price),
+          minQty > 1 ? `Minimum ${minQty} pièces` : "Dès 1 pièce",
+          shop.city ? `${shop.shop_name}, ${shop.city}` : shop.shop_name
+        ].join(" · "), 200),
+        image: cardImage(Array.isArray(product.images) ? product.images[0] : null),
+        url: `${base}/s/${id}`,
+        siteName: "MAJESTÉ PRESSE"
+      });
+    }
+
+    if (type === "produit") {
+      if (!PRODUCT_ID_RE.test(id)) return notFound();
+
+      const { data: product, error } = await supabase
+        .from("digital_products_public")
+        .select("nom, description, image_url, prix, promotion, disponible")
+        .eq("id", id)
+        .maybeSingle();
+      if (error || !product || !product.disponible) return notFound();
+
+      const brandName = brandForRequest(req).name;
+      res.setHeader("Cache-Control", "public, max-age=300, s-maxage=600, stale-while-revalidate=3600");
+      return res.status(200).json({
+        title: cut(product.nom, 120),
+        description: cut(`${money(product.promotion ?? product.prix)} — ${product.description || `Produit numérique ${brandName}`}`, 200),
+        image: cardImage(product.image_url),
+        url: `${base}/p/${id}`,
+        siteName: brandName
+      });
+    }
+  } catch (err) {
+    console.error(err);
+    return notFound();
+  }
+
+  return notFound();   // type non pris en charge en mode JSON
+}
+
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "public, max-age=120, s-maxage=300");
   res.setHeader("Content-Type", "text/html; charset=utf-8");
@@ -343,6 +455,10 @@ export default async function handler(req, res) {
   const base = configuredSite || `${proto}://${req.headers.host}`;
 
   const type = (req.query && req.query.type) || "produit";
+
+  if (req.query && req.query.format === "json") {
+    return handleJson(req, res, base, type);
+  }
 
   if (type === "formation") {
     return handleFormation(req, res, base);
