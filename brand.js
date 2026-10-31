@@ -58,6 +58,8 @@
       hideSelectors: ['.module-card[href="academie-majestepresse.html"]', "#card-majeste-presse"],
       domain: "majestepresse.com",
       logo: "assets/logo-majeste-presse.png",                        // fichier existant, à confirmer comme logo officiel
+      favicon: "assets/favicon-majeste.png",
+      appleTouchIcon: "assets/apple-touch-icon-majeste.png",
       themeColor: "#FFC107",                                         // REPLI = valeur de « mahouto » (couleur à fournir)
       aiOrigin: "https://ai.majestepresse.com",
       manifest: "manifest-majeste.json"
@@ -213,6 +215,15 @@
       for (var l = 0; l < logos.length; l++) {
         var attr = logos[l].tagName === "LINK" ? "href" : "src";
         logos[l].setAttribute(attr, logos[l].getAttribute(attr).replace(LOGO_FILE, brand.logo));
+      }
+
+      // Favicon et icône iPhone (même principe que le logo : préfixe de chemin conservé)
+      var ICON_FILES = { "icon": ["assets/favicon.png", brand.favicon], "apple-touch-icon": ["assets/apple-touch-icon.png", brand.appleTouchIcon] };
+      var iconLinks = document.querySelectorAll('link[rel="icon"], link[rel="apple-touch-icon"]');
+      for (var ic = 0; ic < iconLinks.length; ic++) {
+        var pair = ICON_FILES[iconLinks[ic].getAttribute("rel")];
+        var iconHref = iconLinks[ic].getAttribute("href") || "";
+        if (pair && pair[1] && iconHref.indexOf(pair[0]) !== -1) iconLinks[ic].setAttribute("href", iconHref.replace(pair[0], pair[1]));
       }
 
       // Titres « MAHOUTO<span>+</span> » : le « + » est dans un <span>, donc invisible pour la passe texte.
