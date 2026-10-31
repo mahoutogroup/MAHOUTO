@@ -60,6 +60,7 @@
       logo: "assets/logo-majeste-presse.png",                        // fichier existant, à confirmer comme logo officiel
       favicon: "assets/favicon-majeste.png",
       appleTouchIcon: "assets/apple-touch-icon-majeste.png",
+      splash: "assets/majeste-splash.png",
       themeColor: "#FFC107",                                         // REPLI = valeur de « mahouto » (couleur à fournir)
       aiOrigin: "https://ai.majestepresse.com",
       manifest: "manifest-majeste.json"
@@ -215,6 +216,30 @@
       for (var l = 0; l < logos.length; l++) {
         var attr = logos[l].tagName === "LINK" ? "href" : "src";
         logos[l].setAttribute(attr, logos[l].getAttribute(attr).replace(LOGO_FILE, brand.logo));
+      }
+
+      // Écran de démarrage (index.html) : image MAJESTÉ, fond #0A0A0A, sans déformation ni défilement.
+      // La page reste masquée (visibility) jusqu'à la fin de cette passe : l'image MAHOUTO+ n'est jamais affichée.
+      if (brand.splash) {
+        var splashFiles = document.querySelectorAll('img[src*="splash-screen.png"], link[href*="splash-screen.png"]');
+        for (var sp0 = 0; sp0 < splashFiles.length; sp0++) {
+          var spAttr = splashFiles[sp0].tagName === "LINK" ? "href" : "src";
+          splashFiles[sp0].setAttribute(spAttr, splashFiles[sp0].getAttribute(spAttr).replace("assets/splash-screen.png", brand.splash));
+        }
+        var splashBox = document.getElementById("splash-screen");
+        if (splashBox) {
+          splashBox.style.setProperty("background", "#0A0A0A", "important");
+          splashBox.style.setProperty("overflow", "hidden", "important");
+          var splashGlow = splashBox.querySelector(".splash-glow");
+          if (splashGlow) splashGlow.style.setProperty("display", "none", "important");
+          var splashImg = splashBox.querySelector("img");
+          if (splashImg) {
+            ["width:100%", "height:100%", "max-width:none", "max-height:none", "object-fit:contain"].forEach(function (d) {
+              var kv = d.split(":");
+              splashImg.style.setProperty(kv[0], kv[1], "important");
+            });
+          }
+        }
       }
 
       // Favicon et icône iPhone (même principe que le logo : préfixe de chemin conservé)
