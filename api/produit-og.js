@@ -229,11 +229,18 @@ const CLOUDINARY_CLOUD = (process.env.CLOUDINARY_CLOUD_NAME || "hefa5gqf").trim(
 
 // Image d'aperçu 1200x630. Seule une image du compte Cloudinary du projet est utilisée ;
 // toute autre origine (ou image absente) -> image par défaut MAJESTÉ (URL absolue).
-// « c_pad » + « b_blurred:400:15 » : l'image entière est conservée (pas de rognage), qu'elle soit
-// carrée, verticale ou un collage de plusieurs vues ; l'espace restant est comblé par une version
-// floue et assombrie de la même image (intensité 400, luminosité 15) au lieu de bandes unies.
-// Repli possible si b_blurred n'est pas pris en charge : « b_auto:predominant » (couleur dominante).
+// « c_pad » + « b_auto:predominant » : l'image entière est conservée (pas de rognage), qu'elle soit
+// carrée, verticale ou un collage de plusieurs vues ; l'espace restant est comblé avec la couleur
+// dominante de l'image. (« b_blurred » est refusé par le compte Cloudinary : erreur HTTP 400.)
 // f_auto / q_auto : format et qualité automatiques (poids réduit).
+//
+// Une adresse enregistrée peut déjà contenir UN segment de transformation, par exemple
+//   .../image/upload/f_auto,q_auto,w_1000,c_limit/v1793189115/dossier/image.png
+// Il est alors REMPLACÉ par le nôtre (jamais empilé). Segment reconnu = uniquement des
+// paramètres connus (f, q, w, h, c, dpr, ar, g), suivi d'un segment de version « v<chiffres> ».
+// Tout segment de transformation inconnu ou multiple -> image par défaut (on ne devine pas).
+const KNOWN_TRANSFORM_TOKEN = /^(?:f|q|w|h|c|dpr|ar|g)_[A-Za-z0-9:._-]+$/;
+
 function serigraphieOgImage(images, base) {
   const fallback = { url: `${base}/assets/og-majeste.png`, width: "1200", height: "630" };
   const first = Array.isArray(images) ? images[0] : null;
@@ -242,10 +249,26 @@ function serigraphieOgImage(images, base) {
   const prefix = `https://res.cloudinary.com/${CLOUDINARY_CLOUD}/image/upload/`;
   if (!first.startsWith(prefix) || first.length > 500 || /[\s"'<>]/.test(first)) return fallback;
 
-  const rest = first.slice(prefix.length);
+  let rest = first.slice(prefix.length);
   if (!rest || rest.includes("..")) return fallback;
+
+  const slash = rest.indexOf("/");
+  if (slash > 0) {
+    const firstSegment = rest.slice(0, slash);
+    if (!/^v\d+$/.test(firstSegment)) {
+      // Segment qui ressemble à une transformation (virgule, ou « xx_valeur ») ?
+      if (firstSegment.includes(",") || /^[a-z]{1,4}_/.test(firstSegment)) {
+        const known = firstSegment.split(",").every((t) => KNOWN_TRANSFORM_TOKEN.test(t));
+        const afterSegment = rest.slice(slash + 1);
+        const next = afterSegment.split("/")[0];
+        if (!known || !/^v\d+$/.test(next) || !afterSegment.includes("/")) return fallback;
+        rest = afterSegment;   // transformation existante retirée
+      }
+      // sinon : simple dossier (public_id sans version) -> conservé tel quel
+    }
+  }
   return {
-    url: `${prefix}f_auto,q_auto,w_1200,h_630,c_pad,b_blurred:400:15/${rest}`,
+    url: `${prefix}f_auto,q_auto,w_1200,h_630,c_pad,b_auto:predominant/${rest}`,
     width: "1200",
     height: "630"
   };
