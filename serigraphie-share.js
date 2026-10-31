@@ -27,9 +27,12 @@
         "border-radius:12px;border:1px solid var(--border);background:var(--bg-card);color:var(--text-muted);font-size:13px;font-weight:700;" +
         "font-family:inherit;cursor:pointer}" +
       ".sg-share-btn:active{transform:scale(.96)}" +
-      ".sg-share-btn.on-card{position:absolute;top:8px;left:8px;z-index:2;background:rgba(10,10,10,.72);color:#fff;border-color:rgba(255,255,255,.28)}" +
-      ".sg-share-wrap{position:relative;display:flex}" +
-      ".sg-share-wrap>.product-card{flex:1;min-width:0}" +
+      ".sg-share-btn{flex:none}" +
+      ".sg-cover-link{display:block}" +
+      ".sg-badge-row{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:44px}" +
+      ".sg-badge-link{flex:1;min-width:0;display:flex;align-items:center;align-self:stretch}" +
+      ".sg-badge-link .product-badge{align-self:center;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}" +
+      ".sg-body-link{display:flex;flex-direction:column;gap:6px;color:inherit;text-decoration:none}" +
       ".sg-share-row{margin:10px 0 0}" +
       ".sg-toast{position:fixed;left:50%;bottom:92px;transform:translateX(-50%);z-index:60;max-width:calc(100vw - 32px);padding:11px 18px;" +
         "border-radius:12px;background:#111;color:#fff;border:1px solid var(--gold,#D4AF37);font-size:13.5px;font-weight:600;text-align:center}";
@@ -102,14 +105,14 @@
   }
 
   // product : { id, name, price } ; shopName : nom de l'atelier (peut être vide).
-  // opts.onCard : bouton posé en haut à droite d'une carte ; opts.row : bouton dans sa propre ligne.
+  // opts.row : bouton dans sa propre ligne (fiche produit).
   function createButton(product, shopName, opts) {
     if (!enabled || !product || !product.id) return null;
     opts = opts || {};
     addStyle();
     var btn = document.createElement("button");
     btn.type = "button";
-    btn.className = "sg-share-btn" + (opts.onCard ? " on-card" : "");
+    btn.className = "sg-share-btn";
     btn.setAttribute("aria-label", "Partager « " + (product.name || "ce produit") + " »");
     btn.textContent = "↗ Partager";
     btn.addEventListener("click", function (ev) {
@@ -126,16 +129,49 @@
     return btn;
   }
 
-  // Carte du catalogue (un lien <a>) : enveloppée avec le bouton à côté du lien (pas dedans, HTML valide).
-  // Hors marque MAJESTÉ : la carte est renvoyée telle quelle.
+  // Carte du catalogue : le bouton est HORS de l'image, sur la ligne de la pastille de catégorie
+  // (pastille à gauche, bouton à droite). Comme un bouton ne peut pas se trouver dans un lien <a>,
+  // la carte (un <a>) est reconstruite en <div> avec trois liens : image, pastille, texte.
+  // Hors marque MAJESTÉ, ou si la structure de la carte est inattendue : carte renvoyée telle quelle.
   function wrapCard(card, product, shopName) {
-    var btn = createButton(product, shopName, { onCard: true });
+    if (!enabled) return card;
+    var cover = card.firstElementChild;
+    var body = card.querySelector(".product-body");
+    if (!cover || !body || cover === body) return card;
+    var btn = createButton(product, shopName);
     if (!btn) return card;
-    var wrap = document.createElement("div");
-    wrap.className = "sg-share-wrap";
-    wrap.appendChild(card);
-    wrap.appendChild(btn);
-    return wrap;
+
+    var href = card.getAttribute("href") || "#";
+    function link(cls, hidden) {
+      var a = document.createElement("a");
+      a.className = cls;
+      a.href = href;
+      if (hidden) { a.setAttribute("tabindex", "-1"); a.setAttribute("aria-hidden", "true"); }  // un seul lien annoncé par carte : le texte
+      return a;
+    }
+
+    var box = document.createElement("div");
+    box.className = card.className + " sg-share-card";
+
+    var coverLink = link("sg-cover-link", true);
+    coverLink.appendChild(cover);
+    box.appendChild(coverLink);
+
+    var badge = body.querySelector(".product-badge");
+    var badgeLink = link("sg-badge-link", true);
+    if (badge) badgeLink.appendChild(badge);
+    var row = document.createElement("div");
+    row.className = "sg-badge-row";
+    row.appendChild(badgeLink);
+    row.appendChild(btn);
+
+    var textLink = link("sg-body-link", false);
+    while (body.firstChild) textLink.appendChild(body.firstChild);
+    body.appendChild(row);
+    body.appendChild(textLink);
+
+    box.appendChild(body);
+    return box;
   }
 
   window.MahoutoSerigraphieShare = { enabled: enabled, createButton: createButton, wrapCard: wrapCard };
