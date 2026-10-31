@@ -79,8 +79,13 @@
     return window.location.origin + "/s/" + encodeURIComponent(product.id);
   }
 
+  // « <nom> – <prix> FCFA · <atelier> sur MAJESTÉ PRESSE » (sans numéro de téléphone).
   function shareText(product, shopName) {
-    return product.name;
+    var price = Number(product.price);
+    var text = product.name;
+    if (isFinite(price)) text += " – " + price.toLocaleString("fr-FR") + " FCFA";
+    if (shopName) text += " · " + shopName;
+    return text + " sur MAJESTÉ PRESSE";
   }
 
   function share(product, shopName) {
