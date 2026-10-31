@@ -268,6 +268,7 @@
 <script src="push-notifications.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="attachments.js"></script>
+<script src="message-editor.js"></script>
 <script src="audio-player.js"></script>
 <script src="video-player.js"></script>
 <script src="https://www.gstatic.com/cv/js/sender/v1/cast_sender.js?loadCastFramework=1"></script>
@@ -1055,18 +1056,16 @@
     const msg = activeMessage;
     closeMessageActions();
 
-    const newContent = prompt("Modifier le message :", msg.content || "");
-    if (newContent === null) return;
-    const trimmed = newContent.trim();
-    if (!trimmed) return;
-
-    supabase
-      .from("dm_messages")
-      .update({ content: trimmed, edited_at: new Date().toISOString() })
-      .eq("id", msg.id)
-      .then(({ error }) => {
-        if (error) { console.error(error); alert("Impossible de modifier ce message."); }
-      });
+    // Fenêtre intégrée (message-editor.js) à la place de prompt() : même enregistrement qu'avant.
+    MahoutoMessageEditor.open(msg.content || "", (trimmed) => {
+      supabase
+        .from("dm_messages")
+        .update({ content: trimmed, edited_at: new Date().toISOString() })
+        .eq("id", msg.id)
+        .then(({ error }) => {
+          if (error) { console.error(error); alert("Impossible de modifier ce message."); }
+        });
+    });
   });
 
   actionSheet.querySelector('[data-action="delete-me"]').addEventListener("click", async () => {
