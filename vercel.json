@@ -14,6 +14,10 @@
       "destination": "/api/produit-og?type=formation&id=:id"
     },
     {
+      "source": "/s/:id",
+      "destination": "/api/produit-og?type=serigraphie&id=:id"
+    },
+    {
       "source": "/verify/:code",
       "destination": "/verify.html?code=:code"
     }
