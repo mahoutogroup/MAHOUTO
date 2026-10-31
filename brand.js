@@ -60,7 +60,7 @@
       logo: "assets/logo-majeste-presse.png",                        // fichier existant, à confirmer comme logo officiel
       favicon: "assets/favicon-majeste.png",
       appleTouchIcon: "assets/apple-touch-icon-majeste.png",
-      splash: "assets/majeste-splash.png",
+      splash: "assets/majeste-splash-q88.jpg",
       themeColor: "#FFC107",                                         // REPLI = valeur de « mahouto » (couleur à fournir)
       aiOrigin: "https://ai.majestepresse.com",
       manifest: "manifest-majeste.json"
