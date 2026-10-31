@@ -14,6 +14,7 @@
 <script src="theme-toggle.js"></script>
 <style>
   .hero-sg { padding: 28px 20px 22px; background: var(--bg-elevated); border-bottom: 1px solid var(--border); text-align: center; }
+  .hero-sg .hero-logo { display: block; width: 64px; height: 64px; margin: 0 auto 10px; border-radius: 16px; object-fit: cover; }
   .hero-sg h1 { font-size: 26px; color: var(--gold); letter-spacing: .01em; }
   .hero-sg .by { font-size: 12.5px; color: var(--gold-bright); font-weight: 700; letter-spacing: .08em; text-transform: uppercase; margin-top: 4px; }
   .hero-sg p.lead { font-size: 13.5px; color: var(--text-muted); line-height: 1.6; margin: 12px auto 0; max-width: 420px; }
@@ -53,6 +54,8 @@
   .vendor-cta p { font-size: 12.5px; color: var(--text-muted); margin: 8px 0 14px; line-height: 1.6; }
 
   .sg-footer { text-align: center; color: var(--text-dim); font-size: 11.5px; padding: 26px 20px 20px; }
+  .sg-footer .sg-legal { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 16px; margin-bottom: 8px; }
+  .sg-footer .sg-legal a { color: var(--text-muted); text-decoration: underline; }
 
   .wa-fab { position: fixed; right: 16px; bottom: 18px; z-index: 40; width: 56px; height: 56px; border-radius: 50%; background: #25D366; color: #fff; display: flex; align-items: center; justify-content: center; box-shadow: 0 6px 20px rgba(0,0,0,.4); }
   .wa-fab svg { width: 30px; height: 30px; fill: currentColor; }
@@ -66,7 +69,8 @@
 <div class="page-content">
 
   <header class="hero-sg">
-    <h1>🎨 Le Sérigraphe</h1>
+    <img class="hero-logo" src="assets/header-serigraphie.png" alt="MAJESTÉ PRESSE" width="64" height="64">
+    <h1>Le Sérigraphe</h1>
     <div class="by">by MAJESTÉ PRESSE</div>
     <p class="lead">Des sérigraphes de confiance, des produits imprimés sur mesure : choisissez, commandez, soyez livré.</p>
     <div class="hero-actions">
@@ -90,7 +94,14 @@
     <a class="btn-gold" href="serigraphie-vendeur.html">Devenir vendeur</a>
   </div>
 
-  <footer class="sg-footer">© 2026 Le Sérigraphe by MAJESTÉ PRESSE</footer>
+  <footer class="sg-footer">
+    <nav class="sg-legal" aria-label="Informations légales">
+      <a href="conditions-vente.html">Conditions de vente et retours</a>
+      <a href="conditions-vendeurs.html">Conditions vendeurs</a>
+      <a href="mentions-legales.html">Mentions légales</a>
+    </nav>
+    © 2026 Le Sérigraphe by MAJESTÉ PRESSE
+  </footer>
 
 </div>
 

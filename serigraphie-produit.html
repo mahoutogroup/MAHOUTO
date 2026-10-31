@@ -57,6 +57,8 @@
   .ask-link a { color: var(--gold); font-weight: bold; }
 
   .sg-footer { text-align: center; color: var(--text-dim); font-size: 11.5px; padding: 10px 20px 20px; }
+  .sg-footer .sg-legal { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 16px; margin-bottom: 8px; }
+  .sg-footer .sg-legal a { color: var(--text-muted); text-decoration: underline; }
 </style>
 </head>
 <body>
@@ -71,7 +73,14 @@
   <div id="error-state" class="hidden">Produit introuvable. <a href="serigraphie.html">Retour au catalogue</a></div>
   <div id="detail-content" class="hidden"></div>
 
-  <footer class="sg-footer">© 2026 Le Sérigraphe by MAJESTÉ PRESSE</footer>
+  <footer class="sg-footer">
+    <nav class="sg-legal" aria-label="Informations légales">
+      <a href="conditions-vente.html">Conditions de vente et retours</a>
+      <a href="conditions-vendeurs.html">Conditions vendeurs</a>
+      <a href="mentions-legales.html">Mentions légales</a>
+    </nav>
+    © 2026 Le Sérigraphe by MAJESTÉ PRESSE
+  </footer>
 
 </div>
 

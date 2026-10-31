@@ -1,9 +1,9 @@
 /* =========================================================
    serigraphie-share.js — bouton « Partager » des produits du Sérigraphe
 
-   Actif UNIQUEMENT pour la marque MAJESTÉ PRESSE (brand.js : MAHOUTO_BRAND.id === "majeste").
-   Pour toute autre marque (mahouto.com), ce fichier n'ajoute rien à la page :
-   createButton() / wrapCard() renvoient null / la carte telle quelle.
+   Actif sur les deux marques (mahouto.com et majestepresse.com, avec ou sans « www ») : la
+   sérigraphie est une prestation de MAJESTÉ PRESSE proposée sur les deux domaines. Le lien
+   partagé utilise l'adresse du site où l'on se trouve (window.location.origin).
 
    Le lien partagé est le lien court /s/<id> (réécrit vers /api/produit-og?type=serigraphie,
    qui sert l'aperçu riche WhatsApp / Facebook puis redirige vers serigraphie-produit.html).
@@ -11,9 +11,6 @@
    ========================================================= */
 (function () {
   "use strict";
-
-  var brand = window.MAHOUTO_BRAND;
-  var enabled = !!(brand && brand.id === "majeste");
 
   var styleAdded = false;
   var toastEl = null;
@@ -107,7 +104,7 @@
   // product : { id, name, price } ; shopName : nom de l'atelier (peut être vide).
   // opts.row : bouton dans sa propre ligne (fiche produit).
   function createButton(product, shopName, opts) {
-    if (!enabled || !product || !product.id) return null;
+    if (!product || !product.id) return null;
     opts = opts || {};
     addStyle();
     var btn = document.createElement("button");
@@ -132,9 +129,8 @@
   // Carte du catalogue : le bouton est HORS de l'image, sur la ligne de la pastille de catégorie
   // (pastille à gauche, bouton à droite). Comme un bouton ne peut pas se trouver dans un lien <a>,
   // la carte (un <a>) est reconstruite en <div> avec trois liens : image, pastille, texte.
-  // Hors marque MAJESTÉ, ou si la structure de la carte est inattendue : carte renvoyée telle quelle.
+  // Si la structure de la carte est inattendue : carte renvoyée telle quelle.
   function wrapCard(card, product, shopName) {
-    if (!enabled) return card;
     var cover = card.firstElementChild;
     var body = card.querySelector(".product-body");
     if (!cover || !body || cover === body) return card;
@@ -174,5 +170,5 @@
     return box;
   }
 
-  window.MahoutoSerigraphieShare = { enabled: enabled, createButton: createButton, wrapCard: wrapCard };
+  window.MahoutoSerigraphieShare = { enabled: true, createButton: createButton, wrapCard: wrapCard };
 })();

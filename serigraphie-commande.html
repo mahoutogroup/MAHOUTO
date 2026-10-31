@@ -216,7 +216,7 @@
         el("div", { class: "line" }, el("span", { text: "Total à payer" }), totalEl),
         el("div", { class: "indicative", text: "Montant indicatif : le prix définitif est recalculé et vérifié par nos serveurs au moment du paiement." })
       ),
-      window.MAHOUTO_BRAND && window.MAHOUTO_BRAND.id === "majeste" ? el("p", { class: "cgv-line" }, "En payant, vous acceptez les ", el("a", { href: "conditions-vente.html", target: "_blank", rel: "noopener noreferrer", text: "conditions de vente et retours" }), ".") : null,
+      el("p", { class: "cgv-line" }, "En payant, vous acceptez les ", el("a", { href: "conditions-vente.html", target: "_blank", rel: "noopener noreferrer", text: "conditions de vente et retours" }), "."),
       payBtn,
       statusEl
     );
