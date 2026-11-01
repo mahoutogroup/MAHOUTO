@@ -131,14 +131,30 @@ create policy "page_views_insert_public" on public.page_views
 
 -- =========================================================
 -- 3. GARDE-FOUS À L'INSERTION (trigger, optionnel mais recommandé)
---    a) même visiteur + même page + même article dans les 30 dernières minutes : ligne ignorée
---       (le navigateur le fait déjà ; ceci protège aussi contre un client mal écrit) ;
---    b) plafond global : au-delà de 1000 insertions par minute, les lignes sont ignorées
---       (protège le stockage contre un envoi massif). Le trafic normal est très loin de ce seuil.
+--    a) plafond de TAILLE : si la table dépasse environ 300 000 lignes, les insertions sont ignorées.
+--       Calcul : une ligne pèse environ 400 octets index compris
+--         - ligne dans la table : ~24 o d'en-tête + id 8 + created_at 8 + visitor_id 16
+--           + brand/page_type/source/device ~40 + path ~40 + item_id ~30  = ~170 o ;
+--         - 4 index (brand+date, item+date, date, visitor+page+date) : ~55 o chacun = ~220 o ;
+--         - total ~390, arrondi à 400 o.
+--       300 000 lignes x 400 o = ~120 Mo, soit environ un quart des 500 Mo du plan gratuit de
+--       Supabase : le compteur ne peut pas remplir la base, même sous attaque. Le nombre de lignes
+--       est une ESTIMATION (pg_class.reltuples, mise à jour par l'autovacuum/ANALYZE) : lecture
+--       quasi instantanée, mais en retard de quelques minutes à quelques heures. Une table jamais
+--       analysée vaut -1 (ou 0) : sous le plafond, donc insertion permise. La purge à 90 jours
+--       (section 5) fait redescendre le compteur.
+--    b) plafond global : au-delà de 100 insertions par minute, les lignes sont ignorées
+--       (protège le stockage contre un envoi massif). 100 par minute = 6 000 vues par heure, bien
+--       au-dessus du trafic normal ; un pic exceptionnel (lien très partagé) perdrait des vues
+--       au-delà : relevez la valeur ci-dessous si besoin.
+--    c) même visiteur + même page + même article dans les 30 dernières minutes : ligne ignorée
+--       (le navigateur le fait déjà ; ceci protège aussi contre un client mal écrit).
 --    Les lignes ignorées ne renvoient aucune erreur au navigateur.
 --    Limite connue : un script qui change d'identifiant visiteur à chaque envoi peut quand même
---    gonfler les chiffres jusqu'au plafond (clé publique : inévitable sans service serveur).
+--    gonfler les chiffres jusqu'aux plafonds (clé publique : inévitable sans service serveur).
 --    SECURITY DEFINER : le trigger doit pouvoir LIRE la table alors que anon ne le peut pas.
+--    Son droit d'exécution est retiré à tout le monde (voir plus bas) : seul le déclenchement
+--    par la table l'exécute.
 -- =========================================================
 create or replace function public.page_views_guard()
  returns trigger
@@ -147,6 +163,17 @@ create or replace function public.page_views_guard()
  set search_path to 'public'
 as $function$
 begin
+  -- a) plafond de taille (estimation, lecture du catalogue : très rapide)
+  if (select reltuples::bigint from pg_class where oid = 'public.page_views'::regclass) > 300000 then
+    return null;
+  end if;
+
+  -- b) plafond global par minute
+  if (select count(*) from public.page_views where created_at > now() - interval '1 minute') >= 100 then
+    return null;
+  end if;
+
+  -- c) même visiteur, même page, même article dans les 30 dernières minutes
   if exists (
     select 1 from public.page_views
     where visitor_id = new.visitor_id
@@ -157,13 +184,12 @@ begin
     return null;
   end if;
 
-  if (select count(*) from public.page_views where created_at > now() - interval '1 minute') >= 1000 then
-    return null;
-  end if;
-
   return new;
 end;
 $function$;
+
+-- La fonction du trigger n'est appelable par personne (le trigger se déclenche quand même).
+revoke execute on function public.page_views_guard() from public, anon, authenticated;
 
 drop trigger if exists page_views_guard_trg on public.page_views;
 create trigger page_views_guard_trg
@@ -272,11 +298,11 @@ begin
            count(distinct pv.visitor_id) as unique_visitors
     from public.page_views pv
     left join public.digital_products dp
-           on pv.page_type = 'product' and dp.id = pv.item_id
+           on pv.page_type = 'product' and dp.id::text = pv.item_id
     left join public.serigraphie_products sp
            on pv.page_type = 'serigraphie_product' and sp.id::text = pv.item_id
     left join public.formations f
-           on pv.page_type = 'formation' and f.id = pv.item_id
+           on pv.page_type = 'formation' and f.id::text = pv.item_id
     where pv.item_id is not null
       and pv.created_at >= v_from and pv.created_at < v_to
       and (v_brand is null or pv.brand = v_brand)
@@ -312,13 +338,31 @@ begin
   end if;
 
   return jsonb_build_object(
+    -- 30 premières sources ; toutes les autres regroupées sous « autres » (visiteurs uniques recalculés,
+    -- pas additionnés : un visiteur peut apparaître dans plusieurs sources). « autres » est placé en dernier.
     'by_source', coalesce((
-      select jsonb_agg(jsonb_build_object('source', s.source, 'views', s.views, 'visitors', s.visitors)
-                       order by s.views desc, s.source)
-      from (select source, count(*) as views, count(distinct visitor_id) as visitors
-            from public.page_views
-            where created_at >= v_from and created_at < v_to and (v_brand is null or brand = v_brand)
-            group by source) s
+      with s as (
+        select source, count(*) as views, count(distinct visitor_id) as visitors,
+               row_number() over (order by count(*) desc, source) as rn
+        from public.page_views
+        where created_at >= v_from and created_at < v_to and (v_brand is null or brand = v_brand)
+        group by source
+      ), top as (
+        select source, views, visitors, 0 as grp, rn as ord from s where rn <= 30
+      ), other as (
+        select 'autres'::text as source,
+               sum(views)::bigint as views,
+               (select count(distinct pv.visitor_id) from public.page_views pv
+                 where pv.created_at >= v_from and pv.created_at < v_to
+                   and (v_brand is null or pv.brand = v_brand)
+                   and pv.source in (select s2.source from s s2 where s2.rn > 30))::bigint as visitors,
+               1 as grp, 0::bigint as ord
+        from s where rn > 30
+        having count(*) > 0
+      )
+      select jsonb_agg(jsonb_build_object('source', u.source, 'views', u.views, 'visitors', u.visitors)
+                       order by u.grp, u.ord)
+      from (select * from top union all select * from other) u
     ), '[]'::jsonb),
     'by_device', coalesce((
       select jsonb_agg(jsonb_build_object('device', d.device, 'views', d.views, 'visitors', d.visitors)
@@ -414,3 +458,31 @@ revoke execute on function public.purge_old_page_views(integer) from public, ano
 --   rollback;
 -- RPC admin refusée pour un non-admin (doit renvoyer l'erreur 42501) :
 --   begin; set local role authenticated; select public.admin_page_views_live(); rollback;
+-- La fonction du trigger n'est exécutable par personne (doit renvoyer false, false, false) :
+--   select has_function_privilege('anon', 'public.page_views_guard()', 'execute'),
+--          has_function_privilege('authenticated', 'public.page_views_guard()', 'execute'),
+--          has_function_privilege('public', 'public.page_views_guard()', 'execute');
+-- Colonnes utilisées par la jointure des noms (top_items). Attendu :
+--   digital_products.id text, digital_products.nom text,
+--   serigraphie_products.id uuid, serigraphie_products.name text,
+--   formations.id text, formations.nom text
+--   select table_name, column_name, data_type
+--     from information_schema.columns
+--    where table_schema = 'public'
+--      and ((table_name = 'digital_products'    and column_name in ('id', 'nom'))
+--        or (table_name = 'serigraphie_products' and column_name in ('id', 'name'))
+--        or (table_name = 'formations'           and column_name in ('id', 'nom')))
+--    order by table_name, column_name;
+-- Les 4 RPC en tant qu'ADMIN. Remplacez <UUID_ADMIN> par l'id d'un compte admin :
+--   select id, role from public.profiles where role in ('admin', 'super_admin', 'founder');
+-- puis lancez ce bloc d'un seul coup :
+--   begin;
+--   set local role authenticated;
+--   select set_config('request.jwt.claims',
+--                     json_build_object('sub', '<UUID_ADMIN>', 'role', 'authenticated')::text, true);
+--   select public.admin_page_views_summary();
+--   select * from public.admin_page_views_top_items();
+--   select public.admin_page_views_sources();
+--   select public.admin_page_views_live();
+--   rollback;
+-- (sans ligne dans page_views, les compteurs valent 0 et les listes sont vides : c'est normal)
