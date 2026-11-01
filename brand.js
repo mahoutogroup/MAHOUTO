@@ -316,6 +316,9 @@
       if (tag && brand.tagline) tag.textContent = brand.tagline;
       var sub = document.querySelector(".hero .subtagline");
       if (sub && brand.subtitle) sub.textContent = brand.subtitle;
+      // Page de réception des partages (share.html) : sous-titre de la marque
+      var shareSub = document.querySelector(".brand .brand-subtitle");
+      if (shareSub && brand.subtitle) shareSub.textContent = brand.subtitle;
 
       // Textes visibles
       var walker = document.createTreeWalker(document.body || document.documentElement, NodeFilter.SHOW_TEXT, {
