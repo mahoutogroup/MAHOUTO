@@ -47,6 +47,24 @@
   #form-status.error { color: #F87171; }
   .hint { font-size: 11px; color: var(--text-dim); }
 
+  .stats-panel .stats-head { display: flex; flex-direction: column; gap: 4px; }
+  .stats-panel .stats-head p { font-size: 12px; color: var(--text-dim); line-height: 1.5; }
+  .stats-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+  .stats-chip { min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-muted); font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer; }
+  .stats-chip.active { background: var(--gold-bright); color: #0A0A0A; border-color: var(--gold-bright); }
+  .stats-kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .stats-kpi { padding: 12px; border-radius: 14px; background: var(--bg); border: 1px solid var(--border); text-align: center; }
+  .stats-kpi.wide { grid-column: 1 / -1; }
+  .stats-kpi .value { font-size: 22px; font-weight: bold; color: var(--gold); overflow-wrap: anywhere; }
+  .stats-kpi.wide .value { font-size: 15px; }
+  .stats-kpi .label { font-size: 11.5px; color: var(--text-muted); margin-top: 4px; }
+  .stats-chart { width: 100%; height: 150px; display: block; }
+  .stats-axis { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+  .stats-legend { display: flex; gap: 14px; font-size: 11.5px; color: var(--text-muted); flex-wrap: wrap; }
+  .stats-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+  .stats-empty { font-size: 12.5px; color: var(--text-dim); text-align: center; padding: 8px 0; }
+  .stats-error { padding: 12px 14px; border-radius: 12px; background: rgba(239,68,68,.12); color: #F87171; font-size: 13px; line-height: 1.5; }
+
   .sg-footer { text-align: center; color: var(--text-dim); font-size: 11.5px; padding: 18px 20px 20px; }
 </style>
 </head>
@@ -121,6 +139,154 @@
     ));
   }
 
+  // ---------- « Mes statistiques » (boutique approuvée) ----------
+  // RPC vendor_page_views_summary : visites de SES produits uniquement (la base impose la restriction).
+  // Dates explicites à l'heure du Bénin (UTC+1, sans heure d'été), quel que soit le fuseau de l'appareil.
+  const DAY_MS = 86400000, WAT_MS = 3600000;
+  const nf = new Intl.NumberFormat("fr-FR");
+  let statsRequest = 0;
+
+  function startOfTodayWat() { return Math.floor((Date.now() + WAT_MS) / DAY_MS) * DAY_MS - WAT_MS; }
+  function statsRange(period) {
+    const days = period === "today" ? 0 : parseInt(period, 10) - 1;
+    return { from: new Date(startOfTodayWat() - days * DAY_MS).toISOString(), to: new Date(Date.now() + 60000).toISOString() };
+  }
+  function dayLabel(iso) { const p = String(iso).split("-"); return p.length === 3 ? p[2] + "/" + p[1] : String(iso); }
+
+  // Message clair selon l'erreur : fonction absente (SQL pas encore installé), droits, ou autre
+  function statsErrorMessage(error) {
+    const text = String((error && (error.message || error.details)) || "");
+    const code = String((error && error.code) || "");
+    if (code === "PGRST202" || code === "42883" || /could not find the function|does not exist|schema cache/i.test(text)) {
+      return "Les statistiques ne sont pas encore disponibles. Réessayez plus tard.";
+    }
+    if (code === "42501" || /réservé|connexion requise|permission denied/i.test(text)) {
+      return "Les statistiques sont réservées aux boutiques approuvées.";
+    }
+    return "Impossible de charger vos statistiques pour le moment. Réessayez dans un instant.";
+  }
+
+  function renderStatsChart(wrap, axisFrom, axisTo, days) {
+    wrap.textContent = "";
+    axisFrom.textContent = days.length ? dayLabel(days[0].day) : "";
+    axisTo.textContent = days.length > 1 ? dayLabel(days[days.length - 1].day) : "";
+    if (!days.length || !days.some((d) => d.views > 0)) {
+      wrap.append(el("div", { class: "stats-empty", text: "Aucune visite sur cette période." }));
+      return;
+    }
+    const NS = "http://www.w3.org/2000/svg";
+    const W = 340, H = 150, padTop = 14;
+    const max = Math.max(1, ...days.map((d) => d.views));
+    const svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+    svg.setAttribute("class", "stats-chart");
+    svg.setAttribute("preserveAspectRatio", "none");
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", "Visites et visiteurs uniques par jour");
+    const slot = W / days.length, barW = Math.max(2, Math.min(26, slot * 0.7)), innerH = H - padTop - 2;
+    days.forEach((d, i) => {
+      const x = i * slot + (slot - barW) / 2;
+      const g = document.createElementNS(NS, "g");
+      const title = document.createElementNS(NS, "title");
+      title.textContent = dayLabel(d.day) + " : " + nf.format(d.views) + " visites, " + nf.format(d.visitors) + " visiteurs";
+      g.append(title);
+      [[d.views, barW, "var(--gold-bright)"], [d.visitors, Math.max(1, barW * 0.5), "var(--accent-green)"]].forEach(([value, w, color]) => {
+        const h = value > 0 ? Math.max(1, Math.round((value / max) * innerH)) : 0;
+        const r = document.createElementNS(NS, "rect");
+        r.setAttribute("x", String(x + (barW - w) / 2));
+        r.setAttribute("y", String(H - 2 - h));
+        r.setAttribute("width", String(w));
+        r.setAttribute("height", String(h));
+        r.setAttribute("rx", "2");
+        r.setAttribute("style", "fill:" + color);
+        g.append(r);
+      });
+      svg.append(g);
+    });
+    const label = document.createElementNS(NS, "text");
+    label.setAttribute("x", "2"); label.setAttribute("y", "10");
+    label.setAttribute("style", "fill:var(--text-dim);font-size:10px");
+    label.textContent = "max " + nf.format(max);
+    svg.append(label);
+    wrap.append(svg);
+  }
+
+  function buildStatsCard() {
+    const errorBox = el("div", { class: "stats-error hidden", role: "alert" });
+    const kViews = el("div", { class: "value", text: "–" });
+    const kVisitors = el("div", { class: "value", text: "–" });
+    const kTop = el("div", { class: "value", text: "–" });
+    const kTopLabel = el("div", { class: "label", text: "Produit le plus vu" });
+    const chartWrap = el("div", {});
+    const axisFrom = el("span", {}), axisTo = el("span", {});
+    const chips = [["today", "Aujourd'hui"], ["7", "7 jours"], ["30", "30 jours"]].map(([key, label]) => {
+      const b = el("button", { type: "button", class: "stats-chip" + (key === "7" ? " active" : ""), text: label });
+      b.dataset.period = key;
+      return b;
+    });
+
+    function showError(message) {
+      errorBox.textContent = message || "";
+      errorBox.classList.toggle("hidden", !message);
+    }
+    function reset() {
+      kViews.textContent = "–"; kVisitors.textContent = "–"; kTop.textContent = "–";
+      kTopLabel.textContent = "Produit le plus vu";
+      chartWrap.textContent = ""; axisFrom.textContent = ""; axisTo.textContent = "";
+    }
+
+    async function load(period) {
+      const mine = ++statsRequest;
+      showError("");
+      const range = statsRange(period);
+      let result;
+      try {
+        result = await supabase.rpc("vendor_page_views_summary", { p_from: range.from, p_to: range.to });
+      } catch (err) {
+        result = { data: null, error: err || { message: "réseau" } };
+      }
+      if (mine !== statsRequest) return;   // une réponse plus récente est déjà arrivée
+
+      if (result.error || !result.data) {
+        if (result.error) console.error(result.error);
+        reset();
+        showError(statsErrorMessage(result.error));
+        return;
+      }
+
+      const d = result.data;
+      kViews.textContent = nf.format(d.total_views || 0);
+      kVisitors.textContent = nf.format(d.unique_visitors || 0);
+      const top = Array.isArray(d.top_products) && d.top_products.length ? d.top_products[0] : null;
+      kTop.textContent = top ? String(top.name) : "–";
+      kTopLabel.textContent = top ? "Produit le plus vu (" + nf.format(top.views) + " visites)" : "Produit le plus vu";
+      renderStatsChart(chartWrap, axisFrom, axisTo, Array.isArray(d.by_day) ? d.by_day : []);
+    }
+
+    chips.forEach((chip) => chip.addEventListener("click", () => {
+      chips.forEach((c) => c.classList.toggle("active", c === chip));
+      load(chip.dataset.period);
+    }));
+
+    const card = el("div", { class: "card panel stats-panel" },
+      el("div", { class: "stats-head" },
+        el("h2", { text: "📊 Mes statistiques" }),
+        el("p", { text: "Visites de vos fiches produit, comptées de façon anonyme (une visite par visiteur et par produit toutes les 30 minutes)." })),
+      el("div", { class: "stats-chips", role: "group", "aria-label": "Période" }, chips),
+      errorBox,
+      el("div", { class: "stats-kpis" },
+        el("div", { class: "stats-kpi" }, kViews, el("div", { class: "label", text: "Visites" })),
+        el("div", { class: "stats-kpi" }, kVisitors, el("div", { class: "label", text: "Visiteurs uniques" })),
+        el("div", { class: "stats-kpi wide" }, kTop, kTopLabel)),
+      el("div", {}, chartWrap, el("div", { class: "stats-axis" }, axisFrom, axisTo)),
+      el("div", { class: "stats-legend" },
+        el("span", {}, el("i", { style: "background:var(--gold-bright)" }), "Visites"),
+        el("span", {}, el("i", { style: "background:var(--accent-green)" }), "Visiteurs uniques"))
+    );
+    load("7");
+    return card;
+  }
+
   function renderStatus(vendor) {
     const status = MESSAGES[vendor.status] ? vendor.status : "pending";
     const panel = el("div", { class: "card panel" },
@@ -139,7 +305,8 @@
       panel.append(waLink("Écrire sur WhatsApp"));
     }
     panel.append(el("div", { class: "shop-recap", text: "Boutique : " + vendor.shop_name + " · " + vendor.city + " · WhatsApp : " + vendor.whatsapp }));
-    setView(panel);
+    if (status === "approved") setView(panel, buildStatsCard());
+    else setView(panel);
   }
 
   let currentUser = null;
