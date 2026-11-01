@@ -14,7 +14,9 @@
 --   - serigraphie_vendors.user_id (unique) = auth.uid() ;
 --   - « vendeur actif » = serigraphie_vendors.status = 'approved'
 --     (serigraphie_my_approved_vendor_id() renvoie l'id de la boutique, sinon NULL) ;
---   - un produit appartient au vendeur par serigraphie_products.vendor_id = serigraphie_vendors.id.
+--   - un produit appartient au vendeur par serigraphie_products.vendor_id = serigraphie_vendors.id ;
+--   - les visites sont rattachées au produit par sp.id::text = lower(pv.item_id) (page_type = 'serigraphie_product') :
+--     lower() rend la jointure insensible à la casse de l'identifiant enregistré.
 -- Le vendeur n'est JAMAIS un paramètre : il est déduit de la session. Aucun paramètre ne permet
 -- donc de viser les produits d'un autre vendeur.
 --
@@ -79,7 +81,7 @@ begin
     select pv.visitor_id, pv.created_at, sp.id as product_id, sp.name as product_name
     from public.page_views pv
     join public.serigraphie_products sp
-      on sp.id::text = pv.item_id
+      on sp.id::text = lower(pv.item_id)     -- lower() : l'uuid de la table est en minuscules, item_id peut avoir des majuscules
      and sp.vendor_id = v_vendor
     where pv.page_type = 'serigraphie_product'
       and pv.created_at >= v_from
