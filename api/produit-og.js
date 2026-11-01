@@ -64,7 +64,18 @@ function money(xof) {
   return Number(xof || 0).toLocaleString("fr-FR") + " FCFA";
 }
 
-function renderRedirectPage({ title, description, image, imageWidth, imageHeight, canonicalUrl, targetUrl, siteName }) {
+// Redirection avec « ?src= » (comptage anonyme des visites, analytics.js) : le navigateur intégré
+// (Facebook, Instagram, TikTok) est reconnu DANS le navigateur du visiteur, au moment de la redirection :
+// rien n'est lu ni enregistré côté serveur (la page reste identique pour tous et mise en cache).
+// Valeurs : facebook, instagram, tiktok, sinon « partage ». La redirection « meta » (sans JavaScript)
+// attend 1 seconde pour laisser le script passer en premier.
+function redirectWithSource(targetUrl) {
+  const joiner = targetUrl.includes("?") ? "&" : "?";
+  return `<meta http-equiv="refresh" content="1;url=${escapeHtml(`${targetUrl}${joiner}src=partage`)}">
+<script>(function(){var t=${JSON.stringify(targetUrl)},u=navigator.userAgent||"",s="partage";if(/Instagram/i.test(u))s="instagram";else if(/FBAN|FBAV|FB_IAB|FBIOS/.test(u))s="facebook";else if(/musical_ly|BytedanceWebview|TikTok|trill/i.test(u))s="tiktok";window.location.replace(t+(t.indexOf("?")<0?"?":"&")+"src="+s);})();</script>`;
+}
+
+function renderRedirectPage({ title, description, image, imageWidth, imageHeight, canonicalUrl, targetUrl, siteName, withSource }) {
   return `<!DOCTYPE html>
 <html lang="fr">
 <head>
@@ -86,8 +97,8 @@ ${image ? `<meta property="og:image" content="${escapeHtml(image)}">` : ""}${ima
 <meta name="twitter:description" content="${escapeHtml(description)}">
 ${image ? `<meta name="twitter:image" content="${escapeHtml(image)}">` : ""}
 
-<meta http-equiv="refresh" content="0;url=${escapeHtml(targetUrl)}">
-<script>window.location.replace(${JSON.stringify(targetUrl)});</script>
+${withSource ? redirectWithSource(targetUrl) : `<meta http-equiv="refresh" content="0;url=${escapeHtml(targetUrl)}">
+<script>window.location.replace(${JSON.stringify(targetUrl)});</script>`}
 </head>
 <body style="background:#0A0A0A;color:#fff;font-family:sans-serif;text-align:center;padding:60px 20px;">
   <p>Redirection vers la boutique ${escapeHtml(siteName)}…</p>
@@ -136,7 +147,7 @@ async function handleProduit(req, res, base) {
     const image = product.image_url ? optimizedImageUrl(product.image_url, 1200) : "";
 
     return res.status(200).send(
-      renderRedirectPage({ title, description, image, canonicalUrl: targetUrl, targetUrl, siteName: brandName })
+      renderRedirectPage({ title, description, image, canonicalUrl: targetUrl, targetUrl, siteName: brandName, withSource: true })
     );
   } catch (err) {
     console.error(err);
@@ -332,6 +343,7 @@ async function handleSerigraphie(req, res, base) {
         canonicalUrl: `${base}/s/${productId}`,
         targetUrl: `${base}/serigraphie-produit.html?id=${encodeURIComponent(productId)}`,
         siteName: "MAJESTÉ PRESSE",
+        withSource: true,
       })
     );
   } catch (err) {
