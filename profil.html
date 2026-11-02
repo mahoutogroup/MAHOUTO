@@ -120,6 +120,7 @@
     <a class="card menu-item" href="certificates.html"><span class="emoji">📜</span><span class="label">Certificats</span><span class="sub">→</span></a>
     <div class="card menu-item"><span class="emoji">⭐</span><span class="label">Abonnements</span><span class="sub">Bientôt</span></div>
     <a class="card menu-item" href="mes-achats.html"><span class="emoji">📦</span><span class="label">Mes achats</span><span class="sub">→</span></a>
+    <a class="card menu-item hidden" id="vendor-space-item" href="serigraphie-vendeur.html"><span class="emoji">🏪</span><span class="label">Mon espace vendeur</span><span class="sub">→</span></a>
     <div class="card menu-item"><span class="emoji">🔳</span><span class="label">QR Code</span><span class="sub">Bientôt</span></div>
     <div class="card menu-item"><span class="emoji">⚙️</span><span class="label">Paramètres</span><span class="sub">Bientôt</span></div>
     <button class="card menu-item hidden" id="logout-btn" style="border:none;width:100%;text-align:left;cursor:pointer;background:var(--bg-card);color:#F87171;font-family:inherit;">
@@ -205,6 +206,18 @@
     }
   }
 
+  // « Mon espace vendeur » : visible seulement si la boutique de l'utilisateur est approuvée
+  // (seule lecture : sa propre ligne de serigraphie_vendors). Échec : l'entrée reste cachée.
+  async function showVendorSpace(userId) {
+    try {
+      const { data: vendor, error } = await supabase
+        .from("serigraphie_vendors").select("status").eq("user_id", userId).maybeSingle();
+      if (!error && vendor && vendor.status === "approved") {
+        document.getElementById("vendor-space-item").classList.remove("hidden");
+      }
+    } catch (e) { /* silencieux */ }
+  }
+
   async function loadProfile() {
     const { data } = await supabase.auth.getSession();
     if (data && data.session && data.session.user) {
@@ -227,6 +240,7 @@
       }
 
       document.getElementById("logout-btn").classList.remove("hidden");
+      showVendorSpace(currentUser.id);   // sans attendre : n'affiche l'entrée que pour une boutique approuvée
       await initNotifUi();
     }
     render();
