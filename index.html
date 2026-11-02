@@ -353,10 +353,10 @@
   </div>
 
   <footer>
-    <nav class="legal-links hidden" id="legal-links" aria-label="Informations légales">
-      <a href="accueil-majeste.html">Présentation</a>
+    <nav class="legal-links" id="legal-links" aria-label="Informations légales">
+      <a class="majeste-only hidden" href="accueil-majeste.html">Présentation</a>
       <a href="conditions-vente.html">Conditions de vente et retours</a>
-      <a href="conditions-vendeurs.html">Conditions vendeurs</a>
+      <a class="majeste-only hidden" href="conditions-vendeurs.html">Conditions vendeurs</a>
       <a href="mentions-legales.html">Mentions légales</a>
     </nav>
     © 2026 MAHOUTO+ — Tous droits réservés.
@@ -797,7 +797,7 @@
 </script>
 <script>
   // Liens légaux : affichés uniquement pour la marque MAJESTÉ PRESSE (brand.js).
-  if (window.MAHOUTO_BRAND && window.MAHOUTO_BRAND.id === "majeste") document.getElementById("legal-links").classList.remove("hidden");
+  if (window.MAHOUTO_BRAND && window.MAHOUTO_BRAND.id === "majeste") document.querySelectorAll("#legal-links .majeste-only").forEach(function (a) { a.classList.remove("hidden"); });
 </script>
 <script src="pwa-install.js"></script>
 </body>
