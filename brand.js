@@ -325,6 +325,8 @@
         acceptNode: function (n) {
           var p = n.parentNode;
           if (p && SKIP_TAGS[p.nodeName]) return NodeFilter.FILTER_REJECT;
+          // Texte à ne jamais réécrire (désigne vraiment l'autre marque) : <span data-brand-fixed>…</span>
+          if (p && p.closest && p.closest("[data-brand-fixed]")) return NodeFilter.FILTER_REJECT;
           return hasToken(n.nodeValue) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
         }
       });
