@@ -32,6 +32,7 @@
       shortName: "MAHOUTO+",
       tagline: "Apprendre • Créer • Entreprendre",
       subtitle: "Construire l'Afrique numérique de demain.",
+      aiName: "MAJESTÉ AI",                // nom affiché de l'IA (source dans les pages : « MAHOUTO AI »)
       schoolName: "MAHOUTO School",        // nom affiché du produit formation
       schoolNavLabel: "School",            // libellé court (barre de navigation du bas)
       marketName: "MAHOUTO Market",
@@ -49,6 +50,7 @@
       shortName: "MAJESTÉ",
       tagline: "Informer • Former • Inspirer",                       // PROPOSITION à valider
       subtitle: "La presse qui éclaire, le savoir qui élève.",       // PROPOSITION à valider
+      aiName: "MAJESTÉ AI",
       schoolName: "Académie MAJESTÉ",
       schoolNavLabel: "Académie",
       marketName: "MAJESTÉ Market",
@@ -168,8 +170,49 @@
     }
   }
 
-  // Marque par défaut : on s'arrête ici, la page reste strictement identique.
-  if (brand.isDefault) return;
+  // Marque par défaut : la page reste strictement identique, SAUF le nom de l'IA (« MAHOUTO AI » -> aiName),
+  // unifié sur les deux marques. Remplacement au fil de l'analyse de la page (sans masquer la page ni attendre la fin du chargement).
+  if (brand.isDefault) {
+    var aiRe = /MAHOUTO AI/g;
+    var aiSkip = { SCRIPT: 1, STYLE: 1, TEXTAREA: 1, NOSCRIPT: 1 };
+    var aiFixText = function (n) {
+      if (n.nodeValue && n.nodeValue.indexOf("MAHOUTO AI") !== -1 && !(n.parentNode && aiSkip[n.parentNode.nodeName])) {
+        n.nodeValue = n.nodeValue.replace(aiRe, brand.aiName);
+      }
+    };
+    var aiFixAttrs = function (e) {
+      var names = ["alt", "title", "placeholder", "aria-label"];
+      for (var k = 0; k < names.length; k++) {
+        var v = e.getAttribute(names[k]);
+        if (v && v.indexOf("MAHOUTO AI") !== -1) e.setAttribute(names[k], v.replace(aiRe, brand.aiName));
+      }
+    };
+    var aiFix = function (node) {
+      if (!node) return;
+      if (node.nodeType === 3) { aiFixText(node); return; }
+      if (node.nodeType !== 1 || aiSkip[node.nodeName]) return;
+      aiFixAttrs(node);
+      var inner = node.querySelectorAll("[alt], [title], [placeholder], [aria-label]");
+      for (var i2 = 0; i2 < inner.length; i2++) aiFixAttrs(inner[i2]);
+      var walker2 = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
+      var found = [];
+      while (walker2.nextNode()) found.push(walker2.currentNode);
+      for (var j = 0; j < found.length; j++) aiFixText(found[j]);
+    };
+    if (root.MutationObserver) {
+      var aiObserver = new root.MutationObserver(function (records) {
+        for (var r = 0; r < records.length; r++) {
+          if (records[r].type === "characterData") aiFixText(records[r].target);
+          else for (var q = 0; q < records[r].addedNodes.length; q++) aiFix(records[r].addedNodes[q]);
+        }
+      });
+      aiObserver.observe(document, { childList: true, subtree: true, characterData: true });
+      document.addEventListener("DOMContentLoaded", function () { aiFix(document.documentElement); aiObserver.disconnect(); });
+    } else {
+      document.addEventListener("DOMContentLoaded", function () { aiFix(document.documentElement); });
+    }
+    return;
+  }
 
   // 2) Marque secondaire : remplace le texte de marque du HTML STATIQUE (une seule passe).
   //    Le HTML garde la marque par défaut comme texte source ; la page est masquée
@@ -178,6 +221,7 @@
   var SCHOOL_TOKEN = /MAHOUTO School/g;     // texte source du produit formation
   var MARKET_TOKEN = /MAHOUTO Market/g;
   var PAY_TOKEN = /MAHOUTO Pay/g;
+  var AI_TOKEN = /MAHOUTO AI/g;             // nom de l'IA (onglets, titres de ai.html)
   var PLAN_TOKEN = /MAHOUTO (FREE|PREMIUM|BUSINESS|ENTERPRISE|ORGANISATION)\b/g;   // affichage seulement
   var LOGO_FILE = "assets/logo-mahouto-plus.png";
   var SKIP_TAGS = { SCRIPT: 1, STYLE: 1, TEXTAREA: 1, NOSCRIPT: 1 };
@@ -186,12 +230,12 @@
 
   function swap(value) {
     return String(value).replace(TOKEN, brand.name).replace(SCHOOL_TOKEN, brand.schoolName)
-      .replace(MARKET_TOKEN, brand.marketName).replace(PAY_TOKEN, brand.payName)
+      .replace(MARKET_TOKEN, brand.marketName).replace(PAY_TOKEN, brand.payName).replace(AI_TOKEN, brand.aiName)
       .replace(PLAN_TOKEN, function (m, plan) { return brand.planPrefix + " " + plan; });
   }
   function hasToken(value) {
     return value.indexOf("MAHOUTO+") !== -1 || value.indexOf("MAHOUTO School") !== -1 ||
-           value.indexOf("MAHOUTO Market") !== -1 || value.indexOf("MAHOUTO Pay") !== -1 ||
+           value.indexOf("MAHOUTO Market") !== -1 || value.indexOf("MAHOUTO Pay") !== -1 || value.indexOf("MAHOUTO AI") !== -1 ||
            value.indexOf("MAHOUTO ") !== -1 && new RegExp(PLAN_TOKEN.source).test(value);
   }
 
