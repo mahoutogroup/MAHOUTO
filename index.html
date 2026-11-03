@@ -162,7 +162,19 @@ body.light-theme .hero .subtagline { color: var(--text-muted); opacity: 1; filte
 .module-card .go { margin-top: auto; padding-top: 8px; font-size: 11px; color: var(--text-muted); font-weight: bold; }
 .module-card.disabled { opacity: .8; }
 
+/* Carte « Le Sérigraphe » mise en avant : pleine largeur, sous le bloc de connexion / la carte profil */
+.feature-wrap { padding: 14px 20px 0; }
+.feature-card { position: relative; display: flex; align-items: center; gap: 12px; padding: 14px 16px; border-color: var(--gold); }
+.feature-card .fc-ico { width: 28px; height: 28px; color: var(--gold); }
+.feature-card .mc-arrow { position: absolute; top: 12px; right: 14px; width: 16px; height: 16px; color: var(--text-muted); }
+.feature-card .fc-text { min-width: 0; }
+.feature-card h2 { font-size: 15.5px; line-height: 1.25; margin-bottom: 2px; }
+.feature-card p { font-size: 12px; color: var(--text-muted); line-height: 1.4; margin: 0; }
+.vendor-space-link { display: block; min-height: 44px; line-height: 44px; padding: 0 4px; font-size: 13px; font-weight: bold; color: var(--gold); text-decoration: underline; }
+
 /* Thème clair : doré plus foncé pour les chiffres, titres et icônes dorés (contraste ≥ 4,5:1) */
+body.light-theme .feature-card .fc-ico,
+body.light-theme .vendor-space-link,
 body.light-theme .profile-stats .stat .value,
 body.light-theme .module-card .mc-ico,
 body.light-theme #auth-modal h3, body.light-theme #confirm-modal h3, body.light-theme #info-modal h3, body.light-theme #email-modal h3,
@@ -329,6 +341,18 @@ nav.bottom-nav .nav-item .icon .ico { width: 24px; height: 24px; }
     </div>
   </div>
 
+  <div class="feature-wrap">
+    <a class="card feature-card" href="serigraphie.html">
+      <svg class="ico mc-arrow" aria-hidden="true"><use href="#ic-arrow"/></svg>
+      <svg class="ico fc-ico" aria-hidden="true"><use href="#ic-shirt"/></svg>
+      <div class="fc-text">
+        <h2>Le Sérigraphe</h2>
+        <p>T-shirts, casquettes, objets personnalisés</p>
+      </div>
+    </a>
+    <a class="vendor-space-link hidden" id="vendor-space-link" href="serigraphie-vendeur.html">Mon espace vendeur</a>
+  </div>
+
   <div class="section-title">🔥 Modules</div>
   <div class="module-grid">
     <div class="card module-card" id="card-majeste-ai" style="cursor:pointer;">
@@ -367,12 +391,6 @@ nav.bottom-nav .nav-item .icon .ico { width: 24px; height: 24px; }
       <p>Programme académique dédié.</p>
       <div class="go">Bientôt disponible</div>
     </div>
-    <a class="card module-card" href="serigraphie.html">
-      <svg class="ico mc-arrow" aria-hidden="true"><use href="#ic-arrow"/></svg>
-      <svg class="ico mc-ico" aria-hidden="true"><use href="#ic-shirt"/></svg>
-      <h2>Le Sérigraphe</h2>
-      <p>T-shirts, casquettes et objets personnalisés. Devenez vendeur.</p>
-    </a>
     <a class="card module-card" href="academie-majestepresse.html">
       <svg class="ico mc-arrow" aria-hidden="true"><use href="#ic-arrow"/></svg>
       <svg class="ico mc-ico" aria-hidden="true"><use href="#ic-book"/></svg>
@@ -882,6 +900,18 @@ nav.bottom-nav .nav-item .icon .ico { width: 24px; height: 24px; }
         .eq("user_id", user.id)
         .then(({ count }) => {
           setStat("certificats", count || 0, "Certificat", "Certificats");
+        })
+        .catch(() => {});
+
+      // Vendeur approuvé : petit lien « Mon espace vendeur » sous la carte du Sérigraphe.
+      // Seule lecture : la ligne de l'utilisateur dans serigraphie_vendors (déjà lue par serigraphie.html). Échec : rien d'affiché.
+      supabase
+        .from("serigraphie_vendors")
+        .select("status")
+        .eq("user_id", user.id)
+        .maybeSingle()
+        .then(({ data, error }) => {
+          if (!error && data && data.status === "approved") document.getElementById("vendor-space-link").classList.remove("hidden");
         })
         .catch(() => {});
 
