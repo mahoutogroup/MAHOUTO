@@ -19,6 +19,17 @@
 <link rel="preload" as="image" href="assets/splash-screen.png" fetchpriority="high">
 <link rel="stylesheet" href="theme.css">
 <script src="theme-toggle.js"></script>
+<script>
+  // Session locale probable : le logo est déjà réduit au premier affichage (pas de saut). Retiré si finalement non connecté.
+  (function () {
+    try {
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (k && /^sb-.+-auth-token$/.test(k)) { document.documentElement.classList.add("has-session"); break; }
+      }
+    } catch (e) {}
+  })();
+</script>
 <style>
   /* index.html : interface uniquement. Toute logique réelle vit
      dans config.js, auth.js, theme.css, theme-toggle.js, sw.js. */
@@ -37,10 +48,21 @@
     object-fit: contain;
   }
 
+/* Connecté : logo réduit pour que la première ligne de modules soit visible sans défiler */
+html.has-session .hero { padding-top: 14px; }
+html.has-session #auth-zone { padding-top: 12px; }
+html.has-session .section-title { margin-top: 18px; }
+html.has-session .logo-badge { width: 96px; height: 96px; margin-bottom: 8px; }
+
 .hero h1 { font-size: 28px; letter-spacing:.01em; }
 .hero h1.plus { color: var(--accent-green); }
-.hero.tagline { font-size: 14px; color: var(--text-muted); margin-top: 10px; font-weight: 600; }
-.hero.subtagline { font-size: 12.5px; color: var(--text-dim); margin-top: 4px; }
+.hero .tagline { font-size: 14px; color: var(--white); margin-top: 8px; font-weight: 600; }
+.hero .subtagline { font-size: 11.5px; color: var(--gold); opacity: .8; filter: saturate(.55); margin-top: 8px; }
+body.light-theme .hero .subtagline { color: var(--text-muted); opacity: 1; filter: none; }
+
+/* Icônes : jeu unique en traits fins, couleur héritée (currentColor) */
+.ico { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.ico-sprite { position: absolute; width: 0; height: 0; overflow: hidden; }
 
   #auth-zone { padding: 18px 20px 6px; }
 
@@ -53,34 +75,40 @@
   }
 .auth-btn.primary { background: var(--gold-bright); color: #0A0A0A; border: none; grid-column: span 2; }
 .auth-btn:active { transform: scale(.98); }
+.auth-btn .ico { width: 20px; height: 20px; }
+.auth-btn .g-badge { width: 26px; height: 26px; border-radius: 50%; background: #fff; display: flex; align-items: center; justify-content: center; flex: none; }
+.auth-btn .g-badge svg { width: 16px; height: 16px; }
 
 .auth-note { text-align: center; font-size: 11.5px; color: var(--text-dim); margin-top: 10px; }
 
 .profile-summary {
     display: none;
-    background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 18px;
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px;
   }
 .profile-summary.visible { display: block; }
 .auth-methods.hidden-by-auth { display: none; }
 
-.profile-summary.top { display: flex; align-items: center; gap: 12px; }
+.profile-top { display: flex; align-items: center; gap: 14px; }
 
-.profile-summary.avatar {
-    width: 52px; height: 52px; border-radius: 50%; background: var(--gold-bright);
+.profile-summary .avatar {
+    width: 72px; height: 72px; border-radius: 50%; background: var(--gold-bright);
+    border: 2px solid var(--gold);
     display: flex; align-items: center; justify-content: center;
-    font-weight: bold; color: #0A0A0A; font-size: 20px; flex: none; overflow: hidden;
+    font-weight: bold; color: #0A0A0A; font-size: 28px; flex: none; overflow: hidden;
   }
-.profile-summary.avatar img { width: 100%; height: 100%; object-fit: cover; }
+.profile-summary .avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
-.profile-summary.name { font-weight: bold; font-size: 15.5px; }
-.profile-summary.mahouto-id { font-size: 11.5px; color: var(--text-dim); margin-top: 2px; }
+.profile-id { min-width: 0; flex: 1; }
+.profile-summary .name { font-weight: bold; font-size: 17px; line-height: 1.2; overflow-wrap: anywhere; }
+.profile-country { font-size: 12.5px; color: var(--text-muted); margin-top: 3px; }
+.profile-meta { display: flex; flex-wrap: wrap; gap: 0 8px; font-size: 11.5px; color: var(--text-muted); margin-top: 3px; line-height: 1.4; }
 
 .profile-stats {
-    display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 16px;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 14px;
   }
-.profile-stats.stat { text-align: center; background: var(--bg-elevated); border-radius: var(--radius-sm); padding: 10px 4px; }
-.profile-stats.stat.value { font-size: 16px; font-weight: bold; color: var(--gold); }
-.profile-stats.stat.label { font-size: 10px; color: var(--text-dim); margin-top: 2px; }
+.profile-stats .stat { text-align: center; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 4px; min-width: 0; }
+.profile-stats .stat .value { font-size: 22px; font-weight: bold; color: var(--gold); line-height: 1.1; }
+.profile-stats .stat .label { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
 
   #auth-modal, #confirm-modal, #info-modal, #email-modal {
     position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.6);
@@ -125,12 +153,17 @@
 }
 
 .module-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 0 20px; }
-.module-card { position: relative; }
-.module-card h2 { font-size: 15.5px; display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
-.module-card p { font-size: 12px; color: var(--text-muted); line-height: 1.5; margin-bottom: 12px; min-height: 32px; }
-.module-card.go { font-size: 12px; color: var(--gold); font-weight: bold; }
-.module-card.disabled { opacity:.55; }
-.module-card.disabled.go { color: var(--text-dim); }
+.module-card { position: relative; display: flex; flex-direction: column; padding: 16px; min-height: 156px; }
+.module-card .mc-ico { width: 26px; height: 26px; color: var(--gold); margin-bottom: 10px; }
+.module-card .mc-arrow { position: absolute; top: 14px; right: 14px; width: 16px; height: 16px; color: var(--text-muted); }
+/* Deux lignes réservées au titre : les descriptions restent alignées d'une carte à l'autre */
+.module-card h2 { font-size: 14px; line-height: 1.25; min-height: 2.5em; margin-bottom: 4px; overflow-wrap: anywhere; }
+.module-card p { font-size: 12px; color: var(--text-muted); line-height: 1.45; margin: 0; }
+.module-card .go { margin-top: auto; padding-top: 8px; font-size: 11px; color: var(--text-muted); font-weight: bold; }
+.module-card.disabled { opacity: .8; }
+
+nav.bottom-nav .nav-item .icon { display: flex; line-height: 1; }
+nav.bottom-nav .nav-item .icon .ico { width: 24px; height: 24px; }
 
 .plans-row { display: flex; gap: 10px; overflow-x: auto; padding: 4px 20px 4px; }
 .plan-chip { flex: none; background: var(--bg-card); border: 1px solid var(--border); border-radius: 999px; padding: 8px 16px; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
@@ -228,6 +261,29 @@
 
 <button id="theme-toggle-btn" class="theme-toggle-fab">🌙</button>
 
+<svg class="ico-sprite" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="ic-home" viewBox="0 0 24 24"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/></symbol>
+  <symbol id="ic-chat" viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></symbol>
+  <symbol id="ic-chat-lock" viewBox="0 0 24 24"><path d="M21 11.5a8.5 8.5 0 0 1-12.3 7.6L3.5 20.5l1.4-4.9A8.5 8.5 0 1 1 21 11.5z"/><rect x="8.5" y="10.5" width="7" height="5" rx="1"/><path d="M10 10.5V9a2 2 0 0 1 4 0v1.5"/></symbol>
+  <symbol id="ic-ai" viewBox="0 0 24 24"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></symbol>
+  <symbol id="ic-school" viewBox="0 0 24 24"><path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11.2V16c0 1.5 2.7 3 6 3s6-1.5 6-3v-4.8"/><path d="M22 9v6"/></symbol>
+  <symbol id="ic-bag" viewBox="0 0 24 24"><path d="M5 8h14l-1 12H6z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></symbol>
+  <symbol id="ic-institute" viewBox="0 0 24 24"><path d="M3 10l9-6 9 6"/><path d="M5 10v9M9.5 10v9M14.5 10v9M19 10v9"/><path d="M3 20h18"/></symbol>
+  <symbol id="ic-shirt" viewBox="0 0 24 24"><path d="M8 4L3 7l2 4 3-1v10h8V10l3 1 2-4-5-3a4 4 0 0 1-8 0z"/></symbol>
+  <symbol id="ic-printer" viewBox="0 0 24 24"><path d="M7 9V3h10v6"/><rect x="3" y="9" width="18" height="8" rx="2"/><path d="M7 14h10v7H7z"/></symbol>
+  <symbol id="ic-book" viewBox="0 0 24 24"><path d="M12 6c-2-1.5-5-2-9-2v14c4 0 7 .5 9 2 2-1.5 5-2 9-2V4c-4 0-7 .5-9 2z"/><path d="M12 6v14"/></symbol>
+  <symbol id="ic-store" viewBox="0 0 24 24"><path d="M4 9l1.5-5h13L20 9"/><path d="M4 9a2.7 2.7 0 0 0 5.3 0 2.7 2.7 0 0 0 5.4 0A2.7 2.7 0 0 0 20 9"/><path d="M5 12v8h14v-8"/><path d="M10 20v-4h4v4"/></symbol>
+  <symbol id="ic-card" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/><path d="M7 15h3"/></symbol>
+  <symbol id="ic-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-6 8-6s8 2 8 6"/></symbol>
+  <symbol id="ic-award" viewBox="0 0 24 24"><circle cx="12" cy="9" r="5.5"/><path d="M8.5 13.8L7 21l5-2.6 5 2.6-1.5-7.2"/></symbol>
+  <symbol id="ic-bell" viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></symbol>
+  <symbol id="ic-sliders" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></symbol>
+  <symbol id="ic-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+  <symbol id="ic-arrow-out" viewBox="0 0 24 24"><path d="M7 17L17 7M8 7h9v9"/></symbol>
+  <symbol id="ic-phone" viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/></symbol>
+  <symbol id="ic-mail" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3.5 7l8.5 6 8.5-6"/></symbol>
+</svg>
+
 <div class="page-content">
   <div class="hero">
     <div class="logo-badge">
@@ -240,26 +296,28 @@
 
   <div id="auth-zone">
     <div id="auth-methods" class="auth-methods">
-      <button class="auth-btn primary" id="btn-login-google">🔐 Continuer avec Google</button>
-      <button class="auth-btn" id="btn-login-phone">📱 Téléphone</button>
-      <button class="auth-btn" id="btn-login-email">✉️ Email</button>
+      <button class="auth-btn primary" id="btn-login-google"><span class="g-badge"><svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg></span> Continuer avec Google</button>
+      <button class="auth-btn" id="btn-login-phone"><svg class="ico" aria-hidden="true"><use href="#ic-phone"/></svg> Téléphone</button>
+      <button class="auth-btn" id="btn-login-email"><svg class="ico" aria-hidden="true"><use href="#ic-mail"/></svg> Email</button>
     </div>
     <p class="auth-note" id="auth-guest-note">Ou explore l'application sans compte.</p>
 
     <div class="profile-summary" id="profile-summary">
-      <div class="top">
+      <div class="profile-top">
         <div class="avatar" id="profile-avatar">?</div>
-        <div>
+        <div class="profile-id">
           <div class="name" id="profile-name">—</div>
-          <div class="mahouto-id" id="mahouto-id">ID MAHOUTO+ : —</div>
+          <div class="profile-country hidden" id="profile-country"></div>
+          <div class="profile-meta">
+            <span id="mahouto-id">ID MAHOUTO+ : —</span>
+            <span id="profile-since"></span>
+          </div>
         </div>
       </div>
       <div class="profile-stats">
-        <div class="stat"><div class="value" id="stat-certificats">—</div><div class="label">Certificats</div></div>
-        <div class="stat"><div class="value" id="stat-formations">—</div><div class="label">Formations</div></div>
-        <div class="stat"><div class="value" id="stat-anciennete">—</div><div class="label">Ancienneté</div></div>
-        <div class="stat"><div class="value" id="stat-messages">—</div><div class="label">Messages</div></div>
-        <div class="stat"><div class="value" id="stat-pays">—</div><div class="label">Pays</div></div>
+        <div class="stat"><div class="value" id="stat-certificats">—</div><div class="label" id="label-certificats">Certificats</div></div>
+        <div class="stat"><div class="value" id="stat-formations">—</div><div class="label" id="label-formations">Formations</div></div>
+        <div class="stat"><div class="value" id="stat-messages">—</div><div class="label" id="label-messages">Messages</div></div>
       </div>
     </div>
   </div>
@@ -267,77 +325,92 @@
   <div class="section-title">🔥 Modules</div>
   <div class="module-grid">
     <div class="card module-card" id="card-majeste-ai" style="cursor:pointer;">
-      <h2>🧠 MAJESTÉ AI</h2>
+      <svg class="ico mc-arrow" aria-hidden="true"><use href="#ic-arrow"/></svg>
+      <svg class="ico mc-ico" aria-hidden="true"><use href="#ic-ai"/></svg>
+      <h2>MAJESTÉ AI</h2>
       <p>Assistant IA, prompts, analyse de documents.</p>
-      <div class="go">Ouvrir →</div>
     </div>
     <a class="card module-card" href="discussions.html">
-      <h2>💬 Messages</h2>
+      <svg class="ico mc-arrow" aria-hidden="true"><use href="#ic-arrow"/></svg>
+      <svg class="ico mc-ico" aria-hidden="true"><use href="#ic-chat"/></svg>
+      <h2>Messages</h2>
       <p>Discussions, groupes — en temps réel.</p>
-      <div class="go">Ouvrir →</div>
     </a>
     <a class="card module-card" href="messages-prives.html">
-      <h2>💌 Messages privés</h2>
+      <svg class="ico mc-arrow" aria-hidden="true"><use href="#ic-arrow"/></svg>
+      <svg class="ico mc-ico" aria-hidden="true"><use href="#ic-chat-lock"/></svg>
+      <h2>Messages privés</h2>
       <p>Conversations 1-à-1, en toute confidentialité.</p>
-      <div class="go">Ouvrir →</div>
     </a>
     <a class="card module-card" href="school.html">
-      <h2>🎓 MAHOUTO School</h2>
+      <svg class="ico mc-arrow" aria-hidden="true"><use href="#ic-arrow"/></svg>
+      <svg class="ico mc-ico" aria-hidden="true"><use href="#ic-school"/></svg>
+      <h2>MAHOUTO School</h2>
       <p>Formations en imprimerie, design, web, IA.</p>
-      <div class="go">Ouvrir →</div>
     </a>
     <a class="card module-card" href="produits.html">
-      <h2>🛍️ Boutique</h2>
+      <svg class="ico mc-arrow" aria-hidden="true"><use href="#ic-arrow"/></svg>
+      <svg class="ico mc-ico" aria-hidden="true"><use href="#ic-bag"/></svg>
+      <h2>Boutique</h2>
       <p>PDF, ebooks, vidéos et fichiers numériques.</p>
-      <div class="go">Ouvrir →</div>
     </a>
     <div class="card module-card disabled">
-      <h2>🏫 Institut SAYÉ LOUIS</h2>
+      <svg class="ico mc-ico" aria-hidden="true"><use href="#ic-institute"/></svg>
+      <h2>Institut SAYÉ LOUIS</h2>
       <p>Programme académique dédié.</p>
       <div class="go">Bientôt disponible</div>
     </div>
     <a class="card module-card" href="serigraphie.html">
-      <h2>🎨 Le Sérigraphe</h2>
+      <svg class="ico mc-arrow" aria-hidden="true"><use href="#ic-arrow"/></svg>
+      <svg class="ico mc-ico" aria-hidden="true"><use href="#ic-shirt"/></svg>
+      <h2>Le Sérigraphe</h2>
       <p>T-shirts, casquettes et objets personnalisés. Devenez vendeur.</p>
-      <div class="go">Ouvrir →</div>
     </a>
     <a class="card module-card" href="academie-majestepresse.html">
-      <h2>🖨️ Académie Majesté Presse</h2>
+      <svg class="ico mc-arrow" aria-hidden="true"><use href="#ic-arrow"/></svg>
+      <svg class="ico mc-ico" aria-hidden="true"><use href="#ic-book"/></svg>
+      <h2>Académie Majesté Presse</h2>
       <p>Formations certifiantes en imprimerie et sérigraphie.</p>
-      <div class="go">Ouvrir →</div>
     </a>
     <div class="card module-card" id="card-majeste-presse" style="cursor:pointer;">
-      <h2>🖨️ Majesté Presse</h2>
+      <svg class="ico mc-arrow" aria-hidden="true"><use href="#ic-arrow-out"/></svg>
+      <svg class="ico mc-ico" aria-hidden="true"><use href="#ic-printer"/></svg>
+      <h2>Majesté Presse</h2>
       <p>L'atelier de sérigraphie et d'imprimerie.</p>
-      <div class="go">Visiter le site →</div>
     </div>
     <div class="card module-card disabled">
-      <h2>🛍️ MAHOUTO Market</h2>
+      <svg class="ico mc-ico" aria-hidden="true"><use href="#ic-store"/></svg>
+      <h2>MAHOUTO Market</h2>
       <p>Produits, services, commandes.</p>
       <div class="go">Bientôt disponible</div>
     </div>
     <div class="card module-card disabled">
-      <h2>💳 MAHOUTO Pay</h2>
+      <svg class="ico mc-ico" aria-hidden="true"><use href="#ic-card"/></svg>
+      <h2>MAHOUTO Pay</h2>
       <p>Portefeuille et paiements Mobile Money.</p>
       <div class="go">Bientôt disponible</div>
     </div>
     <a class="card module-card" href="profil.html">
-      <h2>👤 Profil</h2>
+      <svg class="ico mc-arrow" aria-hidden="true"><use href="#ic-arrow"/></svg>
+      <svg class="ico mc-ico" aria-hidden="true"><use href="#ic-user"/></svg>
+      <h2>Profil</h2>
       <p>Compte, informations personnelles.</p>
-      <div class="go">Ouvrir →</div>
     </a>
     <a class="card module-card" href="certificates.html">
-      <h2>📜 Certificats</h2>
+      <svg class="ico mc-arrow" aria-hidden="true"><use href="#ic-arrow"/></svg>
+      <svg class="ico mc-ico" aria-hidden="true"><use href="#ic-award"/></svg>
+      <h2>Certificats</h2>
       <p>Diplômes numériques.</p>
-      <div class="go">Ouvrir →</div>
     </a>
     <div class="card module-card disabled">
-      <h2>🔔 Notifications</h2>
+      <svg class="ico mc-ico" aria-hidden="true"><use href="#ic-bell"/></svg>
+      <h2>Notifications</h2>
       <p>Alertes et rappels.</p>
       <div class="go">Bientôt disponible</div>
     </div>
     <div class="card module-card disabled">
-      <h2>⚙️ Paramètres</h2>
+      <svg class="ico mc-ico" aria-hidden="true"><use href="#ic-sliders"/></svg>
+      <h2>Paramètres</h2>
       <p>Préférences du compte et de l'application.</p>
       <div class="go">Bientôt disponible</div>
     </div>
@@ -364,11 +437,11 @@
 </div>
 
 <nav class="bottom-nav">
-  <a class="nav-item active" href="index.html"><span class="icon">🏠</span>Accueil</a>
-  <a class="nav-item" href="discussions.html"><span class="icon">💬</span>Messages</a>
-  <a class="nav-item" href="ai.html"><span class="icon">🧠</span>MAJESTÉ AI</a>
-  <a class="nav-item" href="school.html"><span class="icon">🎓</span>School</a>
-  <a class="nav-item" href="profil.html"><span class="icon">👤</span>Profil</a>
+  <a class="nav-item active" href="index.html"><span class="icon"><svg class="ico" aria-hidden="true"><use href="#ic-home"/></svg></span>Accueil</a>
+  <a class="nav-item" href="discussions.html"><span class="icon"><svg class="ico" aria-hidden="true"><use href="#ic-chat"/></svg></span>Messages</a>
+  <a class="nav-item" href="ai.html"><span class="icon"><svg class="ico" aria-hidden="true"><use href="#ic-ai"/></svg></span>MAJESTÉ AI</a>
+  <a class="nav-item" href="school.html"><span class="icon"><svg class="ico" aria-hidden="true"><use href="#ic-school"/></svg></span>School</a>
+  <a class="nav-item" href="profil.html"><span class="icon"><svg class="ico" aria-hidden="true"><use href="#ic-user"/></svg></span>Profil</a>
 </nav>
 
 <div id="confirm-modal" class="hidden">
@@ -689,6 +762,23 @@
     return Math.floor(days / 365) + " an" + (Math.floor(days / 365) > 1 ? "s" : "");
   }
 
+  // Chiffre + étiquette au singulier quand la valeur est 1
+  function setStat(key, n, singular, plural) {
+    document.getElementById("stat-" + key).textContent = String(n);
+    document.getElementById("label-" + key).textContent = n === 1 ? singular : plural;
+  }
+
+  // Drapeau emoji (lettres indicatrices régionales) pour les pays proposés dans profil.html ; "" sinon
+  const COUNTRY_CODES = {
+    "Bénin": "BJ", "Togo": "TG", "Côte d'Ivoire": "CI", "Sénégal": "SN", "Ghana": "GH", "Nigeria": "NG",
+    "Mali": "ML", "Burkina Faso": "BF", "Niger": "NE", "Cameroun": "CM", "France": "FR"
+  };
+  function countryFlag(country) {
+    const code = COUNTRY_CODES[country];
+    if (!code) return "";
+    return String.fromCodePoint(0x1F1E6 + code.charCodeAt(0) - 65, 0x1F1E6 + code.charCodeAt(1) - 65) + " ";
+  }
+
   async function refreshIdentityUI() {
     try {
       if (typeof supabase === "undefined" || !supabase.auth || typeof supabase.auth.getSession !== "function") return;
@@ -710,7 +800,8 @@
         if (last && last.data) user = last.data;
       }
 
-      if (!user) return;
+      if (!user) { document.documentElement.classList.remove("has-session"); return; }
+      document.documentElement.classList.add("has-session");
 
       document.getElementById("auth-methods").classList.add("hidden-by-auth");
       document.getElementById("auth-guest-note").classList.add("hidden");
@@ -749,7 +840,9 @@
       // n'existe encore en base pour un identifiant public séparé.
       document.getElementById("mahouto-id").textContent = "ID " + MAHOUTO_BRAND.name + " : " + user.id.slice(0, 8).toUpperCase();
 
-      document.getElementById("stat-anciennete").textContent = formatAnciennete(profile && profile.created_at);
+      // Ancienneté : discrète, à côté de l'ID
+      const since = formatAnciennete(profile && profile.created_at);
+      document.getElementById("profile-since").textContent = since === "—" ? "" : (since === "Nouveau" ? "Nouveau membre" : "Membre depuis " + since);
 
       // Formations : nombre de formations distinctes réellement payées.
       supabase
@@ -760,7 +853,7 @@
         .eq("status", "paid")
         .then(({ data }) => {
           const distinct = new Set((data || []).map((p) => p.course_id));
-          document.getElementById("stat-formations").textContent = String(distinct.size);
+          setStat("formations", distinct.size, "Formation", "Formations");
         })
         .catch(() => {});
 
@@ -771,7 +864,7 @@
       ])
         .then(([roomRes, dmRes]) => {
           const total = (roomRes.count || 0) + (dmRes.count || 0);
-          document.getElementById("stat-messages").textContent = String(total);
+          setStat("messages", total, "Message", "Messages");
         })
         .catch(() => {});
 
@@ -781,12 +874,19 @@
         .select("id", { count: "exact", head: true })
         .eq("user_id", user.id)
         .then(({ count }) => {
-          document.getElementById("stat-certificats").textContent = String(count || 0);
+          setStat("certificats", count || 0, "Certificat", "Certificats");
         })
         .catch(() => {});
 
-      // Pays : affiché s'il a été renseigné dans le profil.
-      document.getElementById("stat-pays").textContent = (profile && profile.country) || "—";
+      // Pays : sous le nom, avec son drapeau, s'il a été renseigné dans le profil.
+      const countryEl = document.getElementById("profile-country");
+      const country = profile && profile.country;
+      if (country) {
+        countryEl.textContent = countryFlag(country) + country;
+        countryEl.classList.remove("hidden");
+      } else {
+        countryEl.classList.add("hidden");
+      }
     } catch (err) {
       console.error("Vérification de session impossible :", err);
     }
