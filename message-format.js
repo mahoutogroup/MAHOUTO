@@ -76,6 +76,22 @@
     if (last < text.length) parent.appendChild(document.createTextNode(text.slice(last)));
   }
 
+  // Titre numéroté « 3. Créer un compte admin de test » dans un message qui a perdu sa mise en forme
+  // (ex. réponse copiée depuis l'application Claude). Toutes les conditions doivent être vraies.
+  function isNumberedTitle(lines, i, atMessageStart) {
+    var line = lines[i].replace(/\s+$/, "");
+    var m = /^(\d{1,2})\. +(\S.*)$/.exec(line);
+    if (!m) return false;                                   // numéro de 1 à 2 chiffres, point, espace (- et • n'en sont pas)
+    if (m[2].length > 60) return false;                     // 60 caractères au plus après le numéro
+    if (/[.!?:;]$/.test(line)) return false;                // ne finit pas par . ! ? : ;
+    if (/https?:\/\/|www\./i.test(line)) return false;       // pas de lien
+    if (i + 1 >= lines.length) return false;                // pas la dernière ligne
+    var next = lines[i + 1].replace(/\s+$/, "");
+    if (next === line) return false;                        // suivie d'une ligne différente
+    var prevBlank = i === 0 ? atMessageStart : /^\s*$/.test(lines[i - 1]);
+    return prevBlank || next.length > line.length;          // après une ligne vide / début du message, ou suivie d'une ligne plus longue
+  }
+
   // Texte hors bloc de code : paragraphes, titres, listes
   function renderText(parent, text) {
     var lines = text.split("\n");
@@ -87,7 +103,8 @@
       if (prev) {
         var prevKind = prev.getAttribute("data-k");
         var mt = "0.2em";
-        if (gap) mt = "0.65em";
+        if (gap) mt = kind === "hn" ? "0.8em" : "0.65em";
+        else if (kind === "hn") mt = "0.6em";
         else if (kind === "h") mt = "0.5em";
         else if (kind === "li" && prevKind === "li") mt = "0.12em";
         node.style.marginTop = mt;
@@ -117,6 +134,11 @@
         hd.setAttribute("role", "heading");
         hd.setAttribute("aria-level", String(Math.min(h[1].length + 2, 6)));
         place(hd, "h");
+      } else if (isNumberedTitle(lines, i, !parent.lastElementChild && para.length === 0)) {
+        flush();
+        var nt = el("div", "mf-h mf-hn");
+        appendInline(nt, line.replace(/\s+$/, ""), true);
+        place(nt, "hn");
       } else if ((li = /^(\s*)([-*•]|\d{1,3}[.)])\s+(.*)$/.exec(line))) {
         flush();
         var item = el("div", "mf-li");
