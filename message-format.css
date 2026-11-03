@@ -18,6 +18,7 @@
 .mf-p, .mf-li, .mf-h { white-space: pre-wrap; overflow-wrap: anywhere; }
 .mf-h { font-weight: bold; font-size: 1.1em; line-height: 1.35; }
 .mf-h.mf-h1 { font-size: 1.2em; }
+.mf-h.mf-hn { font-size: 1em; line-height: 1.5; }   /* titre numéroté détecté : gras, taille du texte */
 .mf-li { padding-left: 1.5em; text-indent: -1.5em; }
 
 .mf-ic {
