@@ -363,6 +363,21 @@ body.light-theme .card{
   background:#FFFFFF;
 }
 
+/* Doré lisible en thème clair : textes, chiffres et icônes dorés seulement (contraste ≥ 4,5:1 sur fond blanc).
+   --gold et --gold-bright ne changent pas : fonds et bordures dorés restent identiques. */
+body.light-theme{
+  --gold-text:#856500;
+}
+
+body.light-theme .section-title{
+  color:var(--gold-text);
+}
+
+body.light-theme nav.bottom-nav .nav-item.active{
+  color:var(--gold-text);
+  text-shadow:none;
+}
+
 body.light-theme nav.bottom-nav{
   background:#FFFFFF;
 }
