@@ -88,6 +88,9 @@
     if (i + 1 >= lines.length) return false;                // pas la dernière ligne
     var next = lines[i + 1].replace(/\s+$/, "");
     if (next === line) return false;                        // suivie d'une ligne différente
+    // Liste numérotée : jamais un titre si la ligne suivante, ou la précédente (sans ligne vide), est aussi numérotée
+    if (/^\s*\d{1,3}\.(\s|$)/.test(next)) return false;
+    if (i > 0 && /^\s*\d{1,3}\.(\s|$)/.test(lines[i - 1])) return false;
     var prevBlank = i === 0 ? atMessageStart : /^\s*$/.test(lines[i - 1]);
     return prevBlank || next.length > line.length;          // après une ligne vide / début du message, ou suivie d'une ligne plus longue
   }
