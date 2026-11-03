@@ -14,6 +14,7 @@
 <link rel="stylesheet" href="attachment-card.css">
 <link rel="stylesheet" href="audio-player.css">
 <link rel="stylesheet" href="video-player.css">
+<link rel="stylesheet" href="message-format.css">
 <script src="theme-toggle.js"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
@@ -26,7 +27,7 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 16px 20px;
+    padding: 16px 66px 16px 20px;   /* place pour le bouton de thème fixe (lune) à droite */
     background: var(--bg-elevated);
     border-bottom: 1px solid var(--bg-card);
   }
@@ -65,7 +66,7 @@
     font-size: 20px; pointer-events: none;
   }
 
-  header h1 { font-size: 17px; color: var(--gold-bright); }
+  header h1 { font-size: 17px; color: var(--gold-bright); overflow-wrap: anywhere; }
 
   #messages {
     flex: 1;
@@ -90,21 +91,7 @@
 
   .bubble.long { max-width: 90%; }
 
-  .bubble pre.code-block {
-    margin: 6px 0;
-    padding: 10px 12px;
-    border-radius: 10px;
-    background: rgba(0,0,0,.28);
-    overflow-x: auto;
-    white-space: pre;
-    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-    font-size: 12.5px;
-    line-height: 1.5;
-  }
-  .bubble.mine pre.code-block { background: rgba(0,0,0,.14); }
-  .bubble pre.code-block code { white-space: pre; }
-
-  .bubble.mine { background: var(--gold-bright); color: #0A0A0A; align-self: flex-end; }
+  .bubble.mine { background: var(--mf-mine-bg, var(--gold-bright)); color: #0A0A0A; align-self: flex-end; }
   .bubble .meta { font-size: 11px; opacity: .65; margin-bottom: 4px; font-weight: bold; }
 
   /* Accusés de réception : ✓ envoyé, ✓✓ gris livré, ✓✓ bleu lu — uniquement sur mes messages */
@@ -269,6 +256,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="attachments.js"></script>
 <script src="message-editor.js"></script>
+<script src="message-format.js"></script>
 <script src="link-preview.js"></script>
 <script src="audio-player.js"></script>
 <script src="video-player.js"></script>
@@ -334,12 +322,6 @@
     });
   }
 
-  function escapeHtml(str) {
-    const div = document.createElement("div");
-    div.textContent = str;
-    return div.innerHTML;
-  }
-
   // Détecte si une URL de pièce jointe pointe vers un PDF.
   function isPdfUrl(url) {
     return /\.pdf(\?|$)/i.test(url || "");
@@ -349,34 +331,6 @@
   function pdfThumbnailUrl(url) {
     if (!url || !url.includes("/upload/")) return null;
     return url.replace("/upload/", "/upload/pg_1,f_jpg,w_500,c_limit,q_auto/");
-  }
-
-  // Transforme les URLs présentes dans un texte déjà échappé en liens
-  // cliquables — jamais appliqué au texte brut, pour rester sûr contre
-  // les injections.
-  function linkify(escapedText) {
-    return escapedText.replace(/(\bhttps?:\/\/[^\s<]+|\bwww\.[^\s<]+)/gi, function (match) {
-      const href = /^https?:\/\//i.test(match) ? match : "https://" + match;
-      return '<a href="' + href + '" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:underline;">' + match + '</a>';
-    });
-  }
-
-  // Met en forme le corps d'un message : détecte les blocs ```code```
-  // et les isole visuellement, sans jamais désactiver l'échappement.
-  // N'opère QUE sur du texte déjà passé par escapeHtml(). linkify()
-  // n'est appliqué qu'aux portions hors bloc de code.
-  function formatMessageBody(escapedText) {
-    const parts = escapedText.split(/```([\s\S]*?)```/g);
-    let result = "";
-    for (let i = 0; i < parts.length; i++) {
-      if (i % 2 === 1) {
-        const codeContent = parts[i].replace(/^\n/, "").replace(/\n$/, "");
-        result += '<pre class="code-block"><code>' + codeContent + "</code></pre>";
-      } else {
-        result += linkify(parts[i]);
-      }
-    }
-    return result;
   }
 
   // Nettoie un nom de fichier pour l'utiliser dans une URL de
@@ -466,7 +420,8 @@
       if (msg.content) {
         const textWrap = document.createElement("div");
         if (msg.attachment_url) textWrap.style.marginTop = "6px";
-        textWrap.innerHTML = formatMessageBody(escapeHtml(msg.content));
+        if (window.MahoutoMessageFormat) MahoutoMessageFormat.render(textWrap, msg.content, { scroller: messagesEl });
+        else textWrap.textContent = msg.content;
         bubble.appendChild(textWrap);
       }
 
