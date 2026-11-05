@@ -40,3 +40,6 @@ logs
 test
 tests
 __tests__
+
+# Migrations SQL à exécuter à la main dans Supabase : ne pas les publier sur le site
+migrations

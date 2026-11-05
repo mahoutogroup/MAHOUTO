@@ -165,6 +165,7 @@
   <a class="nav-item active" href="profil.html"><span class="icon">👤</span>Profil</a>
 </nav>
 
+<script src="pseudo.js"></script>
 <script src="config.js"></script>
 <script src="push-notifications.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -386,6 +387,8 @@
       currentFullName = fullName;
       render();
       modal.classList.add("hidden");
+    } else if (MahoutoPseudo.refusal(error)) {
+      alert(MahoutoPseudo.refusal(error).message);
     } else {
       alert("Impossible d'enregistrer le pseudo.");
       console.error(error);

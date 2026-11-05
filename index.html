@@ -537,6 +537,7 @@ nav.bottom-nav .nav-item .icon .ico { width: 24px; height: 24px; }
 <script src="config.js"></script>
 <script src="analytics.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="pseudo.js"></script>
 <script src="auth.js"></script>
 <script src="offline-cache.js"></script>
 <script>
@@ -844,7 +845,7 @@ nav.bottom-nav .nav-item .icon .ico { width: 24px; height: 24px; }
 
       const name = (profile && profile.username)
         || (user.user_metadata && (user.user_metadata.full_name || user.user_metadata.name))
-        || user.email || "Utilisateur";
+        || MahoutoPseudo.neutralName(user.id);
       document.getElementById("profile-name").textContent = name;
 
       const avatarEl = document.getElementById("profile-avatar");

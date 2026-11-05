@@ -967,6 +967,7 @@
   IMPORTANT :
   config.js DOIT être chargé avant le script principal.
 -->
+<script src="/pseudo.js"></script>
 <script src="/config.js"></script>
 
 
@@ -3301,10 +3302,10 @@ async function publishTextMessage(destination, roomId, convId, content) {
 
   }
 
+  // Jamais l'adresse e-mail (ni son préfixe) comme nom affiché : sans profil ni nom, pseudo neutre.
   let username =
     (user.user_metadata && (user.user_metadata.full_name || user.user_metadata.name)) ||
-    (user.email ? user.email.split("@")[0] : "") ||
-    "Utilisateur MAHOUTO+";
+    MahoutoPseudo.neutralName(user.id);
 
   const { data: profileRows } = await supabaseClient
     .from("profiles")
