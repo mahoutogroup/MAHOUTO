@@ -45,9 +45,17 @@
   }
 
   // Message affiché à la personne (tutoiement, comme le reste de la messagerie).
+  // Table message_reports absente (migration 003 pas encore exécutée) :
+  // PGRST205 (cache de schéma PostgREST) ou 42P01 (table inexistante).
+  function isUnavailable(error) {
+    return !!error && (error.code === "PGRST205" || error.code === "42P01" ||
+      /message_reports/.test(String(error.message || "")) && /(schema cache|does not exist)/.test(String(error.message || "")));
+  }
+
   function errorMessage(error) {
     if (!error) return "";
     if (error.code === "23505") return "Tu as déjà signalé ce message.";
+    if (isUnavailable(error)) return "Le signalement n'est pas encore disponible. Réessaie un peu plus tard.";
     return "Impossible d'envoyer le signalement pour le moment.";
   }
 
@@ -163,7 +171,7 @@
       } else {
         status.className = "rp-status rp-error";
         // Doublon : inutile de réessayer ; autre erreur : on peut retenter.
-        sendBtn.disabled = !!(result.error && result.error.code === "23505");
+        sendBtn.disabled = !!(result.error && (result.error.code === "23505" || isUnavailable(result.error)));
       }
     });
 
@@ -174,7 +182,7 @@
 
   var api = {
     REASONS: REASONS, KINDS: KINDS, DM_WARNING: DM_WARNING, warningFor: warningFor,
-    isValidRequest: isValidRequest, errorMessage: errorMessage, submit: submit, open: open
+    isValidRequest: isValidRequest, isUnavailable: isUnavailable, errorMessage: errorMessage, submit: submit, open: open
   };
   root.MahoutoReport = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;

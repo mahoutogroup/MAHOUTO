@@ -152,6 +152,7 @@ test("005 : retire anon et PUBLIC sur les trois fonctions, redonne authenticated
   });
   assert.ok(!/(revoke|grant)[^;]*is_admin/i.test(code.replace(/has_function_privilege\([^)]*\)/g, "")), "is_admin() ne doit être ni retirée ni modifiée");
   assert.ok(!/revoke[^;]*\bauthenticated\b/i.test(code));
+  assert.ok(code.lastIndexOf("revoke execute") < code.indexOf("grant execute"), "les GRANT viennent après tous les REVOKE");
 });
 
 test("005 : le retour arrière redonne l'exécution à anon", () => {

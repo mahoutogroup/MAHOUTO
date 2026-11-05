@@ -74,12 +74,25 @@ function fakeSupabase(result) {
     assert.match(res.message, /déjà signalé/);
   });
 
+  await test("submit : table absente (003 pas encore exécutée) → message clair, sans détail technique", async () => {
+    for (const error of [
+      { code: "42P01", message: 'relation "public.message_reports" does not exist' },
+      { code: "PGRST205", message: "Could not find the table 'public.message_reports' in the schema cache" }
+    ]) {
+      const res = await Report.submit(fakeSupabase({ error }), "room", 5, "spam");
+      assert.strictEqual(res.ok, false);
+      assert.match(res.message, /pas encore disponible/);
+      assert.ok(!/relation|message_reports|42P01|PGRST/.test(res.message));
+      assert.strictEqual(Report.isUnavailable(res.error), true);
+    }
+  });
+
   await test("submit : toute autre erreur donne un message générique, sans détail technique", async () => {
-    const supabase = fakeSupabase({ error: { code: "42P01", message: 'relation "message_reports" does not exist' } });
+    const supabase = fakeSupabase({ error: { code: "42501", message: "new row violates row-level security policy" } });
     const res = await Report.submit(supabase, "room", 5, "spam");
     assert.strictEqual(res.ok, false);
     assert.match(res.message, /Impossible d'envoyer le signalement/);
-    assert.ok(!/relation|message_reports|42P01/.test(res.message));
+    assert.ok(!/row-level|42501/.test(res.message));
   });
 
   await test("submit : une exception réseau est rattrapée", async () => {
