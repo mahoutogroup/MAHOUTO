@@ -61,15 +61,21 @@ if (window.__MAHOUTO_AUTH_LOADED__) {
         let { error } = await supabase
            .from("profiles")
            .upsert(payload, { onConflict: "id" });
-        // Pseudo réservé (déclencheur « PSEUDO_RESERVE », migration 002) : le pseudo vient ici
-        // du nom Google ou de l'e-mail, pas d'un choix de la personne. On crée le profil avec
-        // un pseudo neutre plutôt que de laisser le compte sans profil ; elle pourra le changer
-        // dans « Mon profil ».
-        if (error && String(error.message || "").indexOf("PSEUDO_RESERVE") !== -1) {
-            payload.username = "Utilisateur-" + String(userId).slice(0, 4);
+        // Pseudo refusé par la base (réservé, forme d'adresse e-mail, déjà pris : migrations 002 et
+        // 004) : le pseudo ne vient pas ici d'un choix de la personne mais du nom Google. On crée le
+        // profil avec un pseudo neutre plutôt que de laisser le compte sans profil ; elle pourra le
+        // changer dans « Mon profil ». En cas de collision (très improbable), plus de caractères.
+        if (MahoutoPseudo.refusal(error)) {
+            payload.username = MahoutoPseudo.neutralName(userId);
             ({ error } = await supabase
                .from("profiles")
                .upsert(payload, { onConflict: "id" }));
+            if (MahoutoPseudo.refusal(error)) {
+                payload.username = MahoutoPseudo.neutralName(userId, 8);
+                ({ error } = await supabase
+                   .from("profiles")
+                   .upsert(payload, { onConflict: "id" }));
+            }
         }
         if (error) {
             console.error("Profil non enregistré :", error.message);
@@ -88,7 +94,9 @@ if (window.__MAHOUTO_AUTH_LOADED__) {
                 return null;
             }
 
-            const userName = user.user_metadata?.full_name || user.user_metadata?.name || user.email || "Utilisateur";
+            // Jamais l'adresse e-mail comme pseudo : sans nom (inscription par e-mail), pseudo neutre.
+            let userName = user.user_metadata?.full_name || user.user_metadata?.name || "";
+            if (!userName || MahoutoPseudo.looksLikeEmail(userName)) userName = MahoutoPseudo.neutralName(user.id);
             const userPhoto = user.user_metadata?.avatar_url || "";
 
             // Créer le profil si n'existe pas

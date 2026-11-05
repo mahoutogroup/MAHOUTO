@@ -480,6 +480,7 @@
 
 </div>
 
+<script src="pseudo.js"></script>
 <script src="config.js"></script>
 <script src="offline-cache.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -533,8 +534,8 @@
     return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
   }
 
-  // Renvoie l'erreur éventuelle (null si tout va bien) pour que joinChat puisse
-  // prévenir quand le pseudo est réservé (déclencheur « PSEUDO_RESERVE »).
+  // Renvoie l'erreur éventuelle (null si tout va bien) pour que joinChat puisse prévenir
+  // quand le pseudo est refusé par la base (réservé, forme d'e-mail, déjà pris).
   async function ensureProfile(userId, username) {
     const { error } = await supabase
       .from("profiles")
@@ -543,9 +544,6 @@
     return error || null;
   }
 
-  function isReservedNameError(error) {
-    return !!error && String(error.message || "").indexOf("PSEUDO_RESERVE") !== -1;
-  }
 
   async function loadRooms() {
     const cacheKey = "discussions:" + currentUser.id;
@@ -822,8 +820,9 @@
       }
 
       const profileError = await ensureProfile(currentUser.id, username);
-      if (isReservedNameError(profileError)) {
-        setStatus("Ce pseudo est réservé. Choisis-en un autre.");
+      const refused = MahoutoPseudo.refusal(profileError);
+      if (refused) {
+        setStatus(refused.message);
         joinBtn.disabled = false;
         return;
       }
@@ -853,10 +852,16 @@
         .from("profiles").select("username").eq("id", currentUser.id).maybeSingle();
 
       if (!existingProfile) {
+        // Jamais l'adresse e-mail (ni son préfixe) comme pseudo : sans nom Google, pseudo neutre.
         const googleName =
           currentUser.user_metadata && (currentUser.user_metadata.full_name || currentUser.user_metadata.name);
-        const fallbackName = currentUser.email ? currentUser.email.split("@")[0] : "Utilisateur";
-        await ensureProfile(currentUser.id, googleName || fallbackName);
+        const wanted = (googleName && !MahoutoPseudo.looksLikeEmail(googleName))
+          ? googleName
+          : MahoutoPseudo.neutralName(currentUser.id);
+        // Nom refusé par la base : pseudo neutre (la personne le changera dans « Mon profil »).
+        if (MahoutoPseudo.refusal(await ensureProfile(currentUser.id, wanted))) {
+          await ensureProfile(currentUser.id, MahoutoPseudo.neutralName(currentUser.id));
+        }
       }
 
       const { data: roleProfile } = await supabase

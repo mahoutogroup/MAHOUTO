@@ -96,6 +96,20 @@ function fakeSupabase(result) {
     assert.strictEqual(supabase.calls.length, 0);
   });
 
+  await test("avertissement exact avant le signalement d'un message PRIVÉ seulement", () => {
+    assert.strictEqual(Report.DM_WARNING, "En signalant, vous partagez ce message avec l'équipe de modération.");
+    assert.strictEqual(Report.warningFor("dm"), Report.DM_WARNING);
+    assert.strictEqual(Report.warningFor("room"), "");
+    const code = fs.readFileSync(path.join(__dirname, "..", "report.js"), "utf8");
+    assert.ok(/warningFor\(options\.kind\)/.test(code), "la fenêtre doit afficher l'avertissement");
+  });
+
+  await test("le navigateur n'envoie jamais le texte du message privé (la base le copie)", async () => {
+    const supabase = fakeSupabase();
+    await Report.submit(supabase, "dm", 9, "spam");
+    assert.deepStrictEqual(Object.keys(supabase.calls[0].payload).sort(), ["kind", "message_id", "reason"]);
+  });
+
   await test("le module n'utilise pas innerHTML et ne demande pas la ligne en retour (.select)", () => {
     // Commentaires retirés : seuls les appels réels comptent.
     const code = fs.readFileSync(path.join(__dirname, "..", "report.js"), "utf8")

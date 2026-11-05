@@ -196,6 +196,14 @@
   });
 
   async function runSearch(q) {
+    // Sans session, la fonction search_profiles n'est pas appelée (elle n'est plus exécutable
+    // par un visiteur non connecté : migration 005).
+    if (!(await ensureLoggedIn())) {
+      searchResultsEl.classList.remove("hidden");
+      searchResultsEl.innerHTML = '<div style="padding:14px 20px;color:var(--text-dim);">Connecte-toi depuis l\'accueil pour chercher quelqu\'un.</div>';
+      return;
+    }
+
     const { data, error } = await supabase.rpc("search_profiles", { q });
     searchResultsEl.classList.remove("hidden");
 

@@ -29,6 +29,7 @@ const APP_SHELL = [
   "/message-format.js",
   "/message-format.css",
   "/report.js",
+  "/pseudo.js",
   "/pwa-install.js",
   "/assets/icon-192.png",
   "/assets/icon-512.png",

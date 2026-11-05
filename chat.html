@@ -347,6 +347,7 @@
 </form>
 
 <script src="config.js"></script>
+<script src="pseudo.js"></script>
 <script src="offline-cache.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="attachments.js"></script>
@@ -614,8 +615,8 @@
       .subscribe();
   }
 
-  // Renvoie l'erreur éventuelle (null si tout va bien) pour que joinChat puisse
-  // prévenir quand le pseudo est réservé (déclencheur « PSEUDO_RESERVE »).
+  // Renvoie l'erreur éventuelle (null si tout va bien) pour que joinChat puisse prévenir
+  // quand le pseudo est refusé par la base (réservé, forme d'e-mail, déjà pris).
   async function ensureProfile(userId, username) {
     const { error } = await supabase
       .from("profiles")
@@ -624,9 +625,6 @@
     return error || null;
   }
 
-  function isReservedNameError(error) {
-    return !!error && String(error.message || "").indexOf("PSEUDO_RESERVE") !== -1;
-  }
 
   async function markAsRead() {
     if (!currentUser) return;
@@ -656,8 +654,9 @@
       currentUsername = username;
 
       const profileError = await ensureProfile(currentUser.id, currentUsername);
-      if (isReservedNameError(profileError)) {
-        setStatus("Ce pseudo est réservé. Choisis-en un autre.");
+      const refused = MahoutoPseudo.refusal(profileError);
+      if (refused) {
+        setStatus(refused.message);
         joinBtn.disabled = false;
         return;
       }

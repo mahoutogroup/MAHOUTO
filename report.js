@@ -2,10 +2,13 @@
    report.js — Signalement d'un message (salon ou message privé)
    Utilisé par chat.html (salons) et dm-chat.html (messages privés).
 
-   Ce qui est enregistré (table public.message_reports, migration
-   003) : le type (salon ou message privé), l'identifiant du message
-   et la raison choisie. L'auteur du signalement et la date sont
-   ajoutés par la base ; le CONTENU du message n'est jamais copié.
+   Ce que le navigateur envoie (table public.message_reports,
+   migration 003) : le type (salon ou message privé), l'identifiant
+   du message et la raison choisie. L'auteur du signalement, la date,
+   la personne signalée et, pour un MESSAGE PRIVÉ seulement, la copie
+   du texte de ce seul message sont ajoutés par la base (le
+   navigateur ne peut pas les écrire). C'est pourquoi un avertissement
+   est affiché avant l'envoi d'un signalement de message privé.
 
    Important : l'insertion ne demande PAS la ligne en retour (pas de
    .select()) : seuls les admins peuvent lire les signalements, donc
@@ -24,6 +27,13 @@
   ];
 
   var KINDS = ["room", "dm"];
+
+  // Affiché avant l'envoi d'un signalement de message privé (texte exact demandé).
+  var DM_WARNING = "En signalant, vous partagez ce message avec l'équipe de modération.";
+
+  function warningFor(kind) {
+    return kind === "dm" ? DM_WARNING : "";
+  }
 
   function isValidRequest(kind, messageId, reason) {
     var id = Number(messageId);
@@ -68,6 +78,7 @@
       "#rp-overlay .rp-sheet{width:100%;max-width:480px;background:var(--bg-elevated);color:var(--white);border-radius:20px 20px 0 0;padding:16px 20px max(16px,env(safe-area-inset-bottom));max-height:85vh;overflow-y:auto}" +
       "#rp-overlay h2{font-size:16px;margin:0 0 4px}" +
       "#rp-overlay .rp-help{font-size:13px;color:var(--text-muted);margin:0 0 12px}" +
+      "#rp-overlay .rp-warning{font-size:13px;font-weight:600;color:var(--gold);margin:0 0 12px}" +
       "#rp-overlay label.rp-option{display:flex;align-items:center;gap:10px;padding:11px 4px;font-size:15px;cursor:pointer}" +
       "#rp-overlay .rp-status{min-height:18px;font-size:13px;margin:8px 0;color:var(--text-muted)}" +
       "#rp-overlay .rp-status.rp-error{color:#F87171}" +
@@ -109,6 +120,8 @@
     var sheet = el("div", { class: "rp-sheet", role: "dialog", "aria-modal": "true", "aria-label": "Signaler un message" });
     sheet.appendChild(el("h2", { text: "Signaler ce message" }));
     sheet.appendChild(el("p", { class: "rp-help", text: "Pourquoi signales-tu ce message ?" }));
+    var warning = warningFor(options.kind);
+    if (warning) sheet.appendChild(el("p", { class: "rp-warning", role: "note", text: warning }));
 
     REASONS.forEach(function (r) {
       var input = el("input", { type: "radio", name: "rp-reason", value: r.value });
@@ -159,7 +172,10 @@
     if (first) first.focus();
   }
 
-  var api = { REASONS: REASONS, KINDS: KINDS, isValidRequest: isValidRequest, errorMessage: errorMessage, submit: submit, open: open };
+  var api = {
+    REASONS: REASONS, KINDS: KINDS, DM_WARNING: DM_WARNING, warningFor: warningFor,
+    isValidRequest: isValidRequest, errorMessage: errorMessage, submit: submit, open: open
+  };
   root.MahoutoReport = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : globalThis);
