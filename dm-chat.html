@@ -230,6 +230,7 @@
     <button type="button" data-action="share">🔗 Partager</button>
     <button type="button" data-action="edit">✏️ Modifier</button>
     <button type="button" data-action="delete-me">🙈 Supprimer pour moi</button>
+    <button type="button" data-action="report">🚩 Signaler</button>
     <button type="button" class="danger" data-action="delete-all">🗑️ Supprimer pour tous</button>
   </div>
 </div>
@@ -257,6 +258,7 @@
 <script src="attachments.js"></script>
 <script src="message-editor.js"></script>
 <script src="message-format.js"></script>
+<script src="report.js"></script>
 <script src="link-preview.js"></script>
 <script src="audio-player.js"></script>
 <script src="video-player.js"></script>
@@ -951,6 +953,8 @@
     const isMine = msg.sender_id === currentUser.id;
     actionSheet.querySelector('[data-action="edit"]').style.display = isMine && !msg.attachment_url ? "flex" : "none";
     actionSheet.querySelector('[data-action="delete-all"]').style.display = isMine ? "flex" : "none";
+    // « Signaler » : seulement sur un message REÇU (jamais sur le sien).
+    actionSheet.querySelector('[data-action="report"]').style.display = isMine ? "none" : "flex";
 
     actionSheet.classList.remove("hidden");
   }
@@ -1025,6 +1029,13 @@
           if (error) { console.error(error); alert("Impossible de modifier ce message."); }
         });
     });
+  });
+
+  actionSheet.querySelector('[data-action="report"]').addEventListener("click", () => {
+    if (!activeMessage) return;
+    const msg = activeMessage;
+    closeMessageActions();
+    MahoutoReport.open({ supabase, kind: "dm", messageId: msg.id });
   });
 
   actionSheet.querySelector('[data-action="delete-me"]').addEventListener("click", async () => {

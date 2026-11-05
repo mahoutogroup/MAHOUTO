@@ -58,9 +58,19 @@ if (window.__MAHOUTO_AUTH_LOADED__) {
     async function ensureProfile(userId, username, avatarUrl) {
         const payload = { id: userId, username: username };
         if (avatarUrl) payload.avatar_url = avatarUrl;
-        const { error } = await supabase
+        let { error } = await supabase
            .from("profiles")
            .upsert(payload, { onConflict: "id" });
+        // Pseudo réservé (déclencheur « PSEUDO_RESERVE », migration 002) : le pseudo vient ici
+        // du nom Google ou de l'e-mail, pas d'un choix de la personne. On crée le profil avec
+        // un pseudo neutre plutôt que de laisser le compte sans profil ; elle pourra le changer
+        // dans « Mon profil ».
+        if (error && String(error.message || "").indexOf("PSEUDO_RESERVE") !== -1) {
+            payload.username = "Utilisateur-" + String(userId).slice(0, 4);
+            ({ error } = await supabase
+               .from("profiles")
+               .upsert(payload, { onConflict: "id" }));
+        }
         if (error) {
             console.error("Profil non enregistré :", error.message);
         }

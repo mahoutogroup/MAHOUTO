@@ -386,6 +386,8 @@
       currentFullName = fullName;
       render();
       modal.classList.add("hidden");
+    } else if (String(error.message || "").indexOf("PSEUDO_RESERVE") !== -1) {
+      alert("Ce pseudo est réservé. Choisis-en un autre.");
     } else {
       alert("Impossible d'enregistrer le pseudo.");
       console.error(error);

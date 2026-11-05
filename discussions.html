@@ -533,11 +533,18 @@
     return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
   }
 
+  // Renvoie l'erreur éventuelle (null si tout va bien) pour que joinChat puisse
+  // prévenir quand le pseudo est réservé (déclencheur « PSEUDO_RESERVE »).
   async function ensureProfile(userId, username) {
     const { error } = await supabase
       .from("profiles")
       .upsert({ id: userId, username: username }, { onConflict: "id" });
     if (error) console.error("Profil non enregistré :", error);
+    return error || null;
+  }
+
+  function isReservedNameError(error) {
+    return !!error && String(error.message || "").indexOf("PSEUDO_RESERVE") !== -1;
   }
 
   async function loadRooms() {
@@ -807,11 +814,19 @@
     setStatus("Connexion...");
 
     try {
-      const { data, error } = await supabase.auth.signInAnonymously();
-      if (error) throw error;
+      // Réutilise la session anonyme créée par une tentative précédente (pseudo refusé).
+      if (!currentUser) {
+        const { data, error } = await supabase.auth.signInAnonymously();
+        if (error) throw error;
+        currentUser = data.user;
+      }
 
-      currentUser = data.user;
-      await ensureProfile(currentUser.id, username);
+      const profileError = await ensureProfile(currentUser.id, username);
+      if (isReservedNameError(profileError)) {
+        setStatus("Ce pseudo est réservé. Choisis-en un autre.");
+        joinBtn.disabled = false;
+        return;
+      }
 
       const { data: roleProfile } = await supabase
         .from("profiles").select("role").eq("id", currentUser.id).maybeSingle();

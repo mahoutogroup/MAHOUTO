@@ -326,6 +326,7 @@
     <button type="button" data-action="share">🔗 Partager</button>
     <button type="button" data-action="edit">✏️ Modifier</button>
     <button type="button" data-action="delete-me">🙈 Supprimer pour moi</button>
+    <button type="button" data-action="report">🚩 Signaler</button>
     <button type="button" class="danger" data-action="delete-all">🗑️ Supprimer pour tous</button>
   </div>
 </div>
@@ -351,6 +352,7 @@
 <script src="attachments.js"></script>
 <script src="message-editor.js"></script>
 <script src="message-format.js"></script>
+<script src="report.js"></script>
 <script src="link-preview.js"></script>
 <script src="audio-player.js"></script>
 <script src="video-player.js"></script>
@@ -612,11 +614,18 @@
       .subscribe();
   }
 
+  // Renvoie l'erreur éventuelle (null si tout va bien) pour que joinChat puisse
+  // prévenir quand le pseudo est réservé (déclencheur « PSEUDO_RESERVE »).
   async function ensureProfile(userId, username) {
     const { error } = await supabase
       .from("profiles")
       .upsert({ id: userId, username: username }, { onConflict: "id" });
     if (error) console.error("Profil non enregistré :", error);
+    return error || null;
+  }
+
+  function isReservedNameError(error) {
+    return !!error && String(error.message || "").indexOf("PSEUDO_RESERVE") !== -1;
   }
 
   async function markAsRead() {
@@ -637,13 +646,21 @@
     setStatus("Connexion...");
 
     try {
-      const { data, error } = await supabase.auth.signInAnonymously();
-      if (error) throw error;
-
-      currentUser = data.user;
+      // Réutilise la session anonyme créée par une tentative précédente (pseudo refusé) :
+      // évite de créer un nouveau compte à chaque essai.
+      if (!currentUser) {
+        const { data, error } = await supabase.auth.signInAnonymously();
+        if (error) throw error;
+        currentUser = data.user;
+      }
       currentUsername = username;
 
-      await ensureProfile(currentUser.id, currentUsername);
+      const profileError = await ensureProfile(currentUser.id, currentUsername);
+      if (isReservedNameError(profileError)) {
+        setStatus("Ce pseudo est réservé. Choisis-en un autre.");
+        joinBtn.disabled = false;
+        return;
+      }
       await enterRoom();
     } catch (err) {
       console.error(err);
@@ -985,6 +1002,8 @@
     const isMine = msg.user_id === currentUser.id;
     actionSheet.querySelector('[data-action="edit"]').style.display = isMine && !msg.attachment_url ? "flex" : "none";
     actionSheet.querySelector('[data-action="delete-all"]').style.display = isMine ? "flex" : "none";
+    // « Signaler » : seulement sur le message d'une autre personne.
+    actionSheet.querySelector('[data-action="report"]').style.display = isMine ? "none" : "flex";
 
     actionSheet.classList.remove("hidden");
   }
@@ -1061,6 +1080,13 @@
           if (error) { console.error(error); alert("Impossible de modifier ce message."); }
         });
     });
+  });
+
+  actionSheet.querySelector('[data-action="report"]').addEventListener("click", () => {
+    if (!activeMessage) return;
+    const msg = activeMessage;
+    closeMessageActions();
+    MahoutoReport.open({ supabase, kind: "room", messageId: msg.id });
   });
 
   actionSheet.querySelector('[data-action="delete-me"]').addEventListener("click", async () => {
