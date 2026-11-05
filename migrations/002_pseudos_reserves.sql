@@ -1,11 +1,11 @@
 -- ============================================================
--- MAHOUTO+ — 002 : pseudos réservés
+-- MAHOUTO+ — 002 : pseudos réservés et pseudos en forme d'e-mail
 -- ============================================================
 --
 -- Problème : le pseudo (public.profiles.username) et le nom affiché d'un
 -- message de salon (public.messages.username, texte libre) peuvent être
--- n'importe quoi : n'importe qui peut s'appeler « MAJESTÉ AI », « Admin »,
--- « Support »...
+-- n'importe quoi : « MAJESTÉ AI », « Admin », « Support »... ou une adresse
+-- e-mail.
 --
 -- Ce script, côté base (il n'existe aucune route serveur pour écrire un
 -- profil : les pages écrivent directement dans Supabase) :
@@ -24,16 +24,28 @@
 --      EXACTEMENT un nom de la liste. « Mahouto Abdallah » reste autorisé
 --      (nom du fondateur), et « Majesté AI Officiel » aussi : la règle ne
 --      porte que sur l'égalité exacte (voir la description de la PR).
---   4. Deux déclencheurs qui refusent avec le message « PSEUDO_RESERVE » :
---        - profiles : à l'insertion et quand le pseudo CHANGE ;
+--   4. public.reserved_username_exempt_accounts : comptes officiels exemptés
+--      PAR IDENTIFIANT (9 comptes de départ). Pour en ajouter un :
+--        insert into public.reserved_username_exempt_accounts (user_id, note)
+--        values ('<uuid>', 'compte officiel');
+--   5. Deux déclencheurs qui refusent avec le message « PSEUDO_RESERVE » ou
+--      « PSEUDO_EMAIL » :
+--        - profiles : à l'INSERTION et quand le pseudo CHANGE (jamais sur une
+--          autre mise à jour) ;
 --        - messages : à l'insertion et quand le nom affiché change, sauf si
 --          c'est le pseudo actuel de l'auteur (un compte existant qui porte
---          déjà un nom réservé n'est pas bloqué : voir la requête de
---          repérage dans 000_diagnostic_lecture_seule.sql, rien n'est
---          modifié automatiquement).
---      Sont exemptés : les admins (public.is_admin()), et les contextes
---      sans utilisateur (SQL Editor, clé service_role : routes serveur
---      comme api/share-finalize.js).
+--          déjà un nom réservé ou une adresse e-mail n'est pas bloqué : voir
+--          les requêtes de repérage dans 000_diagnostic_lecture_seule.sql,
+--          rien n'est modifié automatiquement).
+--      Exemptés du contrôle des NOMS RÉSERVÉS : les rôles founder, admin,
+--      super_admin (public.is_admin()), les 9 comptes par identifiant, et les
+--      contextes sans utilisateur (SQL Editor, clé service_role : routes
+--      serveur comme api/share-finalize.js).
+--      Le refus d'un pseudo en FORME D'ADRESSE E-MAIL (PSEUDO_EMAIL) ne
+--      connaît d'exemption que le SQL Editor et la clé service_role :
+--      l'e-mail ne doit jamais servir de pseudo, pour personne.
+--
+-- Aucune donnée existante n'est modifiée (ni profil, ni message).
 --
 -- Limites connues : les caractères visuellement proches non listés (autres
 -- alphabets, caractères invisibles) ne sont pas tous couverts ; un nom qui
@@ -41,8 +53,8 @@
 --
 -- ⚠️ À EXÉCUTER MANUELLEMENT (SQL Editor Supabase), APRÈS le déploiement
 -- du code de la PR (qui affiche un message clair quand un pseudo est
--- refusé). Sans ce code, un pseudo refusé ferait échouer l'écriture sans
--- explication à l'écran. Non destructif : aucune ligne existante modifiée.
+-- refusé et ne met plus l'e-mail comme pseudo par défaut). Sans ce code,
+-- un pseudo refusé ferait échouer l'écriture sans explication à l'écran.
 -- Retour arrière : migrations/rollback/002_pseudos_reserves.sql
 -- ------------------------------------------------------------
 
@@ -54,11 +66,19 @@ create table if not exists public.reserved_usernames (
   created_at timestamptz not null default now()
 );
 
--- Table interne : RLS activée, aucune politique, aucun droit pour les
+create table if not exists public.reserved_username_exempt_accounts (
+  user_id uuid primary key,
+  note text,
+  created_at timestamptz not null default now()
+);
+
+-- Tables internes : RLS activée, aucune politique, aucun droit pour les
 -- clients. Seules les fonctions SECURITY DEFINER ci-dessous et
 -- l'administrateur de la base (SQL Editor) y accèdent.
 alter table public.reserved_usernames enable row level security;
+alter table public.reserved_username_exempt_accounts enable row level security;
 revoke all on table public.reserved_usernames from public, anon, authenticated;
+revoke all on table public.reserved_username_exempt_accounts from public, anon, authenticated;
 
 create or replace function public.username_variants(p text)
 returns text[]
@@ -94,6 +114,16 @@ as $$
   );
 $$;
 
+-- Forme d'adresse e-mail : même test que MahoutoPseudo.looksLikeEmail (pseudo.js).
+create or replace function public.looks_like_email(p text)
+returns boolean
+language sql
+immutable
+parallel safe
+as $$
+  select btrim(coalesce(p, '')) ~ '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$'
+$$;
+
 revoke execute on function public.is_reserved_username(text) from public, anon;
 grant execute on function public.is_reserved_username(text) to authenticated, service_role;
 
@@ -105,6 +135,19 @@ from (values
 ) as v(label)
 on conflict (normalized) do nothing;
 
+insert into public.reserved_username_exempt_accounts (user_id, note)
+values
+  ('0b3b3de9-b835-40ec-b076-22fdc3c4ab02'::uuid, 'compte officiel'),
+  ('8894a9f5-c2e4-45c3-a927-e36f64a104f7'::uuid, 'compte officiel'),
+  ('0a68d262-5615-4819-8d48-e6522f6a0e6f'::uuid, 'compte officiel'),
+  ('5b096879-b856-42f5-9952-790f09abbf6f'::uuid, 'compte officiel'),
+  ('6706610f-5a79-411b-a24d-07481cbd0ce7'::uuid, 'compte officiel'),
+  ('9e999155-e1c9-4286-adc4-9f4c97c95c3b'::uuid, 'compte officiel'),
+  ('1af183aa-45ef-4a4d-afa9-6b77ca8b04a2'::uuid, 'compte officiel'),
+  ('149965bd-1565-40ce-bc6d-07154f43c256'::uuid, 'compte officiel'),
+  ('ae75d336-3653-487f-bec2-5ee793e0fafa'::uuid, 'compte officiel')
+on conflict (user_id) do nothing;
+
 create or replace function public.enforce_reserved_username_profiles()
 returns trigger
 language plpgsql
@@ -112,6 +155,7 @@ security definer
 set search_path = public
 as $$
 begin
+  -- Contrôle seulement à l'insertion, ou quand le pseudo change.
   if tg_op = 'UPDATE' and new.username is not distinct from old.username then
     return new;
   end if;
@@ -121,7 +165,15 @@ begin
     return new;
   end if;
 
-  if public.is_admin() then
+  -- Jamais d'adresse e-mail comme pseudo (aucune exemption côté utilisateur).
+  if public.looks_like_email(new.username) then
+    raise exception 'PSEUDO_EMAIL: le pseudo ne peut pas etre une adresse e-mail'
+      using errcode = '23514', hint = 'email_as_username';
+  end if;
+
+  -- Exemptés des noms réservés : founder / admin / super_admin, comptes officiels par identifiant.
+  if public.is_admin()
+     or exists (select 1 from public.reserved_username_exempt_accounts e where e.user_id = auth.uid()) then
     return new;
   end if;
 
@@ -145,20 +197,35 @@ language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+  own_name boolean;
 begin
+  -- Contrôle seulement à l'insertion, ou quand le nom affiché change.
   if tg_op = 'UPDATE' and new.username is not distinct from old.username then
     return new;
   end if;
 
-  if auth.uid() is null or public.is_admin() then
+  if auth.uid() is null then
     return new;
   end if;
 
-  if public.is_reserved_username(new.username)
-     and not exists (
-       select 1 from public.profiles p
-       where p.id = new.user_id and p.username = new.username
-     ) then
+  -- Compte existant : son pseudo actuel reste utilisable, même réservé ou en forme d'e-mail.
+  select exists (
+    select 1 from public.profiles p
+    where p.id = new.user_id and p.username = new.username
+  ) into own_name;
+
+  if public.looks_like_email(new.username) and not own_name then
+    raise exception 'PSEUDO_EMAIL: le nom affiche ne peut pas etre une adresse e-mail'
+      using errcode = '23514', hint = 'email_as_username';
+  end if;
+
+  if public.is_admin()
+     or exists (select 1 from public.reserved_username_exempt_accounts e where e.user_id = auth.uid()) then
+    return new;
+  end if;
+
+  if public.is_reserved_username(new.username) and not own_name then
     raise exception 'PSEUDO_RESERVE: ce nom affiche est reserve'
       using errcode = '23514', hint = 'reserved_username';
   end if;

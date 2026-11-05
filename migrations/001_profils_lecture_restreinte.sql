@@ -20,8 +20,13 @@
 -- listant tous les pseudos et avatars permettrait de les énumérer d'un
 -- seul appel (aujourd'hui, search_profiles est limitée à 20 résultats).
 --
--- Les politiques de profiles_insert_own / profiles_update_own, les
--- déclencheurs de protection du rôle et les fonctions SECURITY DEFINER
+-- Aucune autre lecture n'est ouverte : pas de politique pour les
+-- visiteurs non connectés, pas de vue, pas de nouvelle fonction.
+--
+-- Les politiques de profiles_insert_own / profiles_update_own, les DEUX
+-- déclencheurs de protection du rôle (trg_prevent_profile_role_change et
+-- trg_protect_role : ce script n'y touche pas, il vérifie seulement qu'ils
+-- sont présents) et les fonctions SECURITY DEFINER
 -- (is_admin, get_public_profile, search_profiles, vérification publique
 -- des certificats) ne sont pas modifiés. Les politiques des autres
 -- tables qui vérifient le rôle par « exists (select 1 from profiles ...
@@ -67,6 +72,18 @@ begin
     raise exception
       'Autre(s) politique(s) de lecture encore actives sur public.profiles : %. Rien n''a ete modifie ; examinez-les (voir 000_diagnostic_lecture_seule.sql) avant de relancer.',
       autres;
+  end if;
+end $$;
+
+-- Les deux déclencheurs de protection du rôle ne sont pas modifiés ; simple avertissement
+-- s'il en manque un en production.
+do $$
+begin
+  if not exists (select 1 from pg_trigger where tgrelid = 'public.profiles'::regclass and tgname = 'trg_prevent_profile_role_change' and not tgisinternal) then
+    raise warning 'Declencheur trg_prevent_profile_role_change absent de public.profiles (non modifie par ce script).';
+  end if;
+  if not exists (select 1 from pg_trigger where tgrelid = 'public.profiles'::regclass and tgname = 'trg_protect_role' and not tgisinternal) then
+    raise warning 'Declencheur trg_protect_role absent de public.profiles (non modifie par ce script).';
   end if;
 end $$;
 

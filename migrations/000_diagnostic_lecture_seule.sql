@@ -3,7 +3,7 @@
 -- ============================================================
 --
 -- Aucune écriture, aucune modification : uniquement des SELECT. À lancer
--- dans l'éditeur SQL de Supabase AVANT les migrations 001 à 003, puis à
+-- dans l'éditeur SQL de Supabase AVANT les migrations 001 à 005, puis à
 -- me renvoyer le résultat : les migrations seront finalisées d'après
 -- l'état réel de la base.
 --
@@ -180,3 +180,58 @@ select jsonb_pretty(jsonb_build_object(
     from messages_trouves mt left join public.profiles p on p.id = mt.user_id
   )
 )) as comptes_portant_un_nom_reserve;
+
+
+-- ============================================================
+-- REQUÊTE 3 — doublons de pseudos (même normalisation que l'index unique de
+-- la migration 004 : espaces, casse, accents) et pseudos qui sont une
+-- adresse e-mail. À relancer jusqu'à « nb_groupes_de_doublons: 0 » avant
+-- d'exécuter la migration 004. Ne modifie RIEN.
+-- ============================================================
+
+with cles as (
+  select p.id, p.username, p.role, p.created_at, u.email, coalesce(u.is_anonymous, false) as anonyme,
+         lower(translate(regexp_replace(trim(p.username), '\s+', ' ', 'g'), 'àáâãäåçèéêëìíîïñòóôõöùúûüýÿÀÁÂÃÄÅÇÈÉÊËÌÍÎÏÑÒÓÔÕÖÙÚÛÜÝŸ', 'aaaaaaceeeeiiiinooooouuuuyyaaaaaaceeeeiiiinooooouuuuyy')) as cle
+  from public.profiles p
+  left join auth.users u on u.id = p.id
+  where trim(p.username) <> ''
+),
+doublons as (
+  select cle from cles group by cle having count(*) > 1
+)
+select jsonb_pretty(jsonb_build_object(
+  'nb_groupes_de_doublons', (select count(*) from doublons),
+  'doublons', (
+    select coalesce(jsonb_agg(g.groupe order by g.cle), '[]'::jsonb)
+    from (
+      select c.cle, jsonb_build_object(
+        'pseudo_normalise', c.cle,
+        'comptes', jsonb_agg(jsonb_build_object(
+          'id', c.id, 'pseudo', c.username, 'role', c.role, 'cree_le', c.created_at,
+          'email', c.email, 'compte_anonyme', c.anonyme
+        ) order by c.created_at)
+      ) as groupe
+      from cles c
+      where c.cle in (select cle from doublons)
+      group by c.cle
+    ) g
+  ),
+  'profils_dont_le_pseudo_est_une_adresse_email', (
+    select coalesce(jsonb_agg(jsonb_build_object(
+      'id', c.id, 'pseudo', c.username, 'role', c.role, 'cree_le', c.created_at, 'compte_anonyme', c.anonyme
+    ) order by c.created_at), '[]'::jsonb)
+    from cles c
+    where btrim(c.username) ~ '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$'
+  ),
+  'noms_affiches_en_forme_d_email_dans_des_messages_de_salon', (
+    select coalesce(jsonb_agg(jsonb_build_object(
+      'auteur_id', m.user_id, 'nom_affiche', m.username, 'nb_messages', m.nb
+    ) order by m.nb desc), '[]'::jsonb)
+    from (
+      select user_id, username, count(*) as nb
+      from public.messages
+      where btrim(username) ~ '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$'
+      group by user_id, username
+    ) m
+  )
+)) as doublons_et_pseudos_email;
