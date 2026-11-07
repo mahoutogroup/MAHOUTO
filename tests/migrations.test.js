@@ -24,8 +24,8 @@ const OFFICIAL_IDS = [
   "1af183aa-45ef-4a4d-afa9-6b77ca8b04a2", "149965bd-1565-40ce-bc6d-07154f43c256", "ae75d336-3653-487f-bec2-5ee793e0fafa"
 ];
 
-test("cinq migrations numérotées (001 à 005), chacune avec son retour arrière du même nom", () => {
-  assert.deepStrictEqual(migrations.map((f) => f.slice(0, 3)), ["001", "002", "003", "004", "005"]);
+test("six migrations numérotées (001 à 006), chacune avec son retour arrière du même nom", () => {
+  assert.deepStrictEqual(migrations.map((f) => f.slice(0, 3)), ["001", "002", "003", "004", "005", "006"]);
   migrations.forEach((f) => assert.ok(fs.existsSync(path.join(dir, "rollback", f)), "retour arrière manquant : " + f));
 });
 
@@ -159,6 +159,49 @@ test("005 : le retour arrière redonne l'exécution à anon", () => {
   const code = stripComments(read("rollback/005_anon_sans_fonctions_messagerie.sql"));
   ["get_or_create_dm_conversation(uuid)", "search_profiles(text)", "get_public_profile(uuid)"].forEach((f) =>
     assert.ok(code.includes("grant execute on function public." + f + " to public, anon, authenticated, service_role;")));
+});
+
+
+test("006 : écriture réservée aux admins, quatre colonnes modifiables seulement, aucun DELETE", () => {
+  const code = stripComments(read("006_moderation_signalements.sql"));
+  assert.ok(/revoke update, delete on table public\.message_reports from public, anon, authenticated;/.test(code), "update/delete retirés d'abord");
+  assert.ok(code.includes("grant update (status, handled_by, handled_at, admin_note) on table public.message_reports to authenticated;"));
+  const grants = code.match(/grant update \([^)]*\)/g) || [];
+  assert.strictEqual(grants.length, 1, "un seul GRANT UPDATE, limité à des colonnes");
+  assert.ok(!/grant (all|update|delete)\s+on/i.test(code), "aucun GRANT de table entière");
+  assert.match(code, /create policy "message_reports_update_admin" on public\.message_reports\s+for update to authenticated\s+using \(public\.is_admin\(\)\)\s+with check \(public\.is_admin\(\)\);/);
+  assert.ok(!/for delete|for all/i.test(code), "aucune politique DELETE ni ALL");
+  assert.ok(!/grant[^;]*\bdelete\b/i.test(code));
+  assert.match(code, /check \(status in \('open', 'dismissed', 'actioned'\)\)/);
+  assert.match(code, /status text not null default 'open'/);
+});
+
+test("006 : handled_by et handled_at remplis par un déclencheur (auth.uid(), now())", () => {
+  const code = stripComments(read("006_moderation_signalements.sql"));
+  assert.match(code, /create trigger trg_message_report_handled\s+before update on public\.message_reports/);
+  assert.ok(code.includes("new.handled_by := auth.uid();") && code.includes("new.handled_at := now();"));
+  assert.ok(code.includes("new.handled_by := old.handled_by;"), "non modifiable par le client hors changement de statut");
+});
+
+test("006 : fonction de masquage de salon réservée aux admins, sans équivalent pour les messages privés", () => {
+  const code = stripComments(read("006_moderation_signalements.sql"));
+  const fn = code.slice(code.indexOf("create or replace function public.admin_hide_room_message"));
+  assert.match(fn, /security definer\s+set search_path = public/);
+  assert.ok(fn.indexOf("public.is_admin()") < fn.indexOf("update public.messages"), "is_admin() vérifié avant toute écriture");
+  assert.ok(fn.includes("revoke execute on function public.admin_hide_room_message(bigint) from public, anon;"));
+  assert.ok(fn.includes("grant execute on function public.admin_hide_room_message(bigint) to authenticated;"));
+  assert.ok(/is_deleted = true/.test(fn) && !/delete from/i.test(code), "la ligne n'est pas effacée");
+  assert.ok(!/dm_messages|dm_conversations/.test(code), "006 ne touche jamais aux messages privés (code)");
+  assert.strictEqual((code.match(/create or replace function public\.admin_hide_/g) || []).length, 1, "une seule fonction de masquage");
+  assert.ok(!/(create|alter|drop)\s+policy[^;]*(messages|dm_)/i.test(code.replace(/message_reports/g, "")), "aucune politique existante modifiée");
+});
+
+test("006 : le retour arrière retire seulement ce que la 006 a ajouté", () => {
+  const code = stripComments(read("rollback/006_moderation_signalements.sql"));
+  ["admin_hide_room_message", "trg_message_report_handled", "set_message_report_handled", "message_reports_update_admin"].forEach((n) => assert.ok(code.includes(n), n));
+  ["status", "handled_by", "handled_at", "admin_note"].forEach((c) => assert.ok(new RegExp("drop column if exists " + c).test(code), c));
+  assert.ok(!/drop table|delete from|truncate|update public/i.test(code), "aucun signalement supprimé ou modifié");
+  assert.ok(!/drop column if exists (kind|message_id|reporter_id|reason|created_at|reported_user_id|message_text)/.test(code));
 });
 
 test("les fichiers SQL sont exclus du déploiement Vercel", () => {
