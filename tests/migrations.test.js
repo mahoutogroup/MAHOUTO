@@ -24,8 +24,11 @@ const OFFICIAL_IDS = [
   "1af183aa-45ef-4a4d-afa9-6b77ca8b04a2", "149965bd-1565-40ce-bc6d-07154f43c256", "ae75d336-3653-487f-bec2-5ee793e0fafa"
 ];
 
-test("six migrations numérotées (001 à 006), chacune avec son retour arrière du même nom", () => {
-  assert.deepStrictEqual(migrations.map((f) => f.slice(0, 3)), ["001", "002", "003", "004", "005", "006"]);
+test("migrations numérotées (001 à 006, puis 007…), chacune avec son retour arrière du même nom", () => {
+  const nums = migrations.map((f) => f.slice(0, 3));
+  assert.deepStrictEqual(nums.slice(0, 6), ["001", "002", "003", "004", "005", "006"]);
+  assert.deepStrictEqual(nums, nums.slice().sort(), "numéros croissants");
+  assert.strictEqual(new Set(nums).size, nums.length, "aucun numéro en double");
   migrations.forEach((f) => assert.ok(fs.existsSync(path.join(dir, "rollback", f)), "retour arrière manquant : " + f));
 });
 
@@ -161,6 +164,35 @@ test("005 : le retour arrière redonne l'exécution à anon", () => {
     assert.ok(code.includes("grant execute on function public." + f + " to public, anon, authenticated, service_role;")));
 });
 
+test("007 : seul l'auteur modifie un message privé (plus d'is_admin() dans la politique d'UPDATE de dm_messages)", () => {
+  const raw = read("007_dm_messages_update_auteur_seul.sql");
+  const code = stripComments(raw);
+  assert.ok(!/is_admin/i.test(code), "aucun is_admin() dans le code de la 007");
+  assert.match(code, /create policy "dm_messages_update_own" on public\.dm_messages\s+for update to authenticated\s+using \(sender_id = auth\.uid\(\)\)\s+with check \(sender_id = auth\.uid\(\)\);/);
+  assert.ok(code.includes('drop policy if exists "dm_messages_update_own_or_admin" on public.dm_messages;'));
+  assert.ok(code.includes('drop policy if exists "dm_messages_update_own" on public.dm_messages;'));
+  assert.match(code, /^begin;$/m);
+  assert.match(code, /^commit;$/m);
+  assert.strictEqual((code.match(/create policy/g) || []).length, 1, "une seule politique créée");
+  assert.ok(!/\b(grant|revoke|update public|delete from|insert into|alter table)\b/i.test(code), "ni droits, ni données, ni autre politique");
+  assert.match(raw, /DÉJÀ EXÉCUTÉE EN PRODUCTION LE 7 NOVEMBRE 2026/);
+});
+
+test("007 : le retour arrière recrée l'ancienne politique (auteur ou admin)", () => {
+  const code = stripComments(read("rollback/007_dm_messages_update_auteur_seul.sql"));
+  assert.match(code, /create policy "dm_messages_update_own_or_admin" on public\.dm_messages\s+for update using \(sender_id = auth\.uid\(\) or is_admin\(\)\)\s+with check \(sender_id = auth\.uid\(\) or is_admin\(\)\);/);
+  assert.match(read("rollback/007_dm_messages_update_auteur_seul.sql").split("\n")[0], /^-- ⚠️ ATTENTION/);
+});
+
+test("supabase-schema.sql reflète l'état réel : un seul UPDATE sur dm_messages, réservé à l'auteur", () => {
+  const schema = fs.readFileSync(path.join(__dirname, "..", "supabase-schema.sql"), "utf8");
+  const code = schema.split("\n").filter((l) => !l.trim().startsWith("--")).join("\n");
+  const creates = code.match(/create policy "dm_messages_update[^"]*" on public\.dm_messages[\s\S]*?;/g) || [];
+  assert.strictEqual(creates.length, 1);
+  assert.match(creates[0], /"dm_messages_update_own"/);
+  assert.ok(!/is_admin/.test(creates[0]));
+  assert.match(creates[0], /for update to authenticated\s+using \(sender_id = auth\.uid\(\)\)\s+with check \(sender_id = auth\.uid\(\)\)/);
+});
 
 test("006 : écriture réservée aux admins, quatre colonnes modifiables seulement, aucun DELETE", () => {
   const code = stripComments(read("006_moderation_signalements.sql"));

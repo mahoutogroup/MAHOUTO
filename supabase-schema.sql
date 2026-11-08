@@ -1042,10 +1042,16 @@ create policy "dm_messages_select_participants" on public.dm_messages
     )
   );
 
+-- Corrigé le 07/11/2026 (migration 007, déjà exécutée en production) : seul
+-- l'auteur modifie ou supprime son message privé. Avant, la politique
+-- « dm_messages_update_own_or_admin » laissait aussi un admin modifier
+-- n'importe quel message privé.
 drop policy if exists "dm_messages_update_own_or_admin" on public.dm_messages;
-create policy "dm_messages_update_own_or_admin" on public.dm_messages
-  for update using (sender_id = auth.uid() or is_admin())
-  with check (sender_id = auth.uid() or is_admin());
+drop policy if exists "dm_messages_update_own" on public.dm_messages;
+create policy "dm_messages_update_own" on public.dm_messages
+  for update to authenticated
+  using (sender_id = auth.uid())
+  with check (sender_id = auth.uid());
 
 -- Colonnes verrouillées : seules content/edited_at/is_deleted/attachment_url
 -- sont modifiables par un utilisateur normal (delivered_at/read_at ne
