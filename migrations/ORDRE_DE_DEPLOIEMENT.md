@@ -50,3 +50,11 @@ Utiliser deux comptes normaux (A et B), un compte admin, et une fenêtre privée
 ## Signalement avant la migration 003
 
 L'interface de signalement n'est **pas bloquante** si la table `message_reports` n'existe pas encore : le navigateur reçoit l'erreur « table introuvable » (`PGRST205` ou `42P01`), affiche « Le signalement n'est pas encore disponible. Réessaie un peu plus tard. » et désactive le bouton d'envoi. Aucune erreur technique n'est montrée. Rien à faire à la fusion, mais il vaut mieux exécuter la 003 juste après la 002 pour que le bouton fonctionne vraiment ; elle ne dépend ni de la 001, ni de la 004, ni de la 005.
+
+## Migration 007 — déjà exécutée en production
+
+| Étape | État | Ce qu'on vérifie | Ce qui casse si on ne l'a pas exécutée |
+|---|---|---|---|
+| **`007`** un admin ne modifie plus un message privé | ✅ **Déjà exécutée le 7 novembre 2026** (à la main, vérifiée par `pg_policies`). Indépendante des autres : ne pas la relancer | `select policyname, cmd, roles, qual, with_check from pg_policies where tablename = 'dm_messages' and cmd in ('UPDATE', 'ALL');` : UNE ligne, `dm_messages_update_own`, sans `is_admin()` | Un admin (founder, admin, super_admin) peut modifier ou marquer supprimé n'importe quel message privé |
+
+Test navigateur ensuite : modifier puis supprimer son propre message privé dans `dm-chat.html` (doit fonctionner, comme avant) ; avec un compte admin, ouvrir la conversation d'un autre ne change rien (un admin ne lit pas les messages privés des autres).
