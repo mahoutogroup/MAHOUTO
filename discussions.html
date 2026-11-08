@@ -110,6 +110,16 @@
     border-bottom: 1px solid var(--border);
   }
 
+  .room-share-btn {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 17px;
+    padding: 6px 6px;
+    cursor: pointer;
+    flex: none;
+  }
+
   .room-manage-btn {
     background: none;
     border: none;
@@ -482,6 +492,7 @@
 <script src="pseudo.js"></script>
 <script src="room-safe.js"></script>
 <script src="login-sheet.js"></script>
+<script src="room-share.js"></script>
 <script src="config.js"></script>
 <script src="offline-cache.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -703,6 +714,23 @@
       row.appendChild(avatar);
       row.appendChild(info);
 
+      // Partager le lien du salon (tout le monde, salons payants compris : le lien mène à la présentation).
+      const shareBtn = document.createElement("button");
+      shareBtn.type = "button";
+      shareBtn.className = "room-share-btn";
+      shareBtn.title = "Partager ce salon";
+      shareBtn.setAttribute("aria-label", "Partager ce salon");
+      shareBtn.textContent = "🔗";
+      shareBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        MahoutoRoomShare.share({
+          room: room,
+          brandName: (window.MAHOUTO_BRAND && MAHOUTO_BRAND.name) || "MAHOUTO+",
+          win: window, doc: document
+        });
+      });
+      row.appendChild(shareBtn);
+
       if (canManage) {
         const manage = document.createElement("button");
         manage.type = "button";
@@ -713,7 +741,7 @@
       }
 
       row.addEventListener("click", (e) => {
-        if (e.target.closest(".room-manage-btn")) return;
+        if (e.target.closest(".room-manage-btn") || e.target.closest(".room-share-btn")) return;
         if (locked) { buyRoom(room); return; }
         window.location.href = "chat.html?room=" + encodeURIComponent(room.id) + "&name=" + encodeURIComponent(room.name);
       });

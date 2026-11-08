@@ -76,6 +76,14 @@ Utiliser deux comptes normaux (A et B), un compte admin, et une fenêtre privée
 
 - **N10.** Fenêtre de navigation privée sur `chat.html?room=<salon>` : « Se connecter » ouvre la fenêtre ; **e-mail** : adresse, code reçu (6 chiffres), retour **sur le même salon**, connecté, zone de saisie visible, pseudo « Membre xxxxxx » ; mauvais code : « Code incorrect ou expiré… » ; **Google** : retour sur la même adresse `chat.html?room=<salon>`, connecté, pseudo = nom Google ; Google annulé : « Connexion Google annulée. » ; réseau coupé : « Pas de connexion internet… » ; salon payant : « Se connecter pour débloquer ce salon », puis bouton de paiement. Un compte déjà inscrit garde son pseudo.
 
+## Partager un salon (PR 4, sans migration)
+
+| # | Étape | Ce qu'on vérifie | Ce qui casse si on saute l'étape | Test navigateur ensuite |
+|---|---|---|---|---|
+| 18 | **Fusion de la PR « feat(salons): bouton Partager d'un salon »** et déploiement Vercel (aucune migration) | Voir **N11** | Rien : aucune dépendance côté base | **N11** |
+
+- **N11.** Sur téléphone, dans un salon : le bouton 🔗 de l'en-tête ouvre la feuille de partage du téléphone ; choisir WhatsApp (message ou statut) : le message contient « Rejoins « <nom> » sur MAHOUTO+. » et l'adresse `…/chat.html?room=<salon>` ; annuler la feuille : rien ne s'affiche ; ouvrir le lien reçu dans un autre navigateur (navigation privée) : lecture seule, connexion possible, retour au même salon. Dans `discussions.html` : un 🔗 à droite de chaque salon (payants compris), sans ouvrir le salon. Sur un salon payant : le bouton 🔗 de l'écran de présentation. Sur ordinateur : fenêtre « Partager ce salon » avec « Copier le lien » et « WhatsApp ».
+
 ## Signalement avant la migration 003
 
 L'interface de signalement n'est **pas bloquante** si la table `message_reports` n'existe pas encore : le navigateur reçoit l'erreur « table introuvable » (`PGRST205` ou `42P01`), affiche « Le signalement n'est pas encore disponible. Réessaie un peu plus tard. » et désactive le bouton d'envoi. Aucune erreur technique n'est montrée. Rien à faire à la fusion, mais il vaut mieux exécuter la 003 juste après la 002 pour que le bouton fonctionne vraiment ; elle ne dépend ni de la 001, ni de la 004, ni de la 005.
