@@ -57,8 +57,11 @@
    *   - kept = true  : le profil avait déjà un pseudo, rien n'a été écrit ; username = ce pseudo ;
    *   - kept = false : le pseudo demandé a été enregistré (ou refusé : voir error, cf. refusal()) ;
    *   - si la lecture du profil échoue (réseau…), RIEN n'est écrit et error est renvoyée.
+   * extra (facultatif) : autres colonnes à écrire en même temps que le pseudo, seulement quand
+   * le profil est créé ou son pseudo vide (ex. { avatar_url }).
    */
-  async function saveIfMissing(supabase, userId, username) {
+  async function saveIfMissing(supabase, userId, username, extra) {
+    var more = extra && typeof extra === "object" ? extra : {};
     var existing = await supabase.from("profiles").select("username").eq("id", userId).maybeSingle();
     if (existing.error) return { error: existing.error, username: null, kept: false };
 
@@ -70,10 +73,10 @@
     var res;
     if (row) {
       // Ligne existante sans pseudo (vide) : on le renseigne, sans toucher aux autres colonnes.
-      res = await supabase.from("profiles").update({ username: username }).eq("id", userId);
+      res = await supabase.from("profiles").update(Object.assign({}, more, { username: username })).eq("id", userId);
     } else {
       // Pas de ligne : insertion, jamais d'écrasement si une ligne apparaît entre-temps.
-      res = await supabase.from("profiles").upsert({ id: userId, username: username }, { onConflict: "id", ignoreDuplicates: true });
+      res = await supabase.from("profiles").upsert(Object.assign({}, more, { id: userId, username: username }), { onConflict: "id", ignoreDuplicates: true });
     }
     return { error: res.error || null, username: username, kept: false };
   }

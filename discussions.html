@@ -849,10 +849,11 @@
     if (data && data.session && data.session.user) {
       currentUser = data.session.user;
 
-      const { data: existingProfile } = await supabase
+      const { data: existingProfile, error: profileReadError } = await supabase
         .from("profiles").select("username").eq("id", currentUser.id).maybeSingle();
 
-      if (!existingProfile) {
+      // Lecture du profil en erreur (réseau) : on n'écrit rien (profil « introuvable » ≠ profil absent).
+      if (!profileReadError && !existingProfile) {
         // Jamais l'adresse e-mail (ni son préfixe) comme pseudo : sans nom Google, pseudo neutre.
         const googleName =
           currentUser.user_metadata && (currentUser.user_metadata.full_name || currentUser.user_metadata.name);
