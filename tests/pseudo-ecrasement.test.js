@@ -85,11 +85,13 @@ function fakeSupabase({ row, readError, writeError }) {
   });
 
   // ---------- pages ----------
-  // chat.html n'écrit plus sur profiles (le parcours « pseudo sans compte » a disparu avec les connexions anonymes).
-  await test("chat.html : aucune écriture sur profiles, plus de ensureProfile ni de formulaire de pseudo", () => {
+  // chat.html n'écrit jamais directement sur profiles : le profil d'un nouveau compte passe par
+  // MahoutoPseudo.ensureProfileForUser (saveIfMissing : jamais de réécriture d'un pseudo existant).
+  await test("chat.html : aucune écriture directe sur profiles ; le profil passe par ensureProfileForUser", () => {
     const code = strip(read("chat.html"));
-    assert.ok(!/ensureProfile|joinChat|saveIfMissing/.test(code));
+    assert.ok(!/joinChat|ensureProfile\(|saveIfMissing\(/.test(code), "plus de formulaire de pseudo ni d'appel direct");
     assert.ok(!/\.from\("profiles"\)\s*\.(upsert|update|insert|delete)\(/.test(code));
+    assert.match(code, /MahoutoPseudo\.ensureProfileForUser\(supabase, /);
   });
 
   {
