@@ -70,6 +70,7 @@
   .menu-item .emoji { font-size: 20px; width: 26px; text-align: center; }
   .menu-item .label { flex: 1; font-size: 14.5px; }
   .menu-item .sub { font-size: 11.5px; color: var(--text-dim); }
+  .admin-report-badge { min-width: 20px; padding: 1px 7px; border-radius: 999px; background: #EF4444; color: #fff; font-size: 11.5px; font-weight: bold; text-align: center; margin-right: 8px; }
 
   #edit-modal {
     position: fixed; inset: 0; background: rgba(0,0,0,.7);
@@ -111,7 +112,7 @@
 
   <div class="section-title">Mon compte</div>
   <div class="menu-list">
-    <a class="card menu-item hidden" id="admin-dashboard-link" href="admin/formations.html"><span class="emoji">⚙️</span><span class="label">Tableau de bord Administrateur</span><span class="sub">→</span></a>
+    <a class="card menu-item hidden" id="admin-dashboard-link" href="admin/formations.html"><span class="emoji">⚙️</span><span class="label">Tableau de bord Administrateur</span><span class="admin-report-badge hidden" id="admin-report-badge" title="Signalements ouverts"></span><span class="sub">→</span></a>
     <button type="button" class="card menu-item hidden" id="notif-status-item" style="border:none;width:100%;text-align:left;cursor:pointer;background:var(--bg-card);color:var(--white);font-family:inherit;"><span class="emoji">🔔</span><span class="label">Notifications</span><span class="sub" id="notif-status-sub">Activées — toucher pour désactiver</span></button>
     <button type="button" class="card menu-item hidden" id="notif-enable-btn" style="border:none;width:100%;text-align:left;cursor:pointer;background:var(--bg-card);color:var(--white);font-family:inherit;">
       <span class="emoji">🔔</span><span class="label">Activer les notifications</span><span class="sub">→</span>
@@ -166,6 +167,7 @@
 </nav>
 
 <script src="pseudo.js"></script>
+<script src="moderation.js"></script>
 <script src="config.js"></script>
 <script src="push-notifications.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -238,6 +240,14 @@
       const role = profile ? profile.role : null;
       if (role === "admin" || role === "super_admin" || role === "founder") {
         document.getElementById("admin-dashboard-link").classList.remove("hidden");
+        // Pastille : signalements ouverts (cachée si la migration 006 n'est pas exécutée).
+        MahoutoModeration.fetchOpenCount(supabase).then((n) => {
+          if (n && n > 0) {
+            const b = document.getElementById("admin-report-badge");
+            b.textContent = String(n);
+            b.classList.remove("hidden");
+          }
+        });
       }
 
       document.getElementById("logout-btn").classList.remove("hidden");
