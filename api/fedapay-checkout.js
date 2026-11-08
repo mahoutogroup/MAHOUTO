@@ -61,6 +61,10 @@ export default async function handler(req, res) {
     if (!courseId || typeof courseId !== "string" || courseId.length > 200) {
       return res.status(400).json({ error: "Identifiant d'article invalide." });
     }
+    // Salon : identifiant de la forme [A-Za-z0-9_-]{1,64}, validé avant toute requête.
+    if (productType === "salon" && !/^[A-Za-z0-9_-]{1,64}$/.test(courseId)) {
+      return res.status(400).json({ error: "Identifiant d'article invalide." });
+    }
 
     const supabaseUrl = process.env.SUPABASE_URL;
     const anonKey = process.env.SUPABASE_ANON_KEY;
@@ -91,6 +95,19 @@ export default async function handler(req, res) {
       return res.status(401).json({ error: "Session invalide ou expirée." });
     }
     const authenticatedUser = userData.user;
+
+    // Pas de paiement pour un compte anonyme (session issue d'avant la fin des connexions anonymes) :
+    // l'achat est lié au compte, et un compte anonyme se perd avec sa session. Refus clair, avant toute
+    // lecture d'article ou création de transaction.
+    if (
+      authenticatedUser.is_anonymous === true ||
+      (authenticatedUser.app_metadata && authenticatedUser.app_metadata.provider === "anonymous")
+    ) {
+      return res.status(403).json({
+        error: "Connecte-toi avec Google ou ton e-mail pour acheter.",
+        code: "ANONYMOUS_NOT_ALLOWED"
+      });
+    }
 
     const supabaseAdmin = createClient(supabaseUrl, serviceKey);
 
@@ -207,11 +224,15 @@ export default async function handler(req, res) {
     // et, pour une formation, de sa plateforme d'origine.
     let returnPage;
     let platformLabel;
+    // Salon : retour DANS le salon (chat.html?room=<salon>&payment=return), pas à la liste des discussions.
+    // Le paramètre n'ouvre jamais l'accès : seul un achat « paid » confirmé par le webhook le fait.
+    let callbackUrl;
     if (productType === "digital_product") {
       returnPage = "produits.html";
       platformLabel = `${brandName} Boutique`;
     } else if (productType === "salon") {
-      returnPage = "discussions.html";
+      returnPage = "chat.html";
+      callbackUrl = `${siteUrl}/chat.html?room=${encodeURIComponent(courseId)}&payment=return`;
       platformLabel = `${brandName} Salons`;
     } else {
       returnPage = article.provider === "academie_majestepresse" ? "academie-majestepresse.html" : "school.html";
@@ -233,7 +254,7 @@ export default async function handler(req, res) {
         description: `${platformLabel} — ${articleName}`,
         amount: officialAmount,
         currency: { iso: "XOF" },
-        callback_url: `${siteUrl}/${returnPage}?payment=return&course=${encodeURIComponent(courseId)}&type=${productType}`,
+        callback_url: callbackUrl || `${siteUrl}/${returnPage}?payment=return&course=${encodeURIComponent(courseId)}&type=${productType}`,
         ...(customerPayload ? { customer: customerPayload } : {})
       })
     });
