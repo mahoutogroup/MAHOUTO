@@ -85,28 +85,24 @@ function fakeSupabase({ row, readError, writeError }) {
   });
 
   // ---------- pages ----------
-  for (const page of ["chat.html", "discussions.html"]) {
-    const code = strip(read(page));
-    await test(page + " : ensureProfile passe par saveIfMissing ; plus aucun upsert direct du pseudo saisi sur profiles", () => {
+  // chat.html n'écrit plus sur profiles (le parcours « pseudo sans compte » a disparu avec les connexions anonymes).
+  await test("chat.html : aucune écriture sur profiles, plus de ensureProfile ni de formulaire de pseudo", () => {
+    const code = strip(read("chat.html"));
+    assert.ok(!/ensureProfile|joinChat|saveIfMissing/.test(code));
+    assert.ok(!/\.from\("profiles"\)\s*\.(upsert|update|insert|delete)\(/.test(code));
+  });
+
+  {
+    const code = strip(read("discussions.html"));
+    await test("discussions.html : ensureProfile passe par saveIfMissing ; plus aucun upsert direct du pseudo sur profiles", () => {
       assert.match(code, /MahoutoPseudo\.saveIfMissing\(supabase, userId, username\)/);
       assert.ok(!/\.from\("profiles"\)\s*\.upsert\(/.test(code), "aucun .from(\"profiles\").upsert(...) direct");
       assert.ok(!/\.upsert\(\s*\{\s*id:\s*userId,\s*username/.test(code));
     });
-
-    await test(page + " : joinChat n'écrit pas le pseudo saisi par-dessus un profil (erreur de lecture : on s'arrête)", () => {
-      const join = code.slice(code.indexOf("async function joinChat"), code.indexOf("async function", code.indexOf("async function joinChat") + 10));
-      assert.match(join, /const result = await ensureProfile\(currentUser\.id, username\)/);
-      assert.match(join, /if \(result\.error\) throw result\.error;/);
-      // une fois l'erreur écartée, le formulaire ne réécrit rien d'autre sur profiles
-      assert.ok(!/from\("profiles"\)\s*\.(upsert|update|insert)/.test(join));
+    await test("discussions.html : plus de joinChat (pseudo saisi) ; seul trySilentResume crée le pseudo", () => {
+      assert.ok(!/joinChat/.test(code));
     });
   }
-
-  await test("chat.html : le pseudo affiché est celui du profil si le compte en avait déjà un (pas celui saisi)", () => {
-    const code = strip(read("chat.html"));
-    assert.match(code, /currentUsername = result\.username;/);
-    assert.ok(!/currentUsername = username;/.test(code));
-  });
 
   await test("discussions.html : la création du pseudo au retour Google lit déjà le profil, puis ensureProfile relit avant d'écrire", () => {
     const code = strip(read("discussions.html"));

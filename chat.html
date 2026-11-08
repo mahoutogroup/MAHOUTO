@@ -135,7 +135,8 @@
 
   #composer button:disabled { opacity: .5; cursor: not-allowed; }
 
-  #login-screen {
+  /* ---------- Écran d'état du salon (introuvable, réseau) ---------- */
+  #room-state {
     position: fixed;
     inset: 0;
     background: var(--bg);
@@ -143,35 +144,68 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 16px;
+    gap: 14px;
     padding: 24px;
     text-align: center;
+    z-index: 5;
   }
-
-  #login-screen h2 { color: var(--gold-bright); font-size: 24px; }
-  #login-screen p { color: var(--text-muted); max-width: 320px; }
-
-  #login-screen input {
-    padding: 12px 16px;
-    border-radius: 12px;
-    border: none;
-    background: var(--bg-card);
-    color: var(--white);
-    width: 100%;
-    max-width: 300px;
-    font-size: 15px;
-  }
-
-  #login-screen button {
-    padding: 12px 30px;
+  #room-state h2 { color: var(--gold-bright); font-size: 22px; }
+  #room-state p { color: var(--text-muted); max-width: 320px; }
+  #room-state .state-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  #room-state a, #room-state button {
+    min-height: 44px;
+    padding: 12px 22px;
     border: none;
     border-radius: 12px;
     background: var(--gold-bright);
+    color: #0A0A0A;
     font-weight: bold;
+    font-size: 14px;
+    text-decoration: none;
     cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+  }
+  #room-state a.secondary { background: var(--bg-card); color: var(--white); }
+
+  /* ---------- Visiteur non connecté : lecture seule ---------- */
+  #visitor-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: var(--bg-elevated);
+    border-top: 1px solid var(--bg-card);
+  }
+  #visitor-bar p { flex: 1; min-width: 0; font-size: 13px; color: var(--text-muted); line-height: 1.35; }
+  #visitor-bar a {
+    flex: none;
+    min-height: 44px;
+    padding: 0 20px;
+    display: inline-flex;
+    align-items: center;
+    border-radius: 20px;
+    background: var(--gold-bright);
+    color: #0A0A0A;
+    font-weight: bold;
+    font-size: 14px;
+    text-decoration: none;
   }
 
-  #status-message { color: var(--text-muted); font-size: 13px; min-height: 18px; }
+  #status-message {
+    position: fixed;
+    left: 50%;
+    bottom: 84px;
+    transform: translateX(-50%);
+    max-width: 90%;
+    padding: 8px 14px;
+    border-radius: 12px;
+    background: var(--bg-card);
+    color: var(--text-muted);
+    font-size: 13px;
+    z-index: 6;
+  }
+  #status-message:empty { display: none; }
 
   /* ---------- Salon payant non débloqué ---------- */
   #locked-screen {
@@ -283,18 +317,21 @@
 
 <button id="theme-toggle-btn" class="theme-toggle-fab">🌙</button>
 
-<div id="login-screen">
-  <h2>Rejoindre la discussion</h2>
-  <p>Choisis un pseudo pour commencer à discuter en temps réel.</p>
-  <input id="username-input" type="text" placeholder="Ton pseudo" maxlength="24" autocomplete="off">
-  <button id="join-btn">Entrer dans le chat</button>
-  <div id="status-message"></div>
+<div id="room-state" class="hidden" role="status">
+  <h2 id="room-state-title"></h2>
+  <p id="room-state-text"></p>
+  <div class="state-actions">
+    <button type="button" id="room-state-retry" class="hidden">Réessayer</button>
+    <a class="secondary" href="discussions.html">Voir les salons</a>
+  </div>
 </div>
+
+<div id="status-message" role="status" aria-live="polite"></div>
 
 <header class="hidden" id="chat-header">
   <a class="back" href="discussions.html" aria-label="Retour">←</a>
   <div id="room-avatar" class="hidden"></div>
-  <h1 id="room-title">💬 Discussion</h1>
+  <h1 id="room-title">💬 Salon</h1>
   <span class="room">En direct</span>
 </header>
 
@@ -306,6 +343,8 @@
   <div id="locked-price"></div>
   <p id="cgv-line" style="text-align:center;font-size:12px;color:var(--text-dim);padding:0 20px 16px;padding:0;">En payant, vous acceptez les <a href="conditions-vente.html" target="_blank" rel="noopener noreferrer" style="color:var(--gold);text-decoration:underline;">conditions de vente et retours</a>.</p>
   <button id="locked-buy-btn" type="button">Débloquer l'accès</button>
+  <p id="locked-login-note" class="hidden">Connecte-toi pour débloquer ce salon.</p>
+  <a id="locked-login-link" class="hidden" href="index.html" style="padding:12px 30px;border-radius:12px;background:var(--gold-bright);color:#0A0A0A;font-weight:bold;text-decoration:none;">Se connecter</a>
 </div>
 
 <div id="media-viewer" class="hidden">
@@ -339,6 +378,11 @@
   </div>
 </div>
 
+<div id="visitor-bar" class="hidden">
+  <p>Tu lis ce salon en lecture seule. Connecte-toi pour écrire.</p>
+  <a id="visitor-login" href="index.html">Se connecter</a>
+</div>
+
 <form id="composer" class="hidden">
   <button type="button" id="attach-btn" title="Envoyer un fichier" style="background:var(--bg-card);border:none;border-radius:20px;width:44px;flex:none;color:var(--gold-bright);font-size:18px;cursor:pointer;">📎</button>
   <input type="file" id="file-input" multiple accept=".jpg,.jpeg,.png,.webp,.gif,.tiff,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt,.md,.svg,.ai,.eps,.psd,.cdr,.dng,.cr2,.cr3,.nef,.arw,.raf,.mp3,.wav,.m4a,.ogg,.mp4,.webm,.mov,.mkv,.zip,.rar,.7z,.tar,.gz,.html,.css,.js,.ts,.json,.xml,.sql,.php,.py,.java,.c,.cpp,.h,.go,.rs" class="hidden">
@@ -347,7 +391,6 @@
 </form>
 
 <script src="config.js"></script>
-<script src="pseudo.js"></script>
 <script src="room-safe.js"></script>
 <script src="offline-cache.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -366,14 +409,12 @@
 
   const params = new URLSearchParams(window.location.search);
   const ROOM_ID = params.get("room") || "general";
-  const ROOM_NAME = params.get("name") || "Général";
+  // Le nom du salon vient de la base (jamais du paramètre « name » de l'adresse, que n'importe qui peut
+  // fabriquer) ; en attendant, le titre reste « Salon ».
 
-  document.getElementById("room-title").textContent = "💬 " + ROOM_NAME;
-
-  const loginScreen = document.getElementById("login-screen");
-  const usernameInput = document.getElementById("username-input");
-  const joinBtn = document.getElementById("join-btn");
   const statusMessage = document.getElementById("status-message");
+  const roomStateEl = document.getElementById("room-state");
+  const visitorBar = document.getElementById("visitor-bar");
   const chatHeader = document.getElementById("chat-header");
   const messagesEl = document.getElementById("messages");
   const composer = document.getElementById("composer");
@@ -439,7 +480,27 @@
   let hiddenMessageIds = new Set(); // "supprimé pour moi" (local, table hidden_messages)
   let activeMessageId = null;
 
-  function setStatus(text) { statusMessage.textContent = text || ""; }
+  // Message bref au bas de l'écran (disparaît après quelques secondes).
+  let statusTimer = null;
+  function setStatus(text) {
+    statusMessage.textContent = text || "";
+    if (statusTimer) clearTimeout(statusTimer);
+    if (text) statusTimer = setTimeout(() => { statusMessage.textContent = ""; }, 6000);
+  }
+
+  // Écran plein page : salon introuvable, ou chargement impossible.
+  function showRoomState(title, text, withRetry) {
+    document.getElementById("room-state-title").textContent = title;
+    document.getElementById("room-state-text").textContent = text;
+    document.getElementById("room-state-retry").classList.toggle("hidden", !withRetry);
+    roomStateEl.classList.remove("hidden");
+    chatHeader.classList.add("hidden");
+    messagesEl.classList.add("hidden");
+  }
+  document.getElementById("room-state-retry").addEventListener("click", () => {
+    roomStateEl.classList.add("hidden");
+    enterRoom();
+  });
 
   // Détecte si une URL de pièce jointe pointe vers un PDF.
   function isPdfUrl(url) {
@@ -487,7 +548,7 @@
     bubble.dataset.id = msg.id;
     bubble.dataset.userId = msg.user_id;
     bubble.className = "bubble" +
-      (msg.user_id === currentUser.id ? " mine" : "") +
+      (currentUser && msg.user_id === currentUser.id ? " mine" : "") +
       (msg.is_deleted ? " deleted" : "") +
       (msg.content && msg.content.length > 200 ? " long" : "");
     const time = new Date(msg.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
@@ -616,17 +677,6 @@
       .subscribe();
   }
 
-  // Le formulaire de pseudo ne sert qu'à un compte SANS pseudo (anonyme qui arrive). Un compte qui a
-  // déjà un profil avec un pseudo (Google, e-mail, ou anonyme déjà inscrit) n'est JAMAIS réécrit depuis
-  // ici : son pseudo se change seulement dans « Mon profil ». Renvoie { error, username, kept } ;
-  // error est une erreur de refus (pseudo réservé, forme d'e-mail, déjà pris) ou de lecture/écriture.
-  async function ensureProfile(userId, username) {
-    const result = await MahoutoPseudo.saveIfMissing(supabase, userId, username);
-    if (result.error) console.error("Profil non enregistré :", result.error.code || "erreur");
-    return result;
-  }
-
-
   async function markAsRead() {
     if (!currentUser) return;
     await supabase
@@ -637,40 +687,6 @@
       );
   }
 
-  async function joinChat() {
-    const username = usernameInput.value.trim();
-    if (!username) { setStatus("Entre un pseudo pour continuer."); return; }
-
-    joinBtn.disabled = true;
-    setStatus("Connexion...");
-
-    try {
-      // Réutilise la session anonyme créée par une tentative précédente (pseudo refusé) :
-      // évite de créer un nouveau compte à chaque essai.
-      if (!currentUser) {
-        const { data, error } = await supabase.auth.signInAnonymously();
-        if (error) throw error;
-        currentUser = data.user;
-      }
-
-      const result = await ensureProfile(currentUser.id, username);
-      const refused = MahoutoPseudo.refusal(result.error);
-      if (refused) {
-        setStatus(refused.message);
-        joinBtn.disabled = false;
-        return;
-      }
-      if (result.error) throw result.error;   // lecture ou écriture impossible : rien n'a été modifié
-      // Pseudo déjà enregistré (compte connecté) : on garde celui du profil, pas celui saisi.
-      currentUsername = result.username;
-      await enterRoom();
-    } catch (err) {
-      console.error(err);
-      setStatus("Connexion impossible. Vérifie ta configuration Supabase (config.js).");
-      joinBtn.disabled = false;
-    }
-  }
-
   function money(xof) { return Number(xof).toLocaleString("fr-FR") + " FCFA"; }
 
   // Vérifie l'accès à un salon payant. La vraie barrière est côté
@@ -678,17 +694,35 @@
   // donner un écran clair plutôt qu'un chat vide et muet.
   let roomPhotoUrl = null;
 
-  async function checkRoomAccess() {
-    const { data: room } = await supabase
+  // Lecture du salon (la table rooms est lisible sans compte). Renvoie { room, error } :
+  // room = null sans erreur → le salon n'existe pas ; error → réseau ou serveur.
+  async function loadRoom() {
+    const { data, error } = await supabase
       .from("rooms")
       .select("name, is_paid, price, created_by, photo_url")
       .eq("id", ROOM_ID)
       .maybeSingle();
+    return { room: data || null, error: error || null };
+  }
 
+  async function checkRoomAccess(room) {
     const safePhoto = room ? MahoutoRoomSafe.photoUrl(room.photo_url) : null;
     if (safePhoto) roomPhotoUrl = safePhoto;
 
     if (!room || !room.is_paid) return true;
+
+    // Salon payant, visiteur sans compte : présentation (nom, prix) et invitation à se connecter.
+    // Le paiement exige un compte : le bouton d'achat n'est pas proposé.
+    if (!currentUser) {
+      document.getElementById("locked-room-name").textContent = room.name;
+      document.getElementById("locked-price").textContent = money(room.price);
+      document.getElementById("locked-buy-btn").classList.add("hidden");
+      document.getElementById("locked-login-note").classList.remove("hidden");
+      document.getElementById("locked-login-link").classList.remove("hidden");
+      document.getElementById("locked-screen").classList.remove("hidden");
+      return false;
+    }
+
     if (room.created_by === currentUser.id) return true;
 
     const { data: profile } = await supabase
@@ -752,14 +786,27 @@
   }
 
   async function enterRoom() {
-    loginScreen.classList.add("hidden");
+    const { room, error: roomError } = await loadRoom();
 
-    const hasAccess = await checkRoomAccess();
+    // Salon qui n'existe pas (adresse mal recopiée, salon supprimé) : message clair, pas de salon vide.
+    // Une erreur de lecture (réseau) n'empêche pas d'entrer : l'historique enregistré sur l'appareil
+    // reste lisible hors connexion, comme avant.
+    if (!roomError && !room) {
+      showRoomState("Salon introuvable", "Ce salon n'existe pas ou n'existe plus. Vérifie l'adresse du lien.", false);
+      return;
+    }
+
+    if (room) document.getElementById("room-title").textContent = "💬 " + room.name;
+
+    const hasAccess = await checkRoomAccess(room);
     if (!hasAccess) return;
 
+    roomStateEl.classList.add("hidden");
     chatHeader.classList.remove("hidden");
     messagesEl.classList.remove("hidden");
-    composer.classList.remove("hidden");
+    // Connecté : zone de saisie. Visiteur : lecture seule, invitation à se connecter pour écrire.
+    if (currentUser) composer.classList.remove("hidden");
+    else visitorBar.classList.remove("hidden");
 
     if (roomPhotoUrl) {
       const avatarEl = document.getElementById("room-avatar");
@@ -775,7 +822,7 @@
     await loadHistory();
     subscribeToNewMessages();
     await markAsRead();
-    messageInput.focus();
+    if (currentUser) messageInput.focus();
   }
 
   async function trySilentResume() {
@@ -788,12 +835,10 @@
         .eq("id", currentUser.id)
         .maybeSingle();
       currentUsername = profile ? profile.username : "Utilisateur";
-      await enterRoom();
     }
+    // Sans session : visiteur, lecture seule (salon gratuit) ou présentation (salon payant).
+    await enterRoom();
   }
-
-  joinBtn.addEventListener("click", joinChat);
-  usernameInput.addEventListener("keydown", (e) => { if (e.key === "Enter") joinChat(); });
 
   composer.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -1000,11 +1045,13 @@
     if (msg.is_deleted) return; // rien à faire sur un message déjà supprimé pour tous
     activeMessage = msg;
 
-    const isMine = msg.user_id === currentUser.id;
+    const isMine = !!currentUser && msg.user_id === currentUser.id;
     actionSheet.querySelector('[data-action="edit"]').style.display = isMine && !msg.attachment_url ? "flex" : "none";
     actionSheet.querySelector('[data-action="delete-all"]').style.display = isMine ? "flex" : "none";
-    // « Signaler » : seulement sur le message d'une autre personne.
-    actionSheet.querySelector('[data-action="report"]').style.display = isMine ? "none" : "flex";
+    // Visiteur sans compte : copier et partager seulement (masquer pour moi et signaler exigent un compte).
+    actionSheet.querySelector('[data-action="delete-me"]').style.display = currentUser ? "flex" : "none";
+    // « Signaler » : seulement sur le message d'une autre personne, avec un compte.
+    actionSheet.querySelector('[data-action="report"]').style.display = currentUser && !isMine ? "flex" : "none";
 
     actionSheet.classList.remove("hidden");
   }

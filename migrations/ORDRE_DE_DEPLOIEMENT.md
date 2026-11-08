@@ -59,6 +59,15 @@ Utiliser deux comptes normaux (A et B), un compte admin, et une fenêtre privée
 - **N8a (après la fusion, avant la 009).** Compte de test A : créer par l'API (console du navigateur, ou outil de test) un salon avec `emoji = <img src=x onerror=alert(1)>` et `color = red" onmouseover="alert(2)` ; avec un compte B, ouvrir `discussions.html`, `mes-achats.html` (salon acheté), la fenêtre « Envoyer à… » de `share.html`/discussions ; compte admin : `admin/rooms.html`. Attendu : aucune alerte, la pastille du salon est verte avec 💬, le nom s'affiche en texte. Salon normal (couleur `#38BDF8`, photo Cloudinary) : affichage inchangé.
 - **N8b (après la 009).** Même tentative d'insertion : refusée par la base (erreur `rooms_emoji_safe_check` ou `rooms_color_hex_check`) ; création d'un salon normal depuis `discussions.html` : fonctionne ; changement de photo d'un salon : fonctionne.
 
+## Lien de salon : lecture seule pour un visiteur (PR 3a, sans migration)
+
+| # | Étape | Ce qu'on vérifie | Ce qui casse si on saute l'étape | Test navigateur ensuite |
+|---|---|---|---|---|
+| 16 | **Fusion de la PR « feat(salons): lecture seule pour un visiteur »** et déploiement Vercel (aucune migration) | Voir **N9** ; requêtes de contrôle en lecture seule ci-dessous | Rien à sauter : la PR n'exige aucune migration. Si la lecture publique de `messages` ou le temps réel sans compte ne fonctionnent pas sur ta base, le visiteur voit un salon vide ou sans mise à jour en direct | **N9** |
+
+- **N9.** Fenêtre de navigation privée, sans compte, sur `chat.html?room=general` : les messages s'affichent, la zone de saisie est remplacée par « Tu lis ce salon en lecture seule. Connecte-toi pour écrire. » ; un message envoyé **en direct** par un compte réel (autre fenêtre) apparaît **sans recharger** la fenêtre privée ; un clic sur un message ne propose que « Copier » et « Partager » ; un salon payant affiche son nom, son prix et « Se connecter », **sans aucun message** ; une adresse de salon inexistante affiche « Salon introuvable ».
+- **Contrôles de la base (lecture seule)** : `select policyname, roles, cmd, qual from pg_policies where schemaname = 'public' and tablename = 'messages' and cmd = 'SELECT';` (une politique de lecture sans restriction de rôle) ; `select tablename from pg_publication_tables where pubname = 'supabase_realtime' and tablename = 'messages';` (une ligne) ; `select has_table_privilege('anon', 'public.messages', 'select');` (vrai).
+
 ## Signalement avant la migration 003
 
 L'interface de signalement n'est **pas bloquante** si la table `message_reports` n'existe pas encore : le navigateur reçoit l'erreur « table introuvable » (`PGRST205` ou `42P01`), affiche « Le signalement n'est pas encore disponible. Réessaie un peu plus tard. » et désactive le bouton d'envoi. Aucune erreur technique n'est montrée. Rien à faire à la fusion, mais il vaut mieux exécuter la 003 juste après la 002 pour que le bouton fonctionne vraiment ; elle ne dépend ni de la 001, ni de la 004, ni de la 005.

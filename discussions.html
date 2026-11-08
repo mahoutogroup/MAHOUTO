@@ -411,8 +411,7 @@
     <span style="font-size:18px;">G</span> Se connecter avec Google
   </button>
   <div style="color:#64748B;font-size:12px;">— ou —</div>
-  <input id="username-input" type="text" placeholder="Ton pseudo" maxlength="24" autocomplete="off">
-  <button id="join-btn">Continuer sans compte Google</button>
+  <a id="email-login-link" href="index.html" style="color:var(--gold-bright);font-size:14px;">Se connecter par e-mail depuis l'accueil</a>
   <div id="status-message"></div>
 </div>
 
@@ -492,8 +491,6 @@
 
   const loginScreen = document.getElementById("login-screen");
   const appEl = document.getElementById("app");
-  const usernameInput = document.getElementById("username-input");
-  const joinBtn = document.getElementById("join-btn");
   const statusMessage = document.getElementById("status-message");
   const roomListEl = document.getElementById("room-list");
   const searchInput = document.getElementById("search-input");
@@ -836,46 +833,6 @@
     loadRooms();
   });
 
-  async function joinChat() {
-    const username = usernameInput.value.trim();
-    if (!username) { setStatus("Entre un pseudo pour continuer."); return; }
-
-    joinBtn.disabled = true;
-    setStatus("Connexion...");
-
-    try {
-      // Réutilise la session anonyme créée par une tentative précédente (pseudo refusé).
-      if (!currentUser) {
-        const { data, error } = await supabase.auth.signInAnonymously();
-        if (error) throw error;
-        currentUser = data.user;
-      }
-
-      const result = await ensureProfile(currentUser.id, username);
-      const refused = MahoutoPseudo.refusal(result.error);
-      if (refused) {
-        setStatus(refused.message);
-        joinBtn.disabled = false;
-        return;
-      }
-      if (result.error) throw result.error;   // lecture ou écriture impossible : rien n'a été modifié
-
-      const { data: roleProfile } = await supabase
-        .from("profiles").select("role").eq("id", currentUser.id).maybeSingle();
-      currentRole = roleProfile && roleProfile.role ? roleProfile.role : "user";
-
-      loginScreen.classList.add("hidden");
-      appEl.classList.remove("hidden");
-
-      await loadRooms();
-      await checkReturnFromPayment();
-    } catch (err) {
-      console.error(err);
-      setStatus("Connexion impossible. Vérifie config.js.");
-      joinBtn.disabled = false;
-    }
-  }
-
   async function trySilentResume() {
     const { data } = await supabase.auth.getSession();
     if (data && data.session && data.session.user) {
@@ -917,8 +874,6 @@
     if (error) { setStatus("Connexion Google indisponible : " + error.message); console.error(error); }
   });
 
-  joinBtn.addEventListener("click", joinChat);
-  usernameInput.addEventListener("keydown", (e) => { if (e.key === "Enter") joinChat(); });
 
   const roomActionSheet = document.getElementById("room-action-sheet");
   const roomActionTitle = document.getElementById("room-action-title");
