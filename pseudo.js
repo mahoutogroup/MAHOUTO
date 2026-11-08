@@ -43,7 +43,45 @@
     return null;
   }
 
-  var api = { neutralName: neutralName, looksLikeEmail: looksLikeEmail, refusal: refusal, UNIQUE_INDEX: UNIQUE_INDEX };
+  // Pseudo par défaut (« Membre » + début de l'identifiant) : pas un nom de personne.
+  function isNeutralName(value) {
+    return /^Membre [0-9a-f]{6,8}$/i.test(String(value || "").trim());
+  }
+
+  /**
+   * Enregistre le pseudo SEULEMENT si le compte n'en a pas déjà un. Ne réécrit JAMAIS le pseudo
+   * d'un compte qui en a un (Google, e-mail ou anonyme déjà inscrit) : le pseudo se change
+   * uniquement dans « Mon profil ». Sert au formulaire de pseudo des salons.
+   *
+   * Renvoie { error, username, kept } :
+   *   - kept = true  : le profil avait déjà un pseudo, rien n'a été écrit ; username = ce pseudo ;
+   *   - kept = false : le pseudo demandé a été enregistré (ou refusé : voir error, cf. refusal()) ;
+   *   - si la lecture du profil échoue (réseau…), RIEN n'est écrit et error est renvoyée.
+   */
+  async function saveIfMissing(supabase, userId, username) {
+    var existing = await supabase.from("profiles").select("username").eq("id", userId).maybeSingle();
+    if (existing.error) return { error: existing.error, username: null, kept: false };
+
+    var row = existing.data;
+    if (row && String(row.username || "").trim()) {
+      return { error: null, username: row.username, kept: true };
+    }
+
+    var res;
+    if (row) {
+      // Ligne existante sans pseudo (vide) : on le renseigne, sans toucher aux autres colonnes.
+      res = await supabase.from("profiles").update({ username: username }).eq("id", userId);
+    } else {
+      // Pas de ligne : insertion, jamais d'écrasement si une ligne apparaît entre-temps.
+      res = await supabase.from("profiles").upsert({ id: userId, username: username }, { onConflict: "id", ignoreDuplicates: true });
+    }
+    return { error: res.error || null, username: username, kept: false };
+  }
+
+  var api = {
+    neutralName: neutralName, looksLikeEmail: looksLikeEmail, refusal: refusal, isNeutralName: isNeutralName,
+    saveIfMissing: saveIfMissing, UNIQUE_INDEX: UNIQUE_INDEX
+  };
   root.MahoutoPseudo = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : globalThis);

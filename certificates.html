@@ -68,6 +68,7 @@
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="offline-cache.js"></script>
+<script src="certificate-name.js"></script>
 <script src="certificate-pdf.js"></script>
 <script>
 (function () {
@@ -78,6 +79,10 @@
   const emptyEl = document.getElementById("empty-state");
   const offlineEl = document.getElementById("offline-state");
 
+  // Nom saisi à la demande (jamais enregistré) : réutilisé pour les autres documents de cette visite.
+  let typedName = null;
+
+  // userName : nom imprimable (nom légal ou pseudo propre), ou null : il sera demandé avant la génération.
   function render(userName, certs) {
     listEl.innerHTML = "";
     emptyEl.classList.add("hidden");
@@ -126,10 +131,20 @@
       } else {
         btn.addEventListener("click", async () => {
           btn.disabled = true;
+          // Jamais d'adresse e-mail sur un document : sans nom légal ni pseudo propre, on demande le nom.
+          let printedName = MahoutoCertificateName.clean(userName) || typedName;
+          if (!printedName) {
+            printedName = await MahoutoCertificateName.ask(document);
+            if (!printedName) {   // annulé : rien n'est généré
+              btn.disabled = false;
+              return;
+            }
+            typedName = printedName;
+          }
           btn.textContent = "Génération...";
           try {
             await window.MahoutoCertificatePdf.download({
-              userName,
+              userName: printedName,
               formationTitle: cert.formation_title,
               issuedAt: cert.created_at,
               startedAt: cert.started_at,
@@ -179,7 +194,8 @@
     // Affichage instantané depuis le cache local, s'il existe — avant
     // même de savoir si le réseau va répondre.
     const cached = await window.MahoutoOfflineCache.load(cacheKey);
-    if (cached && cached.data) render(cached.data.userName, cached.data.certs);
+    // Le cache peut contenir un ancien repli (adresse e-mail) : on le nettoie avant tout affichage.
+    if (cached && cached.data) render(MahoutoCertificateName.clean(cached.data.userName), cached.data.certs);
 
     try {
       const [{ data: certs, error: certsError }, { data: profile }] = await Promise.all([
@@ -188,11 +204,10 @@
       ]);
       if (certsError) throw certsError;
 
-      // Le nom légal complet (renseigné dans profil.html) est prioritaire
-      // sur les certificats — c'est exactement ce à quoi il sert. Repli
-      // sur le pseudo puis l'e-mail si l'utilisateur ne l'a pas encore
-      // renseigné.
-      const userName = (profile && profile.full_name) || (profile && profile.username) || user.email || ("Utilisateur " + MAHOUTO_BRAND.name);
+      // Le nom légal complet (renseigné dans profil.html) est prioritaire sur les certificats —
+      // c'est exactement ce à quoi il sert. Repli sur un pseudo « propre » ; JAMAIS l'adresse e-mail :
+      // sans nom utilisable, userName vaut null et le nom est demandé avant de générer le document.
+      const userName = MahoutoCertificateName.resolve(profile);
       const certsList = certs || [];
 
       // Pour le texte complet de l'Attestation ("s'est déroulée du ... au

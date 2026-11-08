@@ -534,14 +534,14 @@
     return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
   }
 
-  // Renvoie l'erreur éventuelle (null si tout va bien) pour que joinChat puisse prévenir
-  // quand le pseudo est refusé par la base (réservé, forme d'e-mail, déjà pris).
+  // Le formulaire de pseudo ne sert qu'à un compte SANS pseudo (anonyme qui arrive). Un compte qui a
+  // déjà un profil avec un pseudo (Google, e-mail, ou anonyme déjà inscrit) n'est JAMAIS réécrit depuis
+  // ici : son pseudo se change seulement dans « Mon profil ». Renvoie { error, username, kept } ;
+  // error est une erreur de refus (pseudo réservé, forme d'e-mail, déjà pris) ou de lecture/écriture.
   async function ensureProfile(userId, username) {
-    const { error } = await supabase
-      .from("profiles")
-      .upsert({ id: userId, username: username }, { onConflict: "id" });
-    if (error) console.error("Profil non enregistré :", error);
-    return error || null;
+    const result = await MahoutoPseudo.saveIfMissing(supabase, userId, username);
+    if (result.error) console.error("Profil non enregistré :", result.error.code || "erreur");
+    return result;
   }
 
 
@@ -819,13 +819,14 @@
         currentUser = data.user;
       }
 
-      const profileError = await ensureProfile(currentUser.id, username);
-      const refused = MahoutoPseudo.refusal(profileError);
+      const result = await ensureProfile(currentUser.id, username);
+      const refused = MahoutoPseudo.refusal(result.error);
       if (refused) {
         setStatus(refused.message);
         joinBtn.disabled = false;
         return;
       }
+      if (result.error) throw result.error;   // lecture ou écriture impossible : rien n'a été modifié
 
       const { data: roleProfile } = await supabase
         .from("profiles").select("role").eq("id", currentUser.id).maybeSingle();
@@ -859,7 +860,7 @@
           ? googleName
           : MahoutoPseudo.neutralName(currentUser.id);
         // Nom refusé par la base : pseudo neutre (la personne le changera dans « Mon profil »).
-        if (MahoutoPseudo.refusal(await ensureProfile(currentUser.id, wanted))) {
+        if (MahoutoPseudo.refusal((await ensureProfile(currentUser.id, wanted)).error)) {
           await ensureProfile(currentUser.id, MahoutoPseudo.neutralName(currentUser.id));
         }
       }

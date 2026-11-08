@@ -822,6 +822,11 @@ window.MahoutoCertificatePdf = (function () {
 
   // certificate = { userName, formationTitle, issuedAt (ISO string), code }
   async function download(certificate) {
+    // Garde-fou : jamais d'adresse e-mail (ni de nom vide) imprimée sur un document.
+    const printed = String(certificate.userName == null ? "" : certificate.userName).trim();
+    if (!printed || printed.indexOf("@") !== -1) {
+      throw new Error("Aucun nom à imprimer : indique ton nom pour générer ce document.");
+    }
     await loadJsPDF();
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
@@ -932,7 +937,7 @@ window.MahoutoCertificatePdf = (function () {
     // Nom du bénéficiaire — Helvetica gras (l'équivalent Arial déjà
     // intégré à jsPDF, aucun fichier de police à charger).
     const nameY = isAttestation ? 70 : 73;
-    const nameText = certificate.userName || "—";
+    const nameText = printed;
     doc.setFont("helvetica", "bold");
     doc.setFontSize(isAttestation ? 24 : 26);
     doc.setTextColor(...green);
