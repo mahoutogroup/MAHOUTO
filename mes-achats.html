@@ -272,7 +272,7 @@
     if (roomPurchases.length) {
       const label = document.createElement("div");
       label.className = "section-label";
-      label.textContent = "🔒 Mes salons";
+      label.textContent = "🔒 Mes communautés";
       contentEl.appendChild(label);
       roomPurchases.forEach((p) => {
         contentEl.appendChild(renderRoomRow(p, roomsById[p.course_id]));

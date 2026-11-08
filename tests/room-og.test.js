@@ -72,14 +72,14 @@ const PHOTO = `https://res.cloudinary.com/${CLOUD}/image/upload/v1700000000/maho
     assert.ok(fs.existsSync(path.join(root, "assets", "icon-512.png")), "le logo existe dans le dépôt");
   });
 
-  await test("salon payant : « Salon payant : X FCFA » dans la description, avec nom et photo ; aucune autre donnée", () => {
+  await test("salon payant : « Communauté payante : X FCFA » dans la description, avec nom et photo ; aucune autre donnée", () => {
     const price = Number(2000).toLocaleString("fr-FR") + " FCFA";
     const p = Og.buildRoomPreview({ name: "Salon VIP", is_paid: true, price: 2000, photo_url: PHOTO, emoji: "⭐" }, "vip");
-    assert.strictEqual(p.description, "Salon payant : " + price + " — Rejoins ce salon sur MAHOUTO+");
+    assert.strictEqual(p.description, "Communauté payante : " + price + " — Rejoins cette communauté sur MAHOUTO+");
     assert.strictEqual(p.title, "Salon VIP");
     const html = Og.renderRoomPreviewPage(p);
     assert.ok(!/user_id|created_by|username|messages?\b|conversation|profile/i.test(html), "rien de privé dans la page");
-    assert.strictEqual(Og.buildRoomPreview({ name: "X", is_paid: true, price: null }, "x").description, "Salon payant — Rejoins ce salon sur MAHOUTO+");
+    assert.strictEqual(Og.buildRoomPreview({ name: "X", is_paid: true, price: null }, "x").description, "Communauté payante — Rejoins cette communauté sur MAHOUTO+");
     assert.strictEqual(Og.buildRoomPreview({ name: "X", is_paid: false, price: 500 }, "x").description, "Rejoins ce salon sur MAHOUTO+", "le prix d'un salon gratuit n'est jamais affiché");
   });
 
@@ -99,7 +99,7 @@ const PHOTO = `https://res.cloudinary.com/${CLOUD}/image/upload/v1700000000/maho
   await test("émoji hostile ou trop long : remplacé par 💬 ; prix non numérique : ignoré", () => {
     const p = Og.buildRoomPreview({ name: "N", is_paid: true, price: "<b>", emoji: "<img onerror=x>" }, "n");
     assert.strictEqual(p.title, "💬 N");
-    assert.strictEqual(p.description, "Salon payant — Rejoins ce salon sur MAHOUTO+");
+    assert.strictEqual(p.description, "Communauté payante — Rejoins cette communauté sur MAHOUTO+");
     assert.strictEqual(Og.buildRoomPreview({ name: "N", emoji: "x".repeat(40) }, "n").title, "💬 N");
     assert.ok(Og.buildRoomPreview({ name: "n".repeat(500) }, "n").title.length < 90, "nom tronqué");
   });

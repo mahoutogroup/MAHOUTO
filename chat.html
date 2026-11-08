@@ -373,15 +373,15 @@
 <div id="locked-screen" class="hidden">
   <a href="discussions.html" style="position:absolute;top:18px;left:18px;color:var(--text-muted);text-decoration:none;font-size:15px;">← Retour</a>
   <div class="lock-icon">🔒</div>
-  <h2 id="locked-room-name">Salon payant</h2>
-  <p>Rejoins ce salon pour lire et écrire les messages.</p>
+  <h2 id="locked-room-name">Communauté payante</h2>
+  <p>Rejoins cette communauté pour lire et écrire les messages.</p>
   <div id="locked-price"></div>
   <p id="cgv-line" style="text-align:center;font-size:12px;color:var(--text-dim);padding:0 20px 16px;padding:0;">En payant, vous acceptez les <a href="conditions-vente.html" target="_blank" rel="noopener noreferrer" style="color:var(--gold);text-decoration:underline;">conditions de vente et retours</a>.</p>
   <button id="locked-buy-btn" type="button">Débloquer l'accès</button>
   <p id="locked-status" class="hidden" role="status" aria-live="polite"></p>
   <button id="locked-check-btn" type="button" class="hidden">Vérifier maintenant</button>
-  <button id="locked-share-btn" type="button">🔗 Partager ce salon</button>
-  <p id="locked-login-note" class="hidden">Connecte-toi pour débloquer ce salon.</p>
+  <button id="locked-share-btn" type="button">🔗 Partager cette communauté</button>
+  <p id="locked-login-note" class="hidden">Connecte-toi pour débloquer cette communauté.</p>
   <a id="locked-login-link" class="hidden" href="index.html" style="padding:12px 30px;border-radius:12px;background:var(--gold-bright);color:#0A0A0A;font-weight:bold;text-decoration:none;">Se connecter</a>
 </div>
 
@@ -996,7 +996,7 @@
   });
   document.getElementById("locked-login-link").addEventListener("click", (e) => {
     e.preventDefault();
-    openLogin("Se connecter pour débloquer ce salon");
+    openLogin("Se connecter pour débloquer cette communauté");
   });
 
   async function trySilentResume() {

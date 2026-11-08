@@ -20,7 +20,7 @@
   var MSG_PENDING = "Paiement en cours de vérification… Ne ferme pas cette page.";
   var MSG_TIMEOUT = "Ton paiement n'est pas encore confirmé. Cela peut prendre quelques minutes : réessaie dans un instant.";
   var MSG_FAILED = "Le paiement a échoué ou a été annulé. Tu peux réessayer.";
-  var MSG_PAID = "✅ Paiement confirmé ! Bienvenue dans le salon.";
+  var MSG_PAID = "✅ Paiement confirmé ! Bienvenue dans la communauté.";
   var MSG_LOST_SESSION = "Reconnecte-toi avec le compte utilisé pour payer : ton achat sera retrouvé automatiquement.";
 
   // Vrai si l'adresse porte payment=return (retour du prestataire de paiement).

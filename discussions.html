@@ -692,7 +692,7 @@
       const preview = document.createElement("span");
       preview.className = "preview";
       if (locked) {
-        preview.textContent = "🔒 Salon payant";
+        preview.textContent = "🔒 Communauté payante";
         bottomLine.appendChild(preview);
         const lockBadge = document.createElement("span");
         lockBadge.className = "lock-badge";
@@ -718,8 +718,9 @@
       const shareBtn = document.createElement("button");
       shareBtn.type = "button";
       shareBtn.className = "room-share-btn";
-      shareBtn.title = "Partager ce salon";
-      shareBtn.setAttribute("aria-label", "Partager ce salon");
+      const shareLabel = room.is_paid ? "Partager cette communauté" : "Partager ce salon";
+      shareBtn.title = shareLabel;
+      shareBtn.setAttribute("aria-label", shareLabel);
       shareBtn.textContent = "🔗";
       shareBtn.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -813,7 +814,7 @@
       if (data && data.status === "paid") {
         clearInterval(poll);
         bannerEl.className = "paid";
-        bannerEl.textContent = "✅ Paiement confirmé ! Salon débloqué.";
+        bannerEl.textContent = "✅ Paiement confirmé ! Communauté débloquée.";
         await loadRooms();
       } else if (data && data.status === "failed") {
         clearInterval(poll);
