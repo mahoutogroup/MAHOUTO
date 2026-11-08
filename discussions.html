@@ -411,7 +411,7 @@
     <span style="font-size:18px;">G</span> Se connecter avec Google
   </button>
   <div style="color:#64748B;font-size:12px;">— ou —</div>
-  <a id="email-login-link" href="index.html" style="color:var(--gold-bright);font-size:14px;">Se connecter par e-mail depuis l'accueil</a>
+  <button id="email-login-btn" type="button" class="btn-google-gold" style="background:var(--bg-card);color:var(--white);">✉️ Se connecter par e-mail</button>
   <div id="status-message"></div>
 </div>
 
@@ -481,6 +481,7 @@
 
 <script src="pseudo.js"></script>
 <script src="room-safe.js"></script>
+<script src="login-sheet.js"></script>
 <script src="config.js"></script>
 <script src="offline-cache.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -871,8 +872,29 @@
       provider: "google",
       options: { redirectTo: window.location.origin + "/discussions.html" }
     });
-    if (error) { setStatus("Connexion Google indisponible : " + error.message); console.error(error); }
+    // Message exact selon la cause (jamais le texte brut de l'erreur ni un renvoi vers config.js).
+    if (error) setStatus(MahoutoLogin.authErrorMessage(error, "google"));
   });
+
+  // Connexion par e-mail (code à saisir) : même fenêtre que dans un salon ; après un code valide, la page
+  // se recharge connectée (trySilentResume crée le profil si besoin).
+  document.getElementById("email-login-btn").addEventListener("click", () => {
+    MahoutoLogin.open({
+      doc: document, win: window, supabase: supabase,
+      redirectPath: "discussions.html",
+      title: "Se connecter",
+      onSignedIn: async () => { window.location.reload(); }
+    });
+  });
+
+  // Retour d'une connexion Google refusée ou annulée : message exact.
+  (function showOauthError() {
+    const message = MahoutoLogin.oauthErrorFromUrl(window.location);
+    if (message) {
+      setStatus(message);
+      window.history.replaceState(null, "", window.location.pathname);
+    }
+  })();
 
 
   const roomActionSheet = document.getElementById("room-action-sheet");

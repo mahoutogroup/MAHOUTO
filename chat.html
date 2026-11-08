@@ -391,7 +391,9 @@
 </form>
 
 <script src="config.js"></script>
+<script src="pseudo.js"></script>
 <script src="room-safe.js"></script>
+<script src="login-sheet.js"></script>
 <script src="offline-cache.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="attachments.js"></script>
@@ -825,16 +827,45 @@
     if (currentUser) messageInput.focus();
   }
 
+  // Fenêtre de connexion (Google ou e-mail) : après un code valide, on garantit le profil (jamais d'écrasement
+  // d'un pseudo existant) puis on recharge la page : même salon, session active. Google revient sur la même adresse.
+  function openLogin(title) {
+    MahoutoLogin.open({
+      doc: document, win: window, supabase: supabase,
+      roomId: ROOM_ID,
+      redirectPath: "chat.html?room=" + encodeURIComponent(ROOM_ID),
+      title: title,
+      onSignedIn: async (user) => {
+        if (user) await MahoutoPseudo.ensureProfileForUser(supabase, user);
+        window.location.reload();
+      }
+    });
+  }
+  document.getElementById("visitor-login").addEventListener("click", (e) => {
+    e.preventDefault();
+    openLogin("Se connecter pour écrire");
+  });
+  document.getElementById("locked-login-link").addEventListener("click", (e) => {
+    e.preventDefault();
+    openLogin("Se connecter pour débloquer ce salon");
+  });
+
   async function trySilentResume() {
+    // Retour d'une connexion Google refusée ou annulée : message exact, puis adresse nettoyée.
+    const oauthError = MahoutoLogin.oauthErrorFromUrl(window.location);
+    if (oauthError) {
+      setStatus(oauthError);
+      window.history.replaceState(null, "", window.location.pathname + "?room=" + encodeURIComponent(ROOM_ID));
+    }
+
     const { data } = await supabase.auth.getSession();
     if (data && data.session && data.session.user) {
       currentUser = data.session.user;
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("username")
-        .eq("id", currentUser.id)
-        .maybeSingle();
-      currentUsername = profile ? profile.username : "Utilisateur";
+      MahoutoLogin.consumeReturn(window.sessionStorage);   // destination de secours devenue inutile
+      // Profil garanti (nouveau compte Google ou e-mail) : nom Google, sinon « Membre xxxxxx » ;
+      // un pseudo existant n'est jamais réécrit, et rien n'est écrit si la lecture échoue.
+      const profileResult = await MahoutoPseudo.ensureProfileForUser(supabase, currentUser);
+      currentUsername = (profileResult && profileResult.username) || "Utilisateur";
     }
     // Sans session : visiteur, lecture seule (salon gratuit) ou présentation (salon payant).
     await enterRoom();

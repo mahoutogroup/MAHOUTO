@@ -68,6 +68,14 @@ Utiliser deux comptes normaux (A et B), un compte admin, et une fenêtre privée
 - **N9.** Fenêtre de navigation privée, sans compte, sur `chat.html?room=general` : les messages s'affichent, la zone de saisie est remplacée par « Tu lis ce salon en lecture seule. Connecte-toi pour écrire. » ; un message envoyé **en direct** par un compte réel (autre fenêtre) apparaît **sans recharger** la fenêtre privée ; un clic sur un message ne propose que « Copier » et « Partager » ; un salon payant affiche son nom, son prix et « Se connecter », **sans aucun message** ; une adresse de salon inexistante affiche « Salon introuvable ».
 - **Contrôles de la base (lecture seule)** : `select policyname, roles, cmd, qual from pg_policies where schemaname = 'public' and tablename = 'messages' and cmd = 'SELECT';` (une politique de lecture sans restriction de rôle) ; `select tablename from pg_publication_tables where pubname = 'supabase_realtime' and tablename = 'messages';` (une ligne) ; `select has_table_privilege('anon', 'public.messages', 'select');` (vrai).
 
+## Lien de salon : connexion Google ou e-mail et retour au salon (PR 3b, sans migration)
+
+| # | Étape | Ce qu'on vérifie | Ce qui casse si on saute l'étape | Test navigateur ensuite |
+|---|---|---|---|---|
+| 17 | **Fusion de la PR « feat(salons): connexion Google ou e-mail depuis un lien de salon »** et déploiement Vercel (aucune migration) | Voir **N10** | Rien à sauter. Réglage Supabase : les « Redirect URLs » doivent autoriser `https://mahouto.com/**` (déjà le cas d'après ta capture) | **N10** |
+
+- **N10.** Fenêtre de navigation privée sur `chat.html?room=<salon>` : « Se connecter » ouvre la fenêtre ; **e-mail** : adresse, code reçu (6 chiffres), retour **sur le même salon**, connecté, zone de saisie visible, pseudo « Membre xxxxxx » ; mauvais code : « Code incorrect ou expiré… » ; **Google** : retour sur la même adresse `chat.html?room=<salon>`, connecté, pseudo = nom Google ; Google annulé : « Connexion Google annulée. » ; réseau coupé : « Pas de connexion internet… » ; salon payant : « Se connecter pour débloquer ce salon », puis bouton de paiement. Un compte déjà inscrit garde son pseudo.
+
 ## Signalement avant la migration 003
 
 L'interface de signalement n'est **pas bloquante** si la table `message_reports` n'existe pas encore : le navigateur reçoit l'erreur « table introuvable » (`PGRST205` ou `42P01`), affiche « Le signalement n'est pas encore disponible. Réessaie un peu plus tard. » et désactive le bouton d'envoi. Aucune erreur technique n'est montrée. Rien à faire à la fusion, mais il vaut mieux exécuter la 003 juste après la 002 pour que le bouton fonctionne vraiment ; elle ne dépend ni de la 001, ni de la 004, ni de la 005.

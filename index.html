@@ -538,6 +538,7 @@ nav.bottom-nav .nav-item .icon .ico { width: 24px; height: 24px; }
 <script src="analytics.js" defer></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="pseudo.js"></script>
+<script src="login-sheet.js"></script>
 <script src="auth.js"></script>
 <script src="offline-cache.js"></script>
 <script>
@@ -777,6 +778,15 @@ nav.bottom-nav .nav-item .icon .ico { width: 24px; height: 24px; }
     pendingEmail = "";
     showEmailStep(1);
     emailInput.focus();
+  });
+
+  // Retour au salon : après une connexion Google lancée depuis un lien de salon, si le navigateur revient
+  // quand même sur l'accueil (adresse de retour non autorisée côté Supabase), la destination de secours
+  // (10 minutes, usage unique, uniquement « chat.html?room=<salon> ») ramène au salon.
+  supabase.auth.onAuthStateChange((event, session) => {
+    if (event !== "SIGNED_IN" || !session) return;
+    const destination = MahoutoLogin.consumeReturn(window.sessionStorage);
+    if (destination) window.location.replace(destination);
   });
 
   function formatAnciennete(createdAt) {
