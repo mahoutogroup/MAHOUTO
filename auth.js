@@ -55,30 +55,23 @@ if (window.__MAHOUTO_AUTH_LOADED__) {
     //=========================================================
     // CREATION DU PROFIL
     //=========================================================
+    // Ne réécrit JAMAIS un pseudo existant : MahoutoPseudo.saveIfMissing relit le profil et n'écrit
+    // que s'il n'a pas de pseudo (création, ou pseudo vide). Si la lecture échoue (réseau coupé),
+    // RIEN n'est écrit. Le pseudo ne se change que dans « Mon profil ».
     async function ensureProfile(userId, username, avatarUrl) {
-        const payload = { id: userId, username: username };
-        if (avatarUrl) payload.avatar_url = avatarUrl;
-        let { error } = await supabase
-           .from("profiles")
-           .upsert(payload, { onConflict: "id" });
+        const extra = avatarUrl ? { avatar_url: avatarUrl } : null;
         // Pseudo refusé par la base (réservé, forme d'adresse e-mail, déjà pris : migrations 002 et
         // 004) : le pseudo ne vient pas ici d'un choix de la personne mais du nom Google. On crée le
         // profil avec un pseudo neutre plutôt que de laisser le compte sans profil ; elle pourra le
         // changer dans « Mon profil ». En cas de collision (très improbable), plus de caractères.
-        if (MahoutoPseudo.refusal(error)) {
-            payload.username = MahoutoPseudo.neutralName(userId);
-            ({ error } = await supabase
-               .from("profiles")
-               .upsert(payload, { onConflict: "id" }));
-            if (MahoutoPseudo.refusal(error)) {
-                payload.username = MahoutoPseudo.neutralName(userId, 8);
-                ({ error } = await supabase
-                   .from("profiles")
-                   .upsert(payload, { onConflict: "id" }));
-            }
+        const candidates = [username, MahoutoPseudo.neutralName(userId), MahoutoPseudo.neutralName(userId, 8)];
+        let result = null;
+        for (const candidate of candidates) {
+            result = await MahoutoPseudo.saveIfMissing(supabase, userId, candidate, extra);
+            if (!MahoutoPseudo.refusal(result.error)) break;
         }
-        if (error) {
-            console.error("Profil non enregistré :", error.message);
+        if (result && result.error) {
+            console.error("Profil non enregistré :", result.error.code || "erreur");
         }
     }
 
@@ -100,13 +93,17 @@ if (window.__MAHOUTO_AUTH_LOADED__) {
             const userPhoto = user.user_metadata?.avatar_url || "";
 
             // Créer le profil si n'existe pas
-            const { data: existingProfile } = await supabase
+            const { data: existingProfile, error: profileReadError } = await supabase
                .from("profiles")
                .select("username, avatar_url")
                .eq("id", user.id)
                .maybeSingle();
 
-            if (!existingProfile) {
+            if (profileReadError) {
+                // Lecture impossible (réseau coupé…) : on n'écrit RIEN. Sans cette garde, un profil
+                // « introuvable » faute de réseau aurait vu son pseudo réécrit par le nom Google.
+                console.error("Profil illisible, aucune écriture :", profileReadError.code || "erreur");
+            } else if (!existingProfile) {
                 await ensureProfile(user.id, userName, userPhoto);
             } else if (!existingProfile.avatar_url && userPhoto) {
                 // Synchronise la photo Google vers profiles.avatar_url
