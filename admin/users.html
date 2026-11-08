@@ -155,6 +155,7 @@
           <option value="business">business</option>
           <option value="organisation">organisation</option>
           <option value="formateur">formateur</option>
+          <option value="moderateur">modérateur</option>
           <option value="admin">admin</option>
           <option value="super_admin">super_admin</option>
           <option value="founder">founder</option>
@@ -183,6 +184,7 @@
 </div>
 
 <script src="../config.js"></script>
+<script src="../admin-roles.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
 (function () {
@@ -200,6 +202,7 @@
   let allUsers = [];
   let accessToken = null;
   let currentAdminId = null;
+  let callerRole = null;
   let formationsCache = null;
   let chartMode = "day";
 
@@ -335,7 +338,8 @@
 
     let filtered = allUsers.filter((u) => {
       if (q && !((u.name || "").toLowerCase().includes(q) || (u.email || "").toLowerCase().includes(q))) return false;
-      if (role && u.role !== role) return false;
+      if (role === "moderateur") { if (!u.is_moderator) return false; }
+      else if (role && u.role !== role) return false;
       if (dateRange) {
         const d = new Date(u.created_at);
         if (dateRange === "today" && d < startOfToday) return false;
@@ -389,8 +393,55 @@
       if (reactivateBtn) reactivateBtn.addEventListener("click", () => performAction(u, "reactivate"));
       row.querySelector('[data-action="delete"]').addEventListener("click", () => performAction(u, "delete"));
 
+      // Étiquette « modérateur » et bouton « Changer le rôle » (founder seulement) : DOM, textContent.
+      if (u.is_moderator && u.role !== "admin" && u.role !== "super_admin" && u.role !== "founder") {
+        const tag = document.createElement("span");
+        tag.className = "tag role-admin";
+        tag.textContent = "modérateur";
+        row.querySelector(".meta").insertBefore(tag, row.querySelector(".meta").children[1] || null);
+      }
+      if (MahoutoAdminRoles.canChangeRole(callerRole, currentAdminId, u)) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "btn-view btn-role";
+        btn.textContent = "🎖️ Changer le rôle";
+        btn.addEventListener("click", () => openRoleDialog(u));
+        row.querySelector(".actions").insertBefore(btn, row.querySelector(".actions").children[1] || null);
+      }
+
       userListEl.appendChild(row);
     });
+  }
+
+  // -------- Changer le rôle (founder) --------
+  // La route serveur (/api/admin/user-action, action "set_role") et la base protègent :
+  // ce bouton n'est qu'un confort d'affichage.
+  function openRoleDialog(u) {
+    if (document.querySelector(".ar-overlay")) return;
+    MahoutoAdminRoles.injectStyle(document);
+    const dialog = MahoutoAdminRoles.buildDialog({
+      doc: document,
+      target: { id: u.id, name: u.name, role: u.role, is_moderator: u.is_moderator },
+      confirmFn: (text) => confirm(text),
+      send: async (newRole, reason) => {
+        try {
+          const resp = await authorizedFetch("/api/admin/user-action", {
+            method: "POST",
+            body: JSON.stringify({ action: "set_role", userId: u.id, newRole, reason })
+          });
+          let payload = null;
+          try { payload = await resp.json(); } catch (e) { payload = null; }
+          if (!resp.ok) return { ok: false, message: MahoutoAdminRoles.errorMessage(resp.status, payload) };
+          u.role = payload.role;
+          u.is_moderator = !!payload.moderator;
+          return { ok: true, message: "Rôle changé ✅" };
+        } catch (e) {
+          return { ok: false, message: "Impossible de changer le rôle pour le moment." };
+        }
+      },
+      onDone: () => renderList()
+    });
+    document.body.appendChild(dialog.overlay);
   }
 
   searchInput.addEventListener("input", renderList);
@@ -531,6 +582,10 @@
 
     accessToken = data.session.access_token;
     currentAdminId = data.session.user.id;
+    try {
+      const { data: me } = await supabase.from("profiles").select("role").eq("id", currentAdminId).maybeSingle();
+      callerRole = me ? me.role : null;
+    } catch (e) { callerRole = null; }
 
     try {
       const resp = await authorizedFetch("/api/admin/list-users", { method: "GET" });

@@ -29,13 +29,16 @@
 
   var MAX_NOTE = 1000;
 
-  var MSG_UNAVAILABLE = "La modération n'est pas encore activée (la migration 006 n'a pas été exécutée). Rien n'est cassé : reviens ici après son exécution.";
-  var MSG_DENIED = "Action refusée : réservé aux administrateurs.";
+  var MSG_UNAVAILABLE = "La modération n'est pas encore activée (une migration de modération, 006 ou 008, n'a pas été exécutée). Rien n'est cassé : reviens ici après son exécution.";
+  var MSG_DENIED = "Action refusée : réservé aux modérateurs et aux administrateurs, sur un message déjà signalé.";
   var MSG_OTHER = "Impossible de charger les signalements pour le moment.";
 
   function reasonLabel(reason) { return REASON_LABELS[reason] || "Autre"; }
   function statusLabel(status) { return STATUS_LABELS[status] || STATUS_LABELS.open; }
   function isAdminRole(role) { return role === "admin" || role === "super_admin" || role === "founder"; }
+  // Droit d'ouvrir la page des signalements : administrateur, ou modérateur (colonne is_moderator, migration 008).
+  // Affichage seulement : la base décide (RLS et fonctions).
+  function canModerate(role, isModerator) { return isAdminRole(role) || isModerator === true; }
 
   // 'unavailable' : migration 003 ou 006 pas encore exécutée (table, colonne ou fonction absente)
   // 'denied'      : refus de la base (pas admin)
@@ -48,7 +51,7 @@
         code === "PGRST200" || code === "PGRST202" || code === "PGRST204" || code === "PGRST205") return "unavailable";
     if (/does not exist|schema cache|could not find/i.test(text) &&
         /message_reports|admin_hide_room_message|status|handled_/i.test(text)) return "unavailable";
-    if (code === "42501" || /ADMIN_REQUIRED|permission denied|row-level security/i.test(text)) return "denied";
+    if (code === "42501" || /ADMIN_REQUIRED|MODERATOR_REQUIRED|SIGNALEMENT_REQUIS|permission denied|row-level security/i.test(text)) return "denied";
     return "other";
   }
 
@@ -208,7 +211,7 @@
   var api = {
     REASON_LABELS: REASON_LABELS, STATUS_LABELS: STATUS_LABELS, MAX_NOTE: MAX_NOTE,
     MSG_UNAVAILABLE: MSG_UNAVAILABLE, MSG_DENIED: MSG_DENIED, MSG_OTHER: MSG_OTHER,
-    reasonLabel: reasonLabel, statusLabel: statusLabel, isAdminRole: isAdminRole,
+    reasonLabel: reasonLabel, statusLabel: statusLabel, isAdminRole: isAdminRole, canModerate: canModerate,
     errorKind: errorKind, errorMessage: errorMessage,
     groupReports: groupReports, filterGroups: filterGroups, countOpenReports: countOpenReports,
     describeMessage: describeMessage, formatDate: formatDate, fetchOpenCount: fetchOpenCount,

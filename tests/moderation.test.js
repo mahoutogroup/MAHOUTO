@@ -191,8 +191,8 @@ const rows = [
   });
 
   await test("page : accès réservé aux admins (vérification du rôle, message et redirection pour les autres)", () => {
-    assert.match(page, /M\.isAdminRole\(profile\.role\)/);
-    assert.match(page, /Accès réservé aux administrateurs/);
+    assert.match(page, /M\.canModerate\(profile && profile\.role, isModerator\)/);
+    assert.match(page, /Accès réservé aux modérateurs et aux administrateurs/);
     assert.match(page, /window\.location\.href = redirectTo/);
     assert.match(page, /\.\.\/profil\.html/);
   });

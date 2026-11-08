@@ -76,10 +76,18 @@ export default async function handler(req, res) {
 
   // -------- 4) Enrichir avec les profils (rôle, pseudo) --------
   const ids = allUsers.map((u) => u.id);
-  const { data: profiles } = await supabaseAdmin
+  const profileIds = ids.length ? ids : ["00000000-0000-0000-0000-000000000000"];
+  let { data: profiles, error: profilesError } = await supabaseAdmin
     .from("profiles")
-    .select("id, username, role")
-    .in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]);
+    .select("id, username, role, is_moderator")
+    .in("id", profileIds);
+  if (profilesError) {
+    // Migration 008 pas encore exécutée : la colonne is_moderator n'existe pas.
+    ({ data: profiles } = await supabaseAdmin
+      .from("profiles")
+      .select("id, username, role")
+      .in("id", profileIds));
+  }
 
   const profileMap = {};
   (profiles || []).forEach((p) => { profileMap[p.id] = p; });
@@ -94,6 +102,7 @@ export default async function handler(req, res) {
         || (u.user_metadata && (u.user_metadata.full_name || u.user_metadata.name))
         || (u.email ? u.email.split("@")[0] : "Utilisateur"),
       role: p.role || "user",
+      is_moderator: !!p.is_moderator,
       created_at: u.created_at,
       status: isBanned ? "désactivé" : "actif"
     };
