@@ -858,10 +858,9 @@
   // Partage du lien du salon (WhatsApp, statut, copie) : feuille native sur mobile, fenêtre de repli sinon.
   let currentRoom = null;   // ligne de la table rooms (nom, prix…) une fois lue
   function shareRoom() {
-    const brand = (window.MAHOUTO_BRAND && MAHOUTO_BRAND.name) || "MAHOUTO+";
     MahoutoRoomShare.share({
       room: Object.assign({ name: "Salon" }, currentRoom || {}, { id: ROOM_ID }),
-      brandName: brand, win: window, doc: document
+      win: window, doc: document
     });
   }
   document.getElementById("share-room-btn").addEventListener("click", shareRoom);

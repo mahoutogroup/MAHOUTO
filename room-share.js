@@ -7,8 +7,11 @@
      statut, Telegram, SMS… Annuler n'affiche aucune erreur.
    - Sinon (ordinateur, navigateur sans partage natif, ou échec) : petite
      fenêtre avec le lien, « Copier le lien » et « WhatsApp ».
-   - Le lien partagé est l'adresse du salon : <site>/chat.html?room=<id>.
-     Si un lien court avec aperçu existe un jour, seule buildUrl() change.
+   - Le lien partagé est TOUJOURS https://mahouto.com/r/<salon>, quel que
+     soit le domaine d'où l'on partage : lien court avec aperçu (photo et nom
+     du salon dans WhatsApp, Telegram, Facebook…), servi par api/produit-og.js.
+     Les anciens liens chat.html?room=<id> continuent de fonctionner.
+   - Dans le texte partagé, la marque est toujours « MAHOUTO+ ».
    - Un identifiant de salon qui n'est pas de la forme [A-Za-z0-9_-]{1,64}
      n'est jamais partagé (même règle que la destination de retour de
      connexion).
@@ -19,22 +22,23 @@
 
   var ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
   var MAX_NAME = 80;
+  var SITE = "https://mahouto.com";
+  var BRAND = "MAHOUTO+";
 
   function isValidRoomId(id) { return typeof id === "string" && ID_RE.test(id); }
 
-  // Adresse du salon, ou null si l'identifiant n'est pas partageable.
-  function buildUrl(origin, roomId) {
+  // Lien court du salon (toujours sur mahouto.com), ou null si l'identifiant n'est pas partageable.
+  function buildUrl(roomId) {
     if (!isValidRoomId(roomId)) return null;
-    return String(origin || "").replace(/\/+$/, "") + "/chat.html?room=" + encodeURIComponent(roomId);
+    return SITE + "/r/" + encodeURIComponent(roomId);
   }
 
   function money(xof) { return Number(xof).toLocaleString("fr-FR") + " FCFA"; }
 
   // Texte d'accompagnement (le lien est transmis à part).
-  function buildMessage(room, brandName) {
+  function buildMessage(room) {
     var name = String((room && room.name) || "").replace(/\s+/g, " ").trim().slice(0, MAX_NAME) || "ce salon";
-    var brand = String(brandName || "MAHOUTO+");
-    var text = "Rejoins « " + name + " » sur " + brand;
+    var text = "Rejoins « " + name + " » sur " + BRAND;
     if (room && room.is_paid && Number(room.price) > 0) text += " (salon payant : " + money(room.price) + ")";
     return text + ".";
   }
@@ -112,7 +116,7 @@
   }
 
   /**
-   * options : { room: { id, name, is_paid, price }, brandName, win, doc }
+   * options : { room: { id, name, is_paid, price }, win, doc }
    * Renvoie 'native' (feuille de partage ouverte et validée), 'cancelled' (la personne a annulé),
    * 'sheet' (fenêtre de repli affichée) ou 'invalid' (identifiant de salon non partageable).
    */
@@ -120,9 +124,9 @@
     var win = options.win || root;
     var doc = options.doc || win.document;
     var room = options.room || {};
-    var url = buildUrl(win.location && win.location.origin, room.id);
+    var url = buildUrl(room.id);
     if (!url) return "invalid";
-    var text = buildMessage(room, options.brandName);
+    var text = buildMessage(room);
     var nav = win.navigator || {};
 
     if (typeof nav.share === "function") {
@@ -139,7 +143,7 @@
   }
 
   var api = {
-    isValidRoomId: isValidRoomId, buildUrl: buildUrl, buildMessage: buildMessage, whatsappUrl: whatsappUrl,
+    SITE: SITE, BRAND: BRAND, isValidRoomId: isValidRoomId, buildUrl: buildUrl, buildMessage: buildMessage, whatsappUrl: whatsappUrl,
     share: share, openSheet: openSheet
   };
   root.MahoutoRoomShare = api;

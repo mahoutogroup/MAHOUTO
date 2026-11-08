@@ -39,27 +39,40 @@ function fakeDoc() {
 const walk = (n, fn) => { fn(n); (n.children || []).forEach((c) => walk(c, fn)); };
 const button = (root, text) => { let r = null; walk(root, (x) => { if (!r && x.tag === "button" && x.textContent === text) r = x; }); return r; };
 const PRICE = Number(2000).toLocaleString("fr-FR") + " FCFA";   // l'espace de milliers dépend de l'environnement (U+202F possible)
-const win = (nav) => ({ location: { origin: "https://mahouto.com" }, navigator: nav, open(...a) { this.opened = a; } });
+const win = (nav, origin) => ({ location: { origin: origin || "https://mahouto.com" }, navigator: nav, open(...a) { this.opened = a; } });
 
 (async () => {
-  await test("adresse du salon : <site>/chat.html?room=<id> ; identifiant non partageable refusé", () => {
-    assert.strictEqual(Share.buildUrl("https://mahouto.com", "general"), "https://mahouto.com/chat.html?room=general");
-    assert.strictEqual(Share.buildUrl("https://mahouto.com/", "salon-170"), "https://mahouto.com/chat.html?room=salon-170");
-    ["", null, undefined, "a b", "a&b=c", "../x", "x".repeat(65), "é", "a#b", "<b>", 5].forEach((id) => assert.strictEqual(Share.buildUrl("https://x.test", id), null, String(id)));
+  await test("lien partagé : TOUJOURS https://mahouto.com/r/<salon> ; identifiant non partageable refusé", () => {
+    assert.strictEqual(Share.buildUrl("general"), "https://mahouto.com/r/general");
+    assert.strictEqual(Share.buildUrl("salon-170"), "https://mahouto.com/r/salon-170");
+    assert.strictEqual(Share.SITE, "https://mahouto.com");
+    ["", null, undefined, "a b", "a&b=c", "../x", "x".repeat(65), "é", "a#b", "<b>", 5].forEach((id) => assert.strictEqual(Share.buildUrl(id), null, String(id)));
     assert.strictEqual(Share.isValidRoomId("a_b-C9"), true);
+    assert.strictEqual(Share.isValidRoomId("x".repeat(64)), true);
+  });
+
+  await test("depuis un autre domaine (majestepresse.com, localhost) : le lien partagé reste https://mahouto.com/r/<salon>", async () => {
+    for (const origin of ["https://majestepresse.com", "https://www.mahouto.com", "http://localhost:3000"]) {
+      const calls = [];
+      await Share.share({ room: { id: "general", name: "G" }, win: win({ share: async (a) => calls.push(a) }, origin), doc: fakeDoc() });
+      assert.strictEqual(calls[0].url, "https://mahouto.com/r/general", origin);
+      assert.match(calls[0].text, /sur MAHOUTO\+\.$/);
+    }
   });
 
   await test("texte d'accompagnement : nom du salon, marque ; prix pour un salon payant ; nom tronqué", () => {
-    assert.strictEqual(Share.buildMessage({ name: "Les Sérigraphes", is_paid: false }, "MAHOUTO+"), "Rejoins « Les Sérigraphes » sur MAHOUTO+.");
-    assert.strictEqual(Share.buildMessage({ name: "VIP", is_paid: true, price: 2000 }, "MAHOUTO+"), "Rejoins « VIP » sur MAHOUTO+ (salon payant : " + PRICE + ").");
-    assert.strictEqual(Share.buildMessage({ name: "  Salon \n  gratuit  ", is_paid: false, price: 500 }, "X"), "Rejoins « Salon gratuit » sur X.");
-    assert.ok(Share.buildMessage({ name: "a".repeat(300) }, "X").length < 140);
-    assert.match(Share.buildMessage({}, undefined), /^Rejoins « ce salon » sur MAHOUTO\+\.$/);
+    assert.strictEqual(Share.buildMessage({ name: "Les Sérigraphes", is_paid: false }), "Rejoins « Les Sérigraphes » sur MAHOUTO+.");
+    assert.strictEqual(Share.buildMessage({ name: "VIP", is_paid: true, price: 2000 }), "Rejoins « VIP » sur MAHOUTO+ (salon payant : " + PRICE + ").");
+    assert.strictEqual(Share.buildMessage({ name: "  Salon \n  gratuit  ", is_paid: false, price: 500 }), "Rejoins « Salon gratuit » sur MAHOUTO+.");
+    assert.ok(Share.buildMessage({ name: "a".repeat(300) }).length < 140);
+    assert.match(Share.buildMessage({}), /^Rejoins « ce salon » sur MAHOUTO\+\.$/);
+    // La marque est fixe : elle ne dépend plus du domaine ni d'un argument.
+    assert.strictEqual(Share.buildMessage({ name: "X" }, "MAJESTÉ PRESSE"), "Rejoins « X » sur MAHOUTO+.");
   });
 
   await test("lien WhatsApp : https://wa.me/?text= + texte et adresse encodés", () => {
-    const u = Share.whatsappUrl("Rejoins « A&B » sur X.", "https://mahouto.com/chat.html?room=a");
-    assert.strictEqual(u, "https://wa.me/?text=" + encodeURIComponent("Rejoins « A&B » sur X.\nhttps://mahouto.com/chat.html?room=a"));
+    const u = Share.whatsappUrl("Rejoins « A&B » sur X.", "https://mahouto.com/r/a");
+    assert.strictEqual(u, "https://wa.me/?text=" + encodeURIComponent("Rejoins « A&B » sur X.\nhttps://mahouto.com/r/a"));
     assert.ok(!/[ \n«]/.test(u));
   });
 
@@ -67,9 +80,9 @@ const win = (nav) => ({ location: { origin: "https://mahouto.com" }, navigator: 
     const calls = [];
     const w = win({ share: async (a) => { calls.push(a); } });
     const doc = fakeDoc();
-    const res = await Share.share({ room: { id: "general", name: "Général", is_paid: false }, brandName: "MAHOUTO+", win: w, doc });
+    const res = await Share.share({ room: { id: "general", name: "Général", is_paid: false }, win: w, doc });
     assert.strictEqual(res, "native");
-    assert.deepStrictEqual(calls, [{ title: "Général", text: "Rejoins « Général » sur MAHOUTO+.", url: "https://mahouto.com/chat.html?room=general" }]);
+    assert.deepStrictEqual(calls, [{ title: "Général", text: "Rejoins « Général » sur MAHOUTO+.", url: "https://mahouto.com/r/general" }]);
     assert.strictEqual(doc.body.children.length, 0, "pas de fenêtre de repli");
   });
 
@@ -83,11 +96,11 @@ const win = (nav) => ({ location: { origin: "https://mahouto.com" }, navigator: 
   await test("autre échec du partage natif, ou pas de partage natif : fenêtre de repli avec le lien", async () => {
     for (const nav of [{ share: async () => { throw new Error("NotAllowedError"); } }, {}, undefined]) {
       const doc = fakeDoc();
-      const res = await Share.share({ room: { id: "general", name: "Général" }, brandName: "MAHOUTO+", win: win(nav), doc });
+      const res = await Share.share({ room: { id: "general", name: "Général" }, win: win(nav), doc });
       assert.strictEqual(res, "sheet");
       const overlay = doc.body.children[0];
       let input = null; walk(overlay, (x) => { if (x.tag === "input") input = x; });
-      assert.strictEqual(input.value, "https://mahouto.com/chat.html?room=general");
+      assert.strictEqual(input.value, "https://mahouto.com/r/general");
       assert.ok(input.readOnly);
       assert.ok(button(overlay, "Copier le lien") && button(overlay, "WhatsApp") && button(overlay, "Fermer"));
     }
@@ -97,15 +110,15 @@ const win = (nav) => ({ location: { origin: "https://mahouto.com" }, navigator: 
     const written = [];
     let w = win({ clipboard: { writeText: async (t) => { written.push(t); } } });
     let doc = fakeDoc();
-    await Share.share({ room: { id: "vip", name: "VIP", is_paid: true, price: 2000 }, brandName: "MAHOUTO+", win: w, doc });
+    await Share.share({ room: { id: "vip", name: "VIP", is_paid: true, price: 2000 }, win: w, doc });
     let overlay = doc.body.children[0];
     let status = null; walk(overlay, (x) => { if (x.attrs.role === "status") status = x; });
     await button(overlay, "Copier le lien").listeners.click();
-    assert.deepStrictEqual(written, ["https://mahouto.com/chat.html?room=vip"]);
+    assert.deepStrictEqual(written, ["https://mahouto.com/r/vip"]);
     assert.strictEqual(status.textContent, "Lien copié ✅");
 
     button(overlay, "WhatsApp").listeners.click();
-    assert.strictEqual(w.opened[0], "https://wa.me/?text=" + encodeURIComponent("Rejoins « VIP » sur MAHOUTO+ (salon payant : " + PRICE + ").\nhttps://mahouto.com/chat.html?room=vip"));
+    assert.strictEqual(w.opened[0], "https://wa.me/?text=" + encodeURIComponent("Rejoins « VIP » sur MAHOUTO+ (salon payant : " + PRICE + ").\nhttps://mahouto.com/r/vip"));
     assert.deepStrictEqual(w.opened.slice(1), ["_blank", "noopener"]);
 
     button(overlay, "Fermer").listeners.click();
@@ -145,7 +158,8 @@ const win = (nav) => ({ location: { origin: "https://mahouto.com" }, navigator: 
     assert.match(chat, /<script src="login-sheet\.js"><\/script>\s*<script src="room-share\.js"><\/script>/);
     assert.match(chat, /<button type="button" id="share-room-btn" class="hidden" aria-label="Partager ce salon"/);
     assert.match(chat, /<button id="locked-share-btn" type="button">🔗 Partager ce salon<\/button>/);
-    assert.match(chatCode, /MahoutoRoomShare\.share\(\{\s*room: Object\.assign\(\{ name: "Salon" \}, currentRoom \|\| \{\}, \{ id: ROOM_ID \}\),/);
+    assert.match(chatCode, /MahoutoRoomShare\.share\(\{\s*room: Object\.assign\(\{ name: "Salon" \}, currentRoom \|\| \{\}, \{ id: ROOM_ID \}\),\s*win: window, doc: document\s*\}\);/);
+    assert.ok(!/brandName|MAHOUTO_BRAND/.test(chatCode.slice(chatCode.indexOf("function shareRoom"), chatCode.indexOf("function shareRoom") + 400)), "plus de marque selon le domaine");
     assert.match(chatCode, /getElementById\("share-room-btn"\)\.addEventListener\("click", shareRoom\)/);
     assert.match(chatCode, /getElementById\("locked-share-btn"\)\.addEventListener\("click", shareRoom\)/);
     assert.match(chatCode, /currentRoom = room;\s*const hasAccess = await checkRoomAccess\(room\);/, "salon connu avant l'écran payant");
@@ -155,15 +169,16 @@ const win = (nav) => ({ location: { origin: "https://mahouto.com" }, navigator: 
   await test("discussions.html : bouton 🔗 sur chaque salon (tout le monde, salons payants compris), sans ouvrir le salon", () => {
     assert.match(disc, /<script src="login-sheet\.js"><\/script>\s*<script src="room-share\.js"><\/script>/);
     assert.match(discCode, /shareBtn\.className = "room-share-btn";/);
-    assert.match(discCode, /shareBtn\.addEventListener\("click", \(e\) => \{\s*e\.stopPropagation\(\);\s*MahoutoRoomShare\.share\(/);
+    assert.match(discCode, /shareBtn\.addEventListener\("click", \(e\) => \{\s*e\.stopPropagation\(\);\s*MahoutoRoomShare\.share\(\{ room: room, win: window, doc: document \}\);/);
+    assert.ok(!/brandName/.test(discCode));
     assert.match(discCode, /e\.target\.closest\("\.room-manage-btn"\) \|\| e\.target\.closest\("\.room-share-btn"\)/);
     assert.ok(!/innerHTML\s*=\s*`/.test(discCode.slice(discCode.indexOf("function renderRooms"), discCode.indexOf("async function buyRoom"))), "liste des salons toujours sans innerHTML");
   });
 
-  await test("cache hors ligne : room-share.js dans l'App Shell, version ≥ v93", () => {
+  await test("cache hors ligne : room-share.js dans l'App Shell, version ≥ v94", () => {
     const sw = read("sw.js");
     assert.match(sw, /"\/room-share\.js"/);
-    assert.ok(Number((sw.match(/mahoutoplus-shell-v(\d+)/) || [])[1]) >= 93);
+    assert.ok(Number((sw.match(/mahoutoplus-shell-v(\d+)/) || [])[1]) >= 94);
   });
 
   console.log("\n" + passed + " test(s) réussi(s)");
