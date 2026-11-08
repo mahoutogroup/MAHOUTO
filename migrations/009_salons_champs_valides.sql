@@ -3,7 +3,8 @@
 -- ============================================================
 --
 -- Problème (faille XSS stockée) : la politique « rooms_insert_own » laisse
--- tout compte connecté, même anonyme, créer un salon avec n'importe quelle
+-- tout compte réel connecté (Google ou e-mail confirmé : les connexions anonymes
+-- sont désactivées sur Supabase) créer un salon avec n'importe quelle
 -- valeur dans color, emoji et photo_url. Ces champs étaient insérés dans du
 -- HTML par discussions.html, mes-achats.html et admin/rooms.html : du code
 -- pouvait s'exécuter chez tous ceux qui ouvraient la liste des salons. Le
