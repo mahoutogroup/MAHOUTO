@@ -87,12 +87,13 @@ export function buildRoomPreview(row, id) {
   }
   const image = roomOgImage(row.photo_url);
   const hasPhoto = image !== DEFAULT_IMAGE;
-  const name = cut(row.name, 80) || "Salon";
+  const isPaid = row.is_paid === true;
+  const name = cut(row.name, 80) || (isPaid ? "Communauté" : "Salon");
   // Sans photo, l'émoji (validé) accompagne le nom, comme la pastille dans l'application.
   const title = hasPhoto ? name : `${globalThis.MahoutoRoomSafe.emoji(row.emoji)} ${name}`;
   const price = Number(row.price);
-  const description = row.is_paid === true
-    ? `Salon payant${price > 0 ? ` : ${money(price)}` : ""} — Rejoins ce salon sur ${ROOM_BRAND}`
+  const description = isPaid
+    ? `Communauté payante${price > 0 ? ` : ${money(price)}` : ""} — Rejoins cette communauté sur ${ROOM_BRAND}`
     : `Rejoins ce salon sur ${ROOM_BRAND}`;
   const targetUrl = `${ROOM_SITE}/chat.html?room=${encodeURIComponent(id)}`;
   return {
@@ -102,7 +103,7 @@ export function buildRoomPreview(row, id) {
     title, description, image,
     canonicalUrl: `${ROOM_SITE}/r/${encodeURIComponent(id)}`,
     targetUrl,
-    redirectLabel: "Ouverture du salon…"
+    redirectLabel: isPaid ? "Ouverture de la communauté…" : "Ouverture du salon…"
   };
 }
 

@@ -155,7 +155,7 @@ export default async function handler(req, res) {
     const requestBrand = brandForRequest(req);
     const brandName = requestBrand.name;
     const articleName = productType === "salon"
-      ? (article.name || `Salon ${brandName}`)
+      ? (article.name || `Communauté ${brandName}`)
       : (article.nom || (productType === "digital_product" ? `Produit ${brandName}` : `Formation ${brandName.replace(/\+$/, "")}`));
 
     // -----------------------------------------------------
@@ -233,7 +233,7 @@ export default async function handler(req, res) {
     } else if (productType === "salon") {
       returnPage = "chat.html";
       callbackUrl = `${siteUrl}/chat.html?room=${encodeURIComponent(courseId)}&payment=return`;
-      platformLabel = `${brandName} Salons`;
+      platformLabel = `${brandName} Communautés`;
     } else {
       returnPage = article.provider === "academie_majestepresse" ? "academie-majestepresse.html" : "school.html";
       platformLabel = article.provider === "academie_majestepresse" ? "Académie Majesté Presse" : requestBrand.schoolName;

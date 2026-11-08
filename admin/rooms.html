@@ -97,7 +97,7 @@
 
   <header>
     <h1>⚙️ Administration — Salons</h1>
-    <p>Crée des salons payants (accès débloqué par achat via FedaPay, comme une formation) et gère le prix des salons existants.</p>
+    <p>Crée des communautés payantes (accès débloqué par achat via FedaPay, comme une formation) et gère le prix des salons existants.</p>
   </header>
 
   <div style="display:flex;gap:10px;padding:14px 20px 0;flex-wrap:wrap;">
@@ -135,7 +135,7 @@
 
     <label class="toggle-row">
       <input type="checkbox" id="nr-is-paid">
-      Salon payant (accès sur achat)
+      Communauté payante (accès sur achat)
     </label>
 
     <div>
@@ -198,7 +198,7 @@
 
         <label class="toggle-row">
           <input type="checkbox" class="r-is-paid" ${r.is_paid ? "checked" : ""}>
-          Salon payant (accès sur achat)
+          Communauté payante (accès sur achat)
         </label>
 
         <div>
@@ -291,7 +291,7 @@
         const price = priceRaw === "" ? null : parseInt(priceRaw, 10);
 
         if (is_paid && (!Number.isFinite(price) || price <= 0)) {
-          alert("Indique un prix valide pour un salon payant.");
+          alert("Indique un prix valide pour une communauté payante.");
           return;
         }
 
@@ -363,7 +363,7 @@
     if (!name) return;
     if (is_paid && (!Number.isFinite(price) || price <= 0)) {
       statusEl.style.color = "#F87171";
-      statusEl.textContent = "Indique un prix valide pour un salon payant.";
+      statusEl.textContent = "Indique un prix valide pour une communauté payante.";
       return;
     }
 

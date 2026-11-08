@@ -33,13 +33,15 @@
     return SITE + "/r/" + encodeURIComponent(roomId);
   }
 
+  function isPaidRoom(room) { return !!(room && room.is_paid === true); }
+
   function money(xof) { return Number(xof).toLocaleString("fr-FR") + " FCFA"; }
 
   // Texte d'accompagnement (le lien est transmis à part).
   function buildMessage(room) {
-    var name = String((room && room.name) || "").replace(/\s+/g, " ").trim().slice(0, MAX_NAME) || "ce salon";
+    var name = String((room && room.name) || "").replace(/\s+/g, " ").trim().slice(0, MAX_NAME) || (isPaidRoom(room) ? "cette communauté" : "ce salon");
     var text = "Rejoins « " + name + " » sur " + BRAND;
-    if (room && room.is_paid && Number(room.price) > 0) text += " (salon payant : " + money(room.price) + ")";
+    if (room && room.is_paid && Number(room.price) > 0) text += " (communauté payante : " + money(room.price) + ")";
     return text + ".";
   }
 
@@ -76,17 +78,17 @@
   }
 
   // Fenêtre de repli : lien, copie, WhatsApp.
-  function openSheet(doc, win, text, url) {
+  function openSheet(doc, win, text, url, paid) {
     injectStyle(doc);
-    var input = el(doc, "input", { type: "text", class: "rs-url", "aria-label": "Lien du salon" });
+    var input = el(doc, "input", { type: "text", class: "rs-url", "aria-label": paid ? "Lien de la communauté" : "Lien du salon" });
     input.value = url;
     input.readOnly = true;
     var status = el(doc, "p", { class: "rs-status", role: "status", "aria-live": "polite" });
     var copyBtn = el(doc, "button", { type: "button", class: "rs-primary", text: "Copier le lien" });
     var waBtn = el(doc, "button", { type: "button", text: "WhatsApp" });
     var closeBtn = el(doc, "button", { type: "button", text: "Fermer" });
-    var sheet = el(doc, "div", { class: "rs-sheet", role: "dialog", "aria-modal": "true", "aria-label": "Partager ce salon" }, [
-      el(doc, "h3", { text: "Partager ce salon" }),
+    var sheet = el(doc, "div", { class: "rs-sheet", role: "dialog", "aria-modal": "true", "aria-label": paid ? "Partager cette communauté" : "Partager ce salon" }, [
+      el(doc, "h3", { text: paid ? "Partager cette communauté" : "Partager ce salon" }),
       el(doc, "p", { class: "rs-text", text: text }),
       input, status,
       el(doc, "div", { class: "rs-actions" }, [copyBtn, waBtn, closeBtn])
@@ -131,14 +133,14 @@
 
     if (typeof nav.share === "function") {
       try {
-        await nav.share({ title: String(room.name || "").slice(0, MAX_NAME) || "Salon", text: text, url: url });
+        await nav.share({ title: String(room.name || "").slice(0, MAX_NAME) || (isPaidRoom(room) ? "Communauté" : "Salon"), text: text, url: url });
         return "native";
       } catch (err) {
         if (err && err.name === "AbortError") return "cancelled";   // annulé : aucune erreur à afficher
         // autre échec : repli sur la fenêtre
       }
     }
-    openSheet(doc, win, text, url);
+    openSheet(doc, win, text, url, isPaidRoom(room));
     return "sheet";
   }
 
