@@ -278,7 +278,7 @@ test("008 : fonctions du modérateur réservées aux connectés ; le modérateur
   });
   const hide = code.slice(code.indexOf("create or replace function public.admin_hide_room_message"), code.indexOf("create or replace function public.moderator_room_messages"));
   assert.ok(hide.indexOf("public.is_moderator()") < hide.indexOf("update public.messages"));
-  assert.match(hide, /not public\.is_admin\(\) and not exists \(\s+select 1 from public\.message_reports r where r\.kind = 'room' and r\.message_id = p_message_id/);
+  assert.match(hide, /not public\.is_admin\(\) and not exists \(\s+select 1 from public\.message_reports r\s+where r\.kind = 'room' and r\.message_id = p_message_id and r\.reporter_id <> auth\.uid\(\)\s+\)/);
   const people = code.slice(code.indexOf("create or replace function public.moderator_report_people"));
   assert.match(people, /returns table \(user_id uuid, username text\)/);
   assert.ok(!/full_name|country|email|\brole\b/.test(people.slice(0, people.indexOf("commit;"))), "ni nom légal, ni pays, ni e-mail, ni rôle");

@@ -30,7 +30,7 @@
   var MAX_NOTE = 1000;
 
   var MSG_UNAVAILABLE = "La modération n'est pas encore activée (une migration de modération, 006 ou 008, n'a pas été exécutée). Rien n'est cassé : reviens ici après son exécution.";
-  var MSG_DENIED = "Action refusée : réservé aux modérateurs et aux administrateurs, sur un message déjà signalé.";
+  var MSG_DENIED = "Action refusée : réservé aux modérateurs et aux administrateurs, sur un message signalé par un autre membre.";
   var MSG_OTHER = "Impossible de charger les signalements pour le moment.";
 
   function reasonLabel(reason) { return REASON_LABELS[reason] || "Autre"; }

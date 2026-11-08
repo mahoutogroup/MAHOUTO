@@ -36,7 +36,11 @@
 --        par la 006) des signalements kind = 'room' (nouvelles politiques,
 --        les politiques existantes ne sont pas modifiées) ;
 --      - public.admin_hide_room_message : accessible au modérateur, mais un
---        modérateur ne peut masquer qu'un message de salon DÉJÀ SIGNALÉ ;
+--        modérateur ne peut masquer qu'un message de salon DÉJÀ SIGNALÉ, au
+--        moins une fois (signalement ouvert ou classé) par UN AUTRE MEMBRE que
+--        lui (reporter_id <> auth.uid()) : se signaler soi-même un message ne
+--        suffit pas. Un admin garde le droit de masquer n'importe quel message
+--        de salon ;
 --      - public.moderator_room_messages(ids) : texte du seul message de salon
 --        de chaque signalement de salon demandé ;
 --      - public.moderator_report_people(ids) : identifiant et pseudo (rien
@@ -232,7 +236,7 @@ create policy "message_reports_update_moderator" on public.message_reports
   using (kind = 'room' and public.is_moderator())
   with check (kind = 'room' and public.is_moderator());
 
--- Masquage d'un message de SALON : admin (tout message) ou modérateur (message déjà signalé).
+-- Masquage d'un message de SALON : admin (tout message) ou modérateur (message signalé par un autre membre).
 create or replace function public.admin_hide_room_message(p_message_id bigint)
 returns integer
 language plpgsql
@@ -257,11 +261,13 @@ begin
       using errcode = 'P0002';
   end if;
 
-  -- Un modérateur (non admin) ne masque qu'un message de salon déjà signalé.
+  -- Un modérateur (non admin) ne masque qu'un message de salon signalé (signalement ouvert ou classé)
+  -- par AU MOINS UN AUTRE membre que lui : se signaler soi-même un message ne suffit pas.
   if not public.is_admin() and not exists (
-    select 1 from public.message_reports r where r.kind = 'room' and r.message_id = p_message_id
+    select 1 from public.message_reports r
+    where r.kind = 'room' and r.message_id = p_message_id and r.reporter_id <> auth.uid()
   ) then
-    raise exception 'SIGNALEMENT_REQUIS: un moderateur ne masque qu''un message signale'
+    raise exception 'SIGNALEMENT_REQUIS: un moderateur ne masque qu''un message signale par un autre membre'
       using errcode = '42501';
   end if;
 
