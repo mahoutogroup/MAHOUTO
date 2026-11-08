@@ -149,6 +149,7 @@
 
 </div>
 
+<script src="../room-safe.js"></script>
 <script src="../config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
@@ -190,7 +191,7 @@
       row.className = "card room-row";
       row.innerHTML = `
         <div class="top-line">
-          <span class="emoji" style="background:${r.color || 'rgba(212,175,55,.12)'}"></span>
+          <span class="emoji"></span>
           <span class="nom">${escapeHtml(r.name)}</span>
           ${r.is_paid ? "" : '<span class="free-tag">Gratuit</span>'}
         </div>
@@ -202,7 +203,7 @@
 
         <div>
           <label>Prix (FCFA)</label>
-          <input type="number" class="r-price" min="0" value="${r.price ?? ""}" placeholder="Ex : 2000" ${r.is_paid ? "" : "disabled"}>
+          <input type="number" class="r-price" min="0" value="${Number.isFinite(Number(r.price)) && r.price !== null ? Number(r.price) : ""}" placeholder="Ex : 2000" ${r.is_paid ? "" : "disabled"}>
         </div>
 
         <div class="actions">
@@ -214,15 +215,19 @@
       `;
 
       // Emoji ou vraie photo — même logique que discussions.html/chat.html.
+      // Couleur, émoji et photo d'un salon (saisis par son créateur, parfois un simple membre) :
+      // jamais dans du HTML, toujours validés par MahoutoRoomSafe.
       const emojiEl = row.querySelector(".emoji");
-      if (typeof r.photo_url === "string" && /^https:\/\//i.test(r.photo_url)) {
+      emojiEl.style.background = MahoutoRoomSafe.color(r.color, "rgba(212,175,55,.12)");
+      const safePhoto = MahoutoRoomSafe.photoUrl(r.photo_url);
+      if (safePhoto) {
         const img = document.createElement("img");
-        img.src = r.photo_url;
+        img.src = safePhoto;
         img.alt = "";
         img.style.cssText = "width:100%;height:100%;object-fit:cover;border-radius:50%;";
         emojiEl.appendChild(img);
       } else {
-        emojiEl.textContent = r.emoji || "💬";
+        emojiEl.textContent = MahoutoRoomSafe.emoji(r.emoji);
       }
 
       const isPaidBox = row.querySelector(".r-is-paid");

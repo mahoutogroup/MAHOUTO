@@ -348,6 +348,7 @@
 
 <script src="config.js"></script>
 <script src="pseudo.js"></script>
+<script src="room-safe.js"></script>
 <script src="offline-cache.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="attachments.js"></script>
@@ -684,9 +685,8 @@
       .eq("id", ROOM_ID)
       .maybeSingle();
 
-    if (room && typeof room.photo_url === "string" && /^https:\/\//i.test(room.photo_url)) {
-      roomPhotoUrl = room.photo_url;
-    }
+    const safePhoto = room ? MahoutoRoomSafe.photoUrl(room.photo_url) : null;
+    if (safePhoto) roomPhotoUrl = safePhoto;
 
     if (!room || !room.is_paid) return true;
     if (room.created_by === currentUser.id) return true;

@@ -63,6 +63,7 @@
   <a class="nav-item" href="profil.html"><span class="icon">👤</span>Profil</a>
 </nav>
 
+<script src="room-safe.js"></script>
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="offline-cache.js"></script>
@@ -161,16 +162,39 @@
   function renderRoomRow(purchase, room) {
     const row = document.createElement("div");
     row.className = "card purchase-row";
-    row.innerHTML = `
-      <span class="emoji" style="background:${(room && room.color) || 'rgba(212,175,55,.12)'}">${(room && room.emoji) || "💬"}</span>
-      <div class="info">
-        <div class="nom">${purchase.course_name}</div>
-        <div class="meta">${money(purchase.amount)} · Acheté le ${formatDate(purchase.created_at)}</div>
-      </div>
-      ${purchase.status === "paid"
-        ? `<a class="access-btn" href="chat.html?room=${encodeURIComponent(purchase.course_id)}&name=${encodeURIComponent(purchase.course_name)}">Ouvrir</a>`
-        : `<span class="status-pending">⏳ En attente</span>`}
-    `;
+    // Rendu DOM seulement : couleur et émoji du salon (saisis par son créateur) validés par MahoutoRoomSafe ;
+    // nom du salon, montant et date écrits avec textContent.
+    const emojiEl = document.createElement("span");
+    emojiEl.className = "emoji";
+    emojiEl.style.background = MahoutoRoomSafe.color(room && room.color, "rgba(212,175,55,.12)");
+    emojiEl.textContent = MahoutoRoomSafe.emoji(room && room.emoji);
+
+    const info = document.createElement("div");
+    info.className = "info";
+    const nom = document.createElement("div");
+    nom.className = "nom";
+    nom.textContent = purchase.course_name;
+    const meta = document.createElement("div");
+    meta.className = "meta";
+    meta.textContent = money(purchase.amount) + " · Acheté le " + formatDate(purchase.created_at);
+    info.appendChild(nom);
+    info.appendChild(meta);
+
+    row.appendChild(emojiEl);
+    row.appendChild(info);
+
+    if (purchase.status === "paid") {
+      const link = document.createElement("a");
+      link.className = "access-btn";
+      link.href = "chat.html?room=" + encodeURIComponent(purchase.course_id) + "&name=" + encodeURIComponent(purchase.course_name);
+      link.textContent = "Ouvrir";
+      row.appendChild(link);
+    } else {
+      const pending = document.createElement("span");
+      pending.className = "status-pending";
+      pending.textContent = "⏳ En attente";
+      row.appendChild(pending);
+    }
     return row;
   }
 
