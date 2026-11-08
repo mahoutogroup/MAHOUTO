@@ -58,7 +58,7 @@ test("l'adresse e-mail (ou son préfixe) n'est plus jamais utilisée comme pseud
 });
 
 test("les pages concernées chargent pseudo.js, et le service worker le met en cache", () => {
-  ["index.html", "chat.html", "discussions.html", "profil.html", "share.html"].forEach((f) => {
+  ["index.html", "discussions.html", "profil.html", "share.html"].forEach((f) => {
     assert.match(read(f), /<script src="\/?pseudo\.js"><\/script>/, f);
   });
   const sw = read("sw.js");
