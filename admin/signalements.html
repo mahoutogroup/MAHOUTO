@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Administration — Signalements — MAHOUTO+</title>
+<meta name="theme-color" content="#0A0A0A">
+<link rel="manifest" href="../manifest.json">
+<script src="../brand.js"></script>
+<link rel="icon" href="../assets/favicon.png">
+<link rel="stylesheet" href="../theme.css">
+<script src="../theme-toggle.js"></script>
+<style>
+  header { padding: 20px; background: var(--bg-elevated); border-bottom: 1px solid var(--border); }
+  header h1 { font-size: 20px; color: var(--gold); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding-right: 52px; }
+  header p { font-size: 12.5px; color: var(--text-muted); margin-top: 6px; }
+
+  .pastille {
+    display: inline-block; min-width: 22px; padding: 2px 8px; border-radius: 999px;
+    background: #EF4444; color: #fff; font-size: 12px; font-weight: bold; text-align: center;
+  }
+
+  .admin-tabs { display: flex; flex-wrap: wrap; gap: 10px; padding: 14px 20px 0; }
+  .admin-tabs a {
+    font-size: 12.5px; font-weight: bold; color: var(--text-muted);
+    background: var(--bg-card); border-radius: 999px; padding: 8px 16px;
+  }
+  .admin-tabs a.active { color: #0A0A0A; background: var(--gold-bright); }
+
+  #loading-state, #access-denied, #notice {
+    text-align: center; color: var(--text-dim); padding: 50px 24px; font-size: 14px; line-height: 1.5;
+  }
+  #notice { padding: 24px; }
+
+  .filters { display: flex; gap: 8px; padding: 16px 20px 4px; }
+  .filters button {
+    flex: 1; min-height: 44px; border: none; border-radius: 12px; cursor: pointer;
+    font-size: 13.5px; font-weight: bold; background: var(--bg-card); color: var(--text-muted);
+  }
+  .filters button.active { background: var(--gold-bright); color: #0A0A0A; }
+
+  #list-status { padding: 6px 20px; font-size: 12.5px; color: var(--text-dim); }
+  #action-status { padding: 0 20px; min-height: 18px; font-size: 13px; color: var(--text-muted); }
+  #action-status.error { color: #F87171; }
+
+  .rp-card { margin: 10px 20px; padding: 14px; }
+  .rp-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .rp-kind { font-weight: bold; font-size: 13.5px; }
+  .rp-count { font-size: 12px; font-weight: bold; color: var(--gold-bright); }
+  .rp-status { font-size: 10.5px; font-weight: bold; padding: 2px 8px; border-radius: 999px; background: var(--bg); margin-left: auto; }
+  .rp-status-open { color: #F87171; }
+  .rp-status-actioned { color: var(--accent-green); }
+  .rp-status-dismissed { color: var(--text-muted); }
+  .rp-line { font-size: 13px; margin: 3px 0; overflow-wrap: anywhere; }
+  .rp-muted { color: var(--text-dim); font-size: 12px; }
+  .rp-admin-note { color: var(--text-muted); font-style: italic; }
+  .rp-note-label { font-size: 11.5px; color: var(--text-dim); margin: 10px 0 4px; }
+  .rp-message {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px;
+    font-size: 14px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 220px; overflow-y: auto;
+  }
+  .rp-note {
+    width: 100%; margin-top: 10px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--bg-card); color: var(--white); font-size: 14px; font-family: inherit; resize: vertical;
+  }
+  .rp-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+  .rp-btn { min-height: 44px; border: none; border-radius: 10px; cursor: pointer; font-size: 13.5px; font-weight: bold; }
+  .rp-btn:disabled { opacity: .5; cursor: not-allowed; }
+  .rp-btn-hide { background: #F87171; color: #fff; }
+  .rp-btn-dismiss { background: var(--bg); color: var(--text-muted); border: 1px solid var(--border); }
+  .rp-btn-action { background: rgba(34,197,94,.15); color: var(--accent-green); }
+
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<button id="theme-toggle-btn" class="theme-toggle-fab">🌙</button>
+
+<div class="page-content">
+
+  <header>
+    <h1>🚩 Administration — Signalements <span id="header-badge" class="pastille hidden"></span></h1>
+    <p>Messages signalés par les membres. Un message privé n'est jamais lu ici : seule la copie prise au moment du signalement est affichée.</p>
+  </header>
+
+  <div class="admin-tabs">
+    <a href="formations.html">Formations</a>
+    <a href="produits.html">Produits numériques</a>
+    <a href="users.html">Utilisateurs</a>
+    <a href="rooms.html">Salons</a>
+    <a href="statistiques.html">Statistiques</a>
+    <a href="signalements.html" class="active">Signalements</a>
+  </div>
+
+  <div id="loading-state">Vérification des droits...</div>
+  <div id="access-denied" class="hidden"></div>
+
+  <div id="content" class="hidden">
+    <div id="notice" class="hidden"></div>
+    <div id="main" class="hidden">
+      <div class="filters">
+        <button type="button" id="filter-open" class="active">Ouverts</button>
+        <button type="button" id="filter-closed">Classés</button>
+      </div>
+      <div id="list-status"></div>
+      <div id="action-status" role="status" aria-live="polite"></div>
+      <div id="list"></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="../config.js"></script>
+<script src="../moderation.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+(function () {
+  "use strict";
+  const M = window.MahoutoModeration;
+  const cfg = window.MAHOUTO_CONFIG;
+  const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+
+  const loadingEl = document.getElementById("loading-state");
+  const deniedEl = document.getElementById("access-denied");
+  const contentEl = document.getElementById("content");
+  const noticeEl = document.getElementById("notice");
+  const mainEl = document.getElementById("main");
+  const listEl = document.getElementById("list");
+  const listStatusEl = document.getElementById("list-status");
+  const actionStatusEl = document.getElementById("action-status");
+  const badgeEl = document.getElementById("header-badge");
+
+  let mode = "open";
+  let groups = [];
+  let names = {};
+  let roomMessages = {};
+  let busy = false;
+
+  // Journal : jamais de contenu de message, seulement le code d'erreur.
+  function logError(where, error) {
+    console.error("[signalements] " + where + " : " + (error && (error.code || "erreur")));
+  }
+
+  function deny(message, redirectTo) {
+    loadingEl.classList.add("hidden");
+    contentEl.classList.add("hidden");
+    deniedEl.textContent = message;
+    deniedEl.classList.remove("hidden");
+    if (redirectTo) setTimeout(() => { window.location.href = redirectTo; }, 2500);
+  }
+
+  function setActionStatus(text, isError) {
+    actionStatusEl.textContent = text || "";
+    actionStatusEl.className = isError ? "error" : "";
+  }
+
+  function chunk(arr, size) {
+    const out = [];
+    for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+    return out;
+  }
+
+  async function init() {
+    const { data } = await supabase.auth.getSession();
+    if (!data || !data.session) {
+      deny("🔒 Connecte-toi pour accéder à cette page. Redirection…", "../index.html");
+      return;
+    }
+    const { data: profile } = await supabase
+      .from("profiles").select("role").eq("id", data.session.user.id).maybeSingle();
+    if (!profile || !M.isAdminRole(profile.role)) {
+      deny("🔒 Accès réservé aux administrateurs. Redirection…", "../profil.html");
+      return;
+    }
+    loadingEl.classList.add("hidden");
+    contentEl.classList.remove("hidden");
+    await load();
+  }
+
+  function showNotice(message) {
+    noticeEl.textContent = message;
+    noticeEl.classList.remove("hidden");
+    mainEl.classList.add("hidden");
+    badgeEl.classList.add("hidden");
+  }
+
+  async function load() {
+    noticeEl.classList.add("hidden");
+    mainEl.classList.remove("hidden");
+    listStatusEl.textContent = "Chargement…";
+
+    const { data: rows, error } = await supabase
+      .from("message_reports")
+      .select("id, kind, message_id, reporter_id, reason, created_at, reported_user_id, message_text, status, admin_note")
+      .order("created_at", { ascending: false })
+      .limit(1000);
+    if (error) {
+      logError("lecture des signalements", error);
+      showNotice(M.errorMessage(error));
+      return;
+    }
+
+    groups = M.groupReports(rows || []);
+    const open = M.countOpenReports(rows || []);
+    if (open > 0) { badgeEl.textContent = String(open); badgeEl.classList.remove("hidden"); }
+    else badgeEl.classList.add("hidden");
+
+    // Pseudos (un admin lit tous les profils : migration 001).
+    const ids = new Set();
+    (rows || []).forEach((r) => { ids.add(r.reporter_id); if (r.reported_user_id) ids.add(r.reported_user_id); });
+    names = {};
+    for (const part of chunk(Array.from(ids), 100)) {
+      const res = await supabase.from("profiles").select("id, username").in("id", part);
+      if (!res.error) (res.data || []).forEach((p) => { names[p.id] = p.username || "Compte sans pseudo"; });
+      else logError("lecture des pseudos", res.error);
+    }
+
+    // Messages de SALON (un admin les lit). Jamais dm_messages : le texte d'un message privé est la copie du signalement.
+    roomMessages = {};
+    const roomIds = Array.from(new Set(groups.filter((g) => g.kind === "room").map((g) => g.message_id)));
+    for (const part of chunk(roomIds, 100)) {
+      const res = await supabase.from("messages")
+        .select("id, content, is_deleted, attachment_type, attachment_url").in("id", part);
+      if (!res.error) (res.data || []).forEach((m) => { roomMessages[m.id] = m; });
+      else logError("lecture des messages de salon", res.error);
+    }
+
+    render();
+  }
+
+  function render() {
+    const shown = M.filterGroups(groups, mode);
+    listEl.textContent = "";
+    listStatusEl.textContent = shown.length
+      ? shown.length + (mode === "open" ? " message(s) signalé(s) à examiner" : " message(s) classé(s)")
+      : (mode === "open" ? "Aucun signalement ouvert. 🎉" : "Aucun signalement classé.");
+    shown.forEach((g) => {
+      listEl.appendChild(M.buildCard(g, {
+        doc: document, names: names, roomMessages: roomMessages,
+        onHide: (group, note) => hideMessage(group, note),
+        onDismiss: (group, note) => classify(group, "dismissed", note),
+        onAction: (group, note) => classify(group, "actioned", note)
+      }));
+    });
+  }
+
+  async function classify(group, status, note) {
+    if (busy) return;
+    const label = status === "dismissed" ? "Classer sans suite" : "Marquer traité";
+    if (!confirm(label + " ce signalement (" + group.openIds.length + " ouvert(s)) ?")) return;
+    busy = true; setActionStatus("Enregistrement…");
+    // handled_by et handled_at sont remplis par la base, jamais envoyés d'ici.
+    const payload = { status: status };
+    const trimmed = String(note || "").trim().slice(0, M.MAX_NOTE);
+    if (trimmed) payload.admin_note = trimmed;
+    const { error } = await supabase.from("message_reports").update(payload).in("id", group.openIds);
+    busy = false;
+    if (error) { logError("classement", error); setActionStatus(M.errorMessage(error), true); return; }
+    setActionStatus("Enregistré ✅");
+    await load();
+  }
+
+  async function hideMessage(group, note) {
+    if (busy || group.kind !== "room") return;
+    if (!confirm("Masquer ce message pour tout le monde dans le salon ? Les signalements ouverts de ce message seront marqués traités.")) return;
+    busy = true; setActionStatus("Masquage…");
+    const { error } = await supabase.rpc("admin_hide_room_message", { p_message_id: Number(group.message_id) });
+    if (error) { busy = false; logError("masquage", error); setActionStatus(M.errorMessage(error), true); return; }
+    const trimmed = String(note || "").trim().slice(0, M.MAX_NOTE);
+    if (trimmed) {
+      // Note facultative sur les signalements désormais traités (colonne admin_note, réservée aux admins).
+      const res = await supabase.from("message_reports").update({ admin_note: trimmed })
+        .eq("kind", "room").eq("message_id", group.message_id).is("admin_note", null);
+      if (res.error) logError("note", res.error);
+    }
+    busy = false;
+    setActionStatus("Message masqué ✅");
+    await load();
+  }
+
+  document.getElementById("filter-open").addEventListener("click", () => setMode("open"));
+  document.getElementById("filter-closed").addEventListener("click", () => setMode("closed"));
+  function setMode(next) {
+    mode = next;
+    document.getElementById("filter-open").classList.toggle("active", next === "open");
+    document.getElementById("filter-closed").classList.toggle("active", next === "closed");
+    setActionStatus("");
+    render();
+  }
+
+  init().catch((err) => { logError("initialisation", err); deny("Impossible de charger la page pour le moment."); });
+})();
+</script>
+
+</body>
+</html>
