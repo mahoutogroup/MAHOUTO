@@ -297,6 +297,52 @@ test("008 : le retour arrière retire tout, rend admin_hide_room_message aux adm
   assert.ok(!/update public\.(profiles|message_reports)|delete from|truncate/i.test(code.replace(/update public\.message_reports\s+set (message_text|status)/g, "")));
 });
 
+test("009 : contraintes CHECK de format sur rooms (couleur hexadécimale, émoji court sans < > \" ' &, photo https), NOT VALID puis validées seulement sans violation", () => {
+  const code = stripComments(read("009_salons_champs_valides.sql"));
+  assert.match(code, /add constraint rooms_color_hex_check\s+check \(color ~ '\^#\(\[0-9A-Fa-f\]\{3\}\|\[0-9A-Fa-f\]\{4\}\|\[0-9A-Fa-f\]\{6\}\|\[0-9A-Fa-f\]\{8\}\)\$'\)\s+not valid;/);
+  assert.match(code, /add constraint rooms_emoji_safe_check\s+check \(char_length\(emoji\) between 1 and 16 and emoji !~ '\[<>"''&\[:cntrl:\]\\u2028\\u2029\]'\)\s+not valid;/);
+  assert.match(code, /add constraint rooms_photo_url_check\s+check \(photo_url is null or \(char_length\(photo_url\) <= 2048 and photo_url ~\* '\^https:\/\/\[\^\[:space:\]"''<>`\\\\\]\+\$'\)\)\s+not valid;/);
+  assert.strictEqual((code.match(/not valid;/g) || []).length, 3, "les trois contraintes sont créées NOT VALID");
+  assert.match(code, /if nb = 0 then\s+execute format\('alter table public\.rooms validate constraint %I', c\.name\);/, "validation seulement si aucune ligne ne viole");
+  assert.ok(!/\b(update|delete from|insert into|truncate|drop table|drop column)\b/i.test(code.replace(/drop constraint if exists/gi, "")), "aucune donnée modifiée");
+  assert.match(code, /^begin;$/m);
+  assert.match(code, /^commit;$/m);
+});
+
+test("009 : les valeurs de couleur produites par le code (salons de départ, création dans les pages) passent la contrainte", () => {
+  const code = stripComments(read("009_salons_champs_valides.sql"));
+  const src = code.match(/color ~ '(\^#[^']+\$)'/)[1];
+  const re = new RegExp(src);
+  const schema = fs.readFileSync(path.join(__dirname, "..", "supabase-schema.sql"), "utf8");
+  const seed = schema.slice(schema.indexOf("insert into public.rooms (id, name, emoji, color, is_group) values"));
+  const colors = (seed.slice(0, seed.indexOf("on conflict")).match(/'#[0-9A-Fa-f]+'/g) || []).map((c) => c.slice(1, -1));
+  assert.ok(colors.length >= 3, "salons de départ trouvés");
+  const pages = ["discussions.html", "admin/rooms.html"].map((f) => fs.readFileSync(path.join(__dirname, "..", f), "utf8")).join("\n");
+  (pages.match(/color: "#[0-9A-Fa-f]+"|\|\| "#[0-9A-Fa-f]+"|value="#[0-9A-Fa-f]+"/g) || []).forEach((m) => colors.push(m.match(/#[0-9A-Fa-f]+/)[0]));
+  assert.ok(colors.length >= 6);
+  colors.forEach((c) => assert.ok(re.test(c), "couleur du code refusée par la contrainte : " + c));
+  ["red", 'x" onmouseover="1', "#12", "#GGGGGG"].forEach((c) => assert.ok(!re.test(c), "couleur piégée acceptée : " + c));
+});
+
+test("009 : retour arrière, requête de lecture seule et script de nettoyage à valider", () => {
+  const rb = read("rollback/009_salons_champs_valides.sql");
+  assert.match(rb.split("\n")[0], /^-- ⚠️ ATTENTION/);
+  ["rooms_color_hex_check", "rooms_emoji_safe_check", "rooms_photo_url_check"].forEach((n) => assert.ok(stripComments(rb).includes("drop constraint if exists " + n), n));
+  assert.ok(!/update|delete from|truncate/i.test(stripComments(rb)));
+
+  const ro = stripComments(read("a_valider/009_salons_violations_lecture_seule.sql"));
+  assert.match(ro.trim(), /^select/i);
+  assert.ok(!/\b(update|delete|insert|alter|drop|create|truncate|grant)\b/i.test(ro), "requête strictement en lecture seule");
+
+  const raw = read("a_valider/009_salons_nettoyage.sql");
+  const clean = stripComments(raw);
+  assert.match(clean, /^begin;$/m);
+  assert.match(clean.trim(), /rollback;$/, "s'annule par défaut : à remplacer par commit après relecture");
+  assert.ok(!/^commit;$/m.test(clean), "aucun commit par défaut");
+  assert.ok(!/delete from|truncate|drop /i.test(clean), "aucune suppression de salon ni de message");
+  assert.ok(!/\bset\s+name\b|name\s*=/.test(clean.replace(/relname/g, "")), "les noms ne sont pas touchés");
+});
+
 test("les fichiers SQL sont exclus du déploiement Vercel", () => {
   const ignore = fs.readFileSync(path.join(__dirname, "..", ".vercelignore"), "utf8");
   assert.match(ignore, /^migrations\/?$/m);
