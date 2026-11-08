@@ -81,7 +81,27 @@
     return { error: res.error || null, username: username, kept: false };
   }
 
+  /**
+   * Garantit qu'un compte connecté a un profil avec un pseudo, SANS jamais réécrire un pseudo existant
+   * (saveIfMissing). Pseudo initial : nom du compte Google (full_name ou name) ; jamais une adresse e-mail ;
+   * sans nom (inscription par e-mail) : « Membre xxxxxx ». Si la base refuse le nom (réservé, forme d'e-mail,
+   * déjà pris), pseudo neutre de 6 caractères, puis de 8. Renvoie { error, username, kept }.
+   */
+  async function ensureProfileForUser(supabase, user, extra) {
+    var meta = (user && user.user_metadata) || {};
+    var name = meta.full_name || meta.name || "";
+    if (!name || looksLikeEmail(name)) name = neutralName(user.id);
+    var candidates = [name, neutralName(user.id), neutralName(user.id, 8)].filter(function (v, i, a) { return a.indexOf(v) === i; });
+    var result = null;
+    for (var i = 0; i < candidates.length; i++) {
+      result = await saveIfMissing(supabase, user.id, candidates[i], extra);
+      if (!refusal(result.error)) break;
+    }
+    return result;
+  }
+
   var api = {
+    ensureProfileForUser: ensureProfileForUser,
     neutralName: neutralName, looksLikeEmail: looksLikeEmail, refusal: refusal, isNeutralName: isNeutralName,
     saveIfMissing: saveIfMissing, UNIQUE_INDEX: UNIQUE_INDEX
   };
