@@ -41,6 +41,28 @@
 
   header h1 { font-size: 18px; color: var(--gold-bright); min-width: 0; overflow-wrap: anywhere; }
 
+  #share-room-btn {
+    flex: none;
+    width: 40px;
+    height: 40px;
+    border: none;
+    border-radius: 50%;
+    background: var(--bg-card);
+    color: var(--gold-bright);
+    font-size: 18px;
+    cursor: pointer;
+  }
+  #locked-share-btn {
+    min-height: 44px;
+    padding: 10px 24px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--bg-card);
+    color: var(--white);
+    font-size: 14px;
+    cursor: pointer;
+  }
+
   #room-avatar {
     width: 36px;
     height: 36px;
@@ -332,6 +354,7 @@
   <a class="back" href="discussions.html" aria-label="Retour">←</a>
   <div id="room-avatar" class="hidden"></div>
   <h1 id="room-title">💬 Salon</h1>
+  <button type="button" id="share-room-btn" class="hidden" aria-label="Partager ce salon" title="Partager ce salon">🔗</button>
   <span class="room">En direct</span>
 </header>
 
@@ -343,6 +366,7 @@
   <div id="locked-price"></div>
   <p id="cgv-line" style="text-align:center;font-size:12px;color:var(--text-dim);padding:0 20px 16px;padding:0;">En payant, vous acceptez les <a href="conditions-vente.html" target="_blank" rel="noopener noreferrer" style="color:var(--gold);text-decoration:underline;">conditions de vente et retours</a>.</p>
   <button id="locked-buy-btn" type="button">Débloquer l'accès</button>
+  <button id="locked-share-btn" type="button">🔗 Partager ce salon</button>
   <p id="locked-login-note" class="hidden">Connecte-toi pour débloquer ce salon.</p>
   <a id="locked-login-link" class="hidden" href="index.html" style="padding:12px 30px;border-radius:12px;background:var(--gold-bright);color:#0A0A0A;font-weight:bold;text-decoration:none;">Se connecter</a>
 </div>
@@ -394,6 +418,7 @@
 <script src="pseudo.js"></script>
 <script src="room-safe.js"></script>
 <script src="login-sheet.js"></script>
+<script src="room-share.js"></script>
 <script src="offline-cache.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="attachments.js"></script>
@@ -799,12 +824,15 @@
     }
 
     if (room) document.getElementById("room-title").textContent = "💬 " + room.name;
+    currentRoom = room;
 
     const hasAccess = await checkRoomAccess(room);
     if (!hasAccess) return;
 
     roomStateEl.classList.add("hidden");
     chatHeader.classList.remove("hidden");
+    // Le bouton de partage n'apparaît que si le salon est connu (nom lu en base).
+    if (room) document.getElementById("share-room-btn").classList.remove("hidden");
     messagesEl.classList.remove("hidden");
     // Connecté : zone de saisie. Visiteur : lecture seule, invitation à se connecter pour écrire.
     if (currentUser) composer.classList.remove("hidden");
@@ -826,6 +854,18 @@
     await markAsRead();
     if (currentUser) messageInput.focus();
   }
+
+  // Partage du lien du salon (WhatsApp, statut, copie) : feuille native sur mobile, fenêtre de repli sinon.
+  let currentRoom = null;   // ligne de la table rooms (nom, prix…) une fois lue
+  function shareRoom() {
+    const brand = (window.MAHOUTO_BRAND && MAHOUTO_BRAND.name) || "MAHOUTO+";
+    MahoutoRoomShare.share({
+      room: Object.assign({ name: "Salon" }, currentRoom || {}, { id: ROOM_ID }),
+      brandName: brand, win: window, doc: document
+    });
+  }
+  document.getElementById("share-room-btn").addEventListener("click", shareRoom);
+  document.getElementById("locked-share-btn").addEventListener("click", shareRoom);
 
   // Fenêtre de connexion (Google ou e-mail) : après un code valide, on garantit le profil (jamais d'écrasement
   // d'un pseudo existant) puis on recharge la page : même salon, session active. Google revient sur la même adresse.
