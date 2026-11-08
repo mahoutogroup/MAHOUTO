@@ -18,6 +18,10 @@
       "destination": "/api/produit-og?type=serigraphie&id=:id"
     },
     {
+      "source": "/r/:id",
+      "destination": "/api/produit-og?type=salon&id=:id"
+    },
+    {
       "source": "/verify/:code",
       "destination": "/verify.html?code=:code"
     }

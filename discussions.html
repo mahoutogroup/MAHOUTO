@@ -723,11 +723,7 @@
       shareBtn.textContent = "🔗";
       shareBtn.addEventListener("click", (e) => {
         e.stopPropagation();
-        MahoutoRoomShare.share({
-          room: room,
-          brandName: (window.MAHOUTO_BRAND && MAHOUTO_BRAND.name) || "MAHOUTO+",
-          win: window, doc: document
-        });
+        MahoutoRoomShare.share({ room: room, win: window, doc: document });
       });
       row.appendChild(shareBtn);
 

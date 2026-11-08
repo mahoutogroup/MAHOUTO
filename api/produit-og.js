@@ -45,6 +45,8 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { brandForRequest } from "./_brand.js";
+import { cloudinaryImageParts } from "./_cloudinary-og.js";
+import { handleRoomPreview, ROOM_FIELDS } from "./_room-og.js";
 
 function escapeHtml(str) {
   return String(str || "")
@@ -235,53 +237,6 @@ async function handleFormation(req, res, base) {
 // ---------------------------------------------------------
 const SERIGRAPHIE_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-// Nom du « cloud » Cloudinary du projet (public) : variable Vercel si définie, sinon la valeur de config.js.
-const CLOUDINARY_CLOUD = (process.env.CLOUDINARY_CLOUD_NAME || "hefa5gqf").trim();
-
-// Image d'aperçu 1200x630. Seule une image du compte Cloudinary du projet est utilisée ;
-// toute autre origine (ou image absente) -> image par défaut MAJESTÉ (URL absolue).
-// « c_pad » + « b_auto:predominant » : l'image entière est conservée (pas de rognage), qu'elle soit
-// carrée, verticale ou un collage de plusieurs vues ; l'espace restant est comblé avec la couleur
-// dominante de l'image. (« b_blurred » est refusé par le compte Cloudinary : erreur HTTP 400.)
-// f_auto / q_auto : format et qualité automatiques (poids réduit).
-//
-// Une adresse enregistrée peut déjà contenir UN segment de transformation, par exemple
-//   .../image/upload/f_auto,q_auto,w_1000,c_limit/v1793189115/dossier/image.png
-// Il est alors REMPLACÉ par le nôtre (jamais empilé). Segment reconnu = uniquement des
-// paramètres connus (f, q, w, h, c, dpr, ar, g), suivi d'un segment de version « v<chiffres> ».
-// Tout segment de transformation inconnu ou multiple -> image par défaut (on ne devine pas).
-const KNOWN_TRANSFORM_TOKEN = /^(?:f|q|w|h|c|dpr|ar|g)_[A-Za-z0-9:._-]+$/;
-
-// Adresse d'image Cloudinary du projet, sans transformation : { prefix, rest } ou null.
-// (validation du domaine, de /image/upload/, de « .. », des caractères interdits, et
-// retrait d'UN segment de transformation connu — voir le commentaire ci-dessus.)
-function cloudinaryImageParts(first) {
-  if (typeof first !== "string") return null;
-
-  const prefix = `https://res.cloudinary.com/${CLOUDINARY_CLOUD}/image/upload/`;
-  if (!first.startsWith(prefix) || first.length > 500 || /[\s"'<>]/.test(first)) return null;
-
-  let rest = first.slice(prefix.length);
-  if (!rest || rest.includes("..")) return null;
-
-  const slash = rest.indexOf("/");
-  if (slash > 0) {
-    const firstSegment = rest.slice(0, slash);
-    if (!/^v\d+$/.test(firstSegment)) {
-      // Segment qui ressemble à une transformation (virgule, ou « xx_valeur ») ?
-      if (firstSegment.includes(",") || /^[a-z]{1,4}_/.test(firstSegment)) {
-        const known = firstSegment.split(",").every((t) => KNOWN_TRANSFORM_TOKEN.test(t));
-        const afterSegment = rest.slice(slash + 1);
-        const next = afterSegment.split("/")[0];
-        if (!known || !/^v\d+$/.test(next) || !afterSegment.includes("/")) return null;
-        rest = afterSegment;   // transformation existante retirée
-      }
-      // sinon : simple dossier (public_id sans version) -> conservé tel quel
-    }
-  }
-  return { prefix, rest };
-}
-
 function serigraphieOgImage(images, base) {
   const fallback = { url: `${base}/assets/og-majeste.png`, width: "1200", height: "630" };
   const parts = cloudinaryImageParts(Array.isArray(images) ? images[0] : null);
@@ -456,7 +411,23 @@ async function handleJson(req, res, base, type) {
   return notFound();   // type non pris en charge en mode JSON
 }
 
+// ---------------------------------------------------------
+// Salons : lien /r/<salon> (type=salon), aperçu avec la photo et le nom du salon.
+// Lecture avec la clé publique (anon), jamais service_role ; champs : name, is_paid, price, photo_url, emoji.
+// Toute la logique (validation, balises, échappement, cache) est dans api/_room-og.js.
+// ---------------------------------------------------------
+async function fetchRoomForPreview(id) {
+  const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
+  const { data, error } = await supabase.from("rooms").select(ROOM_FIELDS).eq("id", id).maybeSingle();
+  return { row: data || null, error: error || null };
+}
+
 export default async function handler(req, res) {
+  // Salons : en-têtes de cache propres (courte durée), site et marque fixes.
+  if (req.query && req.query.type === "salon" && req.query.format !== "json") {
+    return handleRoomPreview(req, res, { fetchRoom: fetchRoomForPreview });
+  }
+
   res.setHeader("Cache-Control", "public, max-age=120, s-maxage=300");
   res.setHeader("Content-Type", "text/html; charset=utf-8");
 
