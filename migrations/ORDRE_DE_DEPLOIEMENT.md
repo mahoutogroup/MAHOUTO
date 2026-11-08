@@ -108,6 +108,14 @@ Utiliser deux comptes normaux (A et B), un compte admin, et une fenêtre privée
 
 - **N14.** (1) Ouvrir un lien `https://mahouto.com/r/<salon payant>` en navigation privée : « Communauté payante », prix, « Rejoins cette communauté pour lire et écrire les messages. », « 🔗 Partager cette communauté », « Connecte-toi pour débloquer cette communauté. ». (2) Partager cette communauté vers WhatsApp : « Rejoins « <nom> » sur MAHOUTO+ (communauté payante : X FCFA). » ; l'aperçu du lien `/r/<id>` affiche « Communauté payante : X FCFA — Rejoins cette communauté sur MAHOUTO+ » (WhatsApp garde l'ancien aperçu en cache : ajouter `?v=3` au lien pour le voir tout de suite). (3) Un **salon gratuit** garde tous ses textes : « Rejoins ce salon sur MAHOUTO+ », « Partager ce salon », « Tu lis ce salon en lecture seule… ». (4) `discussions.html` : « 🔒 Communauté payante » sur la ligne d'une communauté non débloquée ; après un ancien retour de paiement : « Communauté débloquée ». (5) `mes-achats.html` : section « 🔒 Mes communautés ». (6) Administration des salons : case « Communauté payante (accès sur achat) » et message de prix invalide au féminin. (7) Aucune modification des conditions de vente, des mentions légales ni des conditions vendeurs (en attente de validation juridique).
 
+## Ma bibliothèque : achats en attente anciens masqués (PR 8, sans migration)
+
+| # | Étape | Ce qu'on vérifie | Ce qui casse si on saute l'étape | Test navigateur ensuite |
+|---|---|---|---|---|
+| 22 | **Fusion de la PR « fix(achats): masquer les achats en attente anciens »** et déploiement Vercel (aucune migration, aucune écriture en base, aucune nouvelle fonction : toujours 12) | Voir **N15** | Rien à sauter : seul l'affichage change, les lignes restent en base | **N15** |
+
+- **N15.** Sur `mes-achats.html` : un achat « En attente » de plus de 3 jours n'apparaît plus ; un achat « En attente » de moins de 3 jours reste visible ; un « En attente » à côté d'un achat payé du même article (salon, formation ou produit) n'apparaît jamais ; les achats payés restent tous visibles ; les paiements échoués ne sont pas affichés. Contrôle en lecture seule dans Supabase : `select status, created_at from purchases where user_id = '<ton id>' order by created_at desc;` (les lignes masquées y sont toujours). Un paiement tardif qui passe à `paid` réapparaît tout seul.
+
 ## Signalement avant la migration 003
 
 L'interface de signalement n'est **pas bloquante** si la table `message_reports` n'existe pas encore : le navigateur reçoit l'erreur « table introuvable » (`PGRST205` ou `42P01`), affiche « Le signalement n'est pas encore disponible. Réessaie un peu plus tard. » et désactive le bouton d'envoi. Aucune erreur technique n'est montrée. Rien à faire à la fusion, mais il vaut mieux exécuter la 003 juste après la 002 pour que le bouton fonctionne vraiment ; elle ne dépend ni de la 001, ni de la 004, ni de la 005.
