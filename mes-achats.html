@@ -64,6 +64,7 @@
 </nav>
 
 <script src="room-safe.js"></script>
+<script src="purchase-list.js"></script>
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="offline-cache.js"></script>
@@ -239,8 +240,10 @@
     emptyEl.classList.add("hidden");
     offlineEl.classList.add("hidden");
 
-    const { purchases, formationsById, productsById, roomsById } = data;
-    if (!purchases || !purchases.length) {
+    const { formationsById, productsById, roomsById } = data;
+    // Affichage seulement : achats payés + paiements récents encore possibles (rien n'est supprimé en base).
+    const purchases = MahoutoPurchaseList.visiblePurchases(data.purchases);
+    if (!purchases.length) {
       emptyEl.classList.remove("hidden");
       return;
     }
