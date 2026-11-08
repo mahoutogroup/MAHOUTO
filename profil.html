@@ -112,6 +112,7 @@
 
   <div class="section-title">Mon compte</div>
   <div class="menu-list">
+    <a class="card menu-item hidden" id="moderator-reports-link" href="admin/signalements.html"><span class="emoji">🚩</span><span class="label">Signalements (modération)</span><span class="admin-report-badge hidden" id="moderator-report-badge" title="Signalements ouverts"></span><span class="sub">→</span></a>
     <a class="card menu-item hidden" id="admin-dashboard-link" href="admin/formations.html"><span class="emoji">⚙️</span><span class="label">Tableau de bord Administrateur</span><span class="admin-report-badge hidden" id="admin-report-badge" title="Signalements ouverts"></span><span class="sub">→</span></a>
     <button type="button" class="card menu-item hidden" id="notif-status-item" style="border:none;width:100%;text-align:left;cursor:pointer;background:var(--bg-card);color:var(--white);font-family:inherit;"><span class="emoji">🔔</span><span class="label">Notifications</span><span class="sub" id="notif-status-sub">Activées — toucher pour désactiver</span></button>
     <button type="button" class="card menu-item hidden" id="notif-enable-btn" style="border:none;width:100%;text-align:left;cursor:pointer;background:var(--bg-card);color:var(--white);font-family:inherit;">
@@ -247,6 +248,20 @@
             b.textContent = String(n);
             b.classList.remove("hidden");
           }
+        });
+      } else {
+        // Modérateur (colonne is_moderator, migration 008) : lien vers les signalements de salon seulement.
+        // Erreur ignorée si la colonne n'existe pas encore. Affichage seulement : la base décide.
+        supabase.from("profiles").select("is_moderator").eq("id", currentUser.id).maybeSingle().then((res) => {
+          if (res.error || !res.data || res.data.is_moderator !== true) return;
+          document.getElementById("moderator-reports-link").classList.remove("hidden");
+          MahoutoModeration.fetchOpenCount(supabase).then((n) => {
+            if (n && n > 0) {
+              const b = document.getElementById("moderator-report-badge");
+              b.textContent = String(n);
+              b.classList.remove("hidden");
+            }
+          });
         });
       }
 

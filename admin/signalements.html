@@ -81,15 +81,15 @@
 
   <header>
     <h1>🚩 Administration — Signalements <span id="header-badge" class="pastille hidden"></span></h1>
-    <p>Messages signalés par les membres. Un message privé n'est jamais lu ici : seule la copie prise au moment du signalement est affichée.</p>
+    <p id="header-text">Messages signalés par les membres. Un message privé n'est jamais lu ici : seule la copie prise au moment du signalement est affichée.</p>
   </header>
 
   <div class="admin-tabs">
-    <a href="formations.html">Formations</a>
-    <a href="produits.html">Produits numériques</a>
-    <a href="users.html">Utilisateurs</a>
-    <a href="rooms.html">Salons</a>
-    <a href="statistiques.html">Statistiques</a>
+    <a href="formations.html" data-admin-only>Formations</a>
+    <a href="produits.html" data-admin-only>Produits numériques</a>
+    <a href="users.html" data-admin-only>Utilisateurs</a>
+    <a href="rooms.html" data-admin-only>Salons</a>
+    <a href="statistiques.html" data-admin-only>Statistiques</a>
     <a href="signalements.html" class="active">Signalements</a>
   </div>
 
@@ -136,6 +136,7 @@
   let names = {};
   let roomMessages = {};
   let busy = false;
+  let moderatorOnly = false;   // modérateur sans rôle admin : signalements de salon seulement, par les fonctions dédiées
 
   // Journal : jamais de contenu de message, seulement le code d'erreur.
   function logError(where, error) {
@@ -169,9 +170,22 @@
     }
     const { data: profile } = await supabase
       .from("profiles").select("role").eq("id", data.session.user.id).maybeSingle();
-    if (!profile || !M.isAdminRole(profile.role)) {
-      deny("🔒 Accès réservé aux administrateurs. Redirection…", "../profil.html");
+    const isAdmin = !!profile && M.isAdminRole(profile.role);
+    let isModerator = false;
+    if (!isAdmin) {
+      // Colonne is_moderator (migration 008) : si elle n'existe pas encore, l'erreur est ignorée.
+      const res = await supabase.from("profiles").select("is_moderator").eq("id", data.session.user.id).maybeSingle();
+      isModerator = !res.error && !!res.data && res.data.is_moderator === true;
+    }
+    if (!M.canModerate(profile && profile.role, isModerator)) {
+      deny("🔒 Accès réservé aux modérateurs et aux administrateurs. Redirection…", "../profil.html");
       return;
+    }
+    moderatorOnly = !isAdmin;
+    if (moderatorOnly) {
+      // Un modérateur ne voit que cet onglet : les autres pages lui refusent l'accès de toute façon.
+      document.querySelectorAll("[data-admin-only]").forEach((a) => a.classList.add("hidden"));
+      document.getElementById("header-text").textContent = "Messages de salon signalés par les membres. Les signalements de messages privés ne te sont pas accessibles.";
     }
     loadingEl.classList.add("hidden");
     contentEl.classList.remove("hidden");
@@ -206,24 +220,38 @@
     if (open > 0) { badgeEl.textContent = String(open); badgeEl.classList.remove("hidden"); }
     else badgeEl.classList.add("hidden");
 
-    // Pseudos (un admin lit tous les profils : migration 001).
-    const ids = new Set();
-    (rows || []).forEach((r) => { ids.add(r.reporter_id); if (r.reported_user_id) ids.add(r.reported_user_id); });
     names = {};
-    for (const part of chunk(Array.from(ids), 100)) {
-      const res = await supabase.from("profiles").select("id, username").in("id", part);
-      if (!res.error) (res.data || []).forEach((p) => { names[p.id] = p.username || "Compte sans pseudo"; });
-      else logError("lecture des pseudos", res.error);
-    }
-
-    // Messages de SALON (un admin les lit). Jamais dm_messages : le texte d'un message privé est la copie du signalement.
     roomMessages = {};
-    const roomIds = Array.from(new Set(groups.filter((g) => g.kind === "room").map((g) => g.message_id)));
-    for (const part of chunk(roomIds, 100)) {
-      const res = await supabase.from("messages")
-        .select("id, content, is_deleted, attachment_type, attachment_url").in("id", part);
-      if (!res.error) (res.data || []).forEach((m) => { roomMessages[m.id] = m; });
-      else logError("lecture des messages de salon", res.error);
+
+    if (moderatorOnly) {
+      // Modérateur : aucun accès direct aux profils ni aux messages. Deux fonctions de la base renvoient
+      // seulement les pseudos des personnes citées et le texte du message de salon de chaque signalement.
+      const reportIds = (rows || []).filter((r) => r.kind === "room").map((r) => r.id);
+      for (const part of chunk(reportIds, 200)) {
+        const people = await supabase.rpc("moderator_report_people", { p_report_ids: part });
+        if (people.error) { logError("pseudos (modérateur)", people.error); showNotice(M.errorMessage(people.error)); return; }
+        (people.data || []).forEach((p) => { names[p.user_id] = p.username || "Compte sans pseudo"; });
+        const msgs = await supabase.rpc("moderator_room_messages", { p_report_ids: part });
+        if (msgs.error) { logError("messages de salon (modérateur)", msgs.error); showNotice(M.errorMessage(msgs.error)); return; }
+        (msgs.data || []).forEach((m) => { roomMessages[m.message_id] = m; });
+      }
+    } else {
+      // Administrateur : pseudos (un admin lit tous les profils, migration 001) et messages de SALON.
+      // Jamais dm_messages : le texte d'un message privé est la copie du signalement.
+      const ids = new Set();
+      (rows || []).forEach((r) => { ids.add(r.reporter_id); if (r.reported_user_id) ids.add(r.reported_user_id); });
+      for (const part of chunk(Array.from(ids), 100)) {
+        const res = await supabase.from("profiles").select("id, username").in("id", part);
+        if (!res.error) (res.data || []).forEach((p) => { names[p.id] = p.username || "Compte sans pseudo"; });
+        else logError("lecture des pseudos", res.error);
+      }
+      const roomIds = Array.from(new Set(groups.filter((g) => g.kind === "room").map((g) => g.message_id)));
+      for (const part of chunk(roomIds, 100)) {
+        const res = await supabase.from("messages")
+          .select("id, content, is_deleted, attachment_type, attachment_url").in("id", part);
+        if (!res.error) (res.data || []).forEach((m) => { roomMessages[m.id] = m; });
+        else logError("lecture des messages de salon", res.error);
+      }
     }
 
     render();

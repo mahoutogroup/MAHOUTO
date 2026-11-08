@@ -236,6 +236,67 @@ test("006 : le retour arrière retire seulement ce que la 006 a ajouté", () => 
   assert.ok(!/drop column if exists (kind|message_id|reporter_id|reason|created_at|reported_user_id|message_text)/.test(code));
 });
 
+test("008 : modérateur = colonne séparée protégée par son propre déclencheur ; les deux déclencheurs de rôle ne sont pas touchés", () => {
+  const code = stripComments(read("008_roles_moderateur.sql"));
+  assert.match(code, /add column if not exists is_moderator boolean not null default false/);
+  assert.match(code, /create trigger trg_protect_moderator_flag\s+before insert or update on public\.profiles/);
+  assert.match(code, /new\.is_moderator := false;/, "inscription : forcé à faux");
+  assert.ok(!/trg_prevent_profile_role_change|trg_protect_role|prevent_profile_role_change|protect_role_column/.test(code), "les déclencheurs de rôle existants ne sont ni modifiés ni supprimés");
+  assert.ok(!/alter table public\.profiles[^;]*\brole\b/i.test(code), "profiles.role n'est pas touchée");
+  assert.ok(!/function public\.is_admin/.test(code), "is_admin() n'est pas redéfinie");
+});
+
+test("008 : apply_role_change réservée à service_role ; role_changes lisible par le founder seul, jamais écrite par un client", () => {
+  const code = stripComments(read("008_roles_moderateur.sql"));
+  assert.ok(code.includes("revoke execute on function public.apply_role_change(uuid, uuid, text, boolean, text) from public, anon, authenticated;"));
+  assert.ok(code.includes("grant execute on function public.apply_role_change(uuid, uuid, text, boolean, text) to service_role;"));
+  assert.ok(!/grant execute on function public\.apply_role_change[^;]*authenticated/.test(code));
+  ["ROLE_FOUNDER_REQUIS", "ROLE_SOI_MEME", "ROLE_CIBLE_PROTEGEE", "ROLE_CIBLE_INTROUVABLE", "ROLE_VALEUR_INVALIDE", "ROLE_AUCUN_CHANGEMENT"].forEach((e) => assert.ok(code.includes(e), e));
+  assert.match(code, /alter table public\.role_changes enable row level security;/);
+  assert.ok(code.includes("revoke all on table public.role_changes from public, anon, authenticated;"));
+  assert.ok(code.includes("grant select on table public.role_changes to authenticated;"));
+  assert.ok(!/grant (insert|update|delete|all)[^;]*role_changes/i.test(code));
+  assert.match(code, /create policy "role_changes_select_founder" on public\.role_changes\s+for select to authenticated\s+using \(public\.is_founder\(\)\);/);
+});
+
+test("008 : droits du modérateur limités aux signalements de SALON ; aucune politique sur les profils ni les messages privés", () => {
+  const code = stripComments(read("008_roles_moderateur.sql"));
+  assert.match(code, /create policy "message_reports_select_moderator" on public\.message_reports\s+for select to authenticated\s+using \(kind = 'room' and public\.is_moderator\(\)\);/);
+  assert.match(code, /create policy "message_reports_update_moderator" on public\.message_reports\s+for update to authenticated\s+using \(kind = 'room' and public\.is_moderator\(\)\)\s+with check \(kind = 'room' and public\.is_moderator\(\)\);/);
+  const policies = code.match(/create policy "[^"]+" on public\.[a-z_]+/g) || [];
+  assert.deepStrictEqual(policies.map((p) => p.split(" on public.")[1]).sort(), ["message_reports", "message_reports", "role_changes"]);
+  assert.ok(!/(dm_messages|dm_conversations|dm_hidden|dm_read_state)/.test(code.replace(/prosrc/g, "")), "aucune référence aux messages privés dans le code");
+  assert.ok(!/drop policy[^;]*(?<!moderator)"\s+on/.test(code.replace(/drop policy if exists "[a-z_]*(moderator|founder)"[^;]*;/g, "")), "aucune politique existante supprimée");
+  assert.ok(!/grant (insert|update|delete|all)/i.test(code.replace(/grant execute/gi, "")), "aucun droit de table accordé");
+});
+
+test("008 : fonctions du modérateur réservées aux connectés ; le modérateur ne masque qu'un message signalé ; seulement id et pseudo des personnes citées", () => {
+  const code = stripComments(read("008_roles_moderateur.sql"));
+  ["is_moderator()", "is_founder()", "moderator_room_messages(bigint[])", "moderator_report_people(bigint[])", "admin_hide_room_message(bigint)"].forEach((f) => {
+    assert.ok(code.includes("revoke execute on function public." + f + " from public, anon;"), "revoke " + f);
+    assert.ok(code.includes("grant execute on function public." + f + " to authenticated;"), "grant " + f);
+  });
+  const hide = code.slice(code.indexOf("create or replace function public.admin_hide_room_message"), code.indexOf("create or replace function public.moderator_room_messages"));
+  assert.ok(hide.indexOf("public.is_moderator()") < hide.indexOf("update public.messages"));
+  assert.match(hide, /not public\.is_admin\(\) and not exists \(\s+select 1 from public\.message_reports r\s+where r\.kind = 'room' and r\.message_id = p_message_id and r\.reporter_id <> auth\.uid\(\)\s+\)/);
+  const people = code.slice(code.indexOf("create or replace function public.moderator_report_people"));
+  assert.match(people, /returns table \(user_id uuid, username text\)/);
+  assert.ok(!/full_name|country|email|\brole\b/.test(people.slice(0, people.indexOf("commit;"))), "ni nom légal, ni pays, ni e-mail, ni rôle");
+  assert.match(code, /returns table \(report_id bigint, message_id bigint, content text, is_deleted boolean, attachment_type text\)/);
+});
+
+test("008 : le retour arrière retire tout, rend admin_hide_room_message aux admins, ne touche ni profiles.role ni les signalements", () => {
+  const raw = read("rollback/008_roles_moderateur.sql");
+  const code = stripComments(raw);
+  assert.match(raw.split("\n")[0], /^-- ⚠️ ATTENTION/);
+  ["message_reports_select_moderator", "message_reports_update_moderator", "moderator_room_messages", "moderator_report_people", "apply_role_change", "role_changes_select_founder", "trg_protect_moderator_flag", "protect_moderator_flag", "is_moderator()", "is_founder()"].forEach((n) => assert.ok(code.includes(n), n));
+  assert.ok(code.includes("drop column if exists is_moderator"));
+  assert.match(code, /if not public\.is_admin\(\) then\s+raise exception 'ADMIN_REQUIRED/);
+  assert.ok(!/is_moderator\(\)/.test(code.slice(code.indexOf("create or replace function public.admin_hide_room_message"), code.indexOf("drop function if exists public.apply_role_change"))), "la version restaurée n'utilise plus is_moderator()");
+  assert.ok(!/drop trigger[^;]*(prevent_profile_role_change|trg_protect_role)/.test(code));
+  assert.ok(!/update public\.(profiles|message_reports)|delete from|truncate/i.test(code.replace(/update public\.message_reports\s+set (message_text|status)/g, "")));
+});
+
 test("les fichiers SQL sont exclus du déploiement Vercel", () => {
   const ignore = fs.readFileSync(path.join(__dirname, "..", ".vercelignore"), "utf8");
   assert.match(ignore, /^migrations\/?$/m);
