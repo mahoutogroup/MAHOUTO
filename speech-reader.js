@@ -138,21 +138,35 @@
            best(function (v) { return /^fr(-|$)/.test(normLang(v.lang)); });
   }
 
+  var START_WAIT_MS = 3000;   // sans démarrage après 3 s : message de diagnostic
+  var CANCEL_GAP_MS = 80;     // pause entre cancel() et speak() (speak() collé à cancel() est rejeté par certains Chrome Android)
+
   /**
-   * Lecteur. options : { win, onChange(id | null), onNoFrenchVoice() }
+   * Lecteur. options : { win, onChange(id | null), onNoFrenchVoice(message), onFailure(code, detail) }
    * Renvoie { available, speak(id, text), stop(), currentId() }.
    * Rien n'est lu en dehors de speak() ; speak() arrête toujours la lecture précédente.
+   *
+   * onFailure(code, detail) : la lecture n'a pas pu démarrer (rien n'est envoyé hors de l'appareil). Codes :
+   *   no-api            speechSynthesis absent ;
+   *   empty             rien à lire dans ce message ;
+   *   speak-exception   speak() a levé une exception (detail : nom de l'erreur) ;
+   *   error:<nom>       l'appareil a signalé une erreur (synthesis-failed, language-unavailable, not-allowed,
+   *                     interrupted, canceled…) ;
+   *   no-start          aucun démarrage dans les 3 secondes.
    */
   function createReader(options) {
     var win = (options && options.win) || root;
     var available = isAvailable(win);
     var onChange = (options && options.onChange) || function () {};
     var onNoFrenchVoice = (options && options.onNoFrenchVoice) || function () {};
+    var onFailure = (options && options.onFailure) || function () {};
     var synth = available ? win.speechSynthesis : null;
     var session = 0;          // change à chaque lecture/arrêt : les rappels d'une lecture périmée sont ignorés
     var current = null;
     var warned = false;       // message « aucune voix française » : une seule fois
     var voices = [];
+    var active = null;        // référence gardée sur la phrase en cours (Chrome peut sinon la libérer avant « end »)
+    var startTimer = null;
 
     function refreshVoices() { try { voices = synth.getVoices() || []; } catch (e) { voices = []; } }
     if (available) {
@@ -160,7 +174,19 @@
       try { if (synth.addEventListener) synth.addEventListener("voiceschanged", refreshVoices); else synth.onvoiceschanged = refreshVoices; } catch (e) { /* ignoré */ }
     }
 
+    function clearStartTimer() { if (startTimer) { win.clearTimeout(startTimer); startTimer = null; } }
     function setCurrent(id) { if (current !== id) { current = id; try { onChange(id); } catch (e) { /* ignoré */ } } }
+    function fail(code, detail) { try { onFailure(code, detail || ""); } catch (e) { /* ignoré */ } }
+
+    // La lecture de la session « mine » a échoué : on remet le bouton à zéro ET on dit pourquoi.
+    function failSession(mine, code, detail) {
+      if (mine !== session) return;
+      session++;
+      clearStartTimer();
+      active = null;
+      setCurrent(null);
+      fail(code, detail);
+    }
 
     // Attend les voix (chargées en retard) au plus VOICES_WAIT_MS ; rappelle toujours.
     function whenVoicesReady(cb) {
@@ -175,36 +201,67 @@
 
     function stop() {
       session++;
+      clearStartTimer();
+      active = null;
       if (available) { try { synth.cancel(); } catch (e) { /* ignoré */ } }
       setCurrent(null);
     }
 
     function speak(id, text) {
-      if (!available) return false;
+      if (!available) { fail("no-api"); return false; }
       var chunks = splitChunks(text);
-      if (!chunks.length) return false;
+      if (!chunks.length) { fail("empty"); return false; }
+
+      // cancel() seulement si quelque chose est en cours ou en attente : sur certains Chrome Android,
+      // speak() lancé juste après un cancel() inutile est rejeté (« interrupted ») sans un mot.
+      var busy = current !== null;
+      try { busy = busy || synth.speaking === true || synth.pending === true; } catch (e) { /* ignoré */ }
       session++;
       var mine = session;
-      try { synth.cancel(); } catch (e) { /* ignoré */ }
+      clearStartTimer();
+      active = null;
+      if (busy) { try { synth.cancel(); } catch (e) { /* ignoré */ } }
       setCurrent(id);
 
-      whenVoicesReady(function () {
+      function begin() {
         if (mine !== session) return;                       // arrêtée ou remplacée pendant l'attente
-        var voice = pickFrenchVoice(voices);
-        if (!voice && voices.length && !warned) { warned = true; try { onNoFrenchVoice(MSG_NO_FRENCH_VOICE); } catch (e) { /* ignoré */ } }
-        var i = 0;
-        function next() {
+        whenVoicesReady(function () {
           if (mine !== session) return;
-          if (i >= chunks.length) { setCurrent(null); return; }
-          var u = new win.SpeechSynthesisUtterance(chunks[i++]);
-          u.lang = LANG;
-          if (voice) u.voice = voice;
-          u.onend = next;
-          u.onerror = function () { if (mine === session) { session++; setCurrent(null); } };
-          try { synth.speak(u); } catch (e) { if (mine === session) { session++; setCurrent(null); } }
-        }
-        next();
-      });
+          var voice = null;
+          try { voice = pickFrenchVoice(voices); } catch (e) { voice = null; }
+          if (!voice && voices.length && !warned) { warned = true; try { onNoFrenchVoice(MSG_NO_FRENCH_VOICE); } catch (e) { /* ignoré */ } }
+          var i = 0;
+          function next() {
+            if (mine !== session) return;
+            if (i >= chunks.length) { clearStartTimer(); active = null; setCurrent(null); return; }
+            var u;
+            try {
+              u = new win.SpeechSynthesisUtterance(chunks[i++]);
+              u.lang = LANG;
+              if (voice) u.voice = voice;
+            } catch (e) { return failSession(mine, "speak-exception", e && e.name); }
+            u.onstart = clearStartTimer;
+            u.onend = next;
+            u.onerror = function (ev) { failSession(mine, "error:" + ((ev && ev.error) || "unknown")); };
+            active = u;
+            try { synth.speak(u); } catch (e) { return failSession(mine, "speak-exception", e && e.name); }
+            if (i === 1) {
+              // Aucun « start » dans les 3 s (et rien en cours de lecture) : on le dit au lieu de rester muet.
+              startTimer = win.setTimeout(function () {
+                startTimer = null;
+                if (mine !== session) return;
+                // Le moteur dit-il lire vraiment (et non « en attente ») ? Alors pas de faux message, même sans événement « start ».
+                var reading = false;
+                try { reading = synth.speaking === true && synth.pending !== true; } catch (e) { /* ignoré */ }
+                if (!reading) failSession(mine, "no-start");
+              }, START_WAIT_MS);
+            }
+          }
+          next();
+        });
+      }
+
+      if (busy) win.setTimeout(begin, CANCEL_GAP_MS); else begin();
       return true;
     }
 
@@ -212,7 +269,7 @@
   }
 
   var api = {
-    MAX_CHARS: MAX_CHARS, CHUNK_MAX: CHUNK_MAX, LANG: LANG, VOICES_WAIT_MS: VOICES_WAIT_MS,
+    MAX_CHARS: MAX_CHARS, CHUNK_MAX: CHUNK_MAX, LANG: LANG, VOICES_WAIT_MS: VOICES_WAIT_MS, START_WAIT_MS: START_WAIT_MS, CANCEL_GAP_MS: CANCEL_GAP_MS,
     MSG_NO_FRENCH_VOICE: MSG_NO_FRENCH_VOICE,
     SPELLED_ACRONYMS: SPELLED_ACRONYMS, normalizeCaps: normalizeCaps,
     cleanText: cleanText, canListen: canListen, limitText: limitText, splitChunks: splitChunks,

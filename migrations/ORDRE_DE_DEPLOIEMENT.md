@@ -148,6 +148,14 @@ Utiliser deux comptes normaux (A et B), un compte admin, et une fenêtre privée
 
 - **N19.** Sur ton téléphone, dans un salon, écrire (ou faire écrire) un message « MAHOUTO et MAJESTÉ PRESSE, SÉRIGRAPHIE pour tous » puis toucher 🔊 : les mots sont **prononcés** (« mahouto », « majesté presse », « sérigraphie »), pas épelés ; la bulle garde ses majuscules. Un message « Envoie le PDF par SMS, 5 000 FCFA » : PDF, SMS et FCFA restent **épelés**. « Utilise l'IA » : IA épelé. « MAHOUTO+ » : « mahouto » (le « + » est lu « plus » ou ignoré selon la voix). Un message tout en majuscules « BONJOUR À TOUS, REJOIGNEZ MAHOUTO » est lu comme des mots. Un sigle manquant (lu comme un mot alors qu'il devrait être épelé) : l'ajouter à `SPELLED_ACRONYMS` dans `speech-reader.js`.
 
+## Écouter : diagnostic visible quand la lecture ne démarre pas (PR 13, sans migration)
+
+| # | Étape | Ce qu'on vérifie | Ce qui casse si on saute l'étape | Test navigateur ensuite |
+|---|---|---|---|---|
+| 27 | **Fusion de la PR « fix(salons): bouton écouter — diagnostic et lecture plus robuste »** et déploiement Vercel (aucune migration, aucune nouvelle fonction : toujours 12) | Voir **N20** | Rien à sauter : tout se passe sur l'appareil, rien n'est envoyé | **N20** |
+
+- **N20.** Sur le téléphone Android (Chrome), fermer complètement l'application, la rouvrir (le cache v102 se met à jour), ouvrir `https://mahouto.com/chat.html?room=general` puis toucher 🔊 sous un message. **Cas normal** : le bouton devient ⏹ et le message est lu. **Si la lecture ne démarre pas** : le bouton redevient 🔊 et un message reste affiché ~10 s en bas de l'écran : « La lecture n'a pas démarré (code : … ) ». Noter le code et le transmettre : `error:synthesis-failed` (moteur vocal absent ou en panne : Paramètres → Synthèse vocale), `error:language-unavailable` (langue française non installée), `error:not-allowed` (navigateur qui refuse), `error:interrupted` / `error:canceled` (lecture coupée par le moteur), `speak-exception <nom>` (le navigateur refuse l'appel), `no-start` (aucun démarrage dans les 3 s), `empty` (rien à lire dans ce message), `no-api` (pas de synthèse vocale), `exception <nom>` (erreur inattendue). Rien n'est envoyé hors du téléphone.
+
 ## Signalement avant la migration 003
 
 L'interface de signalement n'est **pas bloquante** si la table `message_reports` n'existe pas encore : le navigateur reçoit l'erreur « table introuvable » (`PGRST205` ou `42P01`), affiche « Le signalement n'est pas encore disponible. Réessaie un peu plus tard. » et désactive le bouton d'envoi. Aucune erreur technique n'est montrée. Rien à faire à la fusion, mais il vaut mieux exécuter la 003 juste après la 002 pour que le bouton fonctionne vraiment ; elle ne dépend ni de la 001, ni de la 004, ni de la 005.

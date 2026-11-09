@@ -546,19 +546,24 @@
 
   // Message bref au bas de l'écran (disparaît après quelques secondes).
   let statusTimer = null;
-  function setStatus(text) {
+  function setStatus(text, durationMs) {
     statusMessage.textContent = text || "";
     if (statusTimer) clearTimeout(statusTimer);
-    if (text) statusTimer = setTimeout(() => { statusMessage.textContent = ""; }, 6000);
+    if (text) statusTimer = setTimeout(() => { statusMessage.textContent = ""; }, durationMs || 6000);
   }
 
   // ---------- Écouter un message (voix intégrée à l'appareil, aucun envoi du texte) ----------
   // Sans speechSynthesis (navigateurs intégrés, anciens navigateurs) : aucun bouton, aucune erreur.
   let speakingMessage = null;   // { id, content } du message en cours de lecture
   const speechReader = window.MahoutoSpeechReader
-    ? MahoutoSpeechReader.createReader({ win: window, onChange: refreshSpeakButtons, onNoFrenchVoice: setStatus })
+    ? MahoutoSpeechReader.createReader({ win: window, onChange: refreshSpeakButtons, onNoFrenchVoice: setStatus, onFailure: reportSpeechFailure })
     : null;
   const speechAvailable = !!(speechReader && speechReader.available);
+
+  // Diagnostic visible : la lecture n'a pas démarré. Le code dit pourquoi ; rien n'est envoyé hors de l'appareil.
+  function reportSpeechFailure(code, detail) {
+    setStatus("La lecture n'a pas démarré (code : " + code + (detail ? " " + detail : "") + ")", 10000);
+  }
 
   function setSpeakButtonState(btn, playing) {
     btn.classList.toggle("playing", playing);
@@ -589,7 +594,12 @@
       const id = String(msg.id);
       if (speechReader.currentId() === id) { speechReader.stop(); return; }
       speakingMessage = { id: id, content: msg.content };
-      speechReader.speak(id, msg.content);
+      try {
+        speechReader.speak(id, msg.content);
+      } catch (err) {
+        speechReader.stop();
+        reportSpeechFailure("exception", err && err.name ? err.name : "inconnue");
+      }
     });
     return btn;
   }
