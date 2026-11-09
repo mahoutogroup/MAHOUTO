@@ -36,6 +36,38 @@
       .trim();
   }
 
+  // Sigles gardés EN MAJUSCULES : la voix les épelle (« I A », « P D F »). Liste simple, à compléter au besoin
+  // (en majuscules, sans accent obligatoire). Les mots de 1 ou 2 lettres (IA, TV, PC, CV, QR, RH…) restent de toute façon tels quels.
+  var SPELLED_ACRONYMS = [
+    "IA", "PDF", "SMS", "MMS", "USB", "QR", "CV", "TVA", "TTC", "IFU", "RCCM", "OAPI", "NIF", "RIB", "SARL", "SIM",
+    "URL", "API", "GPS", "HTML", "CSS", "PNG", "JPG", "JPEG", "SVG", "EPS", "GIF", "FAQ", "VIP", "SOS",   // WiFi (casse normale) n'a pas besoin d'être listé
+    "PC", "TV", "RH", "ONG", "PME", "CEO", "LED", "PVC", "MDR", "PTDR",
+    "FCFA", "CFA", "XOF", "XAF", "EUR", "USD",
+    "CMJN", "CMYK", "RVB", "RGB", "DTF", "DTG", "PAO", "PLV", "BAT"
+  ];
+  var SPELLED_SET = {};
+  SPELLED_ACRONYMS.forEach(function (a) { SPELLED_SET[a] = true; });
+
+  // Un mot « tout en majuscules » : au moins 1 lettre, uniquement des lettres (accentuées comprises), toutes majuscules.
+  var WORD_RE = /[\p{L}\p{N}_]+/gu;
+  function isAllCapsWord(w) {
+    return /^\p{Lu}+$/u.test(w);
+  }
+
+  /**
+   * Texte envoyé à la voix : un mot tout en majuscules de 3 lettres ou plus est mis en minuscules pour être
+   * prononcé comme un mot (MAHOUTO → mahouto, MAJESTÉ → majesté), sauf s'il est dans SPELLED_ACRONYMS (épelé).
+   * 1 ou 2 lettres : inchangé. Mots mêlés (Mahouto, iPhone, WhatsApp), mots avec chiffres (A4), nombres,
+   * ponctuation et « + » : inchangés. Ne sert QU'À la voix : le message affiché n'est jamais modifié.
+   */
+  function normalizeCaps(text) {
+    if (typeof text !== "string") return "";
+    return text.replace(WORD_RE, function (w) {
+      if (w.length < 3 || !isAllCapsWord(w) || SPELLED_SET[w]) return w;
+      return w.toLowerCase();
+    });
+  }
+
   // Un message a-t-il un bouton ? Pas s'il est supprimé, sans texte, ou vide une fois nettoyé.
   function canListen(msg) {
     if (!msg || msg.is_deleted === true) return false;
@@ -58,6 +90,7 @@
     var max = maxLen || CHUNK_MAX;
     var clean = cleanText(text);
     if (!clean) return [];
+    clean = normalizeCaps(clean);
     clean = limitText(clean, MAX_CHARS);
     var sentences = clean.match(/[^.!?…]+(?:[.!?…]+|$)\s*/g) || [clean];
     var chunks = [];
@@ -181,6 +214,7 @@
   var api = {
     MAX_CHARS: MAX_CHARS, CHUNK_MAX: CHUNK_MAX, LANG: LANG, VOICES_WAIT_MS: VOICES_WAIT_MS,
     MSG_NO_FRENCH_VOICE: MSG_NO_FRENCH_VOICE,
+    SPELLED_ACRONYMS: SPELLED_ACRONYMS, normalizeCaps: normalizeCaps,
     cleanText: cleanText, canListen: canListen, limitText: limitText, splitChunks: splitChunks,
     isAvailable: isAvailable, pickFrenchVoice: pickFrenchVoice, createReader: createReader
   };
