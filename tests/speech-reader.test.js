@@ -1,0 +1,232 @@
+/* Bouton « écouter » : module speech-reader.js (voix intégrée, aucun envoi du texte).
+   Exécution : node tests/speech-reader.test.js — aucune dépendance, aucun réseau. */
+"use strict";
+const assert = require("node:assert");
+const fs = require("node:fs");
+const path = require("node:path");
+const S = require("../speech-reader");
+
+const root = path.join(__dirname, "..");
+const read = (f) => fs.readFileSync(path.join(root, f), "utf8");
+const strip = (c) => c.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`\\])\/\/.*$/gm, "$1");
+let passed = 0;
+async function test(name, fn) {
+  try { await fn(); passed++; console.log("  OK  " + name); }
+  catch (err) { console.error("  ÉCHEC  " + name + "\n" + (err && err.stack || err)); process.exitCode = 1; }
+}
+
+// Faux navigateur : speechSynthesis qui garde les phrases ; on termine les lectures à la main.
+function fakeWin(opts) {
+  opts = opts || {};
+  const w = { spoken: [], queue: [], cancels: 0, listeners: [], timers: [] };
+  let voices = opts.voices || [];
+  w.SpeechSynthesisUtterance = function (text) { this.text = text; };
+  w.speechSynthesis = {
+    getVoices: () => voices,
+    speak: (u) => { w.spoken.push(u); w.queue.push(u); },
+    cancel: () => { w.cancels++; const q = w.queue.splice(0); q.forEach((u) => u.onerror && u.onerror({ error: "canceled" })); },
+    addEventListener: (ev, fn) => { if (ev === "voiceschanged") w.listeners.push(fn); }
+  };
+  w.setVoices = (v) => { voices = v; w.listeners.slice().forEach((fn) => fn()); };
+  w.setTimeout = (fn, ms) => { const t = { fn, ms }; w.timers.push(t); return t; };
+  w.clearTimeout = (t) => { w.timers = w.timers.filter((x) => x !== t); };
+  w.finish = () => { const u = w.queue.shift(); if (u && u.onend) u.onend(); return u; };
+  return w;
+}
+const FR = { name: "Amélie", lang: "fr-FR", localService: true };
+
+(async () => {
+  await test("nettoyage : liens remplacés par « lien » (http, www, domaine), espaces réduits", () => {
+    assert.strictEqual(S.cleanText("  Salut   à tous \n\n voici https://mahouto.com/p/abc?x=1 ok  "), "Salut à tous voici lien ok");
+    assert.strictEqual(S.cleanText("va sur www.exemple.fr/page puis mahouto.com/r/vip"), "va sur lien puis lien");
+    assert.strictEqual(S.cleanText("https://a.b/c"), "lien");
+    assert.strictEqual(S.cleanText("Bonjour​ monde"), "Bonjour monde");
+    assert.strictEqual(S.cleanText(null), "");
+    assert.strictEqual(S.cleanText(42), "");
+    assert.ok(!/https?:|www\./i.test(S.cleanText("x https://secret.example/token=abc y")));
+  });
+
+  await test("messages : supprimé, vide, sans texte (pièce jointe seule), espaces seuls → pas de bouton", () => {
+    assert.strictEqual(S.canListen({ content: "Bonjour" }), true);
+    assert.strictEqual(S.canListen({ content: "Bonjour", is_deleted: true }), false);
+    assert.strictEqual(S.canListen({ content: "", attachment_url: "https://x/y.pdf" }), false);
+    assert.strictEqual(S.canListen({ content: "   \n " }), false);
+    assert.strictEqual(S.canListen({ content: null }), false);
+    assert.strictEqual(S.canListen({}), false);
+    assert.strictEqual(S.canListen(null), false);
+    assert.strictEqual(S.canListen({ content: "https://a.b/c" }), true, "un lien seul se lit « lien »");
+  });
+
+  await test("découpage : phrases regroupées, chaque morceau ≤ CHUNK_MAX, rien de perdu", () => {
+    assert.deepStrictEqual(S.splitChunks("Bonjour. Ça va ? Oui !"), ["Bonjour. Ça va ? Oui !"]);
+    const long = "Première phrase assez longue. ".repeat(30);
+    const chunks = S.splitChunks(long);
+    assert.ok(chunks.length > 1);
+    chunks.forEach((c) => assert.ok(c.length <= S.CHUNK_MAX, "morceau de " + c.length));
+    assert.strictEqual(chunks.join(" ").replace(/\s+/g, " "), long.trim());
+    assert.deepStrictEqual(S.splitChunks(""), []);
+    assert.deepStrictEqual(S.splitChunks("   "), []);
+  });
+
+  await test("découpage : mot géant coupé net ; limite de 1 000 caractères puis arrêt propre", () => {
+    const giant = S.splitChunks("x".repeat(500));
+    giant.forEach((c) => assert.ok(c.length <= S.CHUNK_MAX));
+    assert.strictEqual(giant.join("").length, 500);
+    const all = S.splitChunks("Une phrase courte. ".repeat(200));
+    const total = all.join(" ").length;
+    assert.ok(total <= S.MAX_CHARS, "total " + total);
+    assert.ok(/\.$/.test(all[all.length - 1]), "coupé en fin de phrase");
+    assert.ok(S.splitChunks("m".repeat(5000)).join("").length <= S.MAX_CHARS);
+    assert.strictEqual(S.MAX_CHARS, 1000);
+  });
+
+  await test("disponibilité de speechSynthesis", () => {
+    assert.strictEqual(S.isAvailable(fakeWin()), true);
+    assert.strictEqual(S.isAvailable({}), false);
+    assert.strictEqual(S.isAvailable(null), false);
+    assert.strictEqual(S.isAvailable({ speechSynthesis: {} , SpeechSynthesisUtterance: function () {} }), false);
+    const w = fakeWin(); delete w.SpeechSynthesisUtterance;
+    assert.strictEqual(S.isAvailable(w), false);
+    const r = S.createReader({ win: {} });
+    assert.strictEqual(r.available, false);
+    assert.strictEqual(r.speak("1", "Bonjour"), false);
+    r.stop();   // sans erreur
+  });
+
+  await test("voix française : fr-FR avant fr-CA, locale avant réseau, fr_FR (Android) reconnu, sinon null", () => {
+    const en = { lang: "en-US" }, frCA = { lang: "fr-CA", localService: true }, frNet = { lang: "fr-FR", localService: false }, frLocal = { lang: "fr-FR", localService: true };
+    assert.strictEqual(S.pickFrenchVoice([en, frCA, frNet, frLocal]), frLocal);
+    assert.strictEqual(S.pickFrenchVoice([en, frCA]), frCA);
+    assert.strictEqual(S.pickFrenchVoice([{ lang: "fr_FR" }]).lang, "fr_FR");
+    assert.strictEqual(S.pickFrenchVoice([{ lang: "fr" }]).lang, "fr");
+    assert.strictEqual(S.pickFrenchVoice([en, { lang: "de-DE" }, { lang: "frisian" }]), null);
+    assert.strictEqual(S.pickFrenchVoice([]), null);
+    assert.strictEqual(S.pickFrenchVoice(undefined), null);
+  });
+
+  await test("lecture : langue fr-FR, voix française, morceaux lus l'un après l'autre, état remis à zéro à la fin", () => {
+    const w = fakeWin({ voices: [{ lang: "en-US" }, FR] });
+    const changes = [];
+    const r = S.createReader({ win: w, onChange: (id) => changes.push(id) });
+    assert.strictEqual(r.speak("m1", "Une phrase. ".repeat(40)), true);
+    assert.strictEqual(r.currentId(), "m1");
+    assert.strictEqual(w.spoken.length, 1, "un seul morceau en file à la fois");
+    assert.strictEqual(w.spoken[0].lang, "fr-FR");
+    assert.strictEqual(w.spoken[0].voice, FR);
+    let guard = 0; while (w.queue.length && guard++ < 50) w.finish();
+    assert.ok(w.spoken.length > 1);
+    assert.strictEqual(r.currentId(), null);
+    assert.deepStrictEqual(changes, ["m1", null]);
+  });
+
+  await test("un seul message à la fois : lire un autre arrête le précédent (rappels périmés ignorés)", () => {
+    const w = fakeWin({ voices: [FR] });
+    const changes = [];
+    const r = S.createReader({ win: w, onChange: (id) => changes.push(id) });
+    r.speak("a", "Premier message. ".repeat(30));
+    r.speak("b", "Deuxième message.");
+    assert.strictEqual(r.currentId(), "b");
+    assert.strictEqual(w.spoken[w.spoken.length - 1].text, "Deuxième message.");
+    assert.ok(w.cancels >= 2);
+    w.finish();
+    assert.strictEqual(r.currentId(), null);
+    assert.deepStrictEqual(changes, ["a", "b", null]);
+  });
+
+  await test("stop() : arrête et vide ; un second stop ne fait rien de mal", () => {
+    const w = fakeWin({ voices: [FR] });
+    const r = S.createReader({ win: w });
+    r.speak("a", "Bonjour tout le monde.");
+    r.stop();
+    assert.strictEqual(r.currentId(), null);
+    assert.strictEqual(w.queue.length, 0);
+    r.stop();
+  });
+
+  await test("voix chargées en retard (voiceschanged) : le premier clic attend puis lit avec la voix française", () => {
+    const w = fakeWin({ voices: [] });
+    const r = S.createReader({ win: w });
+    r.speak("a", "Bonjour.");
+    assert.strictEqual(w.spoken.length, 0, "en attente des voix");
+    assert.strictEqual(r.currentId(), "a");
+    w.setVoices([FR]);
+    assert.strictEqual(w.spoken.length, 1);
+    assert.strictEqual(w.spoken[0].voice, FR);
+  });
+
+  await test("aucune voix listée même après l'attente : on lit quand même (fr-FR), sans message ; arrêt pendant l'attente respecté", () => {
+    const w = fakeWin({ voices: [] });
+    let msg = 0;
+    const r = S.createReader({ win: w, onNoFrenchVoice: () => msg++ });
+    r.speak("a", "Bonjour.");
+    w.timers[0].fn();
+    assert.strictEqual(w.spoken.length, 1);
+    assert.strictEqual(w.spoken[0].voice, undefined);
+    assert.strictEqual(msg, 0);
+    const w2 = fakeWin({ voices: [] });
+    const r2 = S.createReader({ win: w2 });
+    r2.speak("a", "Bonjour.");
+    r2.stop();
+    w2.setVoices([FR]);
+    assert.strictEqual(w2.spoken.length, 0, "arrêtée pendant l'attente : rien n'est lu");
+  });
+
+  await test("voix présentes mais aucune française : message exact UNE seule fois, la lecture continue", () => {
+    const w = fakeWin({ voices: [{ lang: "en-US" }, { lang: "de-DE" }] });
+    const msgs = [];
+    const r = S.createReader({ win: w, onNoFrenchVoice: (m) => msgs.push(m) });
+    r.speak("a", "Bonjour."); w.finish();
+    r.speak("b", "Encore."); 
+    assert.deepStrictEqual(msgs, ["Aucune voix française n'est installée sur ton téléphone."]);
+    assert.strictEqual(w.spoken.length, 2, "rien n'est bloqué");
+    assert.strictEqual(w.spoken[0].lang, "fr-FR");
+  });
+
+  await test("erreur de lecture : état remis à zéro, aucune exception", () => {
+    const w = fakeWin({ voices: [FR] });
+    const r = S.createReader({ win: w });
+    r.speak("a", "Bonjour. Deux.");
+    w.queue[0].onerror({ error: "synthesis-failed" });
+    assert.strictEqual(r.currentId(), null);
+    w.speechSynthesis.speak = () => { throw new Error("boom"); };
+    r.speak("b", "Bonjour.");
+    assert.strictEqual(r.currentId(), null);
+  });
+
+  await test("le module ne touche jamais le réseau ni le HTML ; aucun journal console", () => {
+    const code = strip(read("speech-reader.js"));
+    assert.ok(!/fetch\(|XMLHttpRequest|sendBeacon|WebSocket|innerHTML|insertAdjacentHTML|document\.write|console\./.test(code));
+    assert.ok(!/https?:\/\/(?!\)\)\/)/.test(code.replace(/\(\?:https\?:\\\/\\\/\|www\\\.\)/g, "")), "aucune adresse externe");
+  });
+
+  await test("chat.html : bouton sous les messages texte, rendu sans innerHTML, arrêt en sortie, pas de bouton sans speechSynthesis", () => {
+    const chat = read("chat.html"), code = strip(chat.slice(chat.indexOf("<script>")));
+    assert.match(chat, /<script src="message-format\.js"><\/script>\s*<script src="speech-reader\.js"><\/script>/);
+    assert.match(code, /if \(speechAvailable && MahoutoSpeechReader\.canListen\(msg\)\) bubble\.appendChild\(makeSpeakButton\(msg\)\);/);
+    const block = code.slice(code.indexOf("function setSpeakButtonState"), code.indexOf("function showRoomState"));
+    assert.ok(!/innerHTML/.test(block));
+    assert.match(block, /btn\.textContent = playing \? "⏹" : "🔊"/);
+    assert.match(block, /"Arrêter la lecture" : "Écouter ce message"/);
+    assert.match(block, /btn\.title = label/);
+    assert.match(block, /e\.stopPropagation\(\)/);
+    assert.match(block, /addEventListener\("pagehide", stopSpeaking\)/);
+    assert.match(block, /addEventListener\("beforeunload", stopSpeaking\)/);
+    assert.match(block, /document\.hidden\) stopSpeaking\(\)/);
+    const render = code.slice(code.indexOf("function renderMessage"), code.indexOf("async function loadHiddenMessageIds"));
+    assert.match(render, /msg\.is_deleted \|\| hiddenMessageIds\.has\(msg\.id\) \|\| msg\.content !== speakingMessage\.content/);
+    // le bouton est dans la branche « non supprimé » (jamais sur un message supprimé)
+    assert.ok(render.indexOf("makeSpeakButton") > render.indexOf("} else {"));
+    assert.match(chat, /\.bubble \.speak-btn \{[^}]*min-width: 44px;[^}]*min-height: 44px;/);
+  });
+
+  await test("cache hors ligne : speech-reader.js ; version ≥ v99 ; toujours 12 fonctions Vercel", () => {
+    const sw = read("sw.js");
+    assert.match(sw, /"\/speech-reader\.js"/);
+    assert.ok(Number((sw.match(/mahoutoplus-shell-v(\d+)/) || [])[1]) >= 99);
+    const fns = [];
+    (function scan(d) { fs.readdirSync(d, { withFileTypes: true }).forEach((e) => { const p = path.join(d, e.name); if (e.isDirectory()) return scan(p); if (/\.(js|mjs|ts)$/.test(e.name) && !e.name.startsWith("_")) fns.push(p); }); })(path.join(root, "api"));
+    assert.strictEqual(fns.length, 12);
+  });
+
+  console.log("\n" + passed + " test(s) réussi(s)");
+})();
