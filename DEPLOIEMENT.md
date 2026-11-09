@@ -269,8 +269,9 @@ Le dépôt utilise des **valeurs de repli** (voir `brand.js`, objet `BRANDS.maje
 - [ ] **Couleurs de marque** (aujourd'hui : mêmes valeurs que MAHOUTO+ : `theme_color` `#FFC107`, fond `#0A0A0A`).
 - [ ] **Icônes** 192 / 512 / maskable, favicon, apple-touch-icon, écran de démarrage (aujourd'hui : ceux de MAHOUTO+).
 - [ ] **Captures d'écran** de l'application pour l'installation (retirées du manifest Majesté : celles du dépôt montrent MAHOUTO+).
-- [ ] **Slogan et sous-titre** : propositions actuelles « Informer • Former • Inspirer » et
-      « La presse qui éclaire, le savoir qui élève. » (à valider ou remplacer).
+- [x] **Slogan et sous-titre** : phrase retenue, unique (accueil, page de réception des partages, description du manifeste) :
+      « Imprimeurs et sérigraphes : votre plateforme pour vendre, apprendre et échanger. »
+      (source : `MAJESTE_PITCH` dans `brand.js` ; la description de `manifest-majeste.json` la reprend à la main).
 
 ### 12.11 Voir la marque MAJESTÉ PRESSE dans un aperçu Vercel
 Pour tester la marque MAJESTÉ PRESSE **avant** de brancher `majestepresse.com`, ouvrez l'URL d'aperçu Vercel (`https://….vercel.app`) ou `localhost` avec :

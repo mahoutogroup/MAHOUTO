@@ -124,6 +124,14 @@ Utiliser deux comptes normaux (A et B), un compte admin, et une fenêtre privée
 
 - **N16.** Sur `https://majestepresse.com` (téléphone, puis navigation privée) : sous « MAJESTÉ PRESSE », une seule phrase « Imprimeurs et sérigraphes : votre plateforme pour vendre, apprendre et échanger. » sur deux lignes au maximum, en blanc comme avant ; plus de « Informer • Former • Inspirer » ni de « La presse qui éclaire… ». Logo et boutons de connexion inchangés. Sur `https://mahouto.com` : accueil inchangé (« Apprendre • Créer • Entreprendre » et « Construire l'Afrique numérique de demain. »). Si l'ancien texte s'affiche encore : fermer et rouvrir l'application (cache hors ligne v98).
 
+## Même accroche sur la page de partage et le manifeste MAJESTÉ PRESSE (PR 11, sans migration)
+
+| # | Étape | Ce qu'on vérifie | Ce qui casse si on saute l'étape | Test navigateur ensuite |
+|---|---|---|---|---|
+| 25 | **Fusion de la PR « feat(marque): même accroche MAJESTÉ PRESSE partout »** et déploiement Vercel (aucune migration, aucune nouvelle fonction : toujours 12) | Voir **N18** | Rien à sauter : texte seulement. L'ancienne description reste dans l'application déjà installée tant qu'elle n'est pas mise à jour | **N18** |
+
+- **N18.** (1) Sur `https://majestepresse.com/share.html` (ou partager un fichier vers l'application) : sous « MAJESTÉ PRESSE », « Imprimeurs et sérigraphes : votre plateforme pour vendre, apprendre et échanger. », centré, en deux lignes sur téléphone ; sur `https://mahouto.com/share.html` : « L'Afrique qui apprend, crée et entreprend. » inchangé. (2) `https://majestepresse.com/manifest-majeste.json` : `description` = « MAJESTÉ PRESSE – Imprimeurs et sérigraphes : votre plateforme pour vendre, apprendre et échanger. ». (3) Application MAJESTÉ déjà installée : la description n'est relue par le téléphone qu'à sa propre mise à jour (parfois jamais) ; ce n'est pas un défaut. (4) Si l'ancien texte s'affiche encore sur la page de partage : fermer et rouvrir l'application (cache hors ligne v100).
+
 ## Signalement avant la migration 003
 
 L'interface de signalement n'est **pas bloquante** si la table `message_reports` n'existe pas encore : le navigateur reçoit l'erreur « table introuvable » (`PGRST205` ou `42P01`), affiche « Le signalement n'est pas encore disponible. Réessaie un peu plus tard. » et désactive le bouton d'envoi. Aucune erreur technique n'est montrée. Rien à faire à la fusion, mais il vaut mieux exécuter la 003 juste après la 002 pour que le bouton fonctionne vraiment ; elle ne dépend ni de la 001, ni de la 004, ni de la 005.

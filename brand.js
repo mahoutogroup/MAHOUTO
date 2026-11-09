@@ -26,6 +26,9 @@
 
   var DEFAULT_BRAND = "mahouto";
 
+  // Accroche unique de la marque MAJESTÉ PRESSE : une seule source pour l'accueil (tagline) et share.html (subtitle).
+  var MAJESTE_PITCH = "Imprimeurs et sérigraphes : votre plateforme pour vendre, apprendre et échanger.";
+
   var BRANDS = {
     mahouto: {
       name: "MAHOUTO+",
@@ -48,9 +51,9 @@
     majeste: {
       name: "MAJESTÉ PRESSE",
       shortName: "MAJESTÉ",
-      tagline: "Imprimeurs et sérigraphes : votre plateforme pour vendre, apprendre et échanger.",   // accroche unique de l'accueil
+      tagline: MAJESTE_PITCH,                                        // accroche unique de l'accueil
       hideHomeSubtagline: true,                                      // accueil : une seule ligne d'accroche (le sous-titre est masqué, HTML conservé)
-      subtitle: "La presse qui éclaire, le savoir qui élève.",       // utilisé seulement par share.html (à décider)
+      subtitle: MAJESTE_PITCH,                                       // même phrase : lue par share.html (sous le titre)
       aiName: "MAJESTÉ AI",
       schoolName: "Académie MAJESTÉ",
       schoolNavLabel: "Académie",
