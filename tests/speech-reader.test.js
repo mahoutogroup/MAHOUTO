@@ -193,6 +193,67 @@ const FR = { name: "Amélie", lang: "fr-FR", localService: true };
     assert.strictEqual(r.currentId(), null);
   });
 
+  await test("majuscules : MAHOUTO, MAJESTÉ, SÉRIGRAPHIE, PRESSE (3 lettres ou plus, accents compris) → minuscules, prononcés comme des mots", () => {
+    assert.strictEqual(S.normalizeCaps("MAHOUTO"), "mahouto");
+    assert.strictEqual(S.normalizeCaps("MAJESTÉ"), "majesté");
+    assert.strictEqual(S.normalizeCaps("PRESSE"), "presse");
+    assert.strictEqual(S.normalizeCaps("SÉRIGRAPHIE"), "sérigraphie");
+    assert.strictEqual(S.normalizeCaps("ÉCOLE ÔTE ÇAVA"), "école ôte çava");
+    assert.strictEqual(S.normalizeCaps("MAJESTÉ PRESSE et MAHOUTO"), "majesté presse et mahouto");
+  });
+
+  await test("sigles : IA, PDF, SMS, USB, TVA, IFU, RCCM, OAPI, URL, API, GPS, HTML, CSS, FCFA… restent en majuscules (épelés)", () => {
+    ["IA", "PDF", "SMS", "USB", "QR", "CV", "TVA", "IFU", "RCCM", "OAPI", "URL", "PC", "TV", "RH", "ONG", "PME", "PNG", "JPG", "HTML", "CSS", "API", "GPS", "FCFA"].forEach((a) => {
+      assert.strictEqual(S.normalizeCaps(a), a, a);
+      assert.ok(S.SPELLED_ACRONYMS.includes(a), a + " dans la liste");
+    });
+    assert.strictEqual(S.normalizeCaps("Envoie le PDF par SMS, 5 000 FCFA TVA comprise"), "Envoie le PDF par SMS, 5 000 FCFA TVA comprise");
+    assert.strictEqual(S.normalizeCaps("L'IA de MAHOUTO lit ton PDF"), "L'IA de mahouto lit ton PDF");
+    assert.ok(S.SPELLED_ACRONYMS.every((a) => a === a.toUpperCase()), "liste en majuscules");
+  });
+
+  await test("mots de 1 ou 2 lettres en majuscules : inchangés ; « À » seul reste « À »", () => {
+    assert.strictEqual(S.normalizeCaps("IA TV PC OK À Ô"), "IA TV PC OK À Ô");
+    assert.strictEqual(S.normalizeCaps("ET"), "ET");
+    assert.strictEqual(S.normalizeCaps("TOI"), "toi", "3 lettres : converti (hors liste)");
+  });
+
+  await test("mots mêlés, nombres, montants, ponctuation, « + » : inchangés ou traités sans casse", () => {
+    assert.strictEqual(S.normalizeCaps("Mahouto iPhone WhatsApp WiFi FedaPay"), "Mahouto iPhone WhatsApp WiFi FedaPay");
+    assert.strictEqual(S.normalizeCaps("5 000 FCFA, 12,50 € le 01/02/2026 !?"), "5 000 FCFA, 12,50 € le 01/02/2026 !?");
+    assert.strictEqual(S.normalizeCaps("A4 COVID19 5G B2B 3D"), "A4 COVID19 5G B2B 3D", "mots avec chiffres : inchangés");
+    assert.strictEqual(S.normalizeCaps("MAHOUTO+ est lancé"), "mahouto+ est lancé", "« + » conservé, le mot est prononcé");
+    assert.strictEqual(S.normalizeCaps("SAINT-LOUIS, L'ONU"), "saint-louis, L'onu");
+    assert.strictEqual(S.normalizeCaps("déjà en minuscules, Et Majuscule Initiale"), "déjà en minuscules, Et Majuscule Initiale");
+    assert.strictEqual(S.normalizeCaps(""), "");
+    assert.strictEqual(S.normalizeCaps(null), "");
+  });
+
+  await test("texte entièrement en majuscules : lu comme des mots (sauf sigles)", () => {
+    assert.strictEqual(S.normalizeCaps("BONJOUR À TOUS, REJOIGNEZ MAHOUTO"), "bonjour À tous, rejoignez mahouto");
+    assert.strictEqual(S.normalizeCaps("ENVOYEZ LE PDF À L'ONG AVANT DEMAIN !"), "envoyez LE PDF À L'ONG avant demain !");
+  });
+
+  await test("voix : le texte envoyé à speechSynthesis est converti ; le message (contenu affiché) n'est jamais modifié", () => {
+    const w = fakeWin({ voices: [FR] });
+    const r = S.createReader({ win: w });
+    const msg = { id: "m1", content: "BONJOUR À TOUS, REJOIGNEZ MAHOUTO sur MAJESTÉ PRESSE. Envoie le PDF." };
+    const before = msg.content;
+    r.speak("m1", msg.content);
+    assert.strictEqual(w.spoken[0].text, "bonjour À tous, rejoignez mahouto sur majesté presse. Envoie le PDF.");
+    assert.strictEqual(msg.content, before, "le message n'est pas modifié");
+    assert.strictEqual(S.canListen(msg), true);
+    assert.strictEqual(S.cleanText("MAHOUTO"), "MAHOUTO", "cleanText ne change pas la casse");
+  });
+
+  await test("chat.html : l'affichage des messages n'utilise pas la conversion (elle ne sert qu'à la voix)", () => {
+    const chat = read("chat.html");
+    assert.ok(!/normalizeCaps|toLowerCase\(\)\s*;?\s*\/\/\s*voix/.test(chat));
+    const code = strip(read("speech-reader.js"));
+    assert.strictEqual((code.match(/normalizeCaps\(/g) || []).length, 2, "définie + appelée une seule fois (dans splitChunks)");
+    assert.ok(/clean = normalizeCaps\(clean\);/.test(code));
+  });
+
   await test("le module ne touche jamais le réseau ni le HTML ; aucun journal console", () => {
     const code = strip(read("speech-reader.js"));
     assert.ok(!/fetch\(|XMLHttpRequest|sendBeacon|WebSocket|innerHTML|insertAdjacentHTML|document\.write|console\./.test(code));
@@ -219,10 +280,10 @@ const FR = { name: "Amélie", lang: "fr-FR", localService: true };
     assert.match(chat, /\.bubble \.speak-btn \{[^}]*min-width: 44px;[^}]*min-height: 44px;/);
   });
 
-  await test("cache hors ligne : speech-reader.js ; version ≥ v99 ; toujours 12 fonctions Vercel", () => {
+  await test("cache hors ligne : speech-reader.js ; version ≥ v101 ; toujours 12 fonctions Vercel", () => {
     const sw = read("sw.js");
     assert.match(sw, /"\/speech-reader\.js"/);
-    assert.ok(Number((sw.match(/mahoutoplus-shell-v(\d+)/) || [])[1]) >= 99);
+    assert.ok(Number((sw.match(/mahoutoplus-shell-v(\d+)/) || [])[1]) >= 101);
     const fns = [];
     (function scan(d) { fs.readdirSync(d, { withFileTypes: true }).forEach((e) => { const p = path.join(d, e.name); if (e.isDirectory()) return scan(p); if (/\.(js|mjs|ts)$/.test(e.name) && !e.name.startsWith("_")) fns.push(p); }); })(path.join(root, "api"));
     assert.strictEqual(fns.length, 12);

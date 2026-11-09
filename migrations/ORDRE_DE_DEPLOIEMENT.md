@@ -140,6 +140,14 @@ Utiliser deux comptes normaux (A et B), un compte admin, et une fenêtre privée
 
 - **N18.** (1) Sur `https://majestepresse.com/share.html` (ou partager un fichier vers l'application) : sous « MAJESTÉ PRESSE », « Imprimeurs et sérigraphes : votre plateforme pour vendre, apprendre et échanger. », centré, en deux lignes sur téléphone ; sur `https://mahouto.com/share.html` : « L'Afrique qui apprend, crée et entreprend. » inchangé. (2) `https://majestepresse.com/manifest-majeste.json` : `description` = « MAJESTÉ PRESSE – Imprimeurs et sérigraphes : votre plateforme pour vendre, apprendre et échanger. ». (3) Application MAJESTÉ déjà installée : la description n'est relue par le téléphone qu'à sa propre mise à jour (parfois jamais) ; ce n'est pas un défaut. (4) Si l'ancien texte s'affiche encore sur la page de partage : fermer et rouvrir l'application (cache hors ligne v100).
 
+## Écouter : mots en majuscules prononcés comme des mots (PR 12, sans migration)
+
+| # | Étape | Ce qu'on vérifie | Ce qui casse si on saute l'étape | Test navigateur ensuite |
+|---|---|---|---|---|
+| 26 | **Fusion de la PR « fix(salons): lecture à voix haute des mots en majuscules »** et déploiement Vercel (aucune migration, aucune nouvelle fonction : toujours 12) | Voir **N19** | Rien à sauter : seul le texte envoyé à la voix change, le message affiché reste identique | **N19** |
+
+- **N19.** Sur ton téléphone, dans un salon, écrire (ou faire écrire) un message « MAHOUTO et MAJESTÉ PRESSE, SÉRIGRAPHIE pour tous » puis toucher 🔊 : les mots sont **prononcés** (« mahouto », « majesté presse », « sérigraphie »), pas épelés ; la bulle garde ses majuscules. Un message « Envoie le PDF par SMS, 5 000 FCFA » : PDF, SMS et FCFA restent **épelés**. « Utilise l'IA » : IA épelé. « MAHOUTO+ » : « mahouto » (le « + » est lu « plus » ou ignoré selon la voix). Un message tout en majuscules « BONJOUR À TOUS, REJOIGNEZ MAHOUTO » est lu comme des mots. Un sigle manquant (lu comme un mot alors qu'il devrait être épelé) : l'ajouter à `SPELLED_ACRONYMS` dans `speech-reader.js`.
+
 ## Signalement avant la migration 003
 
 L'interface de signalement n'est **pas bloquante** si la table `message_reports` n'existe pas encore : le navigateur reçoit l'erreur « table introuvable » (`PGRST205` ou `42P01`), affiche « Le signalement n'est pas encore disponible. Réessaie un peu plus tard. » et désactive le bouton d'envoi. Aucune erreur technique n'est montrée. Rien à faire à la fusion, mais il vaut mieux exécuter la 003 juste après la 002 pour que le bouton fonctionne vraiment ; elle ne dépend ni de la 001, ni de la 004, ni de la 005.
