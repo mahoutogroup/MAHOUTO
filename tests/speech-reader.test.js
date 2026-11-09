@@ -23,6 +23,8 @@ function fakeWin(opts) {
   w.SpeechSynthesisUtterance = function (text) { this.text = text; };
   w.speechSynthesis = {
     getVoices: () => voices,
+    get speaking() { return w.queue.length > 0; },
+    get pending() { return false; },
     speak: (u) => { w.spoken.push(u); w.queue.push(u); },
     cancel: () => { w.cancels++; const q = w.queue.splice(0); q.forEach((u) => u.onerror && u.onerror({ error: "canceled" })); },
     addEventListener: (ev, fn) => { if (ev === "voiceschanged") w.listeners.push(fn); }
@@ -30,6 +32,8 @@ function fakeWin(opts) {
   w.setVoices = (v) => { voices = v; w.listeners.slice().forEach((fn) => fn()); };
   w.setTimeout = (fn, ms) => { const t = { fn, ms }; w.timers.push(t); return t; };
   w.clearTimeout = (t) => { w.timers = w.timers.filter((x) => x !== t); };
+  // Exécute les minuteries courtes (≤ maxMs) : par exemple la pause de 80 ms entre cancel() et speak().
+  w.flush = (maxMs) => { const due = w.timers.filter((t) => t.ms <= maxMs); w.timers = w.timers.filter((t) => t.ms > maxMs); due.forEach((t) => t.fn()); };
   w.finish = () => { const u = w.queue.shift(); if (u && u.onend) u.onend(); return u; };
   return w;
 }
@@ -126,8 +130,9 @@ const FR = { name: "Amélie", lang: "fr-FR", localService: true };
     r.speak("a", "Premier message. ".repeat(30));
     r.speak("b", "Deuxième message.");
     assert.strictEqual(r.currentId(), "b");
+    w.flush(S.CANCEL_GAP_MS);
     assert.strictEqual(w.spoken[w.spoken.length - 1].text, "Deuxième message.");
-    assert.ok(w.cancels >= 2);
+    assert.ok(w.cancels >= 1);
     w.finish();
     assert.strictEqual(r.currentId(), null);
     assert.deepStrictEqual(changes, ["a", "b", null]);
@@ -187,6 +192,7 @@ const FR = { name: "Amélie", lang: "fr-FR", localService: true };
     const r = S.createReader({ win: w });
     r.speak("a", "Bonjour. Deux.");
     w.queue[0].onerror({ error: "synthesis-failed" });
+    w.queue.length = 0;   // le moteur a vidé sa file après l'erreur
     assert.strictEqual(r.currentId(), null);
     w.speechSynthesis.speak = () => { throw new Error("boom"); };
     r.speak("b", "Bonjour.");
@@ -254,6 +260,124 @@ const FR = { name: "Amélie", lang: "fr-FR", localService: true };
     assert.ok(/clean = normalizeCaps\(clean\);/.test(code));
   });
 
+  // ---------- Incident « le bouton 🔊 ne fait rien » : diagnostic visible et robustesse ----------
+  // Faux moteur « Chrome Android » : un speak() lancé dans la même milliseconde qu'un cancel() est rejeté (« interrupted »).
+  function strictEngine() {
+    const w = fakeWin({ voices: [FR] });
+    let justCancelled = false;
+    const origSpeak = w.speechSynthesis.speak, origCancel = w.speechSynthesis.cancel;
+    w.speechSynthesis.cancel = () => { justCancelled = true; origCancel(); w.timers.push({ fn: () => { justCancelled = false; }, ms: 0 }); };
+    w.speechSynthesis.speak = (u) => {
+      if (justCancelled) { w.spoken.push(u); setTimeout(() => u.onerror && u.onerror({ error: "interrupted" }), 0); return; }
+      origSpeak(u);
+    };
+    w.tick = () => { const t = w.timers.filter((x) => x.ms === 0); w.timers = w.timers.filter((x) => x.ms !== 0); t.forEach((x) => x.fn()); };
+    return w;
+  }
+
+  await test("premier clic : aucun cancel() inutile juste avant speak() (rejeté par certains Chrome Android)", () => {
+    const w = strictEngine();
+    const fails = [];
+    const r = S.createReader({ win: w, onFailure: (c) => fails.push(c) });
+    r.speak("a", "Bonjour tout le monde.");
+    assert.strictEqual(w.cancels, 0, "rien à annuler : pas de cancel()");
+    assert.strictEqual(w.queue.length, 1);
+    assert.strictEqual(r.currentId(), "a");
+    assert.deepStrictEqual(fails, []);
+  });
+
+  await test("remplacer un message : cancel() puis speak() APRÈS une courte pause (80 ms), pas dans la même milliseconde", () => {
+    const w = strictEngine();
+    const fails = [];
+    const r = S.createReader({ win: w, onFailure: (c) => fails.push(c) });
+    r.speak("a", "Premier message.");
+    r.speak("b", "Second message.");
+    assert.strictEqual(w.cancels, 1);
+    assert.strictEqual(w.spoken.length, 1, "le second message attend la pause");
+    w.tick();            // le moteur est de nouveau prêt
+    w.flush(S.CANCEL_GAP_MS);
+    assert.strictEqual(w.spoken.length, 2);
+    assert.strictEqual(w.spoken[1].text, "Second message.");
+    assert.strictEqual(r.currentId(), "b");
+    assert.deepStrictEqual(fails, []);
+  });
+
+  await test("diagnostic : erreur de l'appareil → bouton remis à zéro ET code d'erreur transmis", () => {
+    for (const err of ["synthesis-failed", "language-unavailable", "not-allowed", "interrupted"]) {
+      const w = fakeWin({ voices: [FR] });
+      const fails = [];
+      const r = S.createReader({ win: w, onFailure: (c, d) => fails.push(c) });
+      r.speak("a", "Bonjour.");
+      w.queue[0].onerror({ error: err });
+      assert.strictEqual(r.currentId(), null);
+      assert.deepStrictEqual(fails, ["error:" + err]);
+    }
+  });
+
+  await test("diagnostic : speak() lève une exception → code speak-exception avec le nom de l'erreur", () => {
+    const w = fakeWin({ voices: [FR] });
+    w.speechSynthesis.speak = () => { const e = new Error("boom"); e.name = "InvalidStateError"; throw e; };
+    const fails = [];
+    const r = S.createReader({ win: w, onFailure: (c, d) => fails.push([c, d]) });
+    r.speak("a", "Bonjour.");
+    assert.strictEqual(r.currentId(), null);
+    assert.deepStrictEqual(fails, [["speak-exception", "InvalidStateError"]]);
+  });
+
+  await test("diagnostic : aucun démarrage dans les 3 secondes → code no-start ; un démarrage à temps n'affiche rien", () => {
+    const w = fakeWin({ voices: [FR] });
+    Object.defineProperty(w.speechSynthesis, "pending", { get: () => true });   // le moteur garde la phrase « en attente »
+    const fails = [];
+    const r = S.createReader({ win: w, onFailure: (c) => fails.push(c) });
+    r.speak("a", "Bonjour.");
+    w.flush(S.CANCEL_GAP_MS);   // file « en attente » : le lecteur annule d'abord, puis relance après la pause
+    const timer = w.timers.find((t) => t.ms === S.START_WAIT_MS);
+    assert.ok(timer, "minuterie de 3 s armée");
+    timer.fn();
+    assert.deepStrictEqual(fails, ["no-start"]);
+    assert.strictEqual(r.currentId(), null);
+
+    const w2 = fakeWin({ voices: [FR] });
+    const fails2 = [];
+    const r2 = S.createReader({ win: w2, onFailure: (c) => fails2.push(c) });
+    r2.speak("a", "Bonjour.");
+    w2.queue[0].onstart();            // l'appareil a démarré
+    assert.ok(!w2.timers.some((t) => t.ms === S.START_WAIT_MS), "minuterie annulée");
+    assert.deepStrictEqual(fails2, []);
+    assert.strictEqual(r2.currentId(), "a");
+  });
+
+  await test("diagnostic : rien à lire (code empty) ; speechSynthesis absent (code no-api)", () => {
+    const w = fakeWin({ voices: [FR] });
+    const fails = [];
+    const r = S.createReader({ win: w, onFailure: (c) => fails.push(c) });
+    assert.strictEqual(r.speak("a", "   "), false);
+    const r2 = S.createReader({ win: {}, onFailure: (c) => fails.push(c) });
+    assert.strictEqual(r2.speak("a", "Bonjour"), false);
+    assert.deepStrictEqual(fails, ["empty", "no-api"]);
+  });
+
+  await test("textes réels (accents, apostrophes, émojis, très court, sauts de ligne, majuscules) : jamais d'exception, toujours au moins un morceau lu", () => {
+    const samples = ["Bonjour à tous, c'est l'équipe MAHOUTO ! 🎉", "Ok", "🔥", "Voir https://mahouto.com/p/abc\nPuis écrire", "a\r\nb\r\n", "ÇA VA ? À BIENTÔT.", "l'été, l’œuvre — « citation » …", "5 000 FCFA (IA/PDF) 😀😀", "...", "?!", "A", "\u00a0\u00a0texte\u00a0", "ǅ ǈ ǋ", "ΕΛΛΗΝΙΚΑ ΚΕΙΜΕΝΟ", "İSTANBUL ÖĞRENCİ"];
+    samples.forEach((t) => {
+      const w = fakeWin({ voices: [FR] });
+      const fails = [];
+      const r = S.createReader({ win: w, onFailure: (c) => fails.push(c) });
+      assert.doesNotThrow(() => r.speak("m", t), t);
+      assert.ok(w.spoken.length >= 1, "rien lu pour : " + JSON.stringify(t));
+      assert.deepStrictEqual(fails, [], JSON.stringify(t));
+      assert.strictEqual(r.currentId(), "m");
+    });
+  });
+
+  await test("chat.html : diagnostic « La lecture n'a pas démarré (code : … ) » affiché, clic protégé par try/catch", () => {
+    const chat = read("chat.html"), code = strip(chat.slice(chat.indexOf("<script>")));
+    assert.match(code, /onFailure: reportSpeechFailure/);
+    assert.match(code, /setStatus\("La lecture n'a pas démarré \(code : " \+ code \+ \(detail \? " " \+ detail : ""\) \+ "\)", 10000\);/);
+    assert.match(code, /try \{\s*speechReader\.speak\(id, msg\.content\);\s*\} catch \(err\) \{\s*speechReader\.stop\(\);\s*reportSpeechFailure\("exception"/);
+    assert.match(chat, /<div id="status-message" role="status" aria-live="polite"><\/div>/);
+  });
+
   await test("le module ne touche jamais le réseau ni le HTML ; aucun journal console", () => {
     const code = strip(read("speech-reader.js"));
     assert.ok(!/fetch\(|XMLHttpRequest|sendBeacon|WebSocket|innerHTML|insertAdjacentHTML|document\.write|console\./.test(code));
@@ -280,10 +404,10 @@ const FR = { name: "Amélie", lang: "fr-FR", localService: true };
     assert.match(chat, /\.bubble \.speak-btn \{[^}]*min-width: 44px;[^}]*min-height: 44px;/);
   });
 
-  await test("cache hors ligne : speech-reader.js ; version ≥ v101 ; toujours 12 fonctions Vercel", () => {
+  await test("cache hors ligne : speech-reader.js ; version ≥ v102 ; toujours 12 fonctions Vercel", () => {
     const sw = read("sw.js");
     assert.match(sw, /"\/speech-reader\.js"/);
-    assert.ok(Number((sw.match(/mahoutoplus-shell-v(\d+)/) || [])[1]) >= 101);
+    assert.ok(Number((sw.match(/mahoutoplus-shell-v(\d+)/) || [])[1]) >= 102);
     const fns = [];
     (function scan(d) { fs.readdirSync(d, { withFileTypes: true }).forEach((e) => { const p = path.join(d, e.name); if (e.isDirectory()) return scan(p); if (/\.(js|mjs|ts)$/.test(e.name) && !e.name.startsWith("_")) fns.push(p); }); })(path.join(root, "api"));
     assert.strictEqual(fns.length, 12);
