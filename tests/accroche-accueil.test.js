@@ -65,11 +65,49 @@ test("accueil : titre, logo et boutons de connexion inchangés ; mêmes classes 
   assert.match(html, /id="btn-login-google"/);
 });
 
-test("cache hors ligne : brand.js et index.html dans le shell, version ≥ v98", () => {
+test("MAJESTÉ PRESSE : une seule source de texte — sous-titre (share.html) = accroche de l'accueil = description du manifeste", () => {
+  const b = brandFor("majestepresse.com");
+  assert.strictEqual(b.subtitle, NEW_LINE);
+  assert.strictEqual(b.subtitle, b.tagline);
+  assert.strictEqual(b.hideHomeSubtagline, true);
+  const code = read("brand.js");
+  assert.strictEqual((code.match(/Imprimeurs et sérigraphes : votre plateforme pour vendre, apprendre et échanger\./g) || []).length, 1, "la phrase n'est écrite qu'une fois dans brand.js");
+  const manifest = JSON.parse(read("manifest-majeste.json"));
+  assert.strictEqual(manifest.description, "MAJESTÉ PRESSE – " + NEW_LINE);
+  assert.strictEqual(manifest.name, "MAJESTÉ PRESSE");
+  // share.html lit la valeur de la marque (brand.js) au lieu de la dupliquer
+  assert.match(code, /shareSub && brand\.subtitle\) shareSub\.textContent = brand\.subtitle;/);
+  assert.ok(!/Imprimeurs et sérigraphes/.test(read("share.html")), "share.html ne duplique pas la phrase");
+});
+
+test("MAHOUTO+ inchangé : sous-titre de share.html par défaut et marque MAHOUTO+", () => {
+  assert.match(read("share.html"), /L'Afrique qui apprend, crée et entreprend\./);
+  assert.strictEqual(brandFor("mahouto.com").subtitle, "Construire l'Afrique numérique de demain.");
+});
+
+test("« Informer • Former • Inspirer » et « La presse qui éclaire » n'apparaissent dans AUCUN texte affiché de la marque MAJESTÉ PRESSE", () => {
+  const OLD = /Informer\s*(?:•|,)\s*[Ff]ormer\s*(?:•|,)\s*[Ii]nspirer|presse qui éclaire|savoir qui élève/i;
+  const files = [];
+  (function scan(dir) {
+    fs.readdirSync(dir, { withFileTypes: true }).forEach((e) => {
+      if ([".git", "node_modules", "tests", "migrations"].includes(e.name)) return;
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) return scan(p);
+      if (/\.(html|js|json|css)$/.test(e.name)) files.push(path.relative(root, p));
+    });
+  })(root);
+  assert.ok(files.includes("manifest-majeste.json") && files.includes("brand.js") && files.includes("share.html"));
+  const bad = files.filter((f) => OLD.test(read(f)));
+  assert.deepStrictEqual(bad, []);
+  const b = brandFor("majestepresse.com");
+  Object.keys(b).forEach((k) => { if (typeof b[k] === "string") assert.ok(!OLD.test(b[k]), "brand." + k); });
+});
+
+test("cache hors ligne : brand.js et index.html dans le shell, version ≥ v100", () => {
   const sw = read("sw.js");
   assert.match(sw, /"\/brand\.js"/);
   assert.match(sw, /"\/index\.html"/);
-  assert.ok(Number((sw.match(/mahoutoplus-shell-v(\d+)/) || [])[1]) >= 98);
+  assert.ok(Number((sw.match(/mahoutoplus-shell-v(\d+)/) || [])[1]) >= 100);
 });
 
 console.log("\n" + passed + " test(s) réussi(s)");
