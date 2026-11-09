@@ -48,8 +48,9 @@
     majeste: {
       name: "MAJESTÉ PRESSE",
       shortName: "MAJESTÉ",
-      tagline: "Informer • Former • Inspirer",                       // PROPOSITION à valider
-      subtitle: "La presse qui éclaire, le savoir qui élève.",       // PROPOSITION à valider
+      tagline: "Imprimeurs et sérigraphes : votre plateforme pour vendre, apprendre et échanger.",   // accroche unique de l'accueil
+      hideHomeSubtagline: true,                                      // accueil : une seule ligne d'accroche (le sous-titre est masqué, HTML conservé)
+      subtitle: "La presse qui éclaire, le savoir qui élève.",       // utilisé seulement par share.html (à décider)
       aiName: "MAJESTÉ AI",
       schoolName: "Académie MAJESTÉ",
       schoolNavLabel: "Académie",
@@ -358,8 +359,10 @@
       }
       var tag = document.querySelector(".hero .tagline");
       if (tag && brand.tagline) tag.textContent = brand.tagline;
+      if (tag && brand.hideHomeSubtagline) tag.classList.add("tagline-long");   // accroche longue : taille réduite sous 360 px
       var sub = document.querySelector(".hero .subtagline");
-      if (sub && brand.subtitle) sub.textContent = brand.subtitle;
+      if (sub && brand.hideHomeSubtagline) sub.style.setProperty("display", "none", "important");
+      else if (sub && brand.subtitle) sub.textContent = brand.subtitle;
       // Page de réception des partages (share.html) : sous-titre de la marque
       var shareSub = document.querySelector(".brand .brand-subtitle");
       if (shareSub && brand.subtitle) shareSub.textContent = brand.subtitle;
