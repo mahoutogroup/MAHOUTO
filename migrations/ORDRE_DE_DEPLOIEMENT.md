@@ -116,6 +116,14 @@ Utiliser deux comptes normaux (A et B), un compte admin, et une fenêtre privée
 
 - **N15.** Sur `mes-achats.html` : un achat « En attente » de plus de 3 jours n'apparaît plus ; un achat « En attente » de moins de 3 jours reste visible ; un « En attente » à côté d'un achat payé du même article (salon, formation ou produit) n'apparaît jamais ; les achats payés restent tous visibles ; les paiements échoués ne sont pas affichés. Contrôle en lecture seule dans Supabase : `select status, created_at from purchases where user_id = '<ton id>' order by created_at desc;` (les lignes masquées y sont toujours). Un paiement tardif qui passe à `paid` réapparaît tout seul.
 
+## Accroche de l'accueil MAJESTÉ PRESSE (PR 9, sans migration)
+
+| # | Étape | Ce qu'on vérifie | Ce qui casse si on saute l'étape | Test navigateur ensuite |
+|---|---|---|---|---|
+| 23 | **Fusion de la PR « feat(accueil): nouvelle accroche MAJESTÉ PRESSE »** et déploiement Vercel (aucune migration, aucune nouvelle fonction : toujours 12) | Voir **N16** | Rien à sauter : texte seulement | **N16** |
+
+- **N16.** Sur `https://majestepresse.com` (téléphone, puis navigation privée) : sous « MAJESTÉ PRESSE », une seule phrase « Imprimeurs et sérigraphes : votre plateforme pour vendre, apprendre et échanger. » sur deux lignes au maximum, en blanc comme avant ; plus de « Informer • Former • Inspirer » ni de « La presse qui éclaire… ». Logo et boutons de connexion inchangés. Sur `https://mahouto.com` : accueil inchangé (« Apprendre • Créer • Entreprendre » et « Construire l'Afrique numérique de demain. »). Si l'ancien texte s'affiche encore : fermer et rouvrir l'application (cache hors ligne v98).
+
 ## Signalement avant la migration 003
 
 L'interface de signalement n'est **pas bloquante** si la table `message_reports` n'existe pas encore : le navigateur reçoit l'erreur « table introuvable » (`PGRST205` ou `42P01`), affiche « Le signalement n'est pas encore disponible. Réessaie un peu plus tard. » et désactive le bouton d'envoi. Aucune erreur technique n'est montrée. Rien à faire à la fusion, mais il vaut mieux exécuter la 003 juste après la 002 pour que le bouton fonctionne vraiment ; elle ne dépend ni de la 001, ni de la 004, ni de la 005.
