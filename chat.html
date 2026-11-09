@@ -280,6 +280,27 @@
 
   .bubble.deleted { font-style: italic; opacity: .6; }
 
+  /* ---------- Bouton « écouter » (voix de l'appareil) : zone tactile de 44 px, discret ---------- */
+  .bubble .speak-btn {
+    display: block;
+    min-width: 44px;
+    min-height: 44px;
+    margin: -8px 0 -14px -12px;
+    padding: 0 12px;
+    background: transparent;
+    border: 0;
+    color: inherit;
+    opacity: .55;
+    font-size: 15px;
+    line-height: 44px;
+    text-align: left;
+    cursor: pointer;
+    white-space: normal;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .bubble .speak-btn:hover, .bubble .speak-btn:focus-visible, .bubble .speak-btn.playing { opacity: .95; }
+  .bubble .speak-btn:focus-visible { outline: 2px solid currentColor; outline-offset: -4px; border-radius: 10px; }
+
   .bubble { cursor: pointer; }
 
   /* ---------- Menu d'actions sur un message (tap long) ---------- */
@@ -439,6 +460,7 @@
 <script src="attachments.js"></script>
 <script src="message-editor.js"></script>
 <script src="message-format.js"></script>
+<script src="speech-reader.js"></script>
 <script src="report.js"></script>
 <script src="link-preview.js"></script>
 <script src="audio-player.js"></script>
@@ -530,6 +552,53 @@
     if (text) statusTimer = setTimeout(() => { statusMessage.textContent = ""; }, 6000);
   }
 
+  // ---------- Écouter un message (voix intégrée à l'appareil, aucun envoi du texte) ----------
+  // Sans speechSynthesis (navigateurs intégrés, anciens navigateurs) : aucun bouton, aucune erreur.
+  let speakingMessage = null;   // { id, content } du message en cours de lecture
+  const speechReader = window.MahoutoSpeechReader
+    ? MahoutoSpeechReader.createReader({ win: window, onChange: refreshSpeakButtons, onNoFrenchVoice: setStatus })
+    : null;
+  const speechAvailable = !!(speechReader && speechReader.available);
+
+  function setSpeakButtonState(btn, playing) {
+    btn.classList.toggle("playing", playing);
+    btn.textContent = playing ? "⏹" : "🔊";
+    const label = playing ? "Arrêter la lecture" : "Écouter ce message";
+    btn.setAttribute("aria-label", label);
+    btn.title = label;
+  }
+
+  function refreshSpeakButtons() {
+    const id = speechReader ? speechReader.currentId() : null;
+    if (id === null) speakingMessage = null;
+    messagesEl.querySelectorAll(".speak-btn").forEach((btn) => {
+      setSpeakButtonState(btn, id !== null && btn.dataset.msgId === id);
+    });
+  }
+
+  function stopSpeaking() { if (speechReader) speechReader.stop(); }
+
+  function makeSpeakButton(msg) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "speak-btn";
+    btn.dataset.msgId = String(msg.id);
+    setSpeakButtonState(btn, speechReader.currentId() === String(msg.id));
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();   // n'ouvre pas le menu d'actions du message
+      const id = String(msg.id);
+      if (speechReader.currentId() === id) { speechReader.stop(); return; }
+      speakingMessage = { id: id, content: msg.content };
+      speechReader.speak(id, msg.content);
+    });
+    return btn;
+  }
+
+  // La lecture s'arrête en quittant la page, en changeant d'onglet ou d'application.
+  window.addEventListener("pagehide", stopSpeaking);
+  window.addEventListener("beforeunload", stopSpeaking);
+  document.addEventListener("visibilitychange", () => { if (document.hidden) stopSpeaking(); });
+
   // Écran plein page : salon introuvable, ou chargement impossible.
   function showRoomState(title, text, withRetry) {
     document.getElementById("room-state-title").textContent = title;
@@ -584,6 +653,11 @@
   // réel), la pièce jointe authenticated est résolue individuellement
   // après le premier rendu, sans bloquer l'affichage du message.
   function renderMessage(msg, resolvedMap) {
+    // Le message lu est supprimé, masqué ou modifié : la lecture s'arrête. Un nouveau message en direct n'y touche pas.
+    if (speakingMessage && speakingMessage.id === String(msg.id) &&
+        (msg.is_deleted || hiddenMessageIds.has(msg.id) || msg.content !== speakingMessage.content)) {
+      stopSpeaking();
+    }
     if (hiddenMessageIds.has(msg.id)) return;
 
     const bubble = document.createElement("div");
@@ -644,6 +718,9 @@
 
       // Carte d'aperçu sous le message si le texte contient un lien vers un produit de notre site
       if (msg.content && window.MahoutoLinkPreview) MahoutoLinkPreview.attach(bubble, msg.content, messagesEl);
+
+      // Bouton « écouter » : messages texte non supprimés seulement, et seulement si l'appareil sait lire à voix haute.
+      if (speechAvailable && MahoutoSpeechReader.canListen(msg)) bubble.appendChild(makeSpeakButton(msg));
     }
 
     bubble.addEventListener("click", (e) => {

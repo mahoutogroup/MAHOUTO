@@ -27,6 +27,7 @@ const APP_SHELL = [
   "/theme.css",
   "/theme-toggle.js",
   "/message-format.js",
+  "/speech-reader.js",
   "/moderation.js",
   "/admin-roles.js",
   "/message-format.css",

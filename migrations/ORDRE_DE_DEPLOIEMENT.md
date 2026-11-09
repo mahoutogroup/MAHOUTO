@@ -124,6 +124,14 @@ Utiliser deux comptes normaux (A et B), un compte admin, et une fenêtre privée
 
 - **N16.** Sur `https://majestepresse.com` (téléphone, puis navigation privée) : sous « MAJESTÉ PRESSE », une seule phrase « Imprimeurs et sérigraphes : votre plateforme pour vendre, apprendre et échanger. » sur deux lignes au maximum, en blanc comme avant ; plus de « Informer • Former • Inspirer » ni de « La presse qui éclaire… ». Logo et boutons de connexion inchangés. Sur `https://mahouto.com` : accueil inchangé (« Apprendre • Créer • Entreprendre » et « Construire l'Afrique numérique de demain. »). Si l'ancien texte s'affiche encore : fermer et rouvrir l'application (cache hors ligne v98).
 
+## Écouter un message à voix haute (PR 10, sans migration)
+
+| # | Étape | Ce qu'on vérifie | Ce qui casse si on saute l'étape | Test navigateur ensuite |
+|---|---|---|---|---|
+| 24 | **Fusion de la PR « feat(salons): bouton écouter sous les messages »** et déploiement Vercel (aucune migration, aucune API externe, aucune nouvelle fonction : toujours 12) | Voir **N17** | Rien à sauter : tout se passe sur l'appareil | **N17** |
+
+- **N17.** Sur ton téléphone (Chrome Android, puis Safari iPhone si possible), dans un salon : un petit 🔊 sous chaque message texte (pas sous un message supprimé, une photo/fichier seul ou un message vide). (1) Toucher 🔊 : le message est lu en français, le bouton devient ⏹ ; retoucher ⏹ : la lecture s'arrête. (2) Toucher 🔊 sur un autre message : le premier s'arrête, le second est lu. (3) Message contenant un lien : on entend « lien », jamais l'adresse. (4) Message très long : lecture limitée (environ 1 000 caractères), sans coupure bizarre. (5) Pendant une lecture, un message arrive en direct : la lecture continue. (6) Passer à une autre application ou verrouiller l'écran, ou toucher « ← » : la lecture s'arrête. (7) Faire modifier ou supprimer le message en cours de lecture depuis un autre compte : la lecture s'arrête. (8) Téléphone sans voix française (Paramètres → Synthèse vocale) : le message « Aucune voix française n'est installée sur ton téléphone. » s'affiche une fois et la lecture continue avec la voix par défaut. (9) Dans le navigateur intégré de WhatsApp ou Facebook (ouvrir un lien de salon `/r/<salon>`) : si aucun bouton 🔊 n'apparaît, c'est normal (pas de synthèse vocale) ; aucune erreur. (10) Visiteur sans compte sur un salon gratuit : le 🔊 fonctionne ; communauté payante non débloquée : aucun message, aucun bouton.
+
 ## Même accroche sur la page de partage et le manifeste MAJESTÉ PRESSE (PR 11, sans migration)
 
 | # | Étape | Ce qu'on vérifie | Ce qui casse si on saute l'étape | Test navigateur ensuite |
