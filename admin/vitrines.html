@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Administration — Vitrines — MAHOUTO+</title>
+<meta name="theme-color" content="#0A0A0A">
+<link rel="manifest" href="../manifest.json">
+<script src="../brand.js"></script>
+<link rel="icon" href="../assets/favicon.png">
+<link rel="stylesheet" href="../theme.css">
+<script src="../theme-toggle.js"></script>
+<style>
+  header { padding: 20px; background: var(--bg-elevated); border-bottom: 1px solid var(--border); }
+  header h1 { font-size: 20px; color: var(--gold); }
+  header p { font-size: 12.5px; color: var(--text-muted); margin-top: 6px; }
+
+  .nav-pills { display: flex; gap: 10px; padding: 14px 20px 0; flex-wrap: wrap; }
+  .nav-pills a { font-size: 12.5px; font-weight: bold; color: var(--text-muted); background: var(--bg-card); border-radius: 999px; padding: 8px 16px; }
+  .nav-pills a.current { color: #0A0A0A; background: var(--gold-bright); }
+
+  #access-denied, #loading-state { text-align: center; color: var(--text-dim); padding: 60px 24px; font-size: 14px; line-height: 1.7; }
+
+  .block { margin: 16px 20px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+  .block h3 { color: var(--gold); font-size: 15px; }
+  .block h4 { color: var(--gold); font-size: 13.5px; margin-top: 6px; }
+  .block label { font-size: 11px; color: var(--text-dim); display: block; margin-bottom: 3px; }
+  .block input[type="text"], .block input[type="number"], .block textarea, .block select {
+    width: 100%; padding: 9px 10px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--white); font-size: 13.5px; font-family: inherit;
+  }
+  .block textarea { resize: vertical; min-height: 80px; }
+  .block .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .hint { font-size: 11px; color: var(--text-dim); margin-top: 3px; line-height: 1.5; }
+  .warn { font-size: 12px; line-height: 1.6; color: #FBBF24; background: rgba(251,191,36,.1); border: 1px solid rgba(251,191,36,.35); border-radius: 8px; padding: 8px 10px; }
+  .block label.toggle-row { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-muted); margin-bottom: 0; min-height: 32px; }
+  .field-error { font-size: 12px; color: #F87171; margin-top: 3px; min-height: 0; }
+  .status { font-size: 12.5px; min-height: 16px; color: var(--accent-green); }
+  .status.error { color: #F87171; }
+  .btn { font-size: 12.5px; font-weight: bold; border: none; border-radius: 8px; padding: 10px 14px; cursor: pointer; background: var(--gold-bright); color: #0A0A0A; font-family: inherit; }
+  .btn.secondary { background: var(--bg); color: var(--text-muted); border: 1px solid var(--border); }
+  .btn.danger { background: rgba(239,68,68,.15); color: #F87171; }
+  .btn:disabled { opacity: .5; cursor: wait; }
+  .btn.small { padding: 7px 10px; min-width: 40px; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  .row-card { display: flex; flex-direction: column; gap: 8px; padding: 12px; margin: 0; }
+  .row-card .top { display: flex; align-items: center; gap: 10px; }
+  .row-card .thumb { width: 52px; height: 52px; border-radius: 10px; object-fit: cover; flex: none; background: var(--bg); border: 1px solid var(--border); }
+  .row-card .nom { font-weight: bold; font-size: 14px; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .row-card .meta { font-size: 12px; color: var(--text-muted); overflow-wrap: anywhere; }
+  .pill { font-size: 10px; font-weight: 700; padding: 3px 9px; border-radius: 999px; text-transform: uppercase; flex: none; }
+  .pill.on { background: rgba(34,197,94,.15); color: var(--accent-green); }
+  .pill.off { background: rgba(212,175,55,.15); color: var(--gold); }
+  .list { display: flex; flex-direction: column; gap: 10px; }
+  .empty { padding: 18px; text-align: center; color: var(--text-dim); font-size: 13px; }
+
+  .image-box { border: 1.5px dashed var(--border); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+  .image-box .preview { width: 100%; max-width: 260px; max-height: 150px; object-fit: contain; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); align-self: flex-start; }
+  .upload-status { font-size: 11.5px; color: var(--text-dim); min-height: 14px; }
+  .upload-status.error { color: #F87171; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<button id="theme-toggle-btn" class="theme-toggle-fab">🌙</button>
+
+<div class="page-content">
+
+  <header>
+    <h1>🏪 Administration — Vitrines</h1>
+    <p>Vitrines publiques d'entreprises (page /e/&lt;adresse&gt;). Réservé aux administrateurs.</p>
+  </header>
+
+  <div class="nav-pills">
+    <a href="formations.html">← Tableau de bord</a>
+    <a href="vitrines.html" class="current">Vitrines</a>
+  </div>
+
+  <div id="loading-state">Vérification des droits...</div>
+  <div id="access-denied" class="hidden"></div>
+
+  <!-- Liste + création -->
+  <section id="list-section" class="hidden">
+    <form id="create-form" class="card block" novalidate>
+      <h3>➕ Nouvelle vitrine</h3>
+      <div class="row-2">
+        <div>
+          <label for="c-nom">Nom commercial</label>
+          <input type="text" id="c-nom" maxlength="80" autocomplete="off">
+        </div>
+        <div>
+          <label for="c-slug">Adresse courte (slug)</label>
+          <input type="text" id="c-slug" maxlength="40" autocomplete="off" autocapitalize="none" spellcheck="false">
+        </div>
+      </div>
+      <div class="hint">L'adresse sera /e/&lt;adresse&gt; : 2 à 40 caractères, lettres minuscules, chiffres et tirets. Elle ne doit plus changer une fois partagée.</div>
+      <div class="actions"><button type="submit" class="btn" id="create-btn">Créer le brouillon</button></div>
+      <div class="status" id="create-status" role="status"></div>
+    </form>
+    <div id="entreprises-list" class="list" style="margin: 0 20px 20px;"></div>
+  </section>
+
+  <!-- Édition d'une vitrine -->
+  <section id="editor" class="hidden">
+    <form id="entreprise-form" class="card block" novalidate>
+      <div class="top" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+        <h3 id="editor-title">Modifier la vitrine</h3>
+        <button type="button" class="btn secondary small" id="close-editor">← Liste</button>
+      </div>
+
+      <div class="row-2">
+        <div>
+          <label for="f-nom-commercial">Nom commercial</label>
+          <input type="text" id="f-nom-commercial" maxlength="80" autocomplete="off">
+        </div>
+        <div>
+          <label for="f-slug">Adresse courte (slug)</label>
+          <input type="text" id="f-slug" maxlength="40" autocomplete="off" autocapitalize="none" spellcheck="false">
+          <div class="field-error" id="e-slug"></div>
+        </div>
+      </div>
+
+      <div>
+        <label for="f-nom-legal">Nom légal</label>
+        <input type="text" id="f-nom-legal" maxlength="120" autocomplete="off">
+        <div class="warn" style="margin-top:6px;">Pour une société, saisissez la dénomination (ex. SOJA SARL). Ne saisissez jamais le nom d'une personne.</div>
+      </div>
+
+      <div>
+        <label for="f-description">Description (1 500 caractères maximum)</label>
+        <textarea id="f-description" maxlength="1500"></textarea>
+      </div>
+
+      <div class="row-2">
+        <div>
+          <label for="f-ville">Ville</label>
+          <input type="text" id="f-ville" maxlength="80" autocomplete="off">
+        </div>
+        <div>
+          <label for="f-departement">Département</label>
+          <input type="text" id="f-departement" maxlength="80" autocomplete="off">
+        </div>
+      </div>
+      <div class="hint">Ville seulement : aucune adresse précise.</div>
+
+      <div class="row-2">
+        <div>
+          <label for="f-whatsapp">WhatsApp</label>
+          <input type="text" id="f-whatsapp" inputmode="tel" maxlength="25" autocomplete="off" placeholder="01 23 45 67 89">
+          <div class="field-error" id="e-whatsapp"></div>
+        </div>
+        <div>
+          <label for="f-tel">Téléphone pour appeler</label>
+          <input type="text" id="f-tel" inputmode="tel" maxlength="25" autocomplete="off" placeholder="01 23 45 67 89">
+          <div class="field-error" id="e-tel"></div>
+        </div>
+      </div>
+      <div class="hint">Numéro à 10 chiffres commençant par 01, avec ou sans +229 ; numéro étranger avec + et l'indicatif. Il est enregistré au format +229…</div>
+
+      <div>
+        <label for="f-conseil">Conseil / information (300 caractères maximum, facultatif)</label>
+        <input type="text" id="f-conseil" maxlength="300" autocomplete="off">
+      </div>
+
+      <div class="warn">Ne publiez pas de photo où une personne est reconnaissable sans son accord.</div>
+
+      <div class="image-box">
+        <label>Logo</label>
+        <img id="logo-preview" class="preview hidden" alt="Aperçu du logo">
+        <div class="actions">
+          <button type="button" class="btn secondary" id="pick-logo">Choisir le logo</button>
+          <button type="button" class="btn danger hidden" id="clear-logo">Retirer</button>
+        </div>
+        <input type="file" id="logo-input" accept="image/jpeg,image/png,image/webp" class="hidden">
+        <div class="upload-status" id="logo-status" role="status"></div>
+      </div>
+
+      <div class="image-box">
+        <label>Photo principale (bannière)</label>
+        <img id="banner-preview" class="preview hidden" alt="Aperçu de la bannière">
+        <div class="actions">
+          <button type="button" class="btn secondary" id="pick-banner">Choisir la photo principale</button>
+          <button type="button" class="btn danger hidden" id="clear-banner">Retirer</button>
+        </div>
+        <input type="file" id="banner-input" accept="image/jpeg,image/png,image/webp" class="hidden">
+        <div class="upload-status" id="banner-status" role="status"></div>
+      </div>
+
+      <label class="toggle-row"><input type="checkbox" id="f-published"> Publié (visible publiquement sur /e/&lt;adresse&gt;)</label>
+      <div class="hint">Pour publier, l'adresse et le nom commercial doivent être renseignés.</div>
+
+      <div class="actions">
+        <button type="submit" class="btn" id="save-btn">Enregistrer</button>
+        <a class="btn secondary hidden" id="view-link" href="#" target="_blank" rel="noopener noreferrer" style="text-decoration:none;display:inline-flex;align-items:center;">Voir la vitrine</a>
+      </div>
+      <div class="status" id="save-status" role="status"></div>
+    </form>
+
+    <!-- Produits -->
+    <div class="card block" id="products-block">
+      <h3>📦 Produits</h3>
+      <div id="products-list" class="list"></div>
+      <form id="product-form" novalidate style="display:flex;flex-direction:column;gap:10px;">
+        <h4 id="product-form-title">Ajouter un produit</h4>
+        <div>
+          <label for="p-nom">Nom du produit</label>
+          <input type="text" id="p-nom" maxlength="120" autocomplete="off">
+        </div>
+        <div>
+          <label for="p-description">Description (600 caractères maximum)</label>
+          <textarea id="p-description" maxlength="600" style="min-height:60px;"></textarea>
+        </div>
+        <div class="row-2">
+          <div>
+            <label for="p-prix">Prix en FCFA (facultatif)</label>
+            <input type="number" id="p-prix" min="1" step="1" inputmode="numeric" placeholder="Prix sur demande">
+          </div>
+          <div>
+            <label for="p-unite">Unité (ex. pièce, kg)</label>
+            <input type="text" id="p-unite" maxlength="30" autocomplete="off">
+          </div>
+        </div>
+        <label class="toggle-row"><input type="checkbox" id="p-dispo" checked> Disponible</label>
+        <label class="toggle-row"><input type="checkbox" id="p-published" checked> Publié</label>
+        <div class="image-box">
+          <label>Image du produit</label>
+          <img id="p-preview" class="preview hidden" alt="Aperçu de l'image du produit">
+          <div class="actions">
+            <button type="button" class="btn secondary" id="pick-p-image">Choisir l'image</button>
+            <button type="button" class="btn danger hidden" id="clear-p-image">Retirer</button>
+          </div>
+          <input type="file" id="p-image-input" accept="image/jpeg,image/png,image/webp" class="hidden">
+          <div class="upload-status" id="p-image-status" role="status"></div>
+        </div>
+        <div class="actions">
+          <button type="submit" class="btn" id="p-save">Ajouter le produit</button>
+          <button type="button" class="btn secondary hidden" id="p-cancel">Annuler</button>
+        </div>
+        <div class="status" id="p-status" role="status"></div>
+      </form>
+    </div>
+
+    <!-- Galerie -->
+    <div class="card block" id="gallery-block" style="margin-bottom:40px;">
+      <h3>🖼️ Galerie photos</h3>
+      <div class="warn">Ne publiez pas de photo où une personne est reconnaissable sans son accord.</div>
+      <div class="hint">Les photos sont recompressées sur votre appareil avant l'envoi (les données GPS et autres métadonnées sont supprimées). Envoi une photo à la fois.</div>
+      <div id="photo-counter" style="font-weight:bold;font-size:13px;" aria-live="polite"></div>
+      <div class="actions">
+        <button type="button" class="btn secondary" id="pick-photos">Ajouter des photos</button>
+      </div>
+      <input type="file" id="photos-input" accept="image/jpeg,image/png,image/webp" multiple class="hidden">
+      <div class="upload-status" id="photos-status" role="status" aria-live="polite"></div>
+      <div id="photos-list" class="list"></div>
+    </div>
+  </section>
+
+</div>
+
+<script src="../config.js"></script>
+<script src="../entreprise-utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+(function () {
+  "use strict";
+  const cfg = window.MAHOUTO_CONFIG;
+  const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+  const U = window.MahoutoEntreprise;
+
+  const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;            // 8 Mo (avant recompression)
+  const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
+  const MAX_SIDE = { logo: 600, banner: 1600, photo: 1600, product: 1200 };
+  const UNREADABLE = "Image illisible : choisissez une autre photo (JPEG, PNG ou WebP).";
+
+  const $ = (id) => document.getElementById(id);
+  const val = (id) => $(id).value.trim();
+  function el(tag, props, ...kids) {
+    const n = document.createElement(tag);
+    if (props) for (const [k, v] of Object.entries(props)) {
+      if (v == null) continue;
+      if (k === "class") n.className = v;
+      else if (k === "text") n.textContent = v;
+      else n.setAttribute(k, v);
+    }
+    kids.flat().forEach((c) => { if (c != null) n.append(c); });
+    return n;
+  }
+  function setStatus(id, msg, isError) { const n = $(id); n.textContent = msg || ""; n.classList.toggle("error", !!isError); }
+
+  // ---- État ----
+  let ENTREPRISES = [];
+  let current = null;            // entreprise en cours d'édition (ligne complète)
+  let PRODUITS = [];
+  let PHOTOS = [];
+  let editingProductId = null;
+  let formLogo = null, formBanner = null, formProductImage = null;
+  let busyUpload = false;
+
+  // Messages d'erreur de la base, en français
+  function dbMessage(error) {
+    const m = String((error && (error.message || error.details)) || "");
+    if (error && error.code === "23505" || /duplicate key|unique/i.test(m)) return "Cette adresse est déjà utilisée par une autre vitrine.";
+    if (/published_requires/.test(m)) return "Pour publier, l'adresse (slug) et le nom commercial doivent être renseignés.";
+    if (/slug_check/.test(m)) return "Adresse invalide : 2 à 40 caractères, lettres minuscules, chiffres et tirets.";
+    if (/Limite de 12 photos/.test(m)) return "Limite de 12 photos par entreprise atteinte : supprimez une photo avant d'en ajouter une autre.";
+    if (/whatsapp_check|telephone_appel_check/.test(m)) return U.PHONE_HELP;
+    if (/prix_check/.test(m)) return "Le prix doit être supérieur à 0, ou laissé vide.";
+    if (/row-level security|permission denied/i.test(m)) return "Action refusée : réservée aux administrateurs.";
+    if (/relation .* does not exist|schema cache|Could not find the table/i.test(m)) return "Les tables n'existent pas : exécutez d'abord entreprises-vitrine.sql.";
+    if (/_check/.test(m)) return "Une valeur est refusée par la base (longueur ou format) : vérifiez les champs.";
+    return "Erreur : " + m;
+  }
+
+  // ---------------------------------------------------------------
+  // Images : contrôle, recompression locale (supprime EXIF/GPS), envoi signé Cloudinary
+  // (même mécanisme que les produits Sérigraphe : signature via /api/attachment).
+  // ---------------------------------------------------------------
+  function checkFile(file) {
+    const type = (file.type || "").toLowerCase();
+    const okType = ALLOWED_TYPES.includes(type) || (!type && /\.(jpe?g|png|webp)$/i.test(file.name || ""));
+    if (!okType) return "Format non accepté : utilisez une image JPEG, PNG ou WebP.";
+    if (file.size > MAX_UPLOAD_BYTES) return "Image trop volumineuse (8 Mo maximum).";
+    return null;
+  }
+
+  // Décode, réduit et ré-encode l'image dans un canvas : le fichier envoyé ne contient AUCUNE métadonnée
+  // d'origine (GPS, appareil…). Libère la mémoire (bitmap, URL d'objet, canvas) dans tous les cas.
+  async function prepareImage(file, kind) {
+    const maxSide = MAX_SIDE[kind] || 1200;
+    const keepAlpha = kind === "logo" && /png|webp/i.test(file.type || "");
+    let bitmap = null, objectUrl = null, canvas = null;
+    try {
+      let source, w, h;
+      if (typeof window.createImageBitmap === "function") {
+        try { bitmap = await createImageBitmap(file, { imageOrientation: "from-image" }); } catch (e) { bitmap = null; }
+      }
+      if (bitmap) { source = bitmap; w = bitmap.width; h = bitmap.height; }
+      else {
+        objectUrl = URL.createObjectURL(file);
+        const img = new Image();
+        img.src = objectUrl;
+        try { await img.decode(); } catch (e) { throw new Error(UNREADABLE); }
+        source = img; w = img.naturalWidth; h = img.naturalHeight;
+      }
+      if (!w || !h) throw new Error(UNREADABLE);
+      const scale = Math.min(1, maxSide / Math.max(w, h));
+      const cw = Math.max(1, Math.round(w * scale)), ch = Math.max(1, Math.round(h * scale));
+      canvas = document.createElement("canvas");
+      canvas.width = cw; canvas.height = ch;
+      const ctx = canvas.getContext("2d");
+      if (!keepAlpha) { ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, cw, ch); }
+      ctx.drawImage(source, 0, 0, cw, ch);
+      const blob = await new Promise((resolve, reject) => {
+        canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Conversion de l'image impossible."))), keepAlpha ? "image/png" : "image/jpeg", 0.85);
+      });
+      if (blob.size > MAX_UPLOAD_BYTES) throw new Error("Image trop volumineuse après compression (8 Mo maximum).");
+      return { blob: blob, name: keepAlpha ? "image.png" : "image.jpg" };
+    } finally {
+      if (bitmap && typeof bitmap.close === "function") bitmap.close();
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      if (canvas) { canvas.width = 0; canvas.height = 0; }
+    }
+  }
+
+  async function uploadBlob(blob, name) {
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData && sessionData.session ? sessionData.session.access_token : null;
+    if (!accessToken) throw new Error("Session expirée, reconnectez-vous.");
+    const signQuery = new URLSearchParams({ filename: name, context: "avatar" });
+    const signResp = await fetch("/api/attachment?" + signQuery.toString(), { headers: { "Authorization": "Bearer " + accessToken } });
+    const sign = await signResp.json();
+    if (!signResp.ok) throw new Error(sign.error || "Signature indisponible");
+
+    const formData = new FormData();
+    formData.append("file", blob, name);
+    formData.append("api_key", sign.apiKey);
+    formData.append("timestamp", sign.timestamp);
+    formData.append("signature", sign.signature);
+    formData.append("folder", sign.folder);
+    const uploadResp = await fetch(sign.uploadUrl, { method: "POST", body: formData });
+    const uploadData = await uploadResp.json();
+    if (!uploadResp.ok) throw new Error((uploadData.error && uploadData.error.message) || "Envoi échoué");
+    if (!U.isCloudinaryUrl(uploadData.secure_url || "")) throw new Error("URL d'image invalide.");
+    return uploadData.secure_url;
+  }
+
+  // Contrôle + recompression + envoi d'UN fichier ; renvoie l'URL https Cloudinary.
+  async function processAndUpload(file, kind) {
+    const problem = checkFile(file);
+    if (problem) throw new Error(problem);
+    let prepared = await prepareImage(file, kind);
+    try { return await uploadBlob(prepared.blob, prepared.name); }
+    finally { prepared = null; }
+  }
+
+  function showPreview(imgId, clearId, url) {
+    const img = $(imgId), clr = $(clearId);
+    const src = url ? U.imageDeliveryUrl(url, 520) : null;
+    if (src) { img.src = src; img.classList.remove("hidden"); clr.classList.remove("hidden"); }
+    else { img.removeAttribute("src"); img.classList.add("hidden"); clr.classList.add("hidden"); }
+  }
+
+  function wireSingleImage(kind, pickId, inputId, clearId, previewId, statusId, getter, setter) {
+    $(pickId).addEventListener("click", () => $(inputId).click());
+    $(clearId).addEventListener("click", () => { setter(null); showPreview(previewId, clearId, null); });
+    $(inputId).addEventListener("change", async () => {
+      const input = $(inputId);
+      const file = input.files[0];
+      input.value = "";
+      setStatus(statusId, "");
+      if (!file || busyUpload) return;
+      busyUpload = true;
+      $(pickId).disabled = true;
+      setStatus(statusId, "Préparation et envoi…");
+      try {
+        const url = await processAndUpload(file, kind);
+        setter(url);
+        showPreview(previewId, clearId, url);
+        setStatus(statusId, "Image envoyée. Pensez à enregistrer.");
+      } catch (err) {
+        console.error(err);
+        setStatus(statusId, "Erreur : " + err.message, true);
+      } finally {
+        busyUpload = false;
+        $(pickId).disabled = false;
+      }
+    });
+  }
+  wireSingleImage("logo", "pick-logo", "logo-input", "clear-logo", "logo-preview", "logo-status", () => formLogo, (v) => { formLogo = v; });
+  wireSingleImage("banner", "pick-banner", "banner-input", "clear-banner", "banner-preview", "banner-status", () => formBanner, (v) => { formBanner = v; });
+  wireSingleImage("product", "pick-p-image", "p-image-input", "clear-p-image", "p-preview", "p-image-status", () => formProductImage, (v) => { formProductImage = v; });
+
+  // ---------------------------------------------------------------
+  // Liste et création
+  // ---------------------------------------------------------------
+  function entrepriseRow(e) {
+    const thumbSrc = U.imageDeliveryUrl(e.logo_url || e.banner_url, 120);
+    const open = el("button", { type: "button", class: "btn", text: "Modifier" });
+    open.addEventListener("click", () => openEditor(e.id));
+    const del = el("button", { type: "button", class: "btn danger", "aria-label": "Supprimer la vitrine", text: "🗑️" });
+    del.addEventListener("click", async () => {
+      if (!confirm("Supprimer définitivement la vitrine « " + (e.nom_commercial || e.slug || "sans nom") + " » avec ses produits et ses photos ?")) return;
+      del.disabled = true;
+      const { error } = await supabase.from("entreprises").delete().eq("id", e.id);
+      if (error) { console.error(error); alert(dbMessage(error)); del.disabled = false; return; }
+      if (current && current.id === e.id) closeEditor();
+      await loadEntreprises();
+    });
+    return el("div", { class: "card row-card" },
+      el("div", { class: "top" },
+        thumbSrc ? el("img", { class: "thumb", src: thumbSrc, alt: "", loading: "lazy" }) : el("div", { class: "thumb", "aria-hidden": "true" }),
+        el("span", { class: "nom", text: e.nom_commercial || "(sans nom)" }),
+        el("span", { class: "pill " + (e.published ? "on" : "off"), text: e.published ? "Publié" : "Brouillon" })
+      ),
+      el("div", { class: "meta", text: (e.slug ? "/e/" + e.slug : "pas d'adresse") + (e.ville ? " · " + e.ville : "") }),
+      el("div", { class: "actions" }, open, del)
+    );
+  }
+
+  function renderList() {
+    const box = $("entreprises-list");
+    box.textContent = "";
+    if (!ENTREPRISES.length) { box.append(el("div", { class: "empty", text: "Aucune vitrine pour le moment." })); return; }
+    ENTREPRISES.forEach((e) => box.append(entrepriseRow(e)));
+  }
+
+  async function loadEntreprises() {
+    const { data, error } = await supabase.from("entreprises").select("*").order("created_at", { ascending: false });
+    if (error) {
+      console.error(error);
+      $("entreprises-list").textContent = "";
+      $("entreprises-list").append(el("div", { class: "empty", text: dbMessage(error) }));
+      return;
+    }
+    ENTREPRISES = data || [];
+    renderList();
+  }
+
+  $("c-nom").addEventListener("input", () => { if (!$("c-slug").dataset.touched) $("c-slug").value = U.slugify($("c-nom").value); });
+  $("c-slug").addEventListener("input", () => { $("c-slug").dataset.touched = "1"; });
+
+  $("create-form").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    setStatus("create-status", "");
+    const nom = val("c-nom"), slug = val("c-slug");
+    if (nom.length < 2) { setStatus("create-status", "Indiquez le nom commercial (2 caractères au moins).", true); return; }
+    if (!U.isValidSlug(slug)) { setStatus("create-status", "Adresse invalide : 2 à 40 caractères, lettres minuscules, chiffres et tirets.", true); return; }
+    $("create-btn").disabled = true;
+    const { data, error } = await supabase.from("entreprises").insert({ slug: slug, nom_commercial: nom, published: false }).select("*").single();
+    $("create-btn").disabled = false;
+    if (error) { console.error(error); setStatus("create-status", dbMessage(error), true); return; }
+    $("create-form").reset();
+    delete $("c-slug").dataset.touched;
+    await loadEntreprises();
+    openEditor(data.id);
+  });
+
+  // ---------------------------------------------------------------
+  // Édition d'une vitrine
+  // ---------------------------------------------------------------
+  function closeEditor() {
+    current = null;
+    $("editor").classList.add("hidden");
+    $("list-section").classList.remove("hidden");
+  }
+  $("close-editor").addEventListener("click", async () => { closeEditor(); await loadEntreprises(); });
+
+  async function openEditor(id) {
+    const e = ENTREPRISES.find((x) => x.id === id);
+    if (!e) return;
+    current = e;
+    $("list-section").classList.add("hidden");
+    $("editor").classList.remove("hidden");
+    $("editor-title").textContent = "Modifier : " + (e.nom_commercial || e.slug || "vitrine");
+    $("f-nom-commercial").value = e.nom_commercial || "";
+    $("f-slug").value = e.slug || "";
+    $("f-nom-legal").value = e.nom_legal || "";
+    $("f-description").value = e.description || "";
+    $("f-ville").value = e.ville || "";
+    $("f-departement").value = e.departement || "";
+    $("f-whatsapp").value = e.whatsapp || "";
+    $("f-tel").value = e.telephone_appel || "";
+    $("f-conseil").value = e.conseil_texte || "";
+    $("f-published").checked = !!e.published;
+    formLogo = e.logo_url || null; formBanner = e.banner_url || null;
+    showPreview("logo-preview", "clear-logo", formLogo);
+    showPreview("banner-preview", "clear-banner", formBanner);
+    ["e-slug", "e-whatsapp", "e-tel"].forEach((i) => { $(i).textContent = ""; });
+    setStatus("save-status", ""); setStatus("logo-status", ""); setStatus("banner-status", "");
+    updateViewLink();
+    resetProductForm();
+    await Promise.all([loadProduits(), loadPhotos()]);
+    window.scrollTo(0, 0);
+  }
+
+  function updateViewLink() {
+    const a = $("view-link");
+    if (current && current.published && U.isValidSlug(current.slug)) { a.href = "../e/" + current.slug; a.classList.remove("hidden"); }
+    else { a.removeAttribute("href"); a.classList.add("hidden"); }
+  }
+
+  // Normalise un champ téléphone ; renvoie { ok, value } et affiche l'erreur sous le champ.
+  function readPhone(inputId, errorId) {
+    const r = U.normalizePhone($(inputId).value);
+    $(errorId).textContent = r.ok ? "" : r.error;
+    if (r.ok && !r.empty) $(inputId).value = r.e164;
+    return r.ok ? { ok: true, value: r.empty ? null : r.e164 } : { ok: false };
+  }
+  $("f-whatsapp").addEventListener("blur", () => readPhone("f-whatsapp", "e-whatsapp"));
+  $("f-tel").addEventListener("blur", () => readPhone("f-tel", "e-tel"));
+
+  $("entreprise-form").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    if (!current) return;
+    setStatus("save-status", "");
+    $("e-slug").textContent = "";
+
+    const slug = val("f-slug"), nomCommercial = val("f-nom-commercial");
+    if (slug && !U.isValidSlug(slug)) { $("e-slug").textContent = "Adresse invalide : 2 à 40 caractères, lettres minuscules, chiffres et tirets."; setStatus("save-status", "Corrigez les champs en rouge.", true); return; }
+    const published = $("f-published").checked;
+    if (published && (!slug || !nomCommercial)) { setStatus("save-status", "Pour publier, renseignez l'adresse (slug) et le nom commercial.", true); return; }
+    const wa = readPhone("f-whatsapp", "e-whatsapp");
+    const tel = readPhone("f-tel", "e-tel");
+    if (!wa.ok || !tel.ok) { setStatus("save-status", "Corrigez les numéros de téléphone.", true); return; }
+
+    const nullable = (id) => (val(id) === "" ? null : val(id));
+    const payload = {
+      slug: slug || null,
+      nom_commercial: nomCommercial || null,
+      nom_legal: nullable("f-nom-legal"),
+      description: nullable("f-description"),
+      ville: nullable("f-ville"),
+      departement: nullable("f-departement"),
+      whatsapp: wa.value,
+      telephone_appel: tel.value,
+      conseil_texte: nullable("f-conseil"),
+      logo_url: formLogo,
+      banner_url: formBanner,
+      published: published
+    };
+    $("save-btn").disabled = true;
+    const { data, error } = await supabase.from("entreprises").update(payload).eq("id", current.id).select("*").single();
+    $("save-btn").disabled = false;
+    if (error) { console.error(error); setStatus("save-status", dbMessage(error), true); return; }
+    current = data;
+    const i = ENTREPRISES.findIndex((x) => x.id === data.id);
+    if (i >= 0) ENTREPRISES[i] = data;
+    $("editor-title").textContent = "Modifier : " + (data.nom_commercial || data.slug || "vitrine");
+    updateViewLink();
+    setStatus("save-status", published ? "Enregistré — la vitrine est publiée." : "Enregistré (brouillon : non visible publiquement).");
+  });
+
+  // ---------------------------------------------------------------
+  // Produits
+  // ---------------------------------------------------------------
+  function resetProductForm() {
+    editingProductId = null;
+    $("product-form").reset();
+    $("p-dispo").checked = true; $("p-published").checked = true;
+    formProductImage = null;
+    showPreview("p-preview", "clear-p-image", null);
+    $("product-form-title").textContent = "Ajouter un produit";
+    $("p-save").textContent = "Ajouter le produit";
+    $("p-cancel").classList.add("hidden");
+    setStatus("p-status", ""); setStatus("p-image-status", "");
+  }
+  $("p-cancel").addEventListener("click", resetProductForm);
+
+  function startEditProduct(p) {
+    editingProductId = p.id;
+    $("p-nom").value = p.nom || "";
+    $("p-description").value = p.description || "";
+    $("p-prix").value = p.prix == null ? "" : String(p.prix);
+    $("p-unite").value = p.unite || "";
+    $("p-dispo").checked = p.disponible !== false;
+    $("p-published").checked = !!p.published;
+    formProductImage = p.image_url || null;
+    showPreview("p-preview", "clear-p-image", formProductImage);
+    $("product-form-title").textContent = "Modifier le produit";
+    $("p-save").textContent = "Enregistrer le produit";
+    $("p-cancel").classList.remove("hidden");
+    setStatus("p-status", "");
+    $("product-form").scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  async function reorder(table, list, index, delta, reload) {
+    const moved = U.moveItem(list, index, delta);
+    const before = U.sortByPosition(list);
+    for (let i = 0; i < moved.length; i++) {
+      const orig = before.find((x) => x.id === moved[i].id);
+      if (orig && orig.position === moved[i].position) continue;
+      const { error } = await supabase.from(table).update({ position: moved[i].position }).eq("id", moved[i].id);
+      if (error) { console.error(error); alert(dbMessage(error)); break; }
+    }
+    await reload();
+  }
+
+  function productRow(p, index, total) {
+    const src = U.imageDeliveryUrl(p.image_url, 120);
+    const up = el("button", { type: "button", class: "btn secondary small", "aria-label": "Monter", text: "↑" });
+    const down = el("button", { type: "button", class: "btn secondary small", "aria-label": "Descendre", text: "↓" });
+    up.disabled = index === 0; down.disabled = index === total - 1;
+    up.addEventListener("click", () => reorder("entreprise_produits", PRODUITS, index, -1, loadProduits));
+    down.addEventListener("click", () => reorder("entreprise_produits", PRODUITS, index, 1, loadProduits));
+    const edit = el("button", { type: "button", class: "btn", text: "Modifier" });
+    edit.addEventListener("click", () => startEditProduct(p));
+    const del = el("button", { type: "button", class: "btn danger", "aria-label": "Supprimer", text: "🗑️" });
+    del.addEventListener("click", async () => {
+      if (!confirm("Supprimer le produit « " + p.nom + " » ?")) return;
+      del.disabled = true;
+      const { error } = await supabase.from("entreprise_produits").delete().eq("id", p.id);
+      if (error) { console.error(error); alert(dbMessage(error)); del.disabled = false; return; }
+      if (editingProductId === p.id) resetProductForm();
+      await loadProduits();
+    });
+    const meta = U.priceLabel(p.prix) + (p.unite ? " / " + p.unite : "") + " · " + U.availabilityLabel(p.disponible) + (p.published ? "" : " · masqué");
+    return el("div", { class: "card row-card" },
+      el("div", { class: "top" },
+        src ? el("img", { class: "thumb", src: src, alt: "", loading: "lazy" }) : el("div", { class: "thumb", "aria-hidden": "true" }),
+        el("span", { class: "nom", text: p.nom }),
+        el("span", { class: "pill " + (p.published ? "on" : "off"), text: p.published ? "Publié" : "Masqué" })
+      ),
+      el("div", { class: "meta", text: meta }),
+      el("div", { class: "actions" }, up, down, edit, del)
+    );
+  }
+
+  function renderProduits() {
+    const box = $("products-list");
+    box.textContent = "";
+    if (!PRODUITS.length) { box.append(el("div", { class: "empty", text: "Aucun produit pour le moment." })); return; }
+    PRODUITS.forEach((p, i) => box.append(productRow(p, i, PRODUITS.length)));
+  }
+
+  async function loadProduits() {
+    if (!current) return;
+    const { data, error } = await supabase.from("entreprise_produits").select("*").eq("entreprise_id", current.id);
+    if (error) { console.error(error); $("products-list").textContent = ""; $("products-list").append(el("div", { class: "empty", text: dbMessage(error) })); return; }
+    PRODUITS = U.sortByPosition(data || []);
+    renderProduits();
+  }
+
+  $("product-form").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    if (!current) return;
+    setStatus("p-status", "");
+    const nom = val("p-nom");
+    if (nom.length < 2) { setStatus("p-status", "Indiquez le nom du produit (2 caractères au moins).", true); return; }
+    const prixRaw = val("p-prix");
+    let prix = null;
+    if (prixRaw !== "") {
+      prix = Number(prixRaw);
+      if (!Number.isInteger(prix) || prix <= 0) { setStatus("p-status", "Le prix doit être un nombre entier de FCFA supérieur à 0, ou laissé vide pour « Prix sur demande ».", true); return; }
+    }
+    const payload = {
+      nom: nom,
+      description: val("p-description") || null,
+      prix: prix,
+      unite: val("p-unite") || null,
+      disponible: $("p-dispo").checked,
+      image_url: formProductImage,
+      published: $("p-published").checked
+    };
+    $("p-save").disabled = true;
+    let error;
+    if (editingProductId) {
+      ({ error } = await supabase.from("entreprise_produits").update(payload).eq("id", editingProductId));
+    } else {
+      const next = PRODUITS.reduce((m, p) => Math.max(m, Number(p.position) || 0), -1) + 1;
+      ({ error } = await supabase.from("entreprise_produits").insert(Object.assign({ entreprise_id: current.id, position: next }, payload)));
+    }
+    $("p-save").disabled = false;
+    if (error) { console.error(error); setStatus("p-status", dbMessage(error), true); return; }
+    const wasEditing = !!editingProductId;
+    resetProductForm();
+    setStatus("p-status", wasEditing ? "Produit enregistré." : "Produit ajouté.");
+    await loadProduits();
+  });
+
+  // ---------------------------------------------------------------
+  // Galerie : envoi UNE PHOTO À LA FOIS (jamais en parallèle), mémoire libérée après chaque image
+  // ---------------------------------------------------------------
+  function renderPhotoCounter() { $("photo-counter").textContent = U.photoCounter(PHOTOS.length); $("pick-photos").disabled = busyUpload || !U.canAddPhoto(PHOTOS.length); }
+
+  function photoRow(p, index, total) {
+    const src = U.imageDeliveryUrl(p.image_url, 160);
+    const legende = el("input", { type: "text", maxlength: "80", value: p.legende || "", "aria-label": "Légende de la photo " + (index + 1), placeholder: "Légende (facultatif, 80 caractères)" });
+    const saveLegende = async () => {
+      const v = legende.value.trim() || null;
+      if (v === (p.legende || null)) return;
+      const { error } = await supabase.from("entreprise_photos").update({ legende: v }).eq("id", p.id);
+      if (error) { console.error(error); alert(dbMessage(error)); legende.value = p.legende || ""; return; }
+      p.legende = v;
+    };
+    legende.addEventListener("change", saveLegende);
+    const up = el("button", { type: "button", class: "btn secondary small", "aria-label": "Monter la photo", text: "↑" });
+    const down = el("button", { type: "button", class: "btn secondary small", "aria-label": "Descendre la photo", text: "↓" });
+    up.disabled = index === 0; down.disabled = index === total - 1;
+    up.addEventListener("click", () => reorder("entreprise_photos", PHOTOS, index, -1, loadPhotos));
+    down.addEventListener("click", () => reorder("entreprise_photos", PHOTOS, index, 1, loadPhotos));
+    const pub = el("input", { type: "checkbox" });
+    pub.checked = !!p.published;
+    pub.addEventListener("change", async () => {
+      const { error } = await supabase.from("entreprise_photos").update({ published: pub.checked }).eq("id", p.id);
+      if (error) { console.error(error); alert(dbMessage(error)); pub.checked = !pub.checked; return; }
+      p.published = pub.checked;
+    });
+    const del = el("button", { type: "button", class: "btn danger", "aria-label": "Supprimer la photo", text: "🗑️" });
+    del.addEventListener("click", async () => {
+      if (!confirm("Supprimer cette photo de la galerie ?")) return;
+      del.disabled = true;
+      const { error } = await supabase.from("entreprise_photos").delete().eq("id", p.id);
+      if (error) { console.error(error); alert(dbMessage(error)); del.disabled = false; return; }
+      await loadPhotos();
+    });
+    return el("div", { class: "card row-card" },
+      el("div", { class: "top" },
+        src ? el("img", { class: "thumb", src: src, alt: U.photoAlt(p, current ? current.nom_commercial : ""), loading: "lazy" }) : el("div", { class: "thumb", "aria-hidden": "true" }),
+        legende
+      ),
+      el("div", { class: "actions", style: "align-items:center;" }, up, down,
+        el("label", { class: "toggle-row", style: "margin:0;" }, pub, "Publiée"), del)
+    );
+  }
+
+  function renderPhotos() {
+    const box = $("photos-list");
+    box.textContent = "";
+    renderPhotoCounter();
+    if (!PHOTOS.length) { box.append(el("div", { class: "empty", text: "Aucune photo pour le moment." })); return; }
+    PHOTOS.forEach((p, i) => box.append(photoRow(p, i, PHOTOS.length)));
+  }
+
+  async function loadPhotos() {
+    if (!current) return;
+    const { data, error } = await supabase.from("entreprise_photos").select("*").eq("entreprise_id", current.id);
+    if (error) { console.error(error); $("photos-list").textContent = ""; $("photos-list").append(el("div", { class: "empty", text: dbMessage(error) })); return; }
+    PHOTOS = U.sortByPosition(data || []);
+    renderPhotos();
+  }
+
+  $("pick-photos").addEventListener("click", () => $("photos-input").click());
+  $("photos-input").addEventListener("change", async () => {
+    const input = $("photos-input");
+    const files = Array.from(input.files || []);
+    input.value = "";
+    if (!files.length || !current || busyUpload) return;
+    busyUpload = true;
+    renderPhotoCounter();
+    const entrepriseId = current.id;
+    const errors = [];
+    let done = 0;
+    try {
+      for (let i = 0; i < files.length; i++) {                       // séquentiel : une photo à la fois
+        if (!U.canAddPhoto(PHOTOS.length)) { errors.push("Limite de " + U.MAX_PHOTOS + " photos atteinte : les photos restantes n'ont pas été envoyées."); break; }
+        setStatus("photos-status", "Envoi de la photo " + (i + 1) + " sur " + files.length + "…");
+        try {
+          const url = await processAndUpload(files[i], "photo");
+          const next = PHOTOS.reduce((m, p) => Math.max(m, Number(p.position) || 0), -1) + 1;
+          const { data, error } = await supabase.from("entreprise_photos").insert({ entreprise_id: entrepriseId, image_url: url, position: next }).select("*").single();
+          if (error) throw new Error(dbMessage(error));
+          PHOTOS.push(data);
+          PHOTOS = U.sortByPosition(PHOTOS);
+          renderPhotos();
+          done++;
+        } catch (err) {
+          console.error(err);
+          errors.push("« " + (files[i].name || "photo") + " » : " + err.message);
+        }
+      }
+    } finally {
+      busyUpload = false;
+      renderPhotoCounter();
+    }
+    setStatus("photos-status",
+      (done ? done + " photo(s) ajoutée(s). " : "") + errors.join(" "),
+      errors.length > 0);
+  });
+
+  // ---------------------------------------------------------------
+  // Accès : administrateurs seulement (la base applique la même règle par RLS)
+  // ---------------------------------------------------------------
+  function deny(text) {
+    $("loading-state").classList.add("hidden");
+    $("access-denied").textContent = text;
+    $("access-denied").classList.remove("hidden");
+  }
+
+  async function init() {
+    const { data } = await supabase.auth.getSession();
+    const user = data && data.session ? data.session.user : null;
+    if (!user) { deny("🔒 Connectez-vous avec un compte administrateur pour accéder à cette page."); return; }
+
+    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
+    const role = profile ? profile.role : "user";
+    if (role !== "admin" && role !== "super_admin" && role !== "founder") { deny("🔒 Cette page est réservée aux administrateurs."); return; }
+
+    $("loading-state").classList.add("hidden");
+    $("list-section").classList.remove("hidden");
+    await loadEntreprises();
+  }
+
+  init();
+})();
+</script>
+<script src="../pwa-install.js"></script>
+
+</body>
+</html>

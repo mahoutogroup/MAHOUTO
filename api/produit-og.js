@@ -47,6 +47,7 @@ import { createClient } from "@supabase/supabase-js";
 import { brandForRequest } from "./_brand.js";
 import { cloudinaryImageParts } from "./_cloudinary-og.js";
 import { handleRoomPreview, ROOM_FIELDS } from "./_room-og.js";
+import { handleEntreprisePreview, ENTREPRISE_FIELDS } from "./_entreprise-og.js";
 
 function escapeHtml(str) {
   return String(str || "")
@@ -422,10 +423,25 @@ async function fetchRoomForPreview(id) {
   return { row: data || null, error: error || null };
 }
 
+// ---------------------------------------------------------
+// Vitrines d'entreprise : lien /e/<slug> (type=entreprise), aperçu avec le nom et la photo.
+// Lecture avec la clé publique (anon), jamais service_role : la RLS ne laisse lire que les vitrines publiées
+// (le filtre published=true est ajouté par prudence). Logique dans api/_entreprise-og.js.
+// ---------------------------------------------------------
+async function fetchEntrepriseForPreview(slug) {
+  const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
+  const { data, error } = await supabase.from("entreprises").select(ENTREPRISE_FIELDS).eq("slug", slug).eq("published", true).maybeSingle();
+  return { row: data || null, error: error || null };
+}
+
 export default async function handler(req, res) {
   // Salons : en-têtes de cache propres (courte durée), site et marque fixes.
   if (req.query && req.query.type === "salon" && req.query.format !== "json") {
     return handleRoomPreview(req, res, { fetchRoom: fetchRoomForPreview });
+  }
+  // Vitrines d'entreprise : même principe (site et marque fixes).
+  if (req.query && req.query.type === "entreprise" && req.query.format !== "json") {
+    return handleEntreprisePreview(req, res, { fetchEntreprise: fetchEntrepriseForPreview });
   }
 
   res.setHeader("Cache-Control", "public, max-age=120, s-maxage=300");
