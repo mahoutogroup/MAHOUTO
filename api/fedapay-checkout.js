@@ -47,6 +47,14 @@ export default async function handler(req, res) {
       return handleSerigraphieCheckout(req, res);
     }
 
+    // Abonnement d'une vitrine d'entreprise (productType "entreprise") : branche déléguée au helper
+    // api/_entreprise-abonnement.js (même raison : pas de nouvelle fonction Vercel). Sans compte : le
+    // commerçant paie via un lien ; montant et durée sont relus côté serveur dans entreprise_forfaits.
+    if (req.body && req.body.productType === "entreprise") {
+      const { handleEntrepriseCheckout } = await import("./_entreprise-abonnement.js");
+      return handleEntrepriseCheckout(req, res);
+    }
+
     // -----------------------------------------------------
     // 1. Le navigateur ne fournit QUE courseId (+ productType
     //    facultatif) — tout le reste (montant, nom, identité)

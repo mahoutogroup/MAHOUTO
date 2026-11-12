@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Abonnement de la vitrine — MAHOUTO+</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#FFC107">
+<link rel="manifest" href="manifest.json">
+<script src="brand.js"></script>
+<link rel="icon" href="assets/favicon.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="stylesheet" href="theme.css">
+<script src="theme-toggle.js"></script>
+<style>
+  .pay { max-width: 520px; margin: 0 auto; padding: 28px 20px 60px; }
+  .pay h1 { font-size: 22px; color: var(--gold); line-height: 1.25; margin-bottom: 6px; }
+  .pay .who { font-size: 15px; color: var(--white); font-weight: 700; margin-bottom: 14px; overflow-wrap: anywhere; }
+  .pay p { font-size: 14px; line-height: 1.7; color: var(--text-muted); margin-bottom: 12px; }
+  .pay .plans { display: flex; flex-direction: column; gap: 10px; margin: 16px 0; }
+  .pay .plan { display: flex; align-items: center; gap: 12px; padding: 14px; border: 2px solid var(--border); background: var(--bg-card); border-radius: var(--radius-md); cursor: pointer; }
+  .pay .plan:focus-within { outline: 3px solid var(--gold-bright); outline-offset: 2px; }
+  .pay .plan.selected { border-color: var(--gold-bright); }
+  .pay .plan input { width: 20px; height: 20px; flex: none; }
+  .pay .plan .lib { flex: 1; min-width: 0; }
+  .pay .plan .lib strong { display: block; color: var(--white); font-size: 15px; overflow-wrap: anywhere; }
+  .pay .plan .lib span { font-size: 12.5px; color: var(--text-muted); }
+  .pay .plan .prix { font-size: 15px; font-weight: 700; color: var(--gold-bright); white-space: nowrap; }
+  .pay .btn { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 54px; border: 0; border-radius: 14px; background: var(--gold-bright); color: #0A0A0A; font-size: 16px; font-weight: 700; cursor: pointer; font-family: inherit; }
+  .pay .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .pay .status { font-size: 14px; line-height: 1.6; text-align: center; margin-top: 14px; min-height: 20px; color: var(--text-muted); overflow-wrap: anywhere; }
+  .pay .status.error { color: #F87171; }
+  .pay .status.ok { color: var(--accent-green); font-weight: 700; }
+  .pay .state { text-align: center; padding: 60px 10px; color: var(--text-muted); font-size: 15px; line-height: 1.7; }
+  .pay .fine { font-size: 12px; color: var(--text-dim); margin-top: 18px; text-align: center; line-height: 1.6; }
+</style>
+</head>
+<body>
+
+<button id="theme-toggle-btn" class="theme-toggle-fab">🌙</button>
+
+<div class="page-content">
+  <main class="pay" id="pay">
+    <div class="state" id="state" role="status">Chargement…</div>
+  </main>
+</div>
+
+<script src="entreprise-abonnement.js"></script>
+<script>
+(function () {
+  "use strict";
+  const A = window.MahoutoAbonnement;
+  const root = document.getElementById("pay");
+  const params = new URLSearchParams(window.location.search);
+  const entrepriseId = params.get("v") || "";
+  const presel = params.get("f") || "";
+  const retour = params.get("retour") === "1";
+
+  function el(tag, props, ...kids) {
+    const n = document.createElement(tag);
+    if (props) for (const [k, v] of Object.entries(props)) {
+      if (v == null) continue;
+      if (k === "class") n.className = v;
+      else if (k === "text") n.textContent = v;
+      else n.setAttribute(k, v);
+    }
+    kids.flat().forEach((c) => { if (c != null) n.append(c); });
+    return n;
+  }
+  function showState(text) { root.textContent = ""; root.append(el("div", { class: "state", role: "status", text: text })); }
+
+  // Tous les appels passent par la fonction de paiement existante ; le navigateur n'envoie que l'identifiant
+  // de la vitrine et le code du forfait. Le montant et la durée sont relus côté serveur.
+  async function call(body) {
+    const resp = await fetch("/api/fedapay-checkout", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(Object.assign({ productType: "entreprise", entrepriseId: entrepriseId }, body))
+    });
+    let data = {};
+    try { data = await resp.json(); } catch (e) { data = {}; }
+    if (!resp.ok) throw new Error(data.error || "Une erreur est survenue. Réessayez dans un instant.");
+    return data;
+  }
+
+  // ---- Retour du paiement : AFFICHAGE seulement. La confirmation réelle vient du webhook serveur. ----
+  async function showReturn() {
+    root.textContent = "";
+    const status = el("div", { class: "status", role: "status", "aria-live": "polite", text: "Paiement en cours de confirmation… Ne fermez pas cette page." });
+    root.append(el("h1", { text: "Merci !" }), el("p", { text: "Nous attendons la confirmation de votre paiement par FedaPay. Votre vitrine sera prolongée dès qu'elle arrivera." }), status,
+      el("p", { class: "fine", text: "Cela peut prendre quelques instants. Si vous avez payé, vous pouvez aussi fermer cette page : la prolongation se fera toute seule." }));
+    for (let i = 0; i < 40; i++) {
+      try {
+        const r = await call({ action: "status" });
+        if (r && r.actif === true) { status.className = "status ok"; status.textContent = "✅ Votre vitrine est active."; return; }
+      } catch (e) { /* on réessaie */ }
+      await new Promise((ok) => setTimeout(ok, 4000));
+    }
+    status.textContent = "La confirmation prend plus de temps que prévu. Si vous avez payé, elle arrivera dans quelques minutes : rien à refaire.";
+  }
+
+  async function showPlans() {
+    let info;
+    try { info = await call({ action: "info" }); }
+    catch (e) { showState(e.message || "Impossible de charger la page. Réessayez dans un instant."); return; }
+    const forfaits = Array.isArray(info.forfaits) ? info.forfaits.filter(A.isPurchasable.bind(null)) : [];
+    root.textContent = "";
+    root.append(el("h1", { text: "Abonnement de votre vitrine" }), el("div", { class: "who", text: (info.entreprise && info.entreprise.nom_commercial) || "Votre vitrine" }));
+    if (!forfaits.length) { root.append(el("p", { text: "Aucun forfait n'est disponible pour le moment. Contactez la personne qui vous a envoyé ce lien." })); return; }
+    root.append(el("p", { text: "Choisissez la durée de visibilité de votre vitrine. Chaque paiement ajoute les jours choisis à votre abonnement ; il n'y a pas de prélèvement automatique." }));
+
+    let selected = forfaits.some((f) => f.code === presel) ? presel : "";
+    const plans = el("div", { class: "plans", role: "radiogroup", "aria-label": "Forfaits" });
+    const payBtn = el("button", { type: "button", class: "btn", text: "Payer", disabled: selected ? null : "disabled" });
+    const status = el("div", { class: "status", role: "status", "aria-live": "polite" });
+    function refresh() {
+      plans.querySelectorAll(".plan").forEach((p) => p.classList.toggle("selected", p.dataset.code === selected));
+      payBtn.disabled = !selected;
+    }
+    forfaits.forEach((f) => {
+      const input = el("input", { type: "radio", name: "forfait", value: f.code });
+      input.checked = f.code === selected;
+      input.addEventListener("change", () => { selected = f.code; refresh(); });
+      const label = el("label", { class: "plan", "data-code": f.code }, input,
+        el("span", { class: "lib" }, el("strong", { text: f.libelle }), el("span", { text: f.jours + (f.jours > 1 ? " jours" : " jour") })),
+        el("span", { class: "prix", text: A.formatFcfa(f.montant) }));
+      plans.append(label);
+    });
+    payBtn.addEventListener("click", async () => {
+      if (!selected) return;
+      payBtn.disabled = true; status.className = "status"; status.textContent = "Redirection vers le paiement…";
+      try {
+        const r = await call({ action: "checkout", forfaitCode: selected });
+        if (typeof r.checkoutUrl !== "string" || !/^https:\/\//.test(r.checkoutUrl)) throw new Error("Lien de paiement indisponible.");
+        window.location.href = r.checkoutUrl;
+      } catch (e) {
+        status.className = "status error"; status.textContent = e.message || "Paiement indisponible. Réessayez dans un instant."; payBtn.disabled = false;
+      }
+    });
+    root.append(plans, payBtn, status, el("p", { class: "fine", text: "Paiement sécurisé par FedaPay (Mobile Money et carte)." }));
+    refresh();
+  }
+
+  if (!A.isValidUuid(entrepriseId)) { showState("Ce lien de paiement n'est pas valide."); return; }
+  if (retour) showReturn(); else showPlans();
+})();
+</script>
+<script src="pwa-install.js"></script>
+
+</body>
+</html>
