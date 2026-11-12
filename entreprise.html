@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vitrine — MAHOUTO+</title>
+<meta name="description" content="Vitrine d'entreprise sur MAHOUTO+ : produits, photos et contact.">
+<meta name="theme-color" content="#FFC107">
+<link rel="manifest" href="manifest.json">
+<script src="brand.js"></script>
+<link rel="icon" href="assets/favicon.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="stylesheet" href="theme.css">
+<script src="theme-toggle.js"></script>
+<style>
+  .vit { max-width: 720px; margin: 0 auto; padding: 0 0 40px; }
+  .vit .banner { position: relative; width: 100%; aspect-ratio: 16 / 7; background: linear-gradient(135deg, var(--bg-elevated), var(--bg-card)); overflow: hidden; }
+  .vit .banner img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .vit .logo { width: 84px; height: 84px; border-radius: 50%; border: 3px solid var(--bg-card); background: var(--bg-card); object-fit: cover; display: block; margin: -42px 0 0 20px; position: relative; }
+  .vit .head { padding: 10px 20px 0; }
+  .vit.no-logo .head { padding-top: 18px; }
+  .vit h1 { font-size: 26px; line-height: 1.2; color: var(--white); overflow-wrap: anywhere; }
+  .vit .legal { font-size: 12px; color: var(--text-dim); margin-top: 4px; overflow-wrap: anywhere; }
+  .vit .loc { font-size: 13.5px; color: var(--gold); margin-top: 8px; font-weight: 600; }
+  .vit .desc { font-size: 14px; line-height: 1.7; color: var(--text-muted); margin-top: 12px; white-space: pre-line; overflow-wrap: anywhere; }
+
+  .vit .cta { display: flex; flex-direction: column; gap: 10px; padding: 18px 20px 0; }
+  .vit .btn { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 52px; padding: 12px 16px; border-radius: 14px; font-size: 15px; font-weight: 700; text-decoration: none; border: 1px solid transparent; cursor: pointer; font-family: inherit; }
+  .vit .btn-wa { background: #25D366; color: #06210F; font-size: 17px; min-height: 58px; }
+  .vit .btn-call { background: var(--bg-card); color: var(--white); border-color: var(--border); }
+  .vit .btn-share { background: transparent; color: var(--gold); border-color: var(--gold); }
+  .vit .btn:focus-visible, .vit .photo-btn:focus-visible { outline: 3px solid var(--gold-bright); outline-offset: 2px; }
+  .vit .conseil { margin: 16px 20px 0; font-size: 13px; line-height: 1.6; color: var(--text-muted); border: 1px solid var(--border); border-left: 3px solid var(--gold); background: var(--bg-elevated); border-radius: var(--radius-sm); padding: 10px 12px; overflow-wrap: anywhere; }
+
+  .vit h2 { font-size: 16px; color: var(--gold); margin: 26px 20px 12px; }
+  .vit .products { display: flex; flex-direction: column; gap: 10px; padding: 0 20px; }
+  .vit .product { display: flex; gap: 12px; align-items: flex-start; padding: 12px; border: 1px solid var(--border); background: var(--bg-card); border-radius: var(--radius-md); }
+  .vit .product .pimg { width: 76px; height: 76px; border-radius: 12px; object-fit: cover; flex: none; background: var(--bg-elevated); }
+  .vit .product .pimg.empty { display: flex; align-items: center; justify-content: center; font-size: 26px; color: var(--text-dim); }
+  .vit .product .pinfo { flex: 1; min-width: 0; }
+  .vit .product .pname { font-size: 14.5px; font-weight: 700; color: var(--white); overflow-wrap: anywhere; }
+  .vit .product .pdesc { font-size: 12.5px; line-height: 1.5; color: var(--text-muted); margin-top: 3px; overflow-wrap: anywhere; }
+  .vit .product .pmeta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
+  .vit .badge { font-size: 10.5px; font-weight: 700; padding: 3px 9px; border-radius: 999px; text-transform: uppercase; }
+  .vit .badge.ok { background: rgba(34,197,94,.15); color: var(--accent-green); }
+  .vit .badge.ko { background: rgba(239,68,68,.15); color: #F87171; }
+  .vit .price { font-size: 13.5px; font-weight: 700; color: var(--gold-bright); }
+  .vit .price.ask { color: var(--text-muted); font-weight: 600; }
+  .vit .unit { font-size: 12px; color: var(--text-dim); }
+
+  .vit .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; padding: 0 20px; }
+  @media (min-width: 560px) { .vit .grid { grid-template-columns: repeat(3, 1fr); } }
+  .vit .photo-btn { padding: 0; border: 0; background: var(--bg-card); border-radius: var(--radius-sm); overflow: hidden; cursor: pointer; aspect-ratio: 1 / 1; display: block; }
+  .vit .photo-btn img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+  .vit .share-zone { margin: 26px 20px 0; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+  .vit .share-zone .btn { width: 100%; }
+  .vit #share-status { font-size: 12.5px; color: var(--text-muted); text-align: center; min-height: 16px; overflow-wrap: anywhere; }
+  .vit .qr-box { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .vit .qr-box svg { width: 170px; height: 170px; border-radius: 10px; background: #fff; }
+  .vit .qr-box p { font-size: 12px; color: var(--text-dim); text-align: center; }
+
+  .vit .foot { font-size: 12px; color: var(--text-dim); text-align: center; margin: 30px 20px 0; line-height: 1.6; }
+  #state { text-align: center; color: var(--text-muted); padding: 80px 24px; font-size: 15px; line-height: 1.7; }
+  #state h1 { color: var(--gold); font-size: 22px; margin-bottom: 8px; }
+  #state .btn { display: inline-block; margin-top: 16px; padding: 12px 20px; border-radius: 12px; background: var(--gold-bright); color: #0A0A0A; font-weight: 700; border: 0; cursor: pointer; font-size: 14px; font-family: inherit; }
+
+  /* Visionneuse plein écran */
+  #viewer { position: fixed; inset: 0; z-index: 9999; background: rgba(0,0,0,.94); display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  #viewer[hidden] { display: none; }
+  #viewer .v-stage { flex: 1; min-height: 0; width: 100%; display: flex; align-items: center; justify-content: center; padding: 56px 8px 8px; touch-action: pan-y; }
+  #viewer img { max-width: 100%; max-height: 100%; object-fit: contain; }
+  #viewer .v-cap { color: #fff; font-size: 14px; line-height: 1.5; text-align: center; padding: 8px 56px 18px; min-height: 24px; max-width: 720px; overflow-wrap: anywhere; }
+  #viewer .v-count { position: absolute; top: 18px; left: 16px; color: #ddd; font-size: 13px; }
+  #viewer button { position: absolute; width: 48px; height: 48px; border-radius: 50%; border: 0; background: rgba(255,255,255,.16); color: #fff; font-size: 24px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  #viewer button:focus-visible { outline: 3px solid var(--gold-bright); outline-offset: 2px; }
+  #viewer .v-close { top: 8px; right: 8px; }
+  #viewer .v-prev { left: 6px; top: 50%; transform: translateY(-50%); }
+  #viewer .v-next { right: 6px; top: 50%; transform: translateY(-50%); }
+</style>
+</head>
+<body>
+
+<button id="theme-toggle-btn" class="theme-toggle-fab">🌙</button>
+
+<div class="page-content">
+  <main id="vitrine" class="vit">
+    <div id="state" role="status">Chargement de la vitrine…</div>
+    <div id="content" hidden></div>
+  </main>
+</div>
+
+<div id="viewer" role="dialog" aria-modal="true" aria-label="Visionneuse de photos" hidden>
+  <span class="v-count" id="v-count" aria-live="polite"></span>
+  <button type="button" class="v-close" id="v-close" aria-label="Fermer la visionneuse">×</button>
+  <button type="button" class="v-prev" id="v-prev" aria-label="Photo précédente">‹</button>
+  <div class="v-stage" id="v-stage"><img id="v-img" alt=""></div>
+  <button type="button" class="v-next" id="v-next" aria-label="Photo suivante">›</button>
+  <p class="v-cap" id="v-cap"></p>
+</div>
+
+<script src="config.js"></script>
+<script src="entreprise-utils.js"></script>
+<script src="qrcode-generator.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script>
+(function () {
+  "use strict";
+  const U = window.MahoutoEntreprise;
+  const $ = (id) => document.getElementById(id);
+  const stateEl = $("state"), contentEl = $("content"), rootEl = $("vitrine");
+
+  function el(tag, props, ...kids) {
+    const n = document.createElement(tag);
+    if (props) for (const [k, v] of Object.entries(props)) {
+      if (v == null) continue;
+      if (k === "class") n.className = v;
+      else if (k === "text") n.textContent = v;
+      else n.setAttribute(k, v);
+    }
+    kids.flat().forEach((c) => { if (c != null) n.append(c); });
+    return n;
+  }
+
+  // ---- Adresse : ?slug=<slug> (redirection depuis /e/<slug>) ou /e/<slug> ----
+  function slugFromLocation() {
+    const q = new URLSearchParams(window.location.search).get("slug");
+    if (q) return q;
+    const m = /^\/e\/([^/?#]+)/.exec(window.location.pathname);
+    return m ? decodeURIComponent(m[1]) : "";
+  }
+
+  function showState(title, text, retry) {
+    contentEl.hidden = true;
+    stateEl.hidden = false;
+    stateEl.textContent = "";
+    if (title) stateEl.append(el("h1", { text: title }));
+    stateEl.append(el("p", { text: text }));
+    if (retry) {
+      const b = el("button", { type: "button", class: "btn", text: "Réessayer" });
+      b.addEventListener("click", load);
+      stateEl.append(b);
+    }
+  }
+  function notFound() { showState("Vitrine introuvable", "Cette vitrine n'existe pas ou n'est plus publiée."); document.title = "Vitrine introuvable — MAHOUTO+"; }
+
+  // ---- QR code : nœuds SVG créés par le code (aucun HTML injecté) ----
+  function renderQr(container, url) {
+    if (typeof window.qrcode !== "function") return false;
+    try {
+      const qr = window.qrcode(0, "M");
+      qr.addData(url);
+      qr.make();
+      const n = qr.getModuleCount(), quiet = 4, size = n + quiet * 2;
+      const NS = "http://www.w3.org/2000/svg";
+      const svg = document.createElementNS(NS, "svg");
+      svg.setAttribute("viewBox", "0 0 " + size + " " + size);
+      svg.setAttribute("role", "img");
+      svg.setAttribute("aria-label", "QR code du lien de cette page");
+      svg.setAttribute("shape-rendering", "crispEdges");
+      const bg = document.createElementNS(NS, "rect");
+      bg.setAttribute("width", String(size)); bg.setAttribute("height", String(size)); bg.setAttribute("fill", "#ffffff");
+      const path = document.createElementNS(NS, "path");
+      let d = "";
+      for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) d += "M" + (c + quiet) + " " + (r + quiet) + "h1v1h-1z";
+      path.setAttribute("d", d); path.setAttribute("fill", "#000000");
+      svg.append(bg, path);
+      container.append(svg);
+      return true;
+    } catch (e) { return false; }
+  }
+
+  // ---- Visionneuse (sans bibliothèque) ----
+  const viewer = { photos: [], index: 0, opener: null, nom: "" };
+  const vEl = $("viewer"), vImg = $("v-img"), vCap = $("v-cap"), vCount = $("v-count");
+  function viewerShow() {
+    const p = viewer.photos[viewer.index];
+    if (!p) return;
+    vImg.src = U.imageDeliveryUrl(p.image_url, 1600) || "";
+    vImg.alt = U.photoAlt(p, viewer.nom);
+    vCap.textContent = p.legende ? p.legende : "";
+    vCount.textContent = (viewer.index + 1) + " / " + viewer.photos.length;
+    const many = viewer.photos.length > 1;
+    $("v-prev").hidden = !many; $("v-next").hidden = !many;
+  }
+  function viewerOpen(photos, index, nom, opener) {
+    viewer.photos = photos; viewer.index = index; viewer.nom = nom; viewer.opener = opener || null;
+    viewerShow();
+    vEl.hidden = false;
+    rootEl.setAttribute("aria-hidden", "true");
+    document.body.style.overflow = "hidden";
+    $("v-close").focus();
+  }
+  function viewerClose() {
+    vEl.hidden = true;
+    vImg.removeAttribute("src");
+    rootEl.removeAttribute("aria-hidden");
+    document.body.style.overflow = "";
+    if (viewer.opener && typeof viewer.opener.focus === "function") viewer.opener.focus();
+  }
+  function viewerStep(delta) {
+    const n = viewer.photos.length;
+    if (n < 2) return;
+    viewer.index = (viewer.index + delta + n) % n;
+    viewerShow();
+  }
+  $("v-close").addEventListener("click", viewerClose);
+  $("v-prev").addEventListener("click", () => viewerStep(-1));
+  $("v-next").addEventListener("click", () => viewerStep(1));
+  vEl.addEventListener("click", (e) => { if (e.target === vEl || e.target === $("v-stage")) viewerClose(); });
+  document.addEventListener("keydown", (e) => {
+    if (vEl.hidden) return;
+    if (e.key === "Escape") { e.preventDefault(); viewerClose(); }
+    else if (e.key === "ArrowLeft") viewerStep(-1);
+    else if (e.key === "ArrowRight") viewerStep(1);
+    else if (e.key === "Tab") {
+      // le focus reste dans la visionneuse
+      const items = [$("v-close"), $("v-prev"), $("v-next")].filter((b) => !b.hidden);
+      const i = items.indexOf(document.activeElement);
+      e.preventDefault();
+      items[(i + (e.shiftKey ? -1 : 1) + items.length) % items.length].focus();
+    }
+  });
+  let touchX = null;
+  $("v-stage").addEventListener("touchstart", (e) => { touchX = e.changedTouches[0].clientX; }, { passive: true });
+  $("v-stage").addEventListener("touchend", (e) => {
+    if (touchX === null) return;
+    const dx = e.changedTouches[0].clientX - touchX;
+    touchX = null;
+    if (Math.abs(dx) > 50) viewerStep(dx < 0 ? 1 : -1);
+  }, { passive: true });
+
+  // ---- Partage ----
+  async function shareEntreprise(url, nom, statusEl) {
+    statusEl.textContent = "";
+    try {
+      if (navigator.share) { await navigator.share({ title: nom, text: "Découvrez " + nom + " sur MAHOUTO+", url: url }); return; }
+    } catch (e) { if (e && e.name === "AbortError") return; }
+    try {
+      await navigator.clipboard.writeText(url);
+      statusEl.textContent = "Lien copié ✅";
+    } catch (e) {
+      statusEl.textContent = "Copiez ce lien : " + url;
+    }
+  }
+
+  // ---- Rendu ----
+  function productCard(p) {
+    const src = U.imageDeliveryUrl(p.image_url, 240);
+    const img = src ? el("img", { class: "pimg", src: src, alt: "", loading: "lazy", decoding: "async" }) : el("div", { class: "pimg empty", "aria-hidden": "true", text: "📦" });
+    const dispo = p.disponible !== false;
+    const priced = p.prix !== null && p.prix !== undefined && Number.isInteger(Number(p.prix)) && Number(p.prix) > 0;
+    return el("div", { class: "product" }, img,
+      el("div", { class: "pinfo" },
+        el("div", { class: "pname", text: p.nom }),
+        p.description ? el("div", { class: "pdesc", text: p.description }) : null,
+        el("div", { class: "pmeta" },
+          el("span", { class: "badge " + (dispo ? "ok" : "ko"), text: U.availabilityLabel(dispo) }),
+          el("span", { class: "price" + (priced ? "" : " ask"), text: U.priceLabel(p.prix) }),
+          p.unite ? el("span", { class: "unit", text: priced ? "/ " + p.unite : p.unite }) : null
+        )
+      )
+    );
+  }
+
+  function render(ent, produits, photos, partial) {
+    const nom = ent.nom_commercial;
+    document.title = nom + " — MAHOUTO+";
+    rootEl.classList.toggle("no-logo", !ent.logo_url);
+    contentEl.textContent = "";
+
+    // Bannière et logo
+    const bannerSrc = U.imageDeliveryUrl(ent.banner_url, 1200);
+    const banner = el("div", { class: "banner" }, bannerSrc ? el("img", { src: bannerSrc, alt: "Bannière de " + nom, decoding: "async" }) : null);
+    contentEl.append(banner);
+    const logoSrc = U.imageDeliveryUrl(ent.logo_url, 200);
+    if (logoSrc) contentEl.append(el("img", { class: "logo", src: logoSrc, alt: "Logo de " + nom }));
+
+    // Identité
+    const head = el("div", { class: "head" }, el("h1", { text: nom }));
+    if (ent.nom_legal && ent.nom_legal.trim() !== nom.trim()) head.append(el("p", { class: "legal", text: ent.nom_legal }));
+    const place = [ent.ville, ent.departement].filter(Boolean).join(", ");
+    if (place) head.append(el("p", { class: "loc", text: "📍 " + place }));
+    if (ent.description) head.append(el("p", { class: "desc", text: ent.description }));
+    contentEl.append(head);
+
+    // Contact (liens construits uniquement à partir des chiffres du numéro)
+    const wa = U.whatsappLink(ent.whatsapp, nom);
+    const tel = U.telLink(ent.telephone_appel);
+    if (wa || tel) {
+      const cta = el("div", { class: "cta" });
+      if (wa) cta.append(el("a", { class: "btn btn-wa", href: wa, target: "_blank", rel: "noopener noreferrer", text: "💬 Écrire sur WhatsApp" }));
+      if (tel) cta.append(el("a", { class: "btn btn-call", href: tel, text: "📞 Appeler" }));
+      contentEl.append(cta);
+    }
+    if (ent.conseil_texte && ent.conseil_texte.trim()) contentEl.append(el("p", { class: "conseil", text: "💡 " + ent.conseil_texte }));
+
+    // Produits
+    if (produits.length) {
+      contentEl.append(el("h2", { text: "Produits" }), el("div", { class: "products" }, produits.map(productCard)));
+    }
+
+    // Photos (section masquée s'il n'y en a aucune)
+    if (photos.length) {
+      const grid = el("div", { class: "grid" });
+      photos.forEach((p, i) => {
+        const src = U.imageDeliveryUrl(p.image_url, 480);
+        if (!src) return;
+        const btn = el("button", { type: "button", class: "photo-btn", "aria-label": "Agrandir : " + U.photoAlt(p, nom) },
+          el("img", { src: src, alt: U.photoAlt(p, nom), loading: "lazy", decoding: "async" }));
+        btn.addEventListener("click", () => viewerOpen(photos, i, nom, btn));
+        grid.append(btn);
+      });
+      contentEl.append(el("h2", { text: "Photos" }), grid);
+    }
+
+    if (partial) contentEl.append(el("p", { class: "conseil", text: "Certaines informations n'ont pas pu être chargées. Rechargez la page pour réessayer." }));
+
+    // Partage et QR code
+    const url = U.shareUrl(ent.slug);
+    if (url) {
+      const status = el("div", { id: "share-status", role: "status", "aria-live": "polite" });
+      const shareBtn = el("button", { type: "button", class: "btn btn-share", text: "🔗 Partager cette page" });
+      shareBtn.addEventListener("click", () => shareEntreprise(url, nom, status));
+      const zone = el("div", { class: "share-zone" }, shareBtn, status);
+      const qrBox = el("div", { class: "qr-box" });
+      if (renderQr(qrBox, url)) { qrBox.append(el("p", { text: "Scannez ce code pour ouvrir cette page." })); zone.append(qrBox); }
+      contentEl.append(zone);
+    }
+
+    contentEl.append(el("p", { class: "foot", text: "Page publiée par MAHOUTO+ avec l'accord de l'entreprise." }));
+
+    stateEl.hidden = true;
+    contentEl.hidden = false;
+  }
+
+  // ---- Chargement ----
+  let supabase = null;
+  try {
+    const cfg = window.MAHOUTO_CONFIG;
+    if (window.supabase && cfg && cfg.SUPABASE_URL && cfg.SUPABASE_ANON_KEY) supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+  } catch (e) { supabase = null; }
+
+  async function load() {
+    const slug = slugFromLocation();
+    if (!U.isValidSlug(slug)) { notFound(); return; }          // adresse validée AVANT toute requête
+    if (!supabase) { showState("", "Impossible de charger la vitrine pour le moment.", true); return; }
+    showState("", "Chargement de la vitrine…");
+    try {
+      const { data: ent, error } = await supabase.from("entreprises")
+        .select("id, slug, nom_legal, nom_commercial, description, ville, departement, whatsapp, telephone_appel, logo_url, banner_url, conseil_texte")
+        .eq("slug", slug).eq("published", true).maybeSingle();
+      if (error) throw error;
+      if (!ent || !ent.nom_commercial) { notFound(); return; }
+
+      const [pr, ph] = await Promise.all([
+        supabase.from("entreprise_produits")
+          .select("id, nom, description, prix, unite, disponible, image_url, position, created_at")
+          .eq("entreprise_id", ent.id).eq("published", true),
+        supabase.from("entreprise_photos")
+          .select("id, image_url, legende, position, created_at")
+          .eq("entreprise_id", ent.id).eq("published", true)
+      ]);
+      const partial = !!(pr.error || ph.error);
+      render(ent, U.sortByPosition(pr.data || []), U.sortByPosition(ph.data || []).filter((p) => U.isCloudinaryUrl(p.image_url)).slice(0, U.MAX_PHOTOS), partial);
+    } catch (err) {
+      console.error("Vitrine : lecture impossible", err && err.message);
+      showState("", "Impossible de charger la vitrine. Vérifiez votre connexion puis réessayez.", true);
+    }
+  }
+
+  load();
+})();
+</script>
+<script src="pwa-install.js"></script>
+
+</body>
+</html>
