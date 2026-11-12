@@ -52,6 +52,17 @@
   .pill { font-size: 10px; font-weight: 700; padding: 3px 9px; border-radius: 999px; text-transform: uppercase; flex: none; }
   .pill.on { background: rgba(34,197,94,.15); color: var(--accent-green); }
   .pill.off { background: rgba(212,175,55,.15); color: var(--gold); }
+  .pill.ok { background: rgba(34,197,94,.15); color: var(--accent-green); }
+  .pill.ko { background: rgba(239,68,68,.15); color: #F87171; }
+  .pill.gold { background: rgba(212,175,55,.2); color: var(--gold-bright); }
+  .pill.grey { background: rgba(255,255,255,.08); color: var(--text-dim); }
+  .ab-line { font-size: 13px; color: var(--text-muted); line-height: 1.6; overflow-wrap: anywhere; }
+  .ab-link { display: flex; flex-direction: column; gap: 8px; }
+  .ab-link input[readonly] { font-size: 12px; }
+  .pay-row { font-size: 12px; color: var(--text-muted); padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; overflow-wrap: anywhere; }
+  .pay-row strong { color: var(--white); }
+  .forfait-row { display: flex; flex-direction: column; gap: 8px; padding: 12px; margin: 0; }
+  .forfait-row .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .list { display: flex; flex-direction: column; gap: 10px; }
   .empty { padding: 18px; text-align: center; color: var(--text-dim); font-size: 13px; }
 
@@ -83,6 +94,9 @@
 
   <!-- Liste + création -->
   <section id="list-section" class="hidden">
+    <div class="actions" style="margin: 16px 20px 0;">
+      <button type="button" class="btn secondary" id="open-forfaits">⚙️ Forfaits d'abonnement</button>
+    </div>
     <form id="create-form" class="card block" novalidate>
       <h3>➕ Nouvelle vitrine</h3>
       <div class="row-2">
@@ -100,6 +114,32 @@
       <div class="status" id="create-status" role="status"></div>
     </form>
     <div id="entreprises-list" class="list" style="margin: 0 20px 20px;"></div>
+  </section>
+
+  <!-- Forfaits d'abonnement (modifiables sans redéployer) -->
+  <section id="forfaits-section" class="hidden">
+    <div class="card block">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+        <h3>⚙️ Forfaits d'abonnement</h3>
+        <button type="button" class="btn secondary small" id="close-forfaits">← Liste</button>
+      </div>
+      <div class="hint">Un forfait ajoute son nombre de jours à l'abonnement de la vitrine à chaque paiement confirmé. Seuls les forfaits « actifs » sont proposés au commerçant. Le montant est lu côté serveur au moment du paiement (jamais envoyé par le navigateur).</div>
+      <div id="forfaits-list" class="list"></div>
+      <h4>Ajouter un forfait</h4>
+      <form id="forfait-new" novalidate style="display:flex;flex-direction:column;gap:8px;">
+        <div class="row-2">
+          <div><label for="nf-code">Code (ex. 7-jours)</label><input type="text" id="nf-code" maxlength="30" autocomplete="off" autocapitalize="none" spellcheck="false"></div>
+          <div><label for="nf-libelle">Libellé</label><input type="text" id="nf-libelle" maxlength="60" autocomplete="off"></div>
+        </div>
+        <div class="row-2">
+          <div><label for="nf-jours">Jours</label><input type="number" id="nf-jours" min="1" step="1" inputmode="numeric"></div>
+          <div><label for="nf-montant">Montant (FCFA)</label><input type="number" id="nf-montant" min="1" step="1" inputmode="numeric"></div>
+        </div>
+        <label class="toggle-row"><input type="checkbox" id="nf-actif"> Actif (proposé au commerçant)</label>
+        <div class="actions"><button type="submit" class="btn" id="nf-save">Ajouter le forfait</button></div>
+        <div class="status" id="nf-status" role="status"></div>
+      </form>
+    </div>
   </section>
 
   <!-- Édition d'une vitrine -->
@@ -198,6 +238,45 @@
       <div class="status" id="save-status" role="status"></div>
     </form>
 
+    <!-- Abonnement -->
+    <div class="card block" id="abonnement-block">
+      <h3>💳 Abonnement</h3>
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <span class="pill grey" id="ab-pill">—</span>
+        <span class="ab-line" id="ab-expire"></span>
+      </div>
+      <div class="ab-line" id="ab-restant"></div>
+      <div class="actions"><button type="button" class="btn secondary" id="ab-offerte-btn">Offrir la gratuité</button></div>
+
+      <h4>Lien de paiement</h4>
+      <div class="row-2">
+        <div>
+          <label for="ab-forfait">Forfait proposé (facultatif)</label>
+          <select id="ab-forfait"></select>
+        </div>
+        <div style="display:flex;align-items:flex-end;"><button type="button" class="btn" id="ab-link-btn">Générer le lien de paiement</button></div>
+      </div>
+      <div class="ab-link hidden" id="ab-link-box">
+        <input type="text" id="ab-link-input" readonly aria-label="Lien de paiement">
+        <div class="actions">
+          <button type="button" class="btn secondary" id="ab-copy">Copier</button>
+          <a class="btn secondary" id="ab-wa" href="#" target="_blank" rel="noopener noreferrer" style="text-decoration:none;display:inline-flex;align-items:center;">Envoyer par WhatsApp</a>
+        </div>
+      </div>
+      <div class="hint">Le commerçant ouvre le lien, choisit un forfait et paie sur FedaPay. Seul le webhook serveur prolonge l'abonnement.</div>
+
+      <h4>Prolonger manuellement</h4>
+      <div class="hint">Pour un paiement reçu en espèces ou par Mobile Money direct. Une ligne « manuel » est ajoutée à l'historique.</div>
+      <div class="row-2">
+        <div><label for="ab-jours">Nombre de jours</label><input type="number" id="ab-jours" min="1" max="3650" step="1" inputmode="numeric"></div>
+        <div style="display:flex;align-items:flex-end;"><button type="button" class="btn" id="ab-prolonger">Prolonger manuellement</button></div>
+      </div>
+      <div class="status" id="ab-status" role="status"></div>
+
+      <h4>Historique des paiements</h4>
+      <div id="ab-historique" class="list"></div>
+    </div>
+
     <!-- Produits -->
     <div class="card block" id="products-block">
       <h3>📦 Produits</h3>
@@ -261,6 +340,7 @@
 
 <script src="../config.js"></script>
 <script src="../entreprise-utils.js"></script>
+<script src="../entreprise-abonnement.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
 (function () {
@@ -268,6 +348,7 @@
   const cfg = window.MAHOUTO_CONFIG;
   const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
   const U = window.MahoutoEntreprise;
+  const AB = window.MahoutoAbonnement;
 
   const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;            // 8 Mo (avant recompression)
   const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -307,6 +388,11 @@
     if (/Limite de 12 photos/.test(m)) return "Limite de 12 photos par entreprise atteinte : supprimez une photo avant d'en ajouter une autre.";
     if (/whatsapp_check|telephone_appel_check/.test(m)) return U.PHONE_HELP;
     if (/prix_check/.test(m)) return "Le prix doit être supérieur à 0, ou laissé vide.";
+    if (error && error.code === "23503" || /foreign key|entreprise_paiements_entreprise_id_fkey/i.test(m)) return "Impossible de supprimer : cette vitrine a un historique de paiements.";
+    if (/Seul un administrateur|Réservé aux administrateurs/i.test(m)) return "Action refusée : réservée aux administrateurs.";
+    if (/Nombre de jours invalide/i.test(m)) return "Le nombre de jours doit être un entier entre 1 et 3650.";
+    if (/entreprise_forfaits_.*_check/.test(m)) return "Forfait refusé par la base : code, libellé, jours (1 à 3650) ou montant (entier > 0) invalide.";
+    if (/Could not find the (function|table)|does not exist/i.test(m) && /entreprise_(forfaits|paiements|prolonger)/.test(m)) return "L'abonnement n'est pas installé : exécutez d'abord entreprises-abonnement.sql.";
     if (/row-level security|permission denied/i.test(m)) return "Action refusée : réservée aux administrateurs.";
     if (/relation .* does not exist|schema cache|Could not find the table/i.test(m)) return "Les tables n'existent pas : exécutez d'abord entreprises-vitrine.sql.";
     if (/_check/.test(m)) return "Une valeur est refusée par la base (longueur ou format) : vérifiez les champs.";
@@ -435,6 +521,8 @@
   // ---------------------------------------------------------------
   // Liste et création
   // ---------------------------------------------------------------
+  const AB_PILL = { active: "ok", expiree: "ko", offerte: "gold", jamais_payee: "grey" };
+
   function entrepriseRow(e) {
     const thumbSrc = U.imageDeliveryUrl(e.logo_url || e.banner_url, 120);
     const open = el("button", { type: "button", class: "btn", text: "Modifier" });
@@ -452,9 +540,11 @@
       el("div", { class: "top" },
         thumbSrc ? el("img", { class: "thumb", src: thumbSrc, alt: "", loading: "lazy" }) : el("div", { class: "thumb", "aria-hidden": "true" }),
         el("span", { class: "nom", text: e.nom_commercial || "(sans nom)" }),
-        el("span", { class: "pill " + (e.published ? "on" : "off"), text: e.published ? "Publié" : "Brouillon" })
+        el("span", { class: "pill " + (e.published ? "on" : "off"), text: e.published ? "Publié" : "Brouillon" }),
+        el("span", { class: "pill " + AB_PILL[AB.subscriptionStatus(e)], text: AB.STATUS_LABELS[AB.subscriptionStatus(e)] })
       ),
       el("div", { class: "meta", text: (e.slug ? "/e/" + e.slug : "pas d'adresse") + (e.ville ? " · " + e.ville : "") }),
+      el("div", { class: "meta", text: e.offerte ? "Gratuite (offerte)" : (e.expire_le ? "Expire le " + AB.formatDate(e.expire_le) + " — " + AB.remainingLabel(e) : "Jamais payée") }),
       el("div", { class: "actions" }, open, del)
     );
   }
@@ -531,7 +621,9 @@
     setStatus("save-status", ""); setStatus("logo-status", ""); setStatus("banner-status", "");
     updateViewLink();
     resetProductForm();
-    await Promise.all([loadProduits(), loadPhotos()]);
+    resetAbonnement();
+    renderAbonnement();
+    await Promise.all([loadProduits(), loadPhotos(), loadAbonnementData()]);
     window.scrollTo(0, 0);
   }
 
@@ -589,7 +681,10 @@
     if (i >= 0) ENTREPRISES[i] = data;
     $("editor-title").textContent = "Modifier : " + (data.nom_commercial || data.slug || "vitrine");
     updateViewLink();
-    setStatus("save-status", published ? "Enregistré — la vitrine est publiée." : "Enregistré (brouillon : non visible publiquement).");
+    renderAbonnement();
+    setStatus("save-status", published
+      ? (AB.isVisible(data) ? "Enregistré — la vitrine est publiée et visible." : "Enregistré — publiée, mais NON visible tant que l'abonnement n'est pas payé ou offert.")
+      : "Enregistré (brouillon : non visible publiquement).");
   });
 
   // ---------------------------------------------------------------
@@ -817,6 +912,207 @@
     setStatus("photos-status",
       (done ? done + " photo(s) ajoutée(s). " : "") + errors.join(" "),
       errors.length > 0);
+  });
+
+  // ---------------------------------------------------------------
+  // Abonnement : statut, gratuité, lien de paiement, prolongation manuelle, historique
+  // (l'affichage ne décide de rien : la visibilité est appliquée par la RLS, la prolongation par
+  // le webhook serveur ou par la fonction SQL réservée aux administrateurs)
+  // ---------------------------------------------------------------
+  let PAIEMENTS = [];
+  let FORFAITS = [];
+
+  function resetAbonnement() {
+    PAIEMENTS = [];
+    $("ab-link-box").classList.add("hidden");
+    $("ab-jours").value = "";
+    setStatus("ab-status", "");
+    $("ab-historique").textContent = "";
+  }
+
+  function renderAbonnement() {
+    if (!current) return;
+    const st = AB.subscriptionStatus(current);
+    const pill = $("ab-pill");
+    pill.className = "pill " + AB_PILL[st];
+    pill.textContent = AB.STATUS_LABELS[st];
+    $("ab-expire").textContent = current.offerte ? "Aucune date d'expiration (vitrine offerte)" : (current.expire_le ? "Expire le " + AB.formatDate(current.expire_le) : "Aucune date : jamais payée");
+    $("ab-restant").textContent = AB.remainingLabel(current)
+      + (current.published ? (AB.isVisible(current) ? " · visible publiquement" : " · publiée mais INVISIBLE (abonnement expiré ou jamais payé)") : " · brouillon (non publiée)");
+    $("ab-offerte-btn").textContent = current.offerte ? "Retirer la gratuité" : "Offrir la gratuité";
+  }
+
+  function renderHistorique() {
+    const box = $("ab-historique");
+    box.textContent = "";
+    if (!PAIEMENTS.length) { box.append(el("div", { class: "empty", text: "Aucun paiement pour le moment." })); return; }
+    PAIEMENTS.forEach((p) => {
+      box.append(el("div", { class: "pay-row" },
+        el("strong", { text: AB.formatDate(p.cree_le) }),
+        " · " + (AB.SOURCE_LABELS[p.source] || p.source)
+        + (p.forfait_code ? " · " + p.forfait_code : "")
+        + " · " + p.jours + (p.jours > 1 ? " jours" : " jour")
+        + (p.montant > 0 ? " · " + AB.formatFcfa(p.montant) : "")
+        + " · " + (AB.PAYMENT_STATUS_LABELS[p.statut] || p.statut)
+        + (p.confirme_le ? " (confirmé le " + AB.formatDate(p.confirme_le) + ")" : "")));
+    });
+  }
+
+  function fillForfaitSelect() {
+    const sel = $("ab-forfait");
+    sel.textContent = "";
+    sel.append(el("option", { value: "", text: "Le commerçant choisit" }));
+    FORFAITS.filter((f) => f.actif).forEach((f) => sel.append(el("option", { value: f.code, text: f.libelle + " — " + f.jours + " j — " + AB.formatFcfa(f.montant) })));
+  }
+
+  async function loadForfaits() {
+    const { data, error } = await supabase.from("entreprise_forfaits").select("*");
+    if (error) { console.error(error); FORFAITS = []; return error; }
+    FORFAITS = (data || []).slice().sort((a, b) => (a.ordre - b.ordre) || String(a.code).localeCompare(String(b.code)));
+    return null;
+  }
+
+  async function loadAbonnementData() {
+    if (!current) return;
+    const [{ data, error }] = await Promise.all([
+      supabase.from("entreprise_paiements").select("*").eq("entreprise_id", current.id),
+      loadForfaits()
+    ]);
+    fillForfaitSelect();
+    if (error) { console.error(error); $("ab-historique").textContent = ""; $("ab-historique").append(el("div", { class: "empty", text: dbMessage(error) })); return; }
+    PAIEMENTS = (data || []).slice().sort((a, b) => String(b.cree_le).localeCompare(String(a.cree_le)));
+    renderHistorique();
+  }
+
+  async function refreshCurrent() {
+    const { data, error } = await supabase.from("entreprises").select("*").eq("id", current.id).maybeSingle();
+    if (error || !data) return;
+    current = data;
+    const i = ENTREPRISES.findIndex((x) => x.id === data.id);
+    if (i >= 0) ENTREPRISES[i] = data;
+    renderAbonnement();
+    updateViewLink();
+  }
+
+  $("ab-offerte-btn").addEventListener("click", async () => {
+    if (!current) return;
+    const next = !current.offerte;
+    if (!confirm(next ? "Offrir la gratuité à cette vitrine (visible sans abonnement) ?" : "Retirer la gratuité : la vitrine ne restera visible que tant que l'abonnement est payé.")) return;
+    $("ab-offerte-btn").disabled = true;
+    const { data, error } = await supabase.from("entreprises").update({ offerte: next }).eq("id", current.id).select("*").single();
+    $("ab-offerte-btn").disabled = false;
+    if (error) { console.error(error); setStatus("ab-status", dbMessage(error), true); return; }
+    current = data;
+    const i = ENTREPRISES.findIndex((x) => x.id === data.id);
+    if (i >= 0) ENTREPRISES[i] = data;
+    renderAbonnement(); updateViewLink();
+    setStatus("ab-status", next ? "Gratuité accordée." : "Gratuité retirée.");
+  });
+
+  $("ab-link-btn").addEventListener("click", () => {
+    if (!current) return;
+    const code = $("ab-forfait").value || "";
+    const site = new URL("../", window.location.href).href;      // racine du site (l'administration est dans /admin/)
+    const link = AB.paymentLink(site, current.id, code);
+    if (!link) { setStatus("ab-status", "Lien impossible : identifiant de vitrine invalide.", true); return; }
+    $("ab-link-input").value = link;
+    $("ab-wa").href = AB.whatsappShareLink(AB.shareMessage(current.nom_commercial, link));
+    $("ab-link-box").classList.remove("hidden");
+    setStatus("ab-status", "");
+  });
+  $("ab-copy").addEventListener("click", async () => {
+    const v = $("ab-link-input").value;
+    try { await navigator.clipboard.writeText(v); setStatus("ab-status", "Lien copié ✅"); }
+    catch (e) { $("ab-link-input").select(); setStatus("ab-status", "Copiez le lien sélectionné (Ctrl+C).", true); }
+  });
+
+  $("ab-prolonger").addEventListener("click", async () => {
+    if (!current) return;
+    const raw = $("ab-jours").value.trim();
+    const jours = Number(raw);
+    if (raw === "" || !Number.isInteger(jours) || jours < 1 || jours > AB.MAX_JOURS) { setStatus("ab-status", "Indiquez un nombre de jours entier entre 1 et " + AB.MAX_JOURS + ".", true); return; }
+    if (!confirm("Ajouter " + jours + (jours > 1 ? " jours" : " jour") + " à l'abonnement de « " + (current.nom_commercial || current.slug || "cette vitrine") + " » (paiement manuel) ?")) return;
+    $("ab-prolonger").disabled = true;
+    const { data, error } = await supabase.rpc("entreprise_prolonger_manuel", { p_entreprise_id: current.id, p_jours: jours });
+    $("ab-prolonger").disabled = false;
+    if (error) { console.error(error); setStatus("ab-status", dbMessage(error), true); return; }
+    $("ab-jours").value = "";
+    setStatus("ab-status", "Abonnement prolongé jusqu'au " + AB.formatDate(data) + ".");
+    await Promise.all([refreshCurrent(), loadAbonnementData()]);
+  });
+
+  // ---------------------------------------------------------------
+  // Écran des forfaits (modifiables sans redéployer)
+  // ---------------------------------------------------------------
+  function forfaitRow(f) {
+    const libelle = el("input", { type: "text", maxlength: "60", value: f.libelle, "aria-label": "Libellé du forfait " + f.code });
+    const jours = el("input", { type: "number", min: "1", step: "1", value: String(f.jours), "aria-label": "Jours du forfait " + f.code });
+    const montant = el("input", { type: "number", min: "1", step: "1", value: String(f.montant), "aria-label": "Montant du forfait " + f.code });
+    const ordre = el("input", { type: "number", step: "1", value: String(f.ordre), "aria-label": "Ordre du forfait " + f.code });
+    const actif = el("input", { type: "checkbox" });
+    actif.checked = !!f.actif;
+    const status = el("div", { class: "status", role: "status" });
+    const save = el("button", { type: "button", class: "btn", text: "Enregistrer" });
+    save.addEventListener("click", async () => {
+      const next = { code: f.code, libelle: libelle.value.trim(), jours: Number(jours.value), montant: Number(montant.value), ordre: Number(ordre.value) || 0, actif: actif.checked };
+      const problem = AB.forfaitProblem(next);
+      if (problem) { status.className = "status error"; status.textContent = problem; return; }
+      save.disabled = true;
+      const { error } = await supabase.from("entreprise_forfaits").update({ libelle: next.libelle, jours: next.jours, montant: next.montant, ordre: next.ordre, actif: next.actif }).eq("id", f.id);
+      save.disabled = false;
+      if (error) { console.error(error); status.className = "status error"; status.textContent = dbMessage(error); return; }
+      status.className = "status"; status.textContent = "Forfait enregistré.";
+      await renderForfaitsScreen();
+    });
+    const del = el("button", { type: "button", class: "btn danger", "aria-label": "Supprimer le forfait " + f.code, text: "🗑️" });
+    del.addEventListener("click", async () => {
+      if (!confirm("Supprimer le forfait « " + f.libelle + " » ? (l'historique des paiements déjà faits n'est pas modifié)")) return;
+      const { error } = await supabase.from("entreprise_forfaits").delete().eq("id", f.id);
+      if (error) { console.error(error); status.className = "status error"; status.textContent = dbMessage(error); return; }
+      await renderForfaitsScreen();
+    });
+    return el("div", { class: "card row-card forfait-row" },
+      el("div", { class: "top" }, el("span", { class: "nom", text: f.code }),
+        el("span", { class: "pill " + (f.actif ? "ok" : "grey"), text: f.actif ? "Actif" : "Inactif" })),
+      el("div", {}, el("label", {}, "Libellé"), libelle),
+      el("div", { class: "grid" }, el("div", {}, el("label", {}, "Jours"), jours), el("div", {}, el("label", {}, "Montant (FCFA)"), montant)),
+      el("div", { class: "grid" }, el("div", {}, el("label", {}, "Ordre"), ordre), el("label", { class: "toggle-row", style: "align-self:end;" }, actif, "Actif")),
+      el("div", { class: "actions" }, save, del), status);
+  }
+
+  async function renderForfaitsScreen() {
+    const err = await loadForfaits();
+    const box = $("forfaits-list");
+    box.textContent = "";
+    if (err) { box.append(el("div", { class: "empty", text: dbMessage(err) })); return; }
+    if (!FORFAITS.length) { box.append(el("div", { class: "empty", text: "Aucun forfait pour le moment. Ajoutez-en un ci-dessous (libellé, jours, montant), puis cochez « Actif »." })); return; }
+    FORFAITS.forEach((f) => box.append(forfaitRow(f)));
+  }
+
+  $("open-forfaits").addEventListener("click", async () => {
+    $("list-section").classList.add("hidden");
+    $("forfaits-section").classList.remove("hidden");
+    setStatus("nf-status", "");
+    await renderForfaitsScreen();
+  });
+  $("close-forfaits").addEventListener("click", () => {
+    $("forfaits-section").classList.add("hidden");
+    $("list-section").classList.remove("hidden");
+  });
+  $("forfait-new").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    setStatus("nf-status", "");
+    const next = { code: val("nf-code"), libelle: val("nf-libelle"), jours: Number(val("nf-jours")), montant: Number(val("nf-montant")), actif: $("nf-actif").checked };
+    next.ordre = FORFAITS.reduce((m, f) => Math.max(m, Number(f.ordre) || 0), 0) + 1;
+    const problem = AB.forfaitProblem(next);
+    if (problem) { setStatus("nf-status", problem, true); return; }
+    $("nf-save").disabled = true;
+    const { error } = await supabase.from("entreprise_forfaits").insert(next);
+    $("nf-save").disabled = false;
+    if (error) { console.error(error); setStatus("nf-status", (error.code === "23505" || /duplicate key/i.test(error.message || "")) ? "Ce code existe déjà." : dbMessage(error), true); return; }
+    $("forfait-new").reset();
+    setStatus("nf-status", "Forfait ajouté.");
+    await renderForfaitsScreen();
   });
 
   // ---------------------------------------------------------------

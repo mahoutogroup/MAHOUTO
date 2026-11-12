@@ -151,6 +151,13 @@ export default async function handler(req, res) {
     const { handleSerigraphieWebhook } = await import("./_serigraphie.js");
     const serigraphieResult = await handleSerigraphieWebhook(supabaseAdmin, { transactionId, officialStatus, officialAmount, log });
     if (serigraphieResult) return res.status(serigraphieResult.status).json(serigraphieResult.body);
+
+    // Abonnement d'une vitrine d'entreprise : paiement retrouvé dans entreprise_paiements (helper
+    // api/_entreprise-abonnement.js). La prolongation de l'abonnement ne dépend QUE de cet appel, après la
+    // vérification de signature et la relecture de la transaction chez FedaPay faites plus haut.
+    const { handleEntrepriseWebhook } = await import("./_entreprise-abonnement.js");
+    const entrepriseResult = await handleEntrepriseWebhook(supabaseAdmin, { transactionId, officialStatus, officialAmount, log });
+    if (entrepriseResult) return res.status(entrepriseResult.status).json(entrepriseResult.body);
   }
 
   if (purchaseError || !purchase) {
