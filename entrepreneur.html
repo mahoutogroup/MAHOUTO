@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Guide de l'entrepreneur — MAHOUTO+</title>
+<meta name="description" content="Guide simple pour les entrepreneurs, gérants et chefs d'entreprise (société ou entreprise individuelle) : garder les papiers, tenir ses comptes, préparer le premier exercice.">
+<meta name="theme-color" content="#FFC107">
+<link rel="manifest" href="manifest.json">
+<script src="brand.js"></script>
+<link rel="icon" href="assets/favicon.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="stylesheet" href="theme.css">
+<script src="theme-toggle.js"></script>
+<style>
+  .guide { max-width: 720px; margin: 0 auto; padding: 20px 20px 110px; }
+  .guide .back { display: inline-block; font-size: 13px; color: var(--gold); margin-bottom: 14px; }
+  .guide h1 { font-size: 22px; line-height: 1.25; color: var(--gold); margin-bottom: 8px; }
+  .guide .lead { font-size: 14px; line-height: 1.7; color: var(--text-muted); margin-bottom: 18px; }
+  .guide .notice {
+    font-size: 12.5px; line-height: 1.6; color: var(--text-muted);
+    border: 1px solid var(--border); border-left: 3px solid var(--gold);
+    background: var(--bg-elevated); border-radius: var(--radius-sm);
+    padding: 10px 12px; margin-bottom: 18px;
+  }
+  .guide details {
+    border: 1px solid var(--border); background: var(--bg-card);
+    border-radius: var(--radius-md); margin-bottom: 10px; overflow: hidden;
+  }
+  .guide summary {
+    list-style: none; cursor: pointer; padding: 14px 16px;
+    font-size: 14.5px; font-weight: 700; color: var(--white);
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  }
+  .guide summary::-webkit-details-marker { display: none; }
+  .guide summary::after { content: "+"; color: var(--gold); font-size: 20px; line-height: 1; flex: none; }
+  .guide details[open] summary::after { content: "−"; }
+  .guide details[open] summary { border-bottom: 1px solid var(--border); }
+  .guide .body { padding: 12px 16px 16px; }
+  .guide .body p { font-size: 14px; line-height: 1.7; color: var(--text-muted); margin-bottom: 10px; }
+  .guide .body p strong, .guide .body li strong { color: var(--white); }
+  .guide .body ul, .guide .body ol { padding-left: 20px; margin-bottom: 10px; }
+  .guide .body li { font-size: 14px; line-height: 1.65; color: var(--text-muted); margin-bottom: 6px; }
+  .guide .tablewrap { overflow-x: auto; margin: 4px 0 10px; }
+  .guide table { width: 100%; min-width: 460px; border-collapse: collapse; font-size: 13px; }
+  .guide th, .guide td { text-align: left; padding: 8px 10px; border: 1px solid var(--border); vertical-align: top; color: var(--text-muted); }
+  .guide th { color: var(--gold); background: var(--bg-elevated); }
+  .guide .ei {
+    border: 1px dashed var(--gold); border-radius: var(--radius-sm);
+    background: var(--bg-elevated); padding: 10px 12px; margin: 12px 0 4px;
+  }
+  .guide .ei .ei-title { font-size: 12.5px; font-weight: 700; color: var(--gold); margin-bottom: 6px; }
+  .guide .ei p, .guide .ei li { font-size: 13px; }
+  .guide .ei ul { margin-bottom: 0; }
+  .guide .small { font-size: 12px; color: var(--text-dim); }
+  .guide .updated { font-size: 12px; color: var(--text-dim); margin-top: 20px; }
+</style>
+</head>
+<body>
+
+<button id="theme-toggle-btn" class="theme-toggle-fab">🌙</button>
+
+<div class="page-content">
+<main class="guide">
+  <a class="back" href="index.html">← Retour à l'accueil</a>
+  <h1>Guide de l'entrepreneur</h1>
+  <p class="lead">Les gestes simples pour bien tenir son entreprise, qu'elle soit une société (SARL, par exemple) ou une entreprise individuelle : suivre son argent, conserver les papiers, tenir ses comptes et préparer le premier exercice. Touchez un titre pour l'ouvrir. Les encadrés en pointillé expliquent ce qui change pour une entreprise individuelle.</p>
+  <p class="notice"><strong>À lire d'abord.</strong> Ce guide donne des repères généraux. Les règles de comptabilité, d'impôts et de démarches changent et dépendent de votre situation (société ou entreprise individuelle, activité, chiffre d'affaires). Confirmez-les avec un comptable, le centre des impôts ou l'APIEx avant de décider ou de signer.</p>
+
+  <details open>
+    <summary>1. Votre entreprise et vous</summary>
+    <div class="body">
+      <p><strong>Si vous avez une société (SARL, etc.) :</strong> la société a ses propres papiers, son propre argent et ses propres dettes. Vous êtes associé et gérant : c'est vous qui dirigez, mais ce n'est pas votre poche.</p>
+      <ul>
+        <li>L'argent de la société n'est pas votre argent personnel.</li>
+        <li>Tout achat ou toute vente se fait au nom de la société, avec une trace écrite.</li>
+        <li>Les règles de responsabilité dépendent du type de société : vérifiez vos statuts.</li>
+      </ul>
+      <div class="ei">
+        <div class="ei-title">Si vous êtes en entreprise individuelle</div>
+        <ul>
+          <li>L'entreprise n'est pas une personne séparée de vous : c'est vous, qui exercez une activité sous un nom commercial.</li>
+          <li>Il n'y a ni statuts, ni capital, ni associé.</li>
+          <li>La séparation entre vos biens personnels et ceux de l'entreprise n'est pas la même que pour une société. Demandez à un comptable ou à un juriste ce que cela signifie pour vous.</li>
+        </ul>
+      </div>
+    </div>
+  </details>
+
+  <details>
+    <summary>2. Suivre l'argent de l'entreprise</summary>
+    <div class="body">
+      <p>Ne mélangez pas l'argent de votre activité et vos dépenses personnelles : c'est la meilleure façon de savoir si l'activité gagne de l'argent.</p>
+      <ul>
+        <li>Si possible, ouvrez un compte dédié à l'activité, ou au minimum utilisez un numéro Mobile Money bien identifié pour ses paiements.</li>
+        <li>Quand vous prenez de l'argent de l'entreprise pour vous, notez-le : c'est un retrait, pas un achat.</li>
+        <li>Pour une société, ne payez pas de dépenses personnelles avec son argent sans conseil d'un comptable.</li>
+      </ul>
+      <div class="ei">
+        <div class="ei-title">Si vous êtes en entreprise individuelle</div>
+        <p>Même sans société, notez séparément ce qui vient de l'activité et ce qui est personnel. Cela rend vos comptes lisibles et facilite vos échanges avec le comptable et les impôts.</p>
+      </div>
+    </div>
+  </details>
+
+  <details>
+    <summary>3. Garder tous les papiers</summary>
+    <div class="body">
+      <p>Chaque achat, vente, transport ou paiement doit laisser un papier. Rangez-les dans une même chemise, à l'abri de l'eau.</p>
+      <ul>
+        <li><strong>Papiers de création :</strong> registre de commerce (RCCM), identifiant fiscal (IFU), et pour une société les statuts signés.</li>
+        <li><strong>Achats :</strong> factures, reçus, bons de livraison.</li>
+        <li><strong>Ventes :</strong> factures, reçus, contrats avec les clients, preuves de paiement.</li>
+        <li><strong>Paiements :</strong> reçus ou captures Mobile Money, virements, bordereaux de banque.</li>
+        <li><strong>Transport et stockage :</strong> reçus de transport, de location de magasin.</li>
+      </ul>
+      <p>Si un vendeur n'a pas de facture, écrivez sur un cahier son nom, son téléphone, ce qu'il a vendu, la quantité, le prix et la date, puis faites-lui signer ou mettre son empreinte.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>4. Le cahier des entrées et des sorties</summary>
+    <div class="body">
+      <p>Achetez un grand cahier. Notez chaque jour l'argent qui entre et l'argent qui sort. À la fin du mois, additionnez les entrées, puis les sorties.</p>
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Date</th><th>Ce qui s'est passé</th><th>Entrée (FCFA)</th><th>Sortie (FCFA)</th><th>Papier gardé</th></tr></thead>
+          <tbody>
+            <tr><td>10-12</td><td>Achat de 20 sacs chez M. X</td><td></td><td>400 000</td><td>Reçu n°1</td></tr>
+            <tr><td>15-12</td><td>Vente de 20 sacs au client Y</td><td>500 000</td><td></td><td>Facture n°2</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="small">Exemple : les chiffres sont inventés.</p>
+    </div>
+  </details>
+
+  <details>
+    <summary>5. Le premier exercice</summary>
+    <div class="body">
+      <p>Un exercice est une année de travail de l'entreprise. Pour une société, le premier exercice commence le jour de l'immatriculation et peut se terminer très vite, par exemple au 31 décembre de la même année, selon les statuts.</p>
+      <ul>
+        <li>Pour une société, regardez la date de fin du premier exercice dans vos statuts.</li>
+        <li>Les comptes doivent être préparés dans le délai prévu, même si l'activité a été faible.</li>
+        <li>Si l'exercice est très court, demandez avant de signer s'il peut être prolongé. C'est plus simple à corriger avant la signature qu'après.</li>
+      </ul>
+      <div class="ei">
+        <div class="ei-title">Si vous êtes en entreprise individuelle</div>
+        <p>Il n'y a pas de statuts, donc pas de date de fin du premier exercice à lire dedans. Demandez au centre des impôts ou à un comptable quelle période de comptes et quelles déclarations s'appliquent à vous, et à partir de quelle date.</p>
+      </div>
+    </div>
+  </details>
+
+  <details>
+    <summary>6. Les papiers à donner au comptable</summary>
+    <div class="body">
+      <p>La liste exacte est à confirmer avec votre comptable. En général :</p>
+      <ol>
+        <li>Les papiers de création : RCCM, IFU, et pour une société les statuts signés et la preuve du versement du capital.</li>
+        <li>Le relevé du compte de l'activité, ou le cahier des entrées et des sorties.</li>
+        <li>Toutes les factures et tous les reçus d'achat et de vente.</li>
+        <li>Les preuves de paiement : Mobile Money, virements, bordereaux.</li>
+        <li>Les papiers de transport et de stockage.</li>
+        <li>Le stock restant à la fin de l'exercice : quoi, combien, à quel prix.</li>
+        <li>L'argent que des clients doivent encore, et celui que l'entreprise doit encore à des fournisseurs.</li>
+      </ol>
+    </div>
+  </details>
+
+  <details>
+    <summary>7. Les impôts</summary>
+    <div class="body">
+      <p>Une entreprise a des obligations fiscales même avec peu d'activité, qu'elle soit une société ou une entreprise individuelle. Le détail dépend de votre situation : demandez-le au centre des impôts ou à un comptable.</p>
+      <ul>
+        <li>Faites vos déclarations aux dates indiquées, même s'il n'y a rien à payer.</li>
+        <li>Demandez s'il existe un régime plus simple ou une exonération la première année. Ne le supposez pas : une entreprise individuelle et une société ne sont pas traitées de la même façon.</li>
+        <li>Demandez si votre IFU doit figurer sur vos factures, et gardez toujours votre attestation d'IFU.</li>
+      </ul>
+    </div>
+  </details>
+
+  <details>
+    <summary>8. Ce qu'il ne faut pas faire</summary>
+    <div class="body">
+      <ul>
+        <li>Ne confiez jamais votre code secret Mobile Money ni vos mots de passe à une autre personne, même de confiance.</li>
+        <li>Ne signez rien que vous n'avez pas compris. Demandez qu'on vous le lise, devant un témoin.</li>
+        <li>Ne jetez aucun papier de l'entreprise.</li>
+        <li>Ne mélangez pas l'argent de l'activité et vos dépenses personnelles.</li>
+        <li>Ne donnez pas votre carte d'identité ni votre casier à des inconnus.</li>
+        <li>Ne laissez personne signer à votre place sans procuration écrite qui le permet.</li>
+      </ul>
+    </div>
+  </details>
+
+  <details>
+    <summary>9. Qui contacter en cas de doute</summary>
+    <div class="body">
+      <div class="tablewrap">
+        <table>
+          <thead><tr><th>Pour quoi</th><th>Qui</th></tr></thead>
+          <tbody>
+            <tr><td>Création d'entreprise ou de société, statuts</td><td>APIEx (guichet unique) : monentreprise.bj</td></tr>
+            <tr><td>Comptes, liste des papiers</td><td>Un comptable</td></tr>
+            <tr><td>Impôts</td><td>Le centre des impôts</td></tr>
+            <tr><td>Question sur l'application</td><td>Messages MAHOUTO+ ou MAHOUTO AI</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>En cas de doute, demandez d'abord, signez ensuite.</p>
+      <p><a href="ai.html" style="color:var(--gold);font-weight:700;">Poser une question à MAHOUTO AI →</a></p>
+    </div>
+  </details>
+
+  <p class="notice" style="margin-top:20px;"><strong>MAHOUTO+ vous accompagne</strong> avec des repères simples. Pour votre situation précise, confirmez avec un comptable ou le centre des impôts. MAHOUTO+ n'est affilié à aucune administration (APIEx, impôts) et ce guide ne remplace pas un conseil juridique, fiscal ou comptable. Éditeur du site : voir les <a href="mentions-legales.html" style="color:var(--gold);">mentions légales</a>.</p>
+  <p class="updated">Dernière mise à jour : 7 novembre 2026.</p>
+</main>
+</div>
+
+<nav class="bottom-nav">
+  <a class="nav-item" href="index.html"><span class="icon">🏠</span>Accueil</a>
+  <a class="nav-item" href="discussions.html"><span class="icon">💬</span>Messages</a>
+  <a class="nav-item" href="ai.html"><span class="icon">🧠</span>MAHOUTO AI</a>
+  <a class="nav-item" href="school.html"><span class="icon">🎓</span>School</a>
+  <a class="nav-item" href="profil.html"><span class="icon">👤</span>Profil</a>
+</nav>
+
+<script src="config.js"></script>
+<script src="pwa-install.js"></script>
+</body>
+</html>
