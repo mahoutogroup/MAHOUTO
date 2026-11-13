@@ -252,6 +252,23 @@ const FORFAITS = [
     assert.strictEqual(env.calls.length, 0, "aucun appel FedaPay pour info/status");
   });
 
+  await test("CONTRAT : la vraie réponse « info » du serveur traverse le filtre de la page (plansFromInfo) sans perdre les forfaits actifs", async () => {
+    mod._resetRateLimitsForTests();
+    const env = checkoutEnv();
+    const res = await call(env, { entrepriseId: ID, action: "info" });
+    assert.strictEqual(res.code, 200);
+    assert.ok(res.body.forfaits.length > 0, "le serveur renvoie au moins un forfait actif");
+    assert.ok(!("actif" in res.body.forfaits[0]), "le serveur ne renvoie pas « actif »");
+    const shown = AB.plansFromInfo(res.body);
+    assert.deepStrictEqual(shown.map((f) => f.code), res.body.forfaits.map((f) => f.code), "aucun forfait n'est rejeté par la page");
+    // la page utilise bien CE filtre partagé, et plus un filtre exigeant « actif »
+    const page = fs.readFileSync(path.join(__dirname, "..", "abonnement.html"), "utf8");
+    assert.ok(page.includes("A.plansFromInfo(info)") && !page.includes("isPurchasable"));
+    // champs invalides toujours écartés
+    assert.deepStrictEqual(AB.plansFromInfo({ forfaits: [{ code: "x", jours: 1, montant: 100 }, { code: "ok-1", jours: 0, montant: 100 }, { code: "ok-2", jours: 1, montant: 1.5 }, null] }), []);
+    assert.deepStrictEqual(AB.plansFromInfo(null), []);
+  });
+
   // ---------- webhook : assistant seul ----------
   const LOG = () => { const l = []; const f = (level, msg, extra) => l.push({ level, msg, extra }); f.entries = l; return f; };
   await test("webhook (assistant) : montant falsifié refusé → paiement « echoue », aucune prolongation", async () => {

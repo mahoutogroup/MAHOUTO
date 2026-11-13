@@ -102,7 +102,7 @@
     let info;
     try { info = await call({ action: "info" }); }
     catch (e) { showState(e.message || "Impossible de charger la page. Réessayez dans un instant."); return; }
-    const forfaits = Array.isArray(info.forfaits) ? info.forfaits.filter(A.isPurchasable.bind(null)) : [];
+    const forfaits = A.plansFromInfo(info);
     root.textContent = "";
     root.append(el("h1", { text: "Abonnement de votre vitrine" }), el("div", { class: "who", text: (info.entreprise && info.entreprise.nom_commercial) || "Votre vitrine" }));
     if (!forfaits.length) { root.append(el("p", { text: "Aucun forfait n'est disponible pour le moment. Contactez la personne qui vous a envoyé ce lien." })); return; }

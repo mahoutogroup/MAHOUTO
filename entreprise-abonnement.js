@@ -108,6 +108,18 @@
     return !!f && f.actif === true && Number.isInteger(f.jours) && f.jours > 0 && Number.isInteger(f.montant) && f.montant > 0;
   }
 
+  /** Forfait affichable côté navigateur : seulement la validité des champs reçus. Le serveur ne renvoie
+   *  QUE des forfaits actifs (et reste l'autorité sur « actif », revérifié au paiement) : on n'exige donc
+   *  pas de champ « actif » ici, il n'est pas envoyé. */
+  function isDisplayable(f) {
+    return !!f && typeof f.code === "string" && /^[a-z0-9_-]{2,30}$/.test(f.code) && Number.isInteger(f.jours) && f.jours > 0 && Number.isInteger(f.montant) && f.montant > 0;
+  }
+
+  /** Forfaits à afficher à partir de la réponse « info » du serveur. */
+  function plansFromInfo(info) {
+    return info && Array.isArray(info.forfaits) ? info.forfaits.filter(isDisplayable) : [];
+  }
+
   /** Lien de paiement à envoyer au commerçant : <site>/abonnement.html?v=<id>[&f=<code>]. */
   function paymentLink(baseHref, entrepriseId, forfaitCode) {
     if (!isValidUuid(entrepriseId)) return null;
@@ -130,7 +142,7 @@
     STATUS_LABELS: STATUS_LABELS, PAYMENT_STATUS_LABELS: PAYMENT_STATUS_LABELS, SOURCE_LABELS: SOURCE_LABELS,
     isValidUuid: isValidUuid, isVisible: isVisible, subscriptionStatus: subscriptionStatus, extendExpiry: extendExpiry,
     remainingLabel: remainingLabel, formatDate: formatDate, formatFcfa: formatFcfa, forfaitProblem: forfaitProblem,
-    isPurchasable: isPurchasable, paymentLink: paymentLink, shareMessage: shareMessage, whatsappShareLink: whatsappShareLink
+    isPurchasable: isPurchasable, isDisplayable: isDisplayable, plansFromInfo: plansFromInfo, paymentLink: paymentLink, shareMessage: shareMessage, whatsappShareLink: whatsappShareLink
   };
   root.MahoutoAbonnement = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
