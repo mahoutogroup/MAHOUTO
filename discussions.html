@@ -493,6 +493,7 @@
 <script src="room-safe.js"></script>
 <script src="login-sheet.js"></script>
 <script src="room-share.js"></script>
+<script src="salon-abonnement.js"></script>
 <script src="config.js"></script>
 <script src="offline-cache.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -594,6 +595,16 @@
 
       unlockedPaidRooms = new Set((paidPurchases || []).map((p) => p.course_id));
 
+      // Abonnements EN COURS du compte (lecture des SIENS) : ils ouvrent aussi les salons à abonnement.
+      // Erreur ou table absente : on ignore (la vraie barrière reste la base de données).
+      const { data: mySubs, error: subsError } = await supabase
+        .from("salon_abonnements")
+        .select("room_id, expire_le")
+        .eq("user_id", currentUser.id);
+      if (!subsError) {
+        (mySubs || []).forEach((a) => { if (MahoutoSalonAbonnement.subscriptionActive(a)) unlockedPaidRooms.add(a.room_id); });
+      }
+
       const enriched = await Promise.all(
         rooms.map(async (room) => {
           const { data: lastMsgs } = await supabase
@@ -692,12 +703,14 @@
       const preview = document.createElement("span");
       preview.className = "preview";
       if (locked) {
-        preview.textContent = "🔒 Communauté payante";
+        preview.textContent = room.abonnement === true ? "🔒 Communauté sur abonnement" : "🔒 Communauté payante";
         bottomLine.appendChild(preview);
-        const lockBadge = document.createElement("span");
-        lockBadge.className = "lock-badge";
-        lockBadge.textContent = money(room.price);
-        bottomLine.appendChild(lockBadge);
+        if (room.abonnement !== true) {
+          const lockBadge = document.createElement("span");
+          lockBadge.className = "lock-badge";
+          lockBadge.textContent = money(room.price);
+          bottomLine.appendChild(lockBadge);
+        }
       } else {
         preview.textContent = room.lastMessage || "";
         bottomLine.appendChild(preview);
@@ -739,7 +752,8 @@
 
       row.addEventListener("click", (e) => {
         if (e.target.closest(".room-manage-btn") || e.target.closest(".room-share-btn")) return;
-        if (locked) { buyRoom(room); return; }
+        // Salon à abonnement : le choix du forfait se fait dans le salon (chat.html), pas ici.
+        if (locked && room.abonnement !== true) { buyRoom(room); return; }
         window.location.href = "chat.html?room=" + encodeURIComponent(room.id) + "&name=" + encodeURIComponent(room.name);
       });
 

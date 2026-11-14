@@ -87,6 +87,31 @@
     border-radius: 10px; padding: 12px; font-weight: bold; font-size: 14px; cursor: pointer;
   }
   #new-room-status { font-size: 12px; color: var(--accent-green); min-height: 16px; }
+
+  .room-row .r-compteurs { font-size: 12px; color: var(--text-muted); }
+  .room-row .abo-hint { font-size: 11.5px; color: var(--text-dim); margin-top: -4px; }
+
+  /* ---------- Forfaits d'abonnement ---------- */
+  #forfaits-section { margin: 20px 20px 0; }
+  #forfaits-section h3 { color: var(--gold); font-size: 15px; margin-bottom: 6px; }
+  #forfaits-section .hint { font-size: 12px; color: var(--text-muted); margin-bottom: 12px; line-height: 1.45; }
+  #forfaits-section .warn { font-size: 12px; color: #F59E0B; margin-bottom: 12px; line-height: 1.45; }
+  .forfait-row { display: flex; flex-direction: column; gap: 8px; padding: 12px; margin-bottom: 10px; }
+  .forfait-row .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .forfait-row label, #new-forfait-form label { font-size: 12px; color: var(--text-muted); display: block; margin-bottom: 3px; }
+  .forfait-row input[type="text"], .forfait-row input[type="number"], #new-forfait-form input {
+    width: 100%; padding: 9px 11px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--white); font-size: 15px; font-family: inherit;
+  }
+  .forfait-row .toggle-row { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text-muted); }
+  .forfait-row .save-forfait, #new-forfait-form button {
+    background: var(--gold-bright); color: #0A0A0A; border: none; border-radius: 8px;
+    padding: 9px 14px; font-weight: bold; font-size: 13px; cursor: pointer;
+  }
+  .forfait-row .code-tag { font-size: 11px; color: var(--text-dim); }
+  .forfait-row .forfait-status, #new-forfait-status { font-size: 11.5px; color: var(--accent-green); min-height: 14px; }
+  #new-forfait-form { padding: 12px; display: flex; flex-direction: column; gap: 8px; margin-bottom: 40px; }
+  #new-forfait-form .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 </style>
 </head>
 <body>
@@ -114,6 +139,24 @@
 
   <div id="rooms-container" class="hidden"></div>
 
+  <section id="forfaits-section" class="hidden">
+    <h3>🗓️ Forfaits d'abonnement</h3>
+    <p class="hint">Les forfaits proposés dans les salons passés en « mode abonnement ». Les prix se changent ici, sans redéployer. Un forfait inactif n'est jamais proposé. Les paiements se cumulent : chaque paiement ajoute ses jours à l'abonnement du membre.</p>
+    <p class="warn" id="forfait-test-warn" hidden>⚠️ Le forfait de test « test-1-jour » est ACTIF : désactive-le après ton essai, avant d'activer le mode abonnement sur un vrai salon.</p>
+    <div id="forfaits-list"></div>
+    <form id="new-forfait-form" class="card">
+      <strong style="font-size:13px;color:var(--text-muted);">➕ Ajouter un forfait</strong>
+      <div class="grid">
+        <div><label>Code (a-z, 0-9, - _)</label><input type="text" id="nf-code" placeholder="ex : 6-mois" maxlength="30" required></div>
+        <div><label>Libellé</label><input type="text" id="nf-libelle" placeholder="ex : 6 mois" maxlength="60" required></div>
+        <div><label>Durée (jours)</label><input type="number" id="nf-jours" min="1" max="3650" required></div>
+        <div><label>Prix (FCFA)</label><input type="number" id="nf-montant" min="1" required></div>
+      </div>
+      <button type="submit">Ajouter (inactif par défaut)</button>
+      <div id="new-forfait-status"></div>
+    </form>
+  </section>
+
   <form id="new-room-form" class="card hidden">
     <h3>➕ Créer un salon</h3>
 
@@ -133,15 +176,29 @@
       </div>
     </div>
 
+    <div>
+      <label>Identifiant du salon (facultatif — vide : tiré du nom)</label>
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="nr-id" placeholder="ex : atelier-k7x9q2" maxlength="64" pattern="[A-Za-z0-9_-]{1,64}">
+        <button type="button" id="nr-id-gen" style="flex:none;padding:0 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text-muted);font-weight:bold;cursor:pointer;">Générer</button>
+      </div>
+      <div style="font-size:11.5px;color:var(--text-dim);margin-top:4px;">Pour un salon d'essai : un nom neutre et un identifiant aléatoire (bouton « Générer »), car la liste des salons est lisible par tous.</div>
+    </div>
+
     <label class="toggle-row">
       <input type="checkbox" id="nr-is-paid">
       Communauté payante (accès sur achat)
     </label>
 
     <div>
-      <label>Prix (FCFA)</label>
+      <label>Prix à vie (FCFA) — inutile en mode abonnement</label>
       <input type="number" id="nr-price" min="0" placeholder="Ex : 2000" disabled>
     </div>
+
+    <label class="toggle-row" id="nr-abo-row">
+      <input type="checkbox" id="nr-abonnement" disabled>
+      Mode abonnement (forfaits : 1 mois, 3 mois…) — remplace l'achat à vie pour les nouveaux membres
+    </label>
 
     <button type="submit">Créer le salon</button>
     <div id="new-room-status"></div>
@@ -180,10 +237,17 @@
       return;
     }
 
-    renderRooms(data || []);
+    // Compteurs par salon (nombres seulement) : membres à vie / abonnés actifs / abonnés expirés.
+    // Erreur (SQL d'abonnement pas encore exécuté) : on les omet.
+    const counters = {};
+    const { data: cpt, error: cptError } = await supabase.rpc("salon_compteurs");
+    if (!cptError) (cpt || []).forEach((c) => { counters[c.room_id] = c; });
+
+    renderRooms(data || [], counters);
   }
 
-  function renderRooms(rooms) {
+  function renderRooms(rooms, counters) {
+    counters = counters || {};
     containerEl.innerHTML = "";
 
     rooms.forEach((r) => {
@@ -201,8 +265,16 @@
           Communauté payante (accès sur achat)
         </label>
 
+        ${"abonnement" in r ? `
+        <label class="toggle-row">
+          <input type="checkbox" class="r-abonnement" ${r.abonnement ? "checked" : ""} ${r.is_paid ? "" : "disabled"}>
+          Mode abonnement (forfaits)
+        </label>
+        <div class="abo-hint">Les membres qui ont déjà payé à vie gardent leur accès. Seuls les nouveaux membres passent par un forfait.</div>
+        <div class="r-compteurs"></div>` : ""}
+
         <div>
-          <label>Prix (FCFA)</label>
+          <label>Prix à vie (FCFA)</label>
           <input type="number" class="r-price" min="0" value="${Number.isFinite(Number(r.price)) && r.price !== null ? Number(r.price) : ""}" placeholder="Ex : 2000" ${r.is_paid ? "" : "disabled"}>
         </div>
 
@@ -230,6 +302,12 @@
         emojiEl.textContent = MahoutoRoomSafe.emoji(r.emoji);
       }
 
+      const aboBox = row.querySelector(".r-abonnement");
+      const cpt = counters[r.id];
+      const cptEl = row.querySelector(".r-compteurs");
+      if (cptEl && cpt) {
+        cptEl.textContent = "À vie : " + cpt.membres_vie + " · Abonnés actifs : " + cpt.abonnes_actifs + " · Abonnés expirés : " + cpt.abonnes_expires;
+      }
       const isPaidBox = row.querySelector(".r-is-paid");
       const priceInput = row.querySelector(".r-price");
       const saveBtn = row.querySelector(".save-btn");
@@ -283,6 +361,10 @@
 
       isPaidBox.addEventListener("change", () => {
         priceInput.disabled = !isPaidBox.checked;
+        if (aboBox) {
+          aboBox.disabled = !isPaidBox.checked;
+          if (!isPaidBox.checked) aboBox.checked = false;   // un salon en abonnement doit rester payant
+        }
       });
 
       saveBtn.addEventListener("click", async () => {
@@ -290,17 +372,25 @@
         const priceRaw = priceInput.value;
         const price = priceRaw === "" ? null : parseInt(priceRaw, 10);
 
-        if (is_paid && (!Number.isFinite(price) || price <= 0)) {
+        const abonnement = !!(aboBox && aboBox.checked) && is_paid;
+        // En mode abonnement le prix vient des forfaits : le prix à vie n'est plus obligatoire.
+        if (is_paid && !abonnement && (!Number.isFinite(price) || price <= 0)) {
           alert("Indique un prix valide pour une communauté payante.");
+          return;
+        }
+        if (abonnement && !r.abonnement && !confirm("Passer ce salon en mode abonnement ? Les membres qui ont déjà payé à vie gardent leur accès ; les nouveaux membres devront choisir un forfait. Vérifie que « Test 1 jour » est désactivé s'il s'agit d'un vrai salon.")) {
           return;
         }
 
         saveBtn.disabled = true;
         statusEl.classList.add("hidden");
 
+        // « abonnement » n'est envoyé que si la colonne existe (SQL d'abonnement exécuté).
+        const payload = { is_paid, price: is_paid && Number.isFinite(price) ? price : null };
+        if (aboBox) payload.abonnement = abonnement;
         const { error } = await supabase
           .from("rooms")
-          .update({ is_paid, price: is_paid ? price : null })
+          .update(payload)
           .eq("id", r.id);
 
         saveBtn.disabled = false;
@@ -344,6 +434,17 @@
 
   document.getElementById("nr-is-paid").addEventListener("change", (e) => {
     document.getElementById("nr-price").disabled = !e.target.checked;
+    const abo = document.getElementById("nr-abonnement");
+    abo.disabled = !e.target.checked;
+    if (!e.target.checked) abo.checked = false;
+  });
+
+  // Identifiant aléatoire non devinable (salon d'essai) : 12 caractères a-z0-9 tirés de crypto.getRandomValues.
+  document.getElementById("nr-id-gen").addEventListener("click", () => {
+    const alphabet = "abcdefghijklmnopqrstuvwxyz0123456789";
+    const bytes = new Uint8Array(12);
+    crypto.getRandomValues(bytes);
+    document.getElementById("nr-id").value = "s-" + Array.from(bytes, (b) => alphabet[b % alphabet.length]).join("");
   });
 
   document.getElementById("new-room-form").addEventListener("submit", async (e) => {
@@ -359,15 +460,22 @@
     const is_paid = document.getElementById("nr-is-paid").checked;
     const priceRaw = document.getElementById("nr-price").value;
     const price = priceRaw === "" ? null : parseInt(priceRaw, 10);
+    const abonnement = is_paid && document.getElementById("nr-abonnement").checked;
+    const customId = document.getElementById("nr-id").value.trim();
 
     if (!name) return;
-    if (is_paid && (!Number.isFinite(price) || price <= 0)) {
+    if (customId && !/^[A-Za-z0-9_-]{1,64}$/.test(customId)) {
+      statusEl.style.color = "#F87171";
+      statusEl.textContent = "Identifiant invalide : lettres, chiffres, - et _ seulement (64 max).";
+      return;
+    }
+    if (is_paid && !abonnement && (!Number.isFinite(price) || price <= 0)) {
       statusEl.style.color = "#F87171";
       statusEl.textContent = "Indique un prix valide pour une communauté payante.";
       return;
     }
 
-    const slug = name.toLowerCase()
+    const slug = customId || name.toLowerCase()
       .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
       .replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || ("salon-" + Date.now());
 
@@ -381,7 +489,8 @@
       color,
       is_group: true,
       is_paid,
-      price: is_paid ? price : null,
+      price: is_paid && Number.isFinite(price) ? price : null,
+      ...(abonnement ? { abonnement: true } : {}),
       created_by: currentUserId
     });
 
@@ -398,7 +507,92 @@
     document.getElementById("nr-emoji").value = "💬";
     document.getElementById("nr-color").value = "#38BDF8";
     document.getElementById("nr-price").disabled = true;
+    document.getElementById("nr-abonnement").disabled = true;
     await loadRooms();
+  });
+
+  // ---------- Forfaits d'abonnement (table salon_forfaits : écriture réservée à l'admin par RLS) ----------
+  const forfaitsSection = document.getElementById("forfaits-section");
+  const forfaitsList = document.getElementById("forfaits-list");
+
+  function forfaitField(labelText, input) {
+    const wrap = document.createElement("div");
+    const label = document.createElement("label");
+    label.textContent = labelText;
+    wrap.append(label, input);
+    return wrap;
+  }
+
+  function renderForfait(f) {
+    const row = document.createElement("div");
+    row.className = "card forfait-row";
+    const code = document.createElement("div");
+    code.className = "code-tag";
+    code.textContent = "code : " + f.code;
+
+    const libelle = document.createElement("input"); libelle.type = "text"; libelle.maxLength = 60; libelle.value = f.libelle;
+    const jours = document.createElement("input"); jours.type = "number"; jours.min = "1"; jours.max = "3650"; jours.value = f.jours;
+    const montant = document.createElement("input"); montant.type = "number"; montant.min = "1"; montant.value = f.montant;
+    const ordre = document.createElement("input"); ordre.type = "number"; ordre.value = f.ordre;
+    const grid = document.createElement("div"); grid.className = "grid";
+    grid.append(forfaitField("Libellé", libelle), forfaitField("Durée (jours)", jours), forfaitField("Prix (FCFA)", montant), forfaitField("Ordre d'affichage", ordre));
+
+    const toggle = document.createElement("label"); toggle.className = "toggle-row";
+    const actif = document.createElement("input"); actif.type = "checkbox"; actif.checked = f.actif === true;
+    toggle.append(actif, document.createTextNode(" Actif (proposé dans les salons en mode abonnement)"));
+
+    const saveBtn = document.createElement("button"); saveBtn.type = "button"; saveBtn.className = "save-forfait"; saveBtn.textContent = "Enregistrer";
+    const status = document.createElement("div"); status.className = "forfait-status";
+
+    saveBtn.addEventListener("click", async () => {
+      const j = parseInt(jours.value, 10), m = parseInt(montant.value, 10), o = parseInt(ordre.value, 10);
+      if (!libelle.value.trim() || !Number.isInteger(j) || j < 1 || j > 3650 || !Number.isInteger(m) || m < 1) {
+        status.style.color = "#F87171";
+        status.textContent = "Libellé, durée (1 à 3650 jours) et prix (> 0) obligatoires.";
+        return;
+      }
+      saveBtn.disabled = true;
+      const { error } = await supabase.from("salon_forfaits").update({
+        libelle: libelle.value.trim(), jours: j, montant: m, ordre: Number.isInteger(o) ? o : 0, actif: actif.checked
+      }).eq("id", f.id);
+      saveBtn.disabled = false;
+      status.style.color = error ? "#F87171" : "";
+      status.textContent = error ? "Erreur : " + error.message : "✓ Enregistré";
+      if (!error) await loadForfaits();
+    });
+
+    row.append(code, grid, toggle, saveBtn, status);
+    return row;
+  }
+
+  async function loadForfaits() {
+    const { data, error } = await supabase.from("salon_forfaits").select("*").order("ordre", { ascending: true });
+    if (error) { forfaitsSection.classList.add("hidden"); return; }   // SQL d'abonnement pas encore exécuté
+    forfaitsSection.classList.remove("hidden");
+    forfaitsList.textContent = "";
+    (data || []).forEach((f) => forfaitsList.appendChild(renderForfait(f)));
+    document.getElementById("forfait-test-warn").hidden = !(data || []).some((f) => f.code === "test-1-jour" && f.actif === true);
+  }
+
+  document.getElementById("new-forfait-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const status = document.getElementById("new-forfait-status");
+    const row = {
+      code: document.getElementById("nf-code").value.trim().toLowerCase(),
+      libelle: document.getElementById("nf-libelle").value.trim(),
+      jours: parseInt(document.getElementById("nf-jours").value, 10),
+      montant: parseInt(document.getElementById("nf-montant").value, 10),
+      actif: false
+    };
+    if (!/^[a-z0-9_-]{2,30}$/.test(row.code) || !row.libelle || !(row.jours > 0) || !(row.montant > 0)) {
+      status.style.color = "#F87171";
+      status.textContent = "Code (a-z 0-9 - _), libellé, durée et prix valides obligatoires.";
+      return;
+    }
+    const { error } = await supabase.from("salon_forfaits").insert(row);
+    status.style.color = error ? "#F87171" : "";
+    status.textContent = error ? "Erreur : " + error.message : "✓ Forfait ajouté (inactif : active-le ci-dessus).";
+    if (!error) { document.getElementById("new-forfait-form").reset(); await loadForfaits(); }
   });
 
   async function init() {
@@ -429,6 +623,7 @@
     containerEl.classList.remove("hidden");
     document.getElementById("new-room-form").classList.remove("hidden");
     await loadRooms();
+    await loadForfaits();
   }
 
   init();

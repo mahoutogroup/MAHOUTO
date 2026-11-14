@@ -158,6 +158,13 @@ export default async function handler(req, res) {
     const { handleEntrepriseWebhook } = await import("./_entreprise-abonnement.js");
     const entrepriseResult = await handleEntrepriseWebhook(supabaseAdmin, { transactionId, officialStatus, officialAmount, log });
     if (entrepriseResult) return res.status(entrepriseResult.status).json(entrepriseResult.body);
+
+    // Abonnement d'un salon payant : paiement retrouvé dans salon_paiements (helper api/_salon-abonnement.js).
+    // La prolongation ne dépend QUE de cet appel, après la vérification de signature et la relecture de la
+    // transaction chez FedaPay faites plus haut. N'écrit jamais dans « purchases » (pas d'accès à vie).
+    const { handleSalonWebhook } = await import("./_salon-abonnement.js");
+    const salonResult = await handleSalonWebhook(supabaseAdmin, { transactionId, officialStatus, officialAmount, log });
+    if (salonResult) return res.status(salonResult.status).json(salonResult.body);
   }
 
   if (purchaseError || !purchase) {

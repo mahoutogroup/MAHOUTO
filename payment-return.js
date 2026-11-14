@@ -56,6 +56,21 @@
     return { status: res.data ? res.data.status : null, error: null };
   }
 
+  // Salon en mode abonnement : l'accès vient d'un abonnement EN COURS (salon_abonnements, lecture du SIEN),
+  // pas d'un achat. Renvoie { status: 'paid' | null, error } : 'paid' si l'abonnement court, sinon on attend
+  // le webhook (l'historique des paiements est réservé à l'admin : un échec n'est pas lisible ici).
+  async function latestSubscriptionStatus(supabase, userId, roomId) {
+    var res = await supabase
+      .from("salon_abonnements")
+      .select("expire_le")
+      .eq("user_id", userId)
+      .eq("room_id", roomId)
+      .maybeSingle();
+    if (res.error) return { status: null, error: res.error };
+    var t = res.data && res.data.expire_le ? Date.parse(res.data.expire_le) : NaN;
+    return { status: isFinite(t) && t > Date.now() ? "paid" : null, error: null };
+  }
+
   // Adresse du salon sans les paramètres de retour (payment, et ceux ajoutés par le prestataire).
   function cleanPath(pathname, roomId) {
     return String(pathname || "chat.html") + "?room=" + encodeURIComponent(roomId);
@@ -64,7 +79,7 @@
   var api = {
     MAX_ATTEMPTS: MAX_ATTEMPTS, DELAY_MS: DELAY_MS,
     MSG_PENDING: MSG_PENDING, MSG_TIMEOUT: MSG_TIMEOUT, MSG_FAILED: MSG_FAILED, MSG_PAID: MSG_PAID, MSG_LOST_SESSION: MSG_LOST_SESSION,
-    isPaymentReturn: isPaymentReturn, decide: decide, latestPurchaseStatus: latestPurchaseStatus, cleanPath: cleanPath
+    isPaymentReturn: isPaymentReturn, decide: decide, latestPurchaseStatus: latestPurchaseStatus, latestSubscriptionStatus: latestSubscriptionStatus, cleanPath: cleanPath
   };
   root.MahoutoPaymentReturn = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;

@@ -76,7 +76,7 @@ export function getAdminClient() {
 
 // Reproduit exactement la règle des policies "messages_public_read" /
 // "messages_insert_own" : salon gratuit, créateur du salon, admin, ou
-// achat validé (purchases.status = 'paid', product_type = 'salon').
+// achat validé (purchases.status = 'paid', product_type = 'salon'), ou abonnement en cours.
 export async function canAccessRoom(admin, userId, roomId, userRole) {
   const { data: room } = await admin
     .from("rooms")
@@ -98,7 +98,19 @@ export async function canAccessRoom(admin, userId, roomId, userRole) {
     .eq("status", "paid")
     .maybeSingle();
 
-  return { allowed: !!purchase, room };
+  if (purchase) return { allowed: true, room };
+
+  // Abonné EN COURS d'un salon en mode abonnement (salon_abonnements.expire_le dans le futur), comme la
+  // règle « messages_*_abonnes ». Un abonnement expiré n'ouvre rien.
+  const { data: abonnement } = await admin
+    .from("salon_abonnements")
+    .select("expire_le")
+    .eq("user_id", userId)
+    .eq("room_id", roomId)
+    .gt("expire_le", new Date().toISOString())
+    .maybeSingle();
+
+  return { allowed: !!abonnement, room };
 }
 
 // Reproduit la policy "dm_messages_select_participants" : l'utilisateur
