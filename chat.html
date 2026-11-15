@@ -258,6 +258,12 @@
   #locked-screen h2 { color: var(--gold-bright); font-size: 22px; }
   #locked-screen p { color: var(--text-muted); max-width: 300px; }
   #locked-price { color: var(--gold); font-weight: bold; font-size: 18px; }
+  #locked-plans { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 320px; }
+  #locked-plans button {
+    padding: 13px 18px; border: none; border-radius: 12px; background: var(--gold-bright);
+    color: #0A0A0A; font-weight: bold; font-size: 15px; cursor: pointer;
+  }
+  #locked-plans button:disabled { opacity: .6; cursor: default; }
   #locked-buy-btn {
     padding: 12px 30px;
     border: none;
@@ -397,6 +403,7 @@
   <h2 id="locked-room-name">Communauté payante</h2>
   <p>Rejoins cette communauté pour lire et écrire les messages.</p>
   <div id="locked-price"></div>
+  <div id="locked-plans" class="hidden" role="group" aria-label="Forfaits d'abonnement"></div>
   <p id="cgv-line" style="text-align:center;font-size:12px;color:var(--text-dim);padding:0 20px 16px;padding:0;">En payant, vous acceptez les <a href="conditions-vente.html" target="_blank" rel="noopener noreferrer" style="color:var(--gold);text-decoration:underline;">conditions de vente et retours</a>.</p>
   <button id="locked-buy-btn" type="button">Débloquer l'accès</button>
   <p id="locked-status" class="hidden" role="status" aria-live="polite"></p>
@@ -455,6 +462,7 @@
 <script src="login-sheet.js"></script>
 <script src="room-share.js"></script>
 <script src="payment-return.js"></script>
+<script src="salon-abonnement.js"></script>
 <script src="offline-cache.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="attachments.js"></script>
@@ -826,11 +834,19 @@
   // Lecture du salon (la table rooms est lisible sans compte). Renvoie { room, error } :
   // room = null sans erreur → le salon n'existe pas ; error → réseau ou serveur.
   async function loadRoom() {
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from("rooms")
-      .select("name, is_paid, price, created_by, photo_url")
+      .select("name, is_paid, price, created_by, photo_url, abonnement")
       .eq("id", ROOM_ID)
       .maybeSingle();
+    if (error) {
+      // Repli : la colonne « abonnement » n'existe pas encore (SQL d'abonnement pas encore exécuté).
+      ({ data, error } = await supabase
+        .from("rooms")
+        .select("name, is_paid, price, created_by, photo_url")
+        .eq("id", ROOM_ID)
+        .maybeSingle());
+    }
     return { room: data || null, error: error || null };
   }
 
@@ -857,6 +873,46 @@
       .eq("status", "paid")
       .maybeSingle();
     return !!purchase;
+  }
+
+  // Abonnement du compte dans ce salon (lecture du SIEN : règle « salon_abonnements_own_read »).
+  // null s'il n'y en a pas (ou si la table n'existe pas encore).
+  async function loadMySubscription() {
+    const { data, error } = await supabase
+      .from("salon_abonnements")
+      .select("expire_le")
+      .eq("user_id", currentUser.id)
+      .eq("room_id", ROOM_ID)
+      .maybeSingle();
+    return error ? null : (data || null);
+  }
+
+  // Forfaits actifs d'un salon en mode abonnement : lecture publique des forfaits ACTIFS seulement.
+  async function showSubscriptionPlans(room, expired) {
+    const plansEl = document.getElementById("locked-plans");
+    plansEl.textContent = "";
+    document.getElementById("locked-buy-btn").classList.add("hidden");
+    document.getElementById("locked-price").textContent = "";
+    if (expired) setLockedStatus("Ton abonnement a expiré. Renouvelle-le pour retrouver l'accès : tes messages sont conservés.", false);
+    const { data, error } = await supabase
+      .from("salon_forfaits")
+      .select(MahoutoSalonAbonnement.FORFAIT_COLUMNS)
+      .order("ordre", { ascending: true });
+    const plans = error ? [] : MahoutoSalonAbonnement.plansFromRows(data);
+    if (!plans.length) {
+      setLockedStatus(error ? "Impossible de charger les forfaits. Réessaie dans un instant." : "Aucun forfait n'est disponible pour le moment.", !!error);
+      plansEl.classList.add("hidden");
+      return;
+    }
+    plans.forEach((plan) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = MahoutoSalonAbonnement.planLabel(plan);
+      btn.dataset.label = btn.textContent;
+      btn.addEventListener("click", () => buyRoomAccess(room, plan.code, btn));
+      plansEl.appendChild(btn);
+    });
+    plansEl.classList.remove("hidden");
   }
 
   async function checkRoomAccess(room) {
@@ -886,7 +942,20 @@
       .from("profiles").select("role").eq("id", currentUser.id).maybeSingle();
     if (profile && ["admin", "super_admin", "founder"].includes(profile.role)) return true;
 
-    if (await hasPaidPurchase()) return true;
+    // Membre à VIE : entre directement, sans jamais voir de forfaits (même si le salon est passé en abonnement).
+    const lifetime = await hasPaidPurchase();
+    if (lifetime) return true;
+
+    // Abonné en cours : entre ; l'accès est revérifié à l'échéance. Sinon : écran verrouillé.
+    const subscription = await loadMySubscription();
+    const decision = MahoutoSalonAbonnement.accessDecision({
+      room, userId: currentUser.id, role: profile && profile.role, lifetime, subscription
+    });
+    if (decision.allowed) {
+      const wait = MahoutoSalonAbonnement.msUntilExpiry(subscription);
+      if (wait !== null) setTimeout(() => window.location.reload(), wait);
+      return true;
+    }
 
     document.getElementById("locked-screen").classList.remove("hidden");
     const buyBtn = document.getElementById("locked-buy-btn");
@@ -901,8 +970,13 @@
       return false;
     }
 
-    buyBtn.classList.remove("hidden");
-    buyBtn.onclick = () => buyRoomAccess(room);
+    if (decision.mode === "abonnement") {
+      // Salon à abonnement : choix d'un forfait (le prix vient du serveur, jamais du navigateur).
+      await showSubscriptionPlans(room, decision.expired);
+    } else {
+      buyBtn.classList.remove("hidden");
+      buyBtn.onclick = () => buyRoomAccess(room);
+    }
 
     // Retour du paiement : l'achat est peut-être encore « pending » (le webhook n'est pas arrivé).
     if (paymentReturn && !paymentVerifying) verifyPaymentReturn();
@@ -916,11 +990,14 @@
     const buyBtn = document.getElementById("locked-buy-btn");
     const checkBtn = document.getElementById("locked-check-btn");
     buyBtn.classList.add("hidden");
+    document.getElementById("locked-plans").classList.add("hidden");
     checkBtn.classList.add("hidden");
     let attempt = 0;
 
     const step = async () => {
-      const { status, error } = await MahoutoPaymentReturn.latestPurchaseStatus(supabase, currentUser.id, ROOM_ID);
+      const { status, error } = (currentRoom && currentRoom.abonnement === true)
+        ? await MahoutoPaymentReturn.latestSubscriptionStatus(supabase, currentUser.id, ROOM_ID)
+        : await MahoutoPaymentReturn.latestPurchaseStatus(supabase, currentUser.id, ROOM_ID);
       // Erreur de lecture (réseau) : on réessaie comme pour un achat encore en attente.
       const decision = MahoutoPaymentReturn.decide(error ? "pending" : status, attempt++);
 
@@ -936,7 +1013,8 @@
         paymentVerifying = false;
         window.history.replaceState(null, "", MahoutoPaymentReturn.cleanPath(window.location.pathname, ROOM_ID));
         setLockedStatus(decision.message, true);
-        buyBtn.classList.remove("hidden");
+        if (currentRoom && currentRoom.abonnement === true) document.getElementById("locked-plans").classList.remove("hidden");
+        else buyBtn.classList.remove("hidden");
         return;
       }
       if (decision.kind === "wait") {
@@ -961,9 +1039,9 @@
     await step();
   }
 
-  async function buyRoomAccess(room) {
-    const btn = document.getElementById("locked-buy-btn");
-    const restore = () => { btn.disabled = false; btn.textContent = "Débloquer l'accès"; };
+  async function buyRoomAccess(room, forfaitCode, planBtn) {
+    const btn = planBtn || document.getElementById("locked-buy-btn");
+    const restore = () => { btn.disabled = false; btn.textContent = planBtn ? planBtn.dataset.label : "Débloquer l'accès"; };
     setLockedStatus("");
     btn.disabled = true;
     btn.textContent = "Redirection...";
@@ -984,7 +1062,8 @@
           "Content-Type": "application/json",
           "Authorization": "Bearer " + accessToken
         },
-        body: JSON.stringify({ courseId: ROOM_ID, productType: "salon" })   // jamais de montant côté navigateur
+        // jamais de montant côté navigateur ; forfaitCode seulement pour un salon à abonnement (le serveur relit le prix)
+        body: JSON.stringify(forfaitCode ? { courseId: ROOM_ID, productType: "salon", forfaitCode } : { courseId: ROOM_ID, productType: "salon" })
       });
 
       let data = {};

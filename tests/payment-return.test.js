@@ -220,7 +220,7 @@ function fakeRes() {
     assert.match(verify, /await enterRoom\(\);\s*return;/);
     assert.ok(!/composer\.classList\.remove|messagesEl\.classList\.remove|loadHistory|subscribeToNewMessages/.test(verify), "la vérification n'ouvre rien elle-même");
     // enterRoom → checkRoomAccess → hasPaidPurchase (achat « paid » en base) avant d'ouvrir le salon
-    assert.match(code, /if \(await hasPaidPurchase\(\)\) return true;/);
+    assert.match(code, /const lifetime = await hasPaidPurchase\(\);\s+if \(lifetime\) return true;/);
     assert.match(code, /\.eq\("status", "paid"\)\s*\.maybeSingle\(\);\s*return !!purchase;/);
     assert.match(code, /const hasAccess = await checkRoomAccess\(room\);\s*if \(!hasAccess\) return;/);
     // aucune lecture du paramètre payment pour décider de l'accès
@@ -243,7 +243,7 @@ function fakeRes() {
     assert.match(code, /resp\.status === 403 && data\.code === "ANONYMOUS_NOT_ALLOWED"[\s\S]*openLogin\("Se connecter pour acheter"\)/);
     const buy = code.slice(code.indexOf("async function buyRoomAccess"), code.indexOf("async function enterRoom"));
     assert.ok(!/alert\(/.test(buy), "message dans la page, plus de alert");
-    assert.match(buy, /body: JSON\.stringify\(\{ courseId: ROOM_ID, productType: "salon" \}\)/, "jamais de montant côté navigateur");
+    assert.match(buy, /JSON\.stringify\(forfaitCode \? \{ courseId: ROOM_ID, productType: "salon", forfaitCode \} : \{ courseId: ROOM_ID, productType: "salon" \}\)/, "jamais de montant côté navigateur : seulement le salon et, en abonnement, le code du forfait");
     assert.ok(!/amount|price|montant/i.test(buy.slice(buy.indexOf("JSON.stringify"), buy.indexOf("JSON.stringify") + 90)));
   });
 

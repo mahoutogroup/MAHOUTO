@@ -151,6 +151,21 @@ export default async function handler(req, res) {
       return res.status(404).json({ error: "Ce salon n'est pas payant." });
     }
 
+    // Salon en MODE ABONNEMENT (rooms.abonnement = true, activé par un admin) : paiement par forfait, branche
+    // déléguée au helper api/_salon-abonnement.js (pas de nouvelle fonction Vercel). Placé AVANT le calcul du
+    // prix à vie : le prix vient du forfait relu en base. Un salon qui n'est pas en mode abonnement continue
+    // exactement comme avant ci-dessous. Les membres à vie, le créateur et les admins sont refusés par le helper.
+    if (productType === "salon" && article.abonnement === true) {
+      const { handleSalonCheckout } = await import("./_salon-abonnement.js");
+      return handleSalonCheckout(req, res, {
+        supabaseAdmin,
+        user: authenticatedUser,
+        room: article,
+        brandName: brandForRequest(req).name,
+        siteUrl: process.env.PUBLIC_SITE_URL || `https://${req.headers.host}`
+      });
+    }
+
     const officialAmount = productType === "salon"
       ? Math.round(Number(article.price))
       : Math.round(Number(article.promotion ?? article.prix));
