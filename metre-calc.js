@@ -113,8 +113,8 @@
   var MAX_SPAN_TOLE_CM = 400; // au-delà, une charpente légère demande des appuis ou des fermes
   var BLOCKS_PER_BAG = { 10: 35, 15: 25, 20: 18 };   // parpaings fabriqués par sac de 50 kg, selon l'épaisseur (cm)
   var BLOCK_DRYING_M2 = 0.04; // surface de séchage par parpaing fabriqué (2 couches)
-  // Sable par parpaing fabriqué (m³) : 0,4 m × 0,2 m × épaisseur (m) × 0,65 (volume plein) × 1,1 (foisonnement)
-  function sandPerBlock(e) { return 0.4 * 0.2 * e * 0.65 * 1.1; }
+  // Sable par parpaing fabriqué (m³) : longueur (m) × hauteur (m) × épaisseur (m) × 0,65 (volume plein) × 1,1 (foisonnement)
+  function sandPerBlock(lengthM, heightM, e) { return lengthM * heightM * e * 0.65 * 1.1; }
 
   /* ---------- Calcul ---------- */
 
@@ -298,7 +298,7 @@
     if (v.makeBlocks) {
       var perBag = v.blocksPerBag > 0 ? v.blocksPerBag : BLOCKS_PER_BAG[v.blockThickness];
       blockMakingCement = blocks / perBag;
-      blockMakingSand = blocks * sandPerBlock(e);
+      blockMakingSand = blocks * sandPerBlock(v.blockLength / 100, v.blockHeight / 100, e);
       warnings.push("Les parpaings fabriqués sur place demandent environ " + fmtNum(Math.round(blocks * BLOCK_DRYING_M2)) +
         " m² pour sécher (2 couches), de l'arrosage pendant 7 jours et 2 à 4 semaines de séchage avant les murs porteurs. " +
         "Testez-les : un bloc ne doit ni s'effriter ni casser en tombant de 1 m.");

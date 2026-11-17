@@ -297,6 +297,14 @@ test("parpaings par sac : valeur saisie utilisée, vide = automatique, invalide 
   });
   assert.ok(/entre 5 et 60/.test(Calc.compute(made({ blocksPerBag: "100" })).errors.blocksPerBag));
 });
+test("sable de fabrication : suit la taille du parpaing saisie (50 × 25 > 40 × 20 par parpaing), 40 × 20 inchangé", () => {
+  const std = Calc.compute(made()).r, big = Calc.compute(made({ blockLength: "50", blockHeight: "25" })).r;
+  const perStd = std.blockMakingSand / std.blocks, perBig = big.blockMakingSand / big.blocks;
+  near(perStd, 0.4 * 0.2 * 0.15 * 0.65 * 1.1, 1e-12);   // 40 × 20 cm : valeur d'origine
+  near(perBig, 0.5 * 0.25 * 0.15 * 0.65 * 1.1, 1e-12);  // 50 × 25 cm
+  assert.ok(perBig > perStd, "un parpaing plus grand demande plus de sable");
+  assert.strictEqual(Calc.compute(made()).r.sand, Calc.compute(made({ blockLength: "40", blockHeight: "20" })).r.sand);
+});
 test("budget : le prix de « blocksMade » est compté ; un prix d'achat « blocks » n'est pas réutilisé", () => {
   const res = Calc.compute(made());
   const b = Calc.budget(res, { blocksMade: "150" }, "", 10);
