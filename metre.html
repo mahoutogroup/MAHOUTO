@@ -260,8 +260,15 @@
     $("building-fields").append(
       numField("depth", "Profondeur extérieure (cm)"),
       numField("wallHeight", "Hauteur des murs (cm)", { hint: "10 rangs de parpaings ≈ 210 cm" }),
-      selectField("blockThickness", "Épaisseur des parpaings", [["15", "15 cm (murs courants)"], ["20", "20 cm (plus solide)"], ["10", "10 cm (cloisons)"]], { full: true })
+      selectField("blockThickness", "Épaisseur des parpaings", [["15", "15 cm (murs courants)"], ["20", "20 cm (plus solide)"], ["10", "10 cm (cloisons)"]], { full: true }),
+      checkField("makeBlocks", "Les parpaings sont fabriqués sur place par le maçon"),
+      numField("blocksPerBag", "Parpaings par sac de ciment", { hint: "Laisser vide : 25 pour 15 cm, 18 pour 20 cm, 35 pour 10 cm" })
     );
+    // Le champ « parpaings par sac » n'apparaît que si l'option est cochée.
+    const bpbField = $("f-blocksPerBag").closest(".field");
+    bpbField.classList.add("full");
+    bpbField.classList.toggle("hidden", !state.makeBlocks);
+    $("f-makeBlocks").addEventListener("change", () => bpbField.classList.toggle("hidden", !state.makeBlocks));
     $("openings-fields").append(
       numField("doors", "Nombre de portes", { int: true }), numField("windows", "Nombre de fenêtres", { int: true }),
       numField("doorW", "Largeur de porte (cm)"), numField("doorH", "Hauteur de porte (cm)"),

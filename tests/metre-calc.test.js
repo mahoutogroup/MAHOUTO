@@ -226,4 +226,95 @@ test("la page est dans le cache hors ligne et liée depuis l'accueil", () => {
   assert.ok(idx.includes('href="metre.html"'));
 });
 
+console.log("Parpaings fabriqués sur place");
+const made = (extra) => { const s = ref(); s.makeBlocks = true; Object.assign(s, extra || {}); return s; };
+const hasLine = (res, id) => res.lines.some((l) => l.id === id);
+test("option désactivée (défaut) : résultats identiques à avant, ligne « blocks » présente", () => {
+  assert.strictEqual(Calc.DEFAULTS.makeBlocks, false);
+  assert.strictEqual(Calc.DEFAULTS.blocksPerBag, "");
+  const res = Calc.compute(ref());
+  assert.strictEqual(res.r.blocks, 1201);
+  assert.strictEqual(res.r.cementBags, 116);
+  assert.strictEqual(res.r.sand, 11);
+  assert.ok(hasLine(res, "blocks") && !hasLine(res, "blocksMade"));
+  assert.strictEqual(res.r.blockMakingCement, 0);
+  assert.ok(!res.warnings.some((w) => /sécher/.test(w)));
+  // un ancien état enregistré, sans les nouveaux champs, donne le même résultat
+  const old = ref(); delete old.makeBlocks; delete old.blocksPerBag;
+  assert.deepStrictEqual(Calc.compute(old).r, res.r);
+  // une valeur invalide dans le champ masqué ne bloque pas le calcul tant que l'option est décochée
+  const hidden = ref(); hidden.blocksPerBag = "abc";
+  assert.strictEqual(Calc.compute(hidden).ready, true);
+});
+test("option activée : « blocksMade » à la place de « blocks », même quantité", () => {
+  const res = Calc.compute(made()), l = res.lines.find((x) => x.id === "blocksMade");
+  assert.ok(!hasLine(res, "blocks"));
+  assert.ok(l, "ligne blocksMade");
+  assert.strictEqual(l.qty, 1201);
+  assert.strictEqual(l.unit, "pièce");
+  assert.strictEqual(l.label, "Fabrication des parpaings (main-d'œuvre du maçon)");
+  assert.strictEqual(l.detail, "Ciment et sable déjà comptés plus bas");
+  assert.strictEqual(res.r.blocks, 1201);
+});
+test("option activée : ciment ≈ + blocs / 25 sacs, sable ≈ + 10 à 11 m³, avant la marge", () => {
+  const base = Calc.compute(ref()).r, res = Calc.compute(made()), r = res.r;
+  near(r.blockMakingCement, 1201 / 25, 1e-9);                       // 48,04 sacs
+  near(r.blockMakingSand, 1201 * 0.4 * 0.2 * 0.15 * 0.65 * 1.1, 1e-9); // ≈ 10,30 m³
+  const dc = r.cementBags - base.cementBags;
+  assert.ok(dc >= 48 && dc <= 53, "ciment en plus : " + dc);          // 48,04 × 1,05 ≈ 50,4
+  const ds = r.sand - base.sand;
+  assert.ok(ds >= 10 && ds <= 11, "sable en plus : " + ds);           // 10,30 × 1,05 ≈ 10,8, arrondi au demi-m³
+  assert.strictEqual(r.sand % 0.5, 0);
+  assert.strictEqual(r.gravel, base.gravel, "le gravier ne change pas");
+  const cementLine = res.lines.find((l) => l.id === "cement");
+  assert.strictEqual(cementLine.qty, r.cementBags);
+  assert.ok(/dont environ \d+ sacs pour fabriquer les parpaings/.test(cementLine.detail), cementLine.detail);
+});
+test("option activée : avertissement de séchage (≈ blocs × 0,04 m²)", () => {
+  const res = Calc.compute(made());
+  const w = res.warnings.find((x) => /sécher/.test(x));
+  assert.ok(w, "avertissement attendu");
+  assert.ok(/environ 48 m² pour sécher \(2 couches\)/.test(w), w);   // 1201 × 0,04 = 48,04
+  assert.ok(/arrosage pendant 7 jours/.test(w) && /2 à 4 semaines/.test(w) && /1 m/.test(w));
+});
+test("parpaing de 20 cm : plus de ciment et de sable pour les fabriquer qu'avec 15 cm", () => {
+  const a = Calc.compute(made({ blockThickness: "20" })).r, b = Calc.compute(made()).r;
+  assert.strictEqual(a.blocks, b.blocks);
+  near(a.blockMakingCement, 1201 / 18, 1e-9);
+  assert.ok(a.blockMakingCement > b.blockMakingCement && a.blockMakingSand > b.blockMakingSand);
+  near(Calc.compute(made({ blockThickness: "10" })).r.blockMakingCement, 1201 / 35, 1e-9);
+});
+test("parpaings par sac : valeur saisie utilisée, vide = automatique, invalide = refus avec message", () => {
+  near(Calc.compute(made({ blocksPerBag: "30" })).r.blockMakingCement, 1201 / 30, 1e-9);
+  near(Calc.compute(made({ blocksPerBag: "" })).r.blockMakingCement, 1201 / 25, 1e-9);
+  assert.strictEqual(Calc.compute(made({ blocksPerBag: "5" })).ready, true);
+  assert.strictEqual(Calc.compute(made({ blocksPerBag: "60" })).ready, true);
+  ["abc", "2", "100", "4,9", "60,5", "-3"].forEach((bad) => {
+    const res = Calc.compute(made({ blocksPerBag: bad }));
+    assert.strictEqual(res.ready, false, "refusé : " + bad);
+    assert.ok(res.errors.blocksPerBag && res.errors.blocksPerBag.length > 5, "message pour " + bad);
+    assert.strictEqual(res.r, null);
+  });
+  assert.ok(/entre 5 et 60/.test(Calc.compute(made({ blocksPerBag: "100" })).errors.blocksPerBag));
+});
+test("budget : le prix de « blocksMade » est compté ; un prix d'achat « blocks » n'est pas réutilisé", () => {
+  const res = Calc.compute(made());
+  const b = Calc.budget(res, { blocksMade: "150" }, "", 10);
+  assert.strictEqual(b.rows.find((r) => r.id === "blocksMade").total, 1201 * 150);
+  assert.strictEqual(b.materials, 1201 * 150);
+  assert.strictEqual(b.total, 1201 * 150 + Math.round(1201 * 150 * 0.10));
+  assert.ok(!b.missing.includes("blocksMade") && b.missing.includes("cement"));
+  const stale = Calc.budget(res, { blocks: "300" }, "", 0);
+  assert.ok(!stale.rows.some((r) => r.id === "blocks"));
+  assert.strictEqual(stale.materials, 0, "le prix d'achat des parpaings n'est pas appliqué à la fabrication");
+});
+test("metre.html : case et champ liés à state.makeBlocks / blocksPerBag, champ masqué par la classe hidden, sans innerHTML", () => {
+  const html = fs.readFileSync(path.join(__dirname, "..", "metre.html"), "utf8");
+  assert.ok(html.includes('checkField("makeBlocks", "Les parpaings sont fabriqués sur place par le maçon")'));
+  assert.ok(html.includes('numField("blocksPerBag", "Parpaings par sac de ciment"'));
+  assert.ok(html.includes("Laisser vide : 25 pour 15 cm, 18 pour 20 cm, 35 pour 10 cm"));
+  assert.ok(/classList\.toggle\("hidden", !state\.makeBlocks\)/.test(html));
+  assert.ok(!/\.innerHTML\s*=/.test(html));
+});
+
 console.log("\n" + passed + " tests réussis" + (process.exitCode ? " — des échecs ont eu lieu" : ""));
