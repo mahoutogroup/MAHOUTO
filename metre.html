@@ -33,6 +33,9 @@
   }
   .hint { font-size: 11.5px; color: var(--text-dim); line-height: 1.5; margin-top: 3px; }
   .invalid { border-color: #EF4444 !important; }
+  /* Case à cocher dans un .field : la règle « .field label » écrasait « .check » (case trop grande, texte collé). */
+  .field .check { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-muted); margin-bottom: 0; }
+  .field .check input { width: 18px; height: 18px; flex: none; padding: 0; margin: 0; accent-color: #D4AF37; }
   .err { font-size: 11.5px; color: #F87171; margin-top: 3px; }
   .err:empty { display: none; }
   .check { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-muted); }
@@ -78,6 +81,9 @@
   .btn { font-size: 13.5px; font-weight: bold; border: none; border-radius: 10px; padding: 12px 18px; cursor: pointer; font-family: inherit; }
   .btn-gold { background: var(--gold-bright); color: #0A0A0A; flex: 1; min-width: 150px; }
   .btn-ghost { background: var(--bg-card); color: var(--text-muted); border: 1px solid var(--border); }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  #export-status { font-size: 12.5px; min-height: 16px; margin: 10px 20px 0; color: var(--accent-green); line-height: 1.5; }
+  #export-status.error { color: #F87171; }
   .foot-note { margin: 16px 20px 0; font-size: 11.5px; color: var(--text-dim); line-height: 1.6; }
   .spacer-bottom { height: 40px; }
   .print-only { display: none; }
@@ -157,16 +163,21 @@
 
   <div class="actions no-print">
     <button type="button" class="btn btn-gold" id="btn-print">Imprimer ou enregistrer en PDF</button>
+    <button type="button" class="btn btn-ghost" id="btn-export-quote">Exporter le devis Word</button>
+    <button type="button" class="btn btn-ghost" id="btn-export-metre">Exporter le métré Word</button>
   </div>
+  <div id="export-status" class="no-print" role="status"></div>
   <p class="foot-note">Estimation établie avec MAHOUTO+. Les quantités sont indicatives : elles doivent être confirmées par un professionnel du bâtiment. Montants en FCFA.</p>
   <div class="spacer-bottom"></div>
 </div>
 
 <script src="metre-calc.js"></script>
+<script src="docx-lite.js"></script>
+<script src="metre-docs.js"></script>
 <script>
 (function () {
   "use strict";
-  const Calc = window.MetreCalc;
+  const Calc = window.MetreCalc, Docs = window.MetreDocs, Docx = window.DocxLite;
   const STORE_KEY = "mahouto-metre-v1";
   const $ = (id) => document.getElementById(id);
   const clone = (o) => JSON.parse(JSON.stringify(o));
@@ -457,6 +468,10 @@
     result = Calc.compute(state);
     showErrors(result.errors || {});
     renderResults();
+    // Exports Word : possibles seulement quand le résultat est prêt (champs valides).
+    $("btn-export-quote").disabled = !result.ready;
+    $("btn-export-metre").disabled = !result.ready;
+    setExportStatus("", false);
   }
   function onFormChange() {
     save();
@@ -484,6 +499,27 @@
     try { localStorage.removeItem(STORE_KEY); } catch (e) { /* ignoré */ }
     init();
   });
+
+  /* ---------------- Exports Word (.docx) ---------------- */
+  function setExportStatus(msg, isError) {
+    const s = $("export-status");
+    s.textContent = msg;
+    s.classList.toggle("error", !!isError);
+  }
+  function exportWord(kind) {
+    const input = { state, prices, labour, contingency, project };
+    const doc = kind === "quote" ? Docs.buildQuoteDoc(input, { now: Date.now() }) : Docs.buildMetreDoc(input, { now: Date.now() });
+    if (doc.error) { setExportStatus(doc.error, true); return; }
+    try {
+      Docx.download(doc.bytes, doc.filename);
+    } catch (e) {
+      setExportStatus("Le téléchargement a échoué sur cet appareil. Réessayez.", true);
+      return;
+    }
+    setExportStatus((kind === "quote" ? "Devis téléchargé : " : "Métré téléchargé : ") + doc.filename + " (estimation à faire valider par un professionnel).", false);
+  }
+  $("btn-export-quote").addEventListener("click", () => exportWord("quote"));
+  $("btn-export-metre").addEventListener("click", () => exportWord("metre"));
 
   $("btn-print").addEventListener("click", () => {
     const d = new Date();
