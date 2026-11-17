@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Métré construction — MAHOUTO+</title>
+<meta name="description" content="Estimez les matériaux et le budget d'une construction : parpaings, ciment, sable, gravier, fer, tôle.">
+<meta name="theme-color" content="#0A0A0A">
+<link rel="manifest" href="manifest.json">
+<script src="brand.js"></script>
+<link rel="icon" href="assets/favicon.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="stylesheet" href="theme.css">
+<script src="theme-toggle.js"></script>
+<style>
+  header { padding: 20px; background: var(--bg-elevated); border-bottom: 1px solid var(--border); }
+  header h1 { font-size: 20px; color: var(--gold); line-height: 1.3; }
+  header p { font-size: 12.5px; color: var(--text-muted); margin-top: 6px; line-height: 1.5; }
+
+  .top-bar { display: flex; align-items: center; padding: 14px 20px 0; }
+  .back-link { font-size: 12.5px; font-weight: 700; color: var(--gold); }
+
+  .notice { margin: 14px 20px 0; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg-card); font-size: 12.5px; color: var(--text-muted); line-height: 1.6; }
+
+  .panel { background: var(--bg-card); border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin: 14px 20px 0; }
+  .panel h2 { color: var(--gold); font-size: 15px; margin-bottom: 10px; line-height: 1.3; }
+  .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .grid .full { grid-column: 1 / -1; }
+  .field label { font-size: 11px; color: var(--text-dim); display: block; margin-bottom: 3px; }
+  .field input[type="text"], .field select, .room input[type="text"], .room select, .price-in {
+    width: 100%; padding: 9px 10px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--white); font-size: 13.5px; font-family: inherit; min-width: 0;
+  }
+  .hint { font-size: 11.5px; color: var(--text-dim); line-height: 1.5; margin-top: 3px; }
+  .invalid { border-color: #EF4444 !important; }
+  .err { font-size: 11.5px; color: #F87171; margin-top: 3px; }
+  .err:empty { display: none; }
+  .check { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text-muted); }
+  .check input { width: 18px; height: 18px; accent-color: #D4AF37; }
+
+  .room select { padding-left: 6px; padding-right: 2px; }
+  .room { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) minmax(0, 0.9fr); gap: 8px; margin-bottom: 4px; padding: 10px; border: 1px solid var(--border); border-radius: 10px; }
+  .room .cap { font-size: 10px; color: var(--text-dim); margin-bottom: 2px; }
+  .room .row-foot { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .room .rm { border: none; border-radius: 8px; background: rgba(239,68,68,.15); color: #F87171; font-size: 12.5px; font-weight: bold; cursor: pointer; padding: 7px 12px; font-family: inherit; }
+  .room-wrap { margin-bottom: 8px; }
+  .add-btn { font-size: 12.5px; font-weight: bold; border: 1px dashed var(--border); border-radius: 8px; padding: 9px 14px; cursor: pointer; background: transparent; color: var(--gold); font-family: inherit; }
+
+  details.adv { margin-top: 12px; font-size: 12.5px; color: var(--text-muted); }
+  details.adv summary { cursor: pointer; font-weight: bold; color: var(--gold); margin-bottom: 10px; }
+
+  .kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
+  .kpi { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 12px; }
+  .kpi .k-label { font-size: 11px; color: var(--text-dim); }
+  .kpi .k-value { font-size: 18px; font-weight: bold; color: var(--white); margin-top: 4px; overflow-wrap: anywhere; }
+  .kpi .k-sub { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+
+  .box { margin-top: 10px; padding: 12px 14px; border-radius: 12px; font-size: 12.5px; line-height: 1.6; }
+  .box.warn { background: rgba(245,158,11,.1); border: 1px solid rgba(245,158,11,.45); color: var(--text-muted); }
+  .box.error { background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.5); color: #F87171; }
+  .box.info { background: rgba(212,175,55,.08); border: 1px solid rgba(212,175,55,.35); color: var(--text-muted); }
+
+  .grp-title { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; font-weight: bold; color: var(--gold); margin: 16px 0 6px; }
+  .item { border-bottom: 1px solid var(--border); padding: 10px 0; }
+  .item .i-top { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+  .item .i-label { font-size: 13px; overflow-wrap: anywhere; }
+  .item .i-qty { font-size: 13px; font-weight: bold; white-space: nowrap; }
+  .item .i-detail { font-size: 11px; color: var(--text-dim); margin-top: 2px; line-height: 1.4; }
+  .item .i-price { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; margin-top: 8px; }
+  .item .i-total { font-size: 13px; font-weight: bold; text-align: right; white-space: nowrap; color: var(--white); min-width: 90px; }
+
+  .sum-row { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+  .sum-row b { white-space: nowrap; }
+  .sum-row.total { font-size: 16px; color: var(--gold); border-bottom: none; padding-top: 12px; }
+  .sum-in { display: grid; grid-template-columns: 1fr minmax(0, 150px); gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+
+  .actions { display: flex; gap: 10px; flex-wrap: wrap; margin: 14px 20px 0; }
+  .btn { font-size: 13.5px; font-weight: bold; border: none; border-radius: 10px; padding: 12px 18px; cursor: pointer; font-family: inherit; }
+  .btn-gold { background: var(--gold-bright); color: #0A0A0A; flex: 1; min-width: 150px; }
+  .btn-ghost { background: var(--bg-card); color: var(--text-muted); border: 1px solid var(--border); }
+  .foot-note { margin: 16px 20px 0; font-size: 11.5px; color: var(--text-dim); line-height: 1.6; }
+  .spacer-bottom { height: 40px; }
+  .print-only { display: none; }
+
+  @media print {
+    :root { --bg: #fff; --bg-elevated: #fff; --bg-card: #fff; --border: #bbb; --gold: #000; --gold-bright: #000; --white: #000; --text-muted: #222; --text-dim: #444; }
+    html, body { height: auto; background: #fff; color: #000; display: block; }
+    body { background: #fff; animation: none; }
+    .page-content { overflow: visible; padding-bottom: 0; }
+    .no-print, #theme-toggle-btn, .top-bar { display: none !important; }
+    .print-only { display: block; }
+    .panel { break-inside: avoid; }
+    .price-in { border: none; padding: 0; text-align: right; }
+  }
+</style>
+</head>
+<body>
+
+<button id="theme-toggle-btn" class="theme-toggle-fab">🌙</button>
+
+<div class="page-content">
+
+  <div class="top-bar no-print"><a class="back-link" href="index.html">← Retour</a></div>
+
+  <header>
+    <h1>📐 MÉTRÉ CONSTRUCTION</h1>
+    <p>Entrez les dimensions de votre bâtiment : le métré calcule les matériaux, puis le budget quand vous saisissez vos prix. Tout se calcule dans votre téléphone et reste sur celui-ci : rien n'est envoyé.</p>
+    <p class="print-only" id="print-date"></p>
+  </header>
+
+  <div class="notice no-print"><b>Estimation, pas un plan.</b> Les quantités sont arrondies avec une marge. Faites-les valider par un maçon ou un technicien avant d'acheter, surtout pour les fondations et la charpente.</div>
+
+  <section class="panel no-print">
+    <h2>Le projet</h2>
+    <div class="grid">
+      <div class="field full">
+        <label for="f-project">Nom du projet (facultatif)</label>
+        <input type="text" id="f-project" maxlength="80" placeholder="Ex. Salon, chambre et cuisine" autocomplete="off">
+      </div>
+    </div>
+  </section>
+
+  <section class="panel no-print" id="rooms-panel">
+    <h2>Les pièces, côte à côte</h2>
+    <p class="hint" style="margin:-4px 0 10px;">Dimensions extérieures en cm. Les pièces sont alignées le long de la façade et séparées par un mur de refend.</p>
+    <div id="rooms-root"></div>
+    <div class="err" id="e-rooms"></div>
+    <button type="button" class="add-btn" id="btn-add-room">+ Ajouter une pièce</button>
+    <div class="grid" style="margin-top:14px;" id="building-fields"></div>
+  </section>
+
+  <section class="panel no-print"><h2>Ouvertures</h2><div class="grid" id="openings-fields"></div></section>
+  <section class="panel no-print"><h2>Toiture</h2><div class="grid" id="roof-fields"></div></section>
+  <section class="panel no-print">
+    <h2>Équipements</h2>
+    <div class="grid" id="equip-fields"></div>
+    <details class="adv">
+      <summary>Hypothèses de calcul (avancé)</summary>
+      <div class="grid" id="adv-fields"></div>
+    </details>
+  </section>
+
+  <div class="actions no-print">
+    <button type="button" class="btn btn-ghost" id="btn-reset">Réinitialiser</button>
+  </div>
+
+  <section class="panel" id="results-panel">
+    <h2 id="results-title">Résultats</h2>
+    <div id="results"></div>
+  </section>
+
+  <section class="panel" id="budget-panel">
+    <h2>Budget</h2>
+    <p class="hint no-print" style="margin:-4px 0 10px;">Saisissez le prix unitaire de chaque matériau dans la liste ci-dessus. Les prix sont gardés sur votre appareil.</p>
+    <div id="budget"></div>
+  </section>
+
+  <div class="actions no-print">
+    <button type="button" class="btn btn-gold" id="btn-print">Imprimer ou enregistrer en PDF</button>
+  </div>
+  <p class="foot-note">Estimation établie avec MAHOUTO+. Les quantités sont indicatives : elles doivent être confirmées par un professionnel du bâtiment. Montants en FCFA.</p>
+  <div class="spacer-bottom"></div>
+</div>
+
+<script src="metre-calc.js"></script>
+<script>
+(function () {
+  "use strict";
+  const Calc = window.MetreCalc;
+  const STORE_KEY = "mahouto-metre-v1";
+  const $ = (id) => document.getElementById(id);
+  const clone = (o) => JSON.parse(JSON.stringify(o));
+
+  function el(tag, props, ...kids) {
+    const n = document.createElement(tag);
+    if (props) for (const [k, v] of Object.entries(props)) {
+      if (k === "class") n.className = v;
+      else if (k === "text") n.textContent = v;
+      else if (v !== undefined && v !== null && v !== false) n.setAttribute(k, v === true ? "" : v);
+    }
+    kids.flat().forEach((c) => { if (c != null) n.append(c); });
+    return n;
+  }
+
+  /* ---------------- État et stockage local ---------------- */
+  const ROOM_TYPES = [["salon", "Salon"], ["chambre", "Chambre"], ["cuisine", "Cuisine"], ["autre", "Autre"]];
+  let state, prices, labour, contingency, project;
+
+  function freshState() { const s = clone(Calc.DEFAULTS); return s; }
+
+  function load() {
+    state = freshState(); prices = {}; labour = ""; contingency = state.contingency; project = "";
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem(STORE_KEY) || "null"); } catch (e) { saved = null; }
+    if (!saved || typeof saved !== "object") return;
+    Object.keys(Calc.DEFAULTS).forEach((k) => {
+      if (k === "rooms") return;
+      const d = Calc.DEFAULTS[k], v = saved.state && saved.state[k];
+      if (typeof v === typeof d) state[k] = typeof v === "string" ? v.slice(0, 20) : v;
+    });
+    const rooms = saved.state && saved.state.rooms;
+    if (Array.isArray(rooms) && rooms.length) {
+      state.rooms = rooms.slice(0, 12).map((r) => ({
+        name: String((r && r.name) || "").slice(0, 60),
+        type: ROOM_TYPES.some((t) => t[0] === (r && r.type)) ? r.type : "autre",
+        length: String((r && r.length) || "").slice(0, 8),
+        tiled: !!(r && r.tiled)
+      }));
+    }
+    if (saved.prices && typeof saved.prices === "object") {
+      Object.keys(saved.prices).slice(0, 80).forEach((k) => {
+        if (typeof saved.prices[k] === "string") prices[k] = saved.prices[k].slice(0, 14);
+      });
+    }
+    if (typeof saved.labour === "string") labour = saved.labour.slice(0, 14);
+    if (typeof saved.contingency === "string") contingency = saved.contingency.slice(0, 5);
+    if (typeof saved.project === "string") project = saved.project.slice(0, 80);
+  }
+  let saveTimer = null;
+  function save() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      try { localStorage.setItem(STORE_KEY, JSON.stringify({ state, prices, labour, contingency, project })); } catch (e) { /* stockage indisponible : on continue sans */ }
+    }, 250);
+  }
+
+  /* ---------------- Formulaire ---------------- */
+  const FIELDS = {}, ERR = {};
+
+  function numField(key, label, o) {
+    o = o || {};
+    const input = el("input", { type: "text", id: "f-" + key, inputmode: o.int ? "numeric" : "decimal", autocomplete: "off", maxlength: 10 });
+    input.value = state[key];
+    input.addEventListener("input", () => { state[key] = input.value; onFormChange(); });
+    FIELDS[key] = input;
+    const err = el("div", { class: "err" }); ERR[key] = err;
+    return el("div", { class: "field" }, el("label", { for: "f-" + key, text: label }), input, o.hint ? el("div", { class: "hint", text: o.hint }) : null, err);
+  }
+  function selectField(key, label, options, o) {
+    o = o || {};
+    const sel = el("select", { id: "f-" + key }, options.map(([v, t]) => el("option", { value: v, text: t })));
+    sel.value = state[key];
+    sel.addEventListener("change", () => { state[key] = sel.value; onFormChange(); });
+    FIELDS[key] = sel;
+    const err = el("div", { class: "err" }); ERR[key] = err;
+    return el("div", { class: "field" + (o.full ? " full" : "") }, el("label", { for: "f-" + key, text: label }), sel, o.hint ? el("div", { class: "hint", text: o.hint }) : null, err);
+  }
+  function checkField(key, label) {
+    const cb = el("input", { type: "checkbox", id: "f-" + key });
+    cb.checked = !!state[key];
+    cb.addEventListener("change", () => { state[key] = cb.checked; onFormChange(); });
+    return el("div", { class: "field full" }, el("label", { class: "check", for: "f-" + key }, cb, el("span", { text: label })));
+  }
+
+  function buildStaticForm() {
+    const proj = $("f-project");
+    proj.value = project;
+    proj.oninput = () => { project = proj.value; save(); renderTitle(); };
+
+    $("building-fields").append(
+      numField("depth", "Profondeur extérieure (cm)"),
+      numField("wallHeight", "Hauteur des murs (cm)", { hint: "10 rangs de parpaings ≈ 210 cm" }),
+      selectField("blockThickness", "Épaisseur des parpaings", [["15", "15 cm (murs courants)"], ["20", "20 cm (plus solide)"], ["10", "10 cm (cloisons)"]], { full: true })
+    );
+    $("openings-fields").append(
+      numField("doors", "Nombre de portes", { int: true }), numField("windows", "Nombre de fenêtres", { int: true }),
+      numField("doorW", "Largeur de porte (cm)"), numField("doorH", "Hauteur de porte (cm)"),
+      numField("windowW", "Largeur de fenêtre (cm)"), numField("windowH", "Hauteur de fenêtre (cm)")
+    );
+    $("roof-fields").append(
+      selectField("roofType", "Type de toiture", [["tole", "Tôle sur charpente"], ["dalle", "Dalle en béton"]], { full: true }),
+      numField("roofOverhang", "Débord de toit (cm)"), numField("roofSlope", "Pente (%)")
+    );
+    $("equip-fields").append(
+      numField("sockets", "Prises", { int: true }), numField("switches", "Interrupteurs", { int: true }),
+      numField("lights", "Points lumineux", { int: true }), numField("pvcLength", "Tuyau PVC cuisine (m)"),
+      numField("fill", "Remblai (m³)", { hint: "À remplir si le sol doit être surélevé." })
+    );
+    $("adv-fields").append(
+      numField("blockLength", "Longueur du parpaing (cm)"), numField("blockHeight", "Hauteur du parpaing (cm)"),
+      numField("jointLength", "Joint vertical (cm)"), numField("jointHeight", "Joint horizontal (cm)"),
+      numField("breakage", "Casse des parpaings (%)"), numField("baseRows", "Rangs de soubassement", { int: true }),
+      numField("foundationDepth", "Profondeur des fondations (cm)"), numField("footingWidth", "Largeur de semelle (cm)"),
+      numField("footingThickness", "Épaisseur de semelle (cm)"), numField("postSpacing", "Espacement des poteaux (cm)"),
+      numField("slabThickness", "Épaisseur dalle de sol (cm)"), numField("plasterThickness", "Épaisseur d'enduit (cm)"),
+      numField("bulkMargin", "Marge ciment, sable, gravier (%)"),
+      checkField("plaster", "Enduire les deux faces des murs")
+    );
+  }
+
+  const ROOM_ERR = {};
+  function buildRooms() {
+    const root = $("rooms-root");
+    root.textContent = "";
+    Object.keys(ROOM_ERR).forEach((k) => delete ROOM_ERR[k]);
+    state.rooms.forEach((rm, i) => {
+      const name = el("input", { type: "text", maxlength: 40, placeholder: "Nom", autocomplete: "off" }); name.value = rm.name;
+      name.addEventListener("input", () => { rm.name = name.value; onFormChange(); });
+      const type = el("select", {}, ROOM_TYPES.map(([v, t]) => el("option", { value: v, text: t }))); type.value = rm.type;
+      const len = el("input", { type: "text", inputmode: "decimal", maxlength: 6, autocomplete: "off" }); len.value = rm.length;
+      len.addEventListener("input", () => { rm.length = len.value; onFormChange(); });
+      const tiled = el("input", { type: "checkbox", id: "tiled-" + i }); tiled.checked = !!rm.tiled;
+      tiled.addEventListener("change", () => { rm.tiled = tiled.checked; onFormChange(); });
+      type.addEventListener("change", () => {
+        rm.type = type.value;
+        if (rm.type === "cuisine") { rm.tiled = true; tiled.checked = true; }
+        onFormChange();
+      });
+      const err = el("div", { class: "err" }); ROOM_ERR[i] = { err, len };
+      const rm_btn = el("button", { type: "button", class: "rm", text: "Retirer" });
+      rm_btn.disabled = state.rooms.length <= 1;
+      rm_btn.addEventListener("click", () => { state.rooms.splice(i, 1); buildRooms(); onFormChange(); });
+      root.append(el("div", { class: "room-wrap" },
+        el("div", { class: "room" },
+          el("div", {}, el("div", { class: "cap", text: "Nom" }), name),
+          el("div", {}, el("div", { class: "cap", text: "Type" }), type),
+          el("div", {}, el("div", { class: "cap", text: "Longueur (cm)" }), len),
+          el("div", { class: "row-foot" }, el("label", { class: "check", for: "tiled-" + i }, tiled, el("span", { text: "Carrelage" })), rm_btn)),
+        err));
+    });
+    $("btn-add-room").disabled = state.rooms.length >= 12;
+  }
+
+  function showErrors(errors) {
+    Object.keys(FIELDS).forEach((k) => {
+      const msg = errors[k] || "";
+      if (ERR[k]) ERR[k].textContent = msg;
+      FIELDS[k].classList.toggle("invalid", !!msg);
+    });
+    Object.keys(ROOM_ERR).forEach((i) => {
+      const msg = errors["rooms." + i + ".length"] || "";
+      ROOM_ERR[i].err.textContent = msg;
+      ROOM_ERR[i].len.classList.toggle("invalid", !!msg);
+    });
+    $("e-rooms").textContent = errors.rooms || "";
+  }
+
+  /* ---------------- Résultats ---------------- */
+  let result = null;
+  let rowRefs = {};
+  let sumRefs = {};
+
+  function renderTitle() {
+    $("results-title").textContent = project.trim() ? "Résultats — " + project.trim() : "Résultats";
+  }
+
+  const PLURALS = { "pièce": "pièces", "sac": "sacs", "barre": "barres" };
+  function unitLabel(qty, unit) { return qty > 1 && PLURALS[unit] ? PLURALS[unit] : unit; }
+
+  function kpi(label, value, sub) {
+    return el("div", { class: "kpi" }, el("div", { class: "k-label", text: label }), el("div", { class: "k-value", text: value }), sub ? el("div", { class: "k-sub", text: sub }) : null);
+  }
+
+  function renderResults() {
+    const box = $("results");
+    box.textContent = "";
+    rowRefs = {}; sumRefs = {};
+    $("budget").textContent = "";
+    if (!result || !result.ready) {
+      box.append(el("div", { class: "box error", text: "Corrigez les champs marqués en rouge pour voir les résultats." }));
+      $("budget-panel").classList.add("hidden");
+      return;
+    }
+    $("budget-panel").classList.remove("hidden");
+    const r = result.r, F = Calc.fmtNum;
+
+    box.append(el("div", { class: "kpis" },
+      kpi("Surface bâtie", F(r.footprint, 1) + " m²", "Intérieur ≈ " + F(r.innerArea, 1) + " m²"),
+      kpi("Longueur des murs", F(r.wallLength, 1) + " m", F(r.rooms) + " pièce" + (r.rooms > 1 ? "s" : "") + ", murs de refend compris"),
+      kpi("Parpaings", F(r.blocks), "casse comprise"),
+      kpi("Ciment", F(r.cementBags) + " sacs", "de 50 kg")
+    ));
+    result.warnings.forEach((w) => box.append(el("div", { class: "box warn", text: w })));
+
+    const groups = [];
+    result.lines.forEach((ln) => {
+      let g = groups.find((x) => x.name === ln.group);
+      if (!g) { g = { name: ln.group, lines: [] }; groups.push(g); }
+      g.lines.push(ln);
+    });
+    groups.forEach((g) => {
+      const subEl = el("span", { text: "" });
+      box.append(el("div", { class: "grp-title" }, el("span", { text: g.name }), subEl));
+      sumRefs["grp:" + g.name] = subEl;
+      g.lines.forEach((ln) => {
+        const price = el("input", { type: "text", class: "price-in", inputmode: "decimal", autocomplete: "off", maxlength: 12, placeholder: "Prix unitaire (FCFA)", "aria-label": "Prix unitaire : " + ln.label });
+        price.value = prices[ln.id] || "";
+        const total = el("div", { class: "i-total", text: "" });
+        price.addEventListener("input", () => { prices[ln.id] = price.value; save(); updateBudget(); });
+        rowRefs[ln.id] = { price, total };
+        box.append(el("div", { class: "item" },
+          el("div", { class: "i-top" }, el("div", { class: "i-label", text: ln.label }), el("div", { class: "i-qty", text: F(ln.qty, Number.isInteger(ln.qty) ? 0 : 1) + " " + unitLabel(ln.qty, ln.unit) })),
+          ln.detail ? el("div", { class: "i-detail", text: ln.detail }) : null,
+          el("div", { class: "i-price" }, price, total)));
+      });
+    });
+
+    // Budget (champs de saisie créés une fois par rendu)
+    const b = $("budget");
+    const labIn = el("input", { type: "text", class: "price-in", inputmode: "decimal", autocomplete: "off", maxlength: 12, placeholder: "FCFA", "aria-label": "Main-d'œuvre, montant forfaitaire" });
+    labIn.value = labour;
+    labIn.addEventListener("input", () => { labour = labIn.value; save(); updateBudget(); });
+    const conIn = el("input", { type: "text", class: "price-in", inputmode: "decimal", autocomplete: "off", maxlength: 5, "aria-label": "Imprévus en pourcentage" });
+    conIn.value = contingency;
+    conIn.addEventListener("input", () => { contingency = conIn.value; save(); updateBudget(); });
+    sumRefs.labIn = labIn; sumRefs.conIn = conIn;
+    sumRefs.materials = el("b", { text: "" }); sumRefs.contingency = el("b", { text: "" }); sumRefs.total = el("b", { text: "" });
+    sumRefs.missing = el("div", { class: "box warn hidden" });
+    sumRefs.error = el("div", { class: "box error hidden" });
+    b.append(
+      el("div", { class: "sum-row" }, el("span", { text: "Matériaux chiffrés" }), sumRefs.materials),
+      el("div", { class: "sum-in" }, el("span", { text: "Main-d'œuvre (montant forfaitaire)" }), labIn),
+      el("div", { class: "sum-in" }, el("span", { text: "Imprévus (%)" }), conIn),
+      el("div", { class: "sum-row" }, el("span", { text: "Montant des imprévus" }), sumRefs.contingency),
+      el("div", { class: "sum-row total" }, el("span", { text: "TOTAL ESTIMÉ" }), sumRefs.total),
+      sumRefs.missing, sumRefs.error
+    );
+    updateBudget();
+  }
+
+  function updateBudget() {
+    if (!result || !result.ready) return;
+    const pctP = Calc.parseNum(contingency);
+    const pct = pctP.empty ? 0 : (pctP.error ? result.contingency : pctP.value);
+    const bd = Calc.budget(result, prices, labour, pct);
+    bd.rows.forEach((row) => {
+      const ref = rowRefs[row.id]; if (!ref) return;
+      ref.total.textContent = row.total === null ? "—" : Calc.fmtMoney(row.total);
+      ref.price.classList.toggle("invalid", !!bd.errors[row.id]);
+    });
+    Object.keys(bd.groups).forEach((g) => { if (sumRefs["grp:" + g]) sumRefs["grp:" + g].textContent = Calc.fmtMoney(bd.groups[g]); });
+    Object.keys(sumRefs).forEach((k) => { if (k.indexOf("grp:") === 0 && !(k.slice(4) in bd.groups)) sumRefs[k].textContent = ""; });
+    sumRefs.labIn.classList.toggle("invalid", !!bd.errors.labour);
+    sumRefs.conIn.classList.toggle("invalid", !!pctP.error);
+    sumRefs.materials.textContent = Calc.fmtMoney(bd.materials);
+    sumRefs.contingency.textContent = Calc.fmtMoney(bd.contingency);
+    sumRefs.total.textContent = Calc.fmtMoney(bd.total);
+    if (!bd.complete) {
+      sumRefs.missing.textContent = bd.missing.length + " ligne" + (bd.missing.length > 1 ? "s" : "") + " sans prix : le total est partiel tant que tous les prix ne sont pas saisis.";
+      sumRefs.missing.classList.remove("hidden");
+    } else sumRefs.missing.classList.add("hidden");
+    if (!bd.ok || pctP.error) {
+      sumRefs.error.textContent = "Une valeur saisie n'est pas un nombre valide : corrigez les champs marqués en rouge.";
+      sumRefs.error.classList.remove("hidden");
+    } else sumRefs.error.classList.add("hidden");
+  }
+
+  let calcTimer = null;
+  function recalc() {
+    result = Calc.compute(state);
+    showErrors(result.errors || {});
+    renderResults();
+  }
+  function onFormChange() {
+    save();
+    clearTimeout(calcTimer);
+    calcTimer = setTimeout(recalc, 200);
+  }
+
+  /* ---------------- Actions ---------------- */
+  $("btn-add-room").addEventListener("click", () => {
+    if (state.rooms.length >= 12) return;
+    state.rooms.push({ name: "", type: "autre", length: "300", tiled: false });
+    buildRooms(); onFormChange();
+  });
+
+  let resetArmed = false, resetTimer = null;
+  $("btn-reset").addEventListener("click", () => {
+    const btn = $("btn-reset");
+    if (!resetArmed) {
+      resetArmed = true;
+      btn.textContent = "Confirmer : tout effacer";
+      resetTimer = setTimeout(() => { resetArmed = false; btn.textContent = "Réinitialiser"; }, 4000);
+      return;
+    }
+    clearTimeout(resetTimer); resetArmed = false; btn.textContent = "Réinitialiser";
+    try { localStorage.removeItem(STORE_KEY); } catch (e) { /* ignoré */ }
+    init();
+  });
+
+  $("btn-print").addEventListener("click", () => {
+    const d = new Date();
+    $("print-date").textContent = "Établi le " + d.toLocaleDateString("fr-FR");
+    window.print();
+  });
+
+  function init() {
+    load();
+    ["building-fields", "openings-fields", "roof-fields", "equip-fields", "adv-fields"].forEach((id) => { $(id).textContent = ""; });
+    Object.keys(FIELDS).forEach((k) => delete FIELDS[k]);
+    Object.keys(ERR).forEach((k) => delete ERR[k]);
+    buildStaticForm();
+    buildRooms();
+    renderTitle();
+    recalc();
+  }
+  init();
+})();
+</script>
+</body>
+</html>
