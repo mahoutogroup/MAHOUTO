@@ -2,7 +2,7 @@
 // Hors-ligne ou fichier absent : on retombe sur la marque par défaut, le service worker ne doit jamais échouer ici.
 try { importScripts("/brand.js"); } catch (e) { /* repli : marque par défaut */ }
 
-const CACHE_NAME = "mahoutoplus-shell-v105";
+const CACHE_NAME = "mahoutoplus-shell-v106";
 const SHARE_CACHE_NAME = "mahoutoplus-share-v1";
 
 const APP_SHELL = [
@@ -23,6 +23,8 @@ const APP_SHELL = [
   "/entrepreneur.html",
   "/entreprise.html",
   "/entreprise-utils.js",
+  "/metre.html",
+  "/metre-calc.js",
   "/qrcode-generator.js",
   "/share.html",
   "/manifest.json",
