@@ -217,11 +217,14 @@ console.log("Intégration de la page");
 test("metre.html charge le moteur et n'utilise pas innerHTML", () => {
   const html = fs.readFileSync(path.join(__dirname, "..", "metre.html"), "utf8");
   assert.ok(/<script src="metre-calc\.js"><\/script>/.test(html));
+  assert.ok(/<script src="docx-lite\.js"><\/script>/.test(html) && /<script src="metre-docs\.js"><\/script>/.test(html), "modules d'export Word");
+  assert.ok(html.indexOf('src="metre-calc.js"') < html.indexOf('src="docx-lite.js"') && html.indexOf('src="docx-lite.js"') < html.indexOf('src="metre-docs.js"') && html.indexOf('src="metre-docs.js"') < html.indexOf("(function () {"), "ordre de chargement");
   assert.ok(!/\.innerHTML\s*=/.test(html), "innerHTML interdit (texte saisi par l'utilisateur)");
 });
 test("la page est dans le cache hors ligne et liée depuis l'accueil", () => {
   const sw = fs.readFileSync(path.join(__dirname, "..", "sw.js"), "utf8");
   assert.ok(sw.includes('"/metre.html"') && sw.includes('"/metre-calc.js"'));
+  assert.ok(sw.includes('"/docx-lite.js"') && sw.includes('"/metre-docs.js"'), "export Word disponible hors ligne");
   const idx = fs.readFileSync(path.join(__dirname, "..", "index.html"), "utf8");
   assert.ok(idx.includes('href="metre.html"'));
 });
