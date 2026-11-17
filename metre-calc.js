@@ -87,7 +87,9 @@
     pvcLength: "10",         // évacuation de la cuisine (m)
     fill: "0",               // remblai (m³), à saisir si le sol doit être surélevé
     bulkMargin: "5",         // marge sur ciment, sable et gravier (%)
-    contingency: "10"        // imprévus sur le budget (%)
+    contingency: "10",       // imprévus sur le budget (%)
+    makeBlocks: false,       // vrai : les parpaings sont fabriqués sur place par le maçon
+    blocksPerBag: ""         // parpaings par sac de ciment ; vide = valeur automatique selon l'épaisseur
   };
 
   /* ---------- Constantes de dosage et de pose ---------- */
@@ -109,6 +111,10 @@
   var GLUE_BAG_KG = 25;
   var SCREED_THICKNESS = 0.03;
   var MAX_SPAN_TOLE_CM = 400; // au-delà, une charpente légère demande des appuis ou des fermes
+  var BLOCKS_PER_BAG = { 10: 35, 15: 25, 20: 18 };   // parpaings fabriqués par sac de 50 kg, selon l'épaisseur (cm)
+  var BLOCK_DRYING_M2 = 0.04; // surface de séchage par parpaing fabriqué (2 couches)
+  // Sable par parpaing fabriqué (m³) : longueur (m) × hauteur (m) × épaisseur (m) × 0,65 (volume plein) × 1,1 (foisonnement)
+  function sandPerBlock(lengthM, heightM, e) { return lengthM * heightM * e * 0.65 * 1.1; }
 
   /* ---------- Calcul ---------- */
 
@@ -183,6 +189,18 @@
     num("bulkMargin", "Marge", { max: 30 });
     num("contingency", "Imprévus", { max: 50 });
     v.plaster = !!s.plaster;
+    v.makeBlocks = !!s.makeBlocks;
+    // Parpaings par sac : facultatif (vide = automatique). Contrôlé seulement si l'option est cochée :
+    // le champ est masqué sinon, une erreur y serait invisible.
+    v.blocksPerBag = 0;
+    if (v.makeBlocks) {
+      var bpb = parseNum(s.blocksPerBag);
+      if (bpb.error) errors.blocksPerBag = bpb.error;
+      else if (!bpb.empty) {
+        if (bpb.value < 5 || bpb.value > 60) errors.blocksPerBag = "Parpaings par sac : entrez un nombre entre 5 et 60, ou laissez vide.";
+        else v.blocksPerBag = bpb.value;
+      }
+    }
     return { errors: errors, v: v };
   }
 
@@ -275,12 +293,23 @@
 
     // --- Ciment, sable, gravier ---
     var bulk = 1 + v.bulkMargin / 100;
+    // Parpaings fabriqués sur place : ciment et sable ajoutés AVANT la marge et les arrondis.
+    var blockMakingCement = 0, blockMakingSand = 0;
+    if (v.makeBlocks) {
+      var perBag = v.blocksPerBag > 0 ? v.blocksPerBag : BLOCKS_PER_BAG[v.blockThickness];
+      blockMakingCement = blocks / perBag;
+      blockMakingSand = blocks * sandPerBlock(v.blockLength / 100, v.blockHeight / 100, e);
+      warnings.push("Les parpaings fabriqués sur place demandent environ " + fmtNum(Math.round(blocks * BLOCK_DRYING_M2)) +
+        " m² pour sécher (2 couches), de l'arrosage pendant 7 jours et 2 à 4 semaines de séchage avant les murs porteurs. " +
+        "Testez-les : un bloc ne doit ni s'effriter ni casser en tombant de 1 m.");
+    }
     var cementBagsRaw =
       concrete * CONCRETE.cementKg / BAG_KG +
       mortar * MORTAR.cementKg / BAG_KG +
-      (plasterVol + screed) * PLASTER.cementKg / BAG_KG;
+      (plasterVol + screed) * PLASTER.cementKg / BAG_KG +
+      blockMakingCement;
     var cementBags = ceilInt(cementBagsRaw * bulk);
-    var sandRaw = concrete * CONCRETE.sand + mortar * MORTAR.sand + (plasterVol + screed) * PLASTER.sand;
+    var sandRaw = concrete * CONCRETE.sand + mortar * MORTAR.sand + (plasterVol + screed) * PLASTER.sand + blockMakingSand;
     var sand = ceilTo(sandRaw * bulk, 0.5);
     var gravel = ceilTo(concrete * CONCRETE.gravel * bulk, 0.5);
 
@@ -301,6 +330,7 @@
       postCount: posts, mortar: mortar, plaster: plasterVol, screed: screed,
       steel8: steel8, steel6: steel6, bars8: bars8, bars6: bars6, lashing: lashing,
       cementBags: cementBags, sand: sand, gravel: gravel,
+      blockMakingCement: blockMakingCement, blockMakingSand: blockMakingSand,
       roofArea: roofArea, sheetArea: sheetArea, screws: screws,
       rafters: rafters, rafterM: rafterM, purlinRows: purlinRows, purlinM: purlinM,
       tileNet: tileNet, tileArea: tileArea, glueBags: glueBags,
@@ -314,9 +344,15 @@
     }
     var G1 = "Gros œuvre", G2 = "Toiture", G3 = "Ouvertures et équipements", G4 = "Cuisine et sols";
 
-    add("blocks", G1, "Parpaings " + v.blockLength + " × " + v.blockHeight + " × " + v.blockThickness + " cm", "pièce", blocks,
-      fmtNum(blocksWalls) + " pour les murs, " + fmtNum(blocksBase) + " pour le soubassement, casse " + v.breakage + " %");
-    add("cement", G1, "Ciment (sac de 50 kg)", "sac", cementBags, "Béton, mortier de pose, enduit et chape, marge " + v.bulkMargin + " %");
+    if (v.makeBlocks) {
+      // Pas de ligne « blocks » : un prix saisi pour l'achat de parpaings ne doit pas être réutilisé ici.
+      add("blocksMade", G1, "Fabrication des parpaings (main-d'œuvre du maçon)", "pièce", blocks, "Ciment et sable déjà comptés plus bas");
+    } else {
+      add("blocks", G1, "Parpaings " + v.blockLength + " × " + v.blockHeight + " × " + v.blockThickness + " cm", "pièce", blocks,
+        fmtNum(blocksWalls) + " pour les murs, " + fmtNum(blocksBase) + " pour le soubassement, casse " + v.breakage + " %");
+    }
+    add("cement", G1, "Ciment (sac de 50 kg)", "sac", cementBags, "Béton, mortier de pose, enduit et chape, marge " + v.bulkMargin + " %" +
+      (v.makeBlocks ? ", dont environ " + fmtNum(Math.round(blockMakingCement * bulk)) + " sacs pour fabriquer les parpaings" : ""));
     add("sand", G1, "Sable", "m³", sand, "Arrondi au demi-m³");
     add("gravel", G1, "Gravier", "m³", gravel, "Arrondi au demi-m³");
     add("steel8", G1, "Fer de 8 mm (barre de 12 m)", "barre", bars8, "Chaînages, poteaux, semelles" + (v.roofType === "dalle" ? " et dalle de toiture" : ""));
