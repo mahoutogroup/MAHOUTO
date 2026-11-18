@@ -10,12 +10,15 @@
      dans institut_demandes.formation.
    - « Mes demandes » : place accordée avec son CODE D'INVITATION (à donner à l'orphelin, qui le saisit sur SON compte).
    - Données minimales (mineurs) : prénom, âge, lien, formation, motif, justificatif. Rien de public.
-   - Aucun innerHTML : createElement / textContent. Aucun journal console de données saisies. Rien de payant ici.
+   - PAIEMENT (PR 4) : sur une demande VALIDÉE sans place, bouton « Payer la place (X FCFA) » avec choix de la formation du
+     catalogue ; pour un petit-fils enregistré, section « Payer ma formation ». Le navigateur n'envoie JAMAIS de montant
+     (institut-paiement-utils.js) : le serveur relit le prix. Boutons absents si l'Institut est fermé (sauf admin).
+   - Aucun innerHTML : createElement / textContent. Aucun journal console de données saisies.
    La vraie barrière est la base de données (RLS) ; ce script donne des messages clairs.
    ========================================================= */
 (function () {
   "use strict";
-  var U = window.InstitutUtils, D = window.InstitutDemandeUtils, P = window.InstitutPlaceUtils, cfg = window.MAHOUTO_CONFIG;
+  var U = window.InstitutUtils, D = window.InstitutDemandeUtils, P = window.InstitutPlaceUtils, PAY = window.InstitutPaiementUtils, cfg = window.MAHOUTO_CONFIG;
   var $ = function (id) { return document.getElementById(id); };
 
   function setHidden(id, hidden) { $(id).classList.toggle("hidden", !!hidden); }
@@ -34,7 +37,7 @@
     return n;
   }
 
-  if (!U || !D || !P || !cfg || !window.supabase || typeof window.supabase.createClient !== "function") {
+  if (!U || !D || !P || !PAY || !cfg || !window.supabase || typeof window.supabase.createClient !== "function") {
     setHidden("bloc-chargement", true);
     setStatus("etat", "Cette page n'a pas pu se charger. Réessayez dans un instant.", true);
     return;
@@ -44,6 +47,8 @@
   var user = null, busy = false;
   var formationList = U.FORMATIONS;   // [id, libellé] : liste lue dans la base, ou constante de repli
   var formationNames = {};            // id -> nom (pour « Mes demandes »)
+  var catalogue = [];                 // formations payables [{id, nom, prixInstitut}] (catalogue actif)
+  var canPay = false;                 // paiements visibles : Institut ouvert, ou administrateur (testeur)
 
   function fillSelect(select, list, placeholder) {
     select.textContent = "";
@@ -86,6 +91,64 @@
     ]);
   }
 
+
+  // ---------- Paiement (PR 4) ----------
+  // Lance le paiement : aucun montant envoyé (le serveur relit le prix). Redirige vers FedaPay (https seulement).
+  async function startPayment(body, statusId, btn) {
+    if (busy || !body) return;
+    busy = true; btn.disabled = true;
+    setStatus(statusId, "Préparation du paiement…", false);
+    try {
+      var session = (await supabase.auth.getSession()).data.session;
+      if (!session) { setStatus(statusId, "Reconnectez-vous puis réessayez.", true); return; }
+      var resp = await fetch("/api/fedapay-checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": "Bearer " + session.access_token },
+        body: JSON.stringify(body)
+      });
+      var data = {};
+      try { data = await resp.json(); } catch (e) { data = {}; }
+      var url = resp.ok ? PAY.safeCheckoutUrl(data.checkoutUrl) : null;
+      if (!url) { setStatus(statusId, PAY.checkoutErrorMessage(resp.status, data && data.error), true); return; }
+      window.location.href = url;
+    } catch (e) {
+      setStatus(statusId, PAY.checkoutErrorMessage(0, null), true);
+    } finally { busy = false; btn.disabled = false; }
+  }
+
+  // Choix de la formation + bouton ; le libellé du bouton suit le prix du catalogue (indicatif).
+  function payBlock(options, defaultId, title, buttonText, makeBody, statusId) {
+    var select = el("select", { "aria-label": "Formation" });
+    options.forEach(function (c) { select.appendChild(el("option", { value: c.id, text: c.nom + " — " + PAY.formatPrice(c.prixInstitut) })); });
+    if (defaultId && options.some(function (c) { return c.id === defaultId; })) select.value = defaultId;
+    var btn = el("button", { type: "button", class: "btn" });
+    function label() {
+      var c = options.filter(function (o) { return o.id === select.value; })[0];
+      btn.textContent = buttonText + (c ? " (" + PAY.formatPrice(c.prixInstitut) + ")" : "");
+    }
+    select.addEventListener("change", label);
+    btn.addEventListener("click", function () { startPayment(makeBody(select.value), statusId, btn); });
+    label();
+    return el("div", { class: "pay" }, [el("div", { class: "pay-title", text: title }), select, btn]);
+  }
+
+  async function loadPetitFilsPay() {
+    var box = $("pay-petit-fils");
+    box.textContent = "";
+    var owned = [];
+    try {
+      var own = await supabase.from("purchases").select("course_id").eq("user_id", user.id).eq("product_type", "formation").eq("status", "paid");
+      if (!own.error && Array.isArray(own.data)) owned = own.data.map(function (r) { return r.course_id; });
+    } catch (e) { /* le serveur refuse de toute façon un doublon */ }
+    var options = PAY.payableForPetitFils(catalogue, owned);
+    if (!options.length) {
+      box.appendChild(el("p", { text: catalogue.length ? "Vous possédez déjà toutes les formations proposées." : "Aucune formation n'est proposée pour le moment." }));
+      return;
+    }
+    var holder = payBlock(options, "", "Choisir la formation", "Payer ma formation", function (fid) { return PAY.checkoutBody("petit_fils", fid); }, "etat-paiement-pf");
+    while (holder.firstChild) box.appendChild(holder.firstChild);
+  }
+
   // ---------- Mes demandes ----------
   async function loadRequests() {
     var box = $("liste-demandes");
@@ -119,7 +182,13 @@
       if (d.statut === "validee") {
         var place = placeByDemande[d.id];
         if (place) card.appendChild(placeBlock(place));
-        else card.appendChild(el("div", { class: "why", text: "Validée : la place est en cours d'attribution." }));
+        else if (canPay && catalogue.length && PAY.canPayDemande(d, false)) {
+          var sid = "etat-paiement-" + d.id;
+          card.appendChild(payBlock(catalogue, d.formation, "Payer la place de cet élève", "Payer la place",
+            function (fid) { return PAY.checkoutBody("parrain", fid, d.id); }, sid));
+          var st = el("p", { class: "status hidden", id: sid, role: "status" });
+          card.appendChild(st);
+        } else card.appendChild(el("div", { class: "why", text: "Validée : la place est en cours d'attribution." }));
       }
       box.appendChild(card);
     });
@@ -207,6 +276,7 @@
       if (choices.length) {
         formationList = choices.map(function (c) { return [c.id, c.nom]; });
         choices.forEach(function (c) { formationNames[c.id] = c.nom; });
+        catalogue = choices.filter(function (c) { return Number.isInteger(c.prixInstitut) && c.prixInstitut > 0; });
       }
     } catch (e) { formationList = U.FORMATIONS; }
     fillSelect($("f-formation"), formationList, "Choisir…");
@@ -241,6 +311,9 @@
     setHidden("bloc-demandes", view === "login");
     setHidden("note-admin", !(view === "form" && isAdmin && !open));
     setHidden("note-petit-fils", !(user && petitFils));
+    canPay = !!user && (open || isAdmin);
+    setHidden("bloc-petit-fils", !(canPay && petitFils));
+    if (canPay && petitFils) await loadPetitFilsPay();
     if (readFailed && view === "closed") setStatus("etat", "Impossible de vérifier l'ouverture de l'Institut pour le moment. Réessayez dans un instant.", true);
     if (user) await loadRequests();
   }

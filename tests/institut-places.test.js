@@ -226,17 +226,20 @@ test("index.html : la carte « Institut SAYÉ LOUIS » reste .disabled, « Bient
 
 test("aucun fichier ajouté dans api/ (12 fonctions) et api/fedapay-*.js non modifiés : pas de paiement dans cette PR", () => {
   const list = (d) => fs.readdirSync(path.join(root, d)).filter((f) => f.endsWith(".js")).sort();
-  assert.deepStrictEqual(list("api"), ["_attachment-rules.js", "_brand.js", "_cloudinary-og.js", "_entreprise-abonnement.js", "_entreprise-og.js", "_roles.js", "_room-og.js", "_salon-abonnement.js", "_serigraphie.js",
+  assert.deepStrictEqual(list("api"), ["_attachment-rules.js", "_brand.js", "_cloudinary-og.js", "_entreprise-abonnement.js", "_entreprise-og.js", "_institut-paiement.js", "_roles.js", "_room-og.js", "_salon-abonnement.js", "_serigraphie.js",
     "attachment.js", "course.js", "digital-products-download.js", "fedapay-checkout.js", "fedapay-webhook.js", "produit-og.js", "push.js", "share-finalize.js", "share-pending.js", "share-target.js"]);
   assert.deepStrictEqual(list("api/admin"), ["list-users.js", "user-action.js"]);
   const functions = list("api").filter((f) => !f.startsWith("_")).concat(list("api/admin").map((f) => "admin/" + f));
   assert.strictEqual(functions.length, 12, "limite Vercel Hobby");
-  // Empreintes des deux fichiers FedaPay à la fin de la PR 2 : à mettre à jour seulement par la PR 4 (paiement), volontairement.
-  const sha = (f) => crypto.createHash("sha256").update(fs.readFileSync(path.join(root, f))).digest("hex");
-  assert.strictEqual(sha("api/fedapay-checkout.js"), "b12a19bd3e1031a92ddca35784ce8df647760c5287782d3076e76b22ce6ee898");
-  assert.strictEqual(sha("api/fedapay-webhook.js"), "d057ea9efb53a43e439e1a37b79de8576e348504e512af38c43f9b6fa7a0a944");
+  // PR 4 : les deux fichiers FedaPay n'ont qu'une branche déléguée chacun vers le helper (pas de logique d'argent ici).
+  assert.match(read("api/fedapay-checkout.js"), /productType === "institut"[\s\S]{0,200}handleInstitutCheckout\(req, res\)/);
+  assert.match(read("api/fedapay-webhook.js"), /handleInstitutWebhook\(supabaseAdmin, \{ transactionId, officialStatus, officialAmount, log \}\)/);
   // purchase-list.js lit la colonne fedapay_transaction_id pour reconnaître une place (affichage) : il n'initie aucun paiement.
-  FILES.filter((f) => f !== "purchase-list.js").forEach((f) => assert.ok(!/fedapay|checkout/i.test(code(f)), f + " : aucun paiement"));
+  // PR 4 : seuls institut-demande.js/.html (boutons de paiement) et admin/institut.html (onglet « Paiements », lecture seule)
+  // parlent de paiement ; les autres pages et scripts de l'Institut n'en initient aucun.
+  const PAIEMENT_OK = ["purchase-list.js", "institut-demande.js", "institut-demande.html", "admin/institut.html"];
+  FILES.filter((f) => PAIEMENT_OK.indexOf(f) === -1).forEach((f) => assert.ok(!/fedapay|checkout/i.test(code(f)), f + " : aucun paiement"));
+  assert.ok(!/fedapay-checkout/i.test(code("admin/institut.html")), "l'administration n'initie aucun paiement");
 });
 
 test("institut.html : « En chiffres » masquée par défaut, lien discret « J'ai un code d'invitation » sous le bouton (hors de la zone remplacée), scripts dans l'ordre", () => {
@@ -292,7 +295,7 @@ test("institut-place.html : saisie du code (majuscules automatiques, espaces et 
 test("admin/institut.html : onglets Formations et Dons, attribution par la fonction, aucun upsert sur institut_formations, prix contrôlé, copie du code, aucune lecture d'e-mail", () => {
   const html = read("admin/institut.html");
   ["tab-demandes", "tab-formations", "tab-dons", "tab-petits-fils", "tab-textes", "panel-formations", "panel-dons"].forEach((id) => assert.ok(html.includes('id="' + id + '"'), id));
-  assert.match(html, /const TABS = \["demandes", "formations", "dons", "petits-fils", "textes"\]/);
+  assert.match(html, /const TABS = \["demandes", "formations", "dons", "petits-fils", "paiements", "textes"\]/);
   assert.match(html, /ADMIN_ROLES\.indexOf\(profile\.role\) === -1\)[\s\S]*access-denied/);
   assert.match(html, /supabase\.rpc\("institut_attribuer_place", \{ p_demande: d\.id, p_formation: fSel\.value, p_source: source, p_don: source === "don" \? donSel\.value : null \}\)/);
   assert.match(html, /if \(activeIds\.indexOf\(d\.formation\) !== -1\) fSel\.value = d\.formation;/, "présélection de la formation de la demande");
