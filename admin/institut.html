@@ -104,6 +104,7 @@
       <button type="button" role="tab" id="tab-formations" aria-selected="false" aria-controls="panel-formations">Formations</button>
       <button type="button" role="tab" id="tab-dons" aria-selected="false" aria-controls="panel-dons">Dons</button>
       <button type="button" role="tab" id="tab-petits-fils" aria-selected="false" aria-controls="panel-petits-fils">Petits-fils</button>
+      <button type="button" role="tab" id="tab-paiements" aria-selected="false" aria-controls="panel-paiements">Paiements</button>
       <button type="button" role="tab" id="tab-textes" aria-selected="false" aria-controls="panel-textes">Textes</button>
     </div>
 
@@ -146,6 +147,14 @@
       <div id="liste-dons"></div>
     </div>
 
+    <!-- Onglet : paiements FedaPay du prix Institut (lecture seule : aucune action ici) -->
+    <div class="panel hidden" id="panel-paiements" role="tabpanel" aria-labelledby="tab-paiements">
+      <h2>Paiements</h2>
+      <p class="hint">Paiements FedaPay du prix Institut (lecture seule). Une mention « À vérifier » signale un paiement encaissé pour lequel rien n'a pu être créé automatiquement : à traiter à la main (remboursement ou attribution).</p>
+      <div class="status" id="etat-paiements" role="status"></div>
+      <div id="liste-paiements"></div>
+    </div>
+
     <!-- Onglet 2 : petits-fils -->
     <div class="panel hidden" id="panel-petits-fils" role="tabpanel" aria-labelledby="tab-petits-fils">
       <h2>Petits-fils de Sayé Louis</h2>
@@ -186,6 +195,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="../institut-utils.js"></script>
 <script src="../institut-place-utils.js"></script>
+<script src="../institut-paiement-utils.js"></script>
 <script>
 (function () {
   "use strict";
@@ -249,7 +259,7 @@
   const nameOf = (id) => (refs.byId[id] && refs.byId[id].nom) || U.formationLabel(id);
 
   // ---------- Onglets ----------
-  const TABS = ["demandes", "formations", "dons", "petits-fils", "textes"];
+  const TABS = ["demandes", "formations", "dons", "petits-fils", "paiements", "textes"];
   function showTab(name) {
     TABS.forEach((t) => {
       $("tab-" + t).setAttribute("aria-selected", t === name ? "true" : "false");
@@ -258,6 +268,7 @@
     // Données fraîches à l'ouverture : une place attribuée dans « Demandes » change les places utilisées d'un don.
     if (name === "dons") loadDons();
     if (name === "formations") loadFormations();
+    if (name === "paiements") loadPaiements();
   }
   TABS.forEach((t) => $("tab-" + t).addEventListener("click", () => showTab(t)));
 
@@ -385,7 +396,7 @@
       setTimeout(() => { copy.textContent = "Copier"; }, 2500);
     });
     const when = place.reclamee_le ? "réclamée le " + U.formatDate(place.reclamee_le) : "non réclamée";
-    const src = place.source === "don" ? "financée par un don" : "offerte";
+    const src = place.source === "don" ? "financée par un don" : place.source === "payee" ? "payée par le parrain" : "offerte";
     return el("div", { class: "place-box" }, [
       el("div", { class: "who", text: "Place : " + when }),
       el("div", { class: "meta", text: nameOf(place.formation_id) + " · " + src + " · attribuée le " + U.formatDate(place.cree_le) }),
@@ -552,6 +563,32 @@
     setStatus("etat-dons", "Don enregistré.", false);
     await loadDons();
   });
+
+  // =========================================================
+  // Onglet « Paiements » : lecture seule (aucun nom, aucun téléphone : date, type, formation, montant, statut)
+  // =========================================================
+  const PAIEMENT_TYPES = { parrain: "Place payée par un parrain", petit_fils: "Formation payée par un petit-fils" };
+  const PAIEMENT_STATUTS = { en_attente: "En attente", paye: "Payé", echoue: "Échoué" };
+  const PAIEMENT_NOTES = { montant_incoherent: "montant incohérent", demande_non_validee: "demande plus validée", place_deja_existante: "place déjà attribuée", deja_possedee: "formation déjà possédée", achat_existant: "achat déjà existant", payeur_inconnu: "payeur inconnu" };
+  async function loadPaiements() {
+    const box = $("liste-paiements");
+    const { data, error } = await supabase.from("institut_paiements").select("id, type, formation_id, montant, statut, note, cree_le, confirme_le").order("cree_le", { ascending: false }).limit(200);
+    box.textContent = "";
+    if (error) { setStatus("etat-paiements", "Impossible de charger les paiements : " + error.message + " (le SQL de la PR 4 est-il exécuté ?)", true); return; }
+    setStatus("etat-paiements", "", false);
+    if (!data.length) { box.appendChild(el("p", { class: "hint", text: "Aucun paiement pour le moment." })); return; }
+    data.forEach((x) => {
+      const verifier = x.statut === "paye" && x.note;
+      box.appendChild(el("div", { class: "card item" }, [
+        el("div", { class: "top" }, [
+          el("span", { class: "who", text: (PAIEMENT_TYPES[x.type] || x.type) + " · " + U.formatFcfa(x.montant) }),
+          el("span", { class: "badge", text: (PAIEMENT_STATUTS[x.statut] || x.statut) + (verifier ? " · À vérifier" : "") })
+        ]),
+        el("div", { class: "meta", text: nameOf(x.formation_id) + " · le " + U.formatDate(x.cree_le) + (x.confirme_le ? " · confirmé le " + U.formatDate(x.confirme_le) : "") }),
+        x.note ? el("div", { class: "text", text: "Mention : " + (PAIEMENT_NOTES[x.note] || x.note) }) : null
+      ]));
+    });
+  }
 
   // =========================================================
   // Onglet « Petits-fils »

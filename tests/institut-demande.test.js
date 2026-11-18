@@ -315,14 +315,14 @@ test("index.html : la carte « Institut SAYÉ LOUIS » reste .disabled, « Bient
   assert.ok(!/<a\b|onclick/.test(m[1]));
 });
 
-test("institut-demande.html : noindex, avertissement « prénom seulement », champs attendus, aucun champ de paiement ni de photo", () => {
+test("institut-demande.html : noindex, avertissement « prénom seulement », champs attendus, aucun champ de montant ni de photo", () => {
   const html = read("institut-demande.html");
   assert.match(html, /<meta name="robots" content="noindex">/);
   assert.ok(html.includes("Ne saisissez que le prénom de l'enfant.") && html.includes("Les informations restent privées."));
   ["f-prenom", "f-age", "f-lien", "f-formation", "f-motif", "f-fichier"].forEach((id) => assert.ok(html.includes('id="' + id + '"'), id));
   assert.match(html, /accept="image\/jpeg,image\/png,image\/webp,application\/pdf"/);
   assert.ok(!/(f-nom\b|f-adresse|f-telephone|f-email|type="tel"|type="email"|capture=)/.test(html), "pas de nom de famille, adresse, téléphone, e-mail ni capture photo");
-  assert.ok(!/(fedapay|paiement|payer|montant)/i.test(html), "rien de payant dans cette PR");
+  assert.ok(!/(fedapay|id="[^"]*montant|name="montant|type="number")/i.test(html), "aucun champ de montant (PR 4 : le serveur relit le prix)");
   const srcs = [...html.matchAll(/<script src="([^"]+)"/g)].map((m) => m[1]);
   ["config.js", "pseudo.js", "login-sheet.js", "institut-utils.js", "institut-demande-utils.js", "institut-demande.js"].forEach((f) => assert.ok(srcs.includes(f), f));
   assert.ok(srcs.indexOf("institut-utils.js") < srcs.indexOf("institut-demande-utils.js") && srcs.indexOf("institut-demande-utils.js") < srcs.indexOf("institut-demande.js"));

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Paiement — Institut SAYÉ LOUIS</title>
+<meta name="description" content="Retour de paiement — Institut SAYÉ LOUIS.">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#FFC107">
+<link rel="manifest" href="manifest.json">
+<script src="brand.js"></script>
+<link rel="icon" href="assets/favicon.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="stylesheet" href="theme.css">
+<script src="theme-toggle.js"></script>
+<style>
+  .guide { max-width: 720px; margin: 0 auto; padding: 20px 20px 110px; }
+  .guide h1 { font-size: 22px; line-height: 1.25; color: var(--gold); margin-bottom: 14px; }
+  .guide section { border: 1px solid var(--border); background: var(--bg-card); border-radius: var(--radius-md); padding: 14px 16px 10px; margin-bottom: 12px; }
+  .guide h2 { font-size: 16px; color: var(--white); margin-bottom: 8px; }
+  .guide p { font-size: 14px; line-height: 1.7; color: var(--text-muted); margin-bottom: 10px; }
+  .guide .actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 8px 0; }
+  .guide .btn { padding: 11px 16px; border: none; border-radius: var(--radius-md); background: var(--gold-bright); color: #0A0A0A; font-family: inherit; font-size: 14px; font-weight: 700; cursor: pointer; text-decoration: none; display: inline-block; }
+  .guide .ok h2 { color: var(--accent-green); }
+  .guide .ko h2 { color: #F87171; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<button id="theme-toggle-btn" class="theme-toggle-fab">🌙</button>
+
+<div class="page-content">
+<main class="guide">
+  <h1>Institut SAYÉ LOUIS</h1>
+  <p id="chargement">Chargement…</p>
+  <section id="bloc-connexion" class="hidden">
+    <h2>Connexion requise</h2>
+    <p>Connectez-vous avec le compte utilisé pour payer afin de voir l'état de votre paiement.</p>
+    <div class="actions"><a class="btn" href="institut-demande.html">Se connecter</a></div>
+  </section>
+  <section id="bloc-etat" class="hidden" role="status">
+    <h2 id="etat-titre"></h2>
+    <p id="etat-texte"></p>
+    <div class="actions">
+      <button type="button" class="btn hidden" id="btn-actualiser">Actualiser</button>
+      <a class="btn" id="lien-suite" href="institut-demande.html">Retour à l'Institut</a>
+    </div>
+  </section>
+</main>
+</div>
+
+<nav class="bottom-nav">
+  <a class="nav-item" href="index.html"><span class="icon">🏠</span>Accueil</a>
+  <a class="nav-item" href="discussions.html"><span class="icon">💬</span>Messages</a>
+  <a class="nav-item" href="ai.html"><span class="icon">🧠</span>MAHOUTO AI</a>
+  <a class="nav-item" href="school.html"><span class="icon">🎓</span>School</a>
+  <a class="nav-item" href="profil.html"><span class="icon">👤</span>Profil</a>
+</nav>
+
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="institut-paiement-utils.js"></script>
+<script src="institut-retour.js"></script>
+<script src="pwa-install.js"></script>
+</body>
+</html>

@@ -55,6 +55,14 @@ export default async function handler(req, res) {
       return handleEntrepriseCheckout(req, res);
     }
 
+    // Prix social de l'Institut SAYÉ LOUIS (productType "institut") : branche déléguée au helper
+    // api/_institut-paiement.js (même raison : pas de nouvelle fonction Vercel). Authentification, droits et prix
+    // (institut_formations.prix_institut) sont vérifiés / relus côté serveur ; le navigateur n'envoie aucun montant.
+    if (req.body && req.body.productType === "institut") {
+      const { handleInstitutCheckout } = await import("./_institut-paiement.js");
+      return handleInstitutCheckout(req, res);
+    }
+
     // -----------------------------------------------------
     // 1. Le navigateur ne fournit QUE courseId (+ productType
     //    facultatif) — tout le reste (montant, nom, identité)

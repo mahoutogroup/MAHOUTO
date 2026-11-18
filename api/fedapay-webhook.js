@@ -165,6 +165,13 @@ export default async function handler(req, res) {
     const { handleSalonWebhook } = await import("./_salon-abonnement.js");
     const salonResult = await handleSalonWebhook(supabaseAdmin, { transactionId, officialStatus, officialAmount, log });
     if (salonResult) return res.status(salonResult.status).json(salonResult.body);
+
+    // Prix social de l'Institut SAYÉ LOUIS : paiement retrouvé dans institut_paiements (helper
+    // api/_institut-paiement.js). La création de la place / de l'accès ne dépend QUE de cet appel, après la
+    // vérification de signature et la relecture de la transaction chez FedaPay faites plus haut.
+    const { handleInstitutWebhook } = await import("./_institut-paiement.js");
+    const institutResult = await handleInstitutWebhook(supabaseAdmin, { transactionId, officialStatus, officialAmount, log });
+    if (institutResult) return res.status(institutResult.status).json(institutResult.body);
   }
 
   if (purchaseError || !purchase) {
