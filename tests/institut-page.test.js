@@ -85,15 +85,19 @@ test("le bouton « Demander un parrainage » est désactivé (disabled + aria-di
   assert.strictEqual((page.match(/<button\b/g) || []).length, 2, "uniquement le bouton de thème et le bouton désactivé");
 });
 
-test("page statique : aucun formulaire, aucune base, aucun paiement, aucun innerHTML, aucun script propre", () => {
+test("page sans formulaire, sans paiement, sans innerHTML ; seuls scripts autorisés : lecture publique des textes (PR 2)", () => {
   assert.ok(!/<form\b|<input\b|<textarea\b|<select\b/i.test(page), "aucun champ de saisie");
   assert.ok(!/innerHTML|outerHTML|insertAdjacentHTML|document\.write|eval\(|new Function/.test(page));
-  assert.ok(!/\b(fetch|XMLHttpRequest|supabase|fedapay|localStorage|sessionStorage)\b/i.test(page));
-  assert.ok(!/config\.js/.test(page), "pas de configuration Supabase chargée");
+  assert.ok(!/\b(XMLHttpRequest|fedapay|localStorage|sessionStorage)\b/i.test(page));
   assert.ok(!/<script>/.test(page) && !/<script\b(?![^>]*\bsrc=)/.test(page), "aucun script en ligne");
+  // PR 2 : la page lit institut_contenus (lecture publique) avec le client Supabase, comme les autres pages.
   const srcs = [...page.matchAll(/<script src="([^"]+)"/g)].map((m) => m[1]).sort();
-  assert.deepStrictEqual(srcs, ["brand.js", "pwa-install.js", "theme-toggle.js"]);
-  assert.ok(!/(src|href)="https?:\/\//.test(page), "aucune ressource externe");
+  assert.deepStrictEqual(srcs, [
+    "brand.js", "config.js", "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js",
+    "institut-page.js", "institut-utils.js", "pwa-install.js", "theme-toggle.js"
+  ]);
+  const external = [...page.matchAll(/(?:src|href)="(https?:\/\/[^"]+)"/g)].map((m) => m[1]);
+  assert.deepStrictEqual(external, ["https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"], "seule ressource externe : le client Supabase");
 });
 
 test("données publiques : aucun téléphone, e-mail, lien de paiement ni donnée personnelle", () => {

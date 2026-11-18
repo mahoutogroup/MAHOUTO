@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Demande de parrainage — Institut SAYÉ LOUIS — MAHOUTO+</title>
+<meta name="description" content="Demande de parrainage pour l'Institut SAYÉ LOUIS, un module de MAHOUTO+.">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#FFC107">
+<link rel="manifest" href="manifest.json">
+<script src="brand.js"></script>
+<link rel="icon" href="assets/favicon.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="stylesheet" href="theme.css">
+<script src="theme-toggle.js"></script>
+<style>
+  .guide { max-width: 720px; margin: 0 auto; padding: 20px 20px 110px; }
+  .guide .back { display: inline-block; font-size: 13px; color: var(--gold); margin-bottom: 14px; }
+  .guide h1 { font-size: 22px; line-height: 1.25; color: var(--gold); margin-bottom: 8px; overflow-wrap: anywhere; }
+  .guide .lead { font-size: 15px; line-height: 1.7; color: var(--text-muted); margin-bottom: 18px; }
+  .guide .notice {
+    font-size: 12.5px; line-height: 1.6; color: var(--text-muted);
+    border: 1px solid var(--border); border-left: 3px solid var(--gold);
+    background: var(--bg-elevated); border-radius: var(--radius-sm);
+    padding: 10px 12px; margin-bottom: 18px;
+  }
+  .guide section {
+    border: 1px solid var(--border); background: var(--bg-card);
+    border-radius: var(--radius-md); padding: 14px 16px 12px; margin-bottom: 12px;
+  }
+  .guide h2 { font-size: 16px; line-height: 1.3; color: var(--white); margin-bottom: 10px; }
+  .guide p, .guide li { font-size: 14px; line-height: 1.7; color: var(--text-muted); }
+  .guide p { margin-bottom: 10px; }
+  .guide strong { color: var(--white); }
+  .guide .field { margin-bottom: 12px; }
+  .guide label { display: block; font-size: 12.5px; color: var(--text-dim); margin-bottom: 4px; }
+  .guide input[type="text"], .guide select, .guide textarea {
+    width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--white); font-family: inherit; font-size: 15px; min-width: 0;
+  }
+  .guide textarea { min-height: 90px; resize: vertical; }
+  .guide input[type="file"] { width: 100%; font-size: 13px; color: var(--text-muted); }
+  .guide .invalid { border-color: #EF4444 !important; }
+  .guide .err { font-size: 12px; color: #F87171; margin-top: 3px; min-height: 0; }
+  .guide .err:empty { display: none; }
+  .guide .hint { font-size: 12px; color: var(--text-dim); margin-top: 3px; line-height: 1.5; }
+  .guide .btn {
+    display: block; width: 100%; max-width: 360px; padding: 13px 18px; border: none; border-radius: var(--radius-md);
+    background: var(--gold-bright); color: #0A0A0A; font-family: inherit; font-size: 15px; font-weight: 700; cursor: pointer;
+  }
+  .guide .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .guide .status { font-size: 13px; line-height: 1.6; margin-top: 10px; color: var(--accent-green); }
+  .guide .status.error { color: #F87171; }
+  .guide .req { border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg); padding: 10px 12px; margin-bottom: 8px; }
+  .guide .req .top { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+  .guide .req .who { font-weight: 700; color: var(--white); font-size: 14px; overflow-wrap: anywhere; }
+  .guide .req .badge { font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 999px; background: var(--bg-card); color: var(--text-muted); white-space: nowrap; }
+  .guide .req .badge.validee { color: var(--accent-green); }
+  .guide .req .badge.refusee { color: #F87171; }
+  .guide .req .meta { font-size: 12px; color: var(--text-dim); margin-top: 3px; }
+  .guide .req .why { font-size: 13px; color: var(--text-muted); margin-top: 6px; overflow-wrap: anywhere; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<button id="theme-toggle-btn" class="theme-toggle-fab">🌙</button>
+
+<div class="page-content">
+<main class="guide">
+  <a class="back" href="institut.html">← Retour à l'Institut</a>
+  <h1>Demande de parrainage</h1>
+  <p class="lead">Institut SAYÉ LOUIS : une formation à tarif social pour les orphelins.</p>
+  <p class="status hidden" id="etat" role="status"></p>
+
+  <section id="bloc-chargement"><p>Chargement…</p></section>
+
+  <section id="bloc-connexion" class="hidden">
+    <h2>Connexion</h2>
+    <p>Connectez-vous pour déposer une demande de parrainage.</p>
+    <button type="button" class="btn" id="btn-connexion">Se connecter</button>
+  </section>
+
+  <section id="bloc-ferme" class="hidden">
+    <h2>Demandes fermées</h2>
+    <p>L'Institut n'est pas encore ouvert aux demandes.</p>
+  </section>
+
+  <p class="notice hidden" id="note-admin"><strong>Mode administrateur.</strong> L'Institut n'est pas encore ouvert au public : seuls les administrateurs peuvent déposer une demande pour l'instant.</p>
+  <p class="notice hidden" id="note-petit-fils">Vous êtes admis d'office au tarif Institut.</p>
+
+  <section id="bloc-formulaire" class="hidden">
+    <h2>Déposer une demande</h2>
+    <p class="notice"><strong>Ne saisissez que le prénom de l'enfant.</strong> Les informations restent privées.</p>
+    <form id="formulaire" novalidate>
+      <div class="field">
+        <label for="f-prenom">Prénom de l'orphelin</label>
+        <input type="text" id="f-prenom" maxlength="40" autocomplete="off" autocapitalize="words">
+        <div class="err" id="e-prenom" role="alert"></div>
+      </div>
+      <div class="field">
+        <label for="f-age">Âge (en années)</label>
+        <input type="text" id="f-age" inputmode="numeric" maxlength="2" autocomplete="off">
+        <div class="err" id="e-age" role="alert"></div>
+      </div>
+      <div class="field">
+        <label for="f-lien">Votre lien avec l'enfant</label>
+        <select id="f-lien"></select>
+        <div class="err" id="e-lien" role="alert"></div>
+      </div>
+      <div class="field">
+        <label for="f-formation">Formation souhaitée</label>
+        <select id="f-formation"></select>
+        <div class="err" id="e-formation" role="alert"></div>
+      </div>
+      <div class="field">
+        <label for="f-motif">Motif (facultatif)</label>
+        <textarea id="f-motif" maxlength="500"></textarea>
+        <div class="hint">500 caractères au maximum. Pas de nom de famille, d'adresse ni de numéro de téléphone.</div>
+        <div class="err" id="e-motif" role="alert"></div>
+      </div>
+      <div class="field">
+        <label for="f-fichier">Justificatif (facultatif, recommandé)</label>
+        <input type="file" id="f-fichier" accept="image/jpeg,image/png,image/webp,application/pdf">
+        <div class="hint">Photo (JPEG, PNG, WebP) ou PDF, 5 Mo au maximum. Il reste privé : seuls les administrateurs de l'Institut peuvent le consulter.</div>
+        <div class="err" id="e-fichier" role="alert"></div>
+      </div>
+      <button type="submit" class="btn" id="btn-envoyer">Envoyer la demande</button>
+      <p class="status hidden" id="etat-formulaire" role="status"></p>
+    </form>
+  </section>
+
+  <section id="bloc-demandes" class="hidden">
+    <h2>Mes demandes</h2>
+    <div id="liste-demandes"></div>
+  </section>
+</main>
+</div>
+
+<nav class="bottom-nav">
+  <a class="nav-item" href="index.html"><span class="icon">🏠</span>Accueil</a>
+  <a class="nav-item" href="discussions.html"><span class="icon">💬</span>Messages</a>
+  <a class="nav-item" href="ai.html"><span class="icon">🧠</span>MAHOUTO AI</a>
+  <a class="nav-item" href="school.html"><span class="icon">🎓</span>School</a>
+  <a class="nav-item" href="profil.html"><span class="icon">👤</span>Profil</a>
+</nav>
+
+<script src="config.js"></script>
+<script src="pseudo.js"></script>
+<script src="login-sheet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="institut-utils.js"></script>
+<script src="institut-demande-utils.js"></script>
+<script src="institut-demande.js"></script>
+<script src="pwa-install.js"></script>
+</body>
+</html>
