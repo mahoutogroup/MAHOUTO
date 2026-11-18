@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Institut SAYÉ LOUIS — MAHOUTO+</title>
+<meta name="description" content="Institut SAYÉ LOUIS : une formation à tarif social pour les orphelins, un module de MAHOUTO+.">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#FFC107">
+<link rel="manifest" href="manifest.json">
+<script src="brand.js"></script>
+<link rel="icon" href="assets/favicon.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="stylesheet" href="theme.css">
+<script src="theme-toggle.js"></script>
+<style>
+  .guide { max-width: 720px; margin: 0 auto; padding: 20px 20px 110px; }
+  .guide .back { display: inline-block; font-size: 13px; color: var(--gold); margin-bottom: 14px; }
+  .guide h1 { font-size: 22px; line-height: 1.25; color: var(--gold); margin-bottom: 8px; overflow-wrap: anywhere; }
+  .guide .lead { font-size: 15px; line-height: 1.7; color: var(--text-muted); margin-bottom: 18px; }
+  .guide .notice {
+    font-size: 12.5px; line-height: 1.6; color: var(--text-muted);
+    border: 1px solid var(--border); border-left: 3px solid var(--gold);
+    background: var(--bg-elevated); border-radius: var(--radius-sm);
+    padding: 10px 12px; margin-bottom: 18px;
+  }
+  .guide section {
+    border: 1px solid var(--border); background: var(--bg-card);
+    border-radius: var(--radius-md); padding: 14px 16px 6px; margin-bottom: 12px;
+  }
+  .guide h2 { font-size: 16px; line-height: 1.3; color: var(--white); margin-bottom: 10px; }
+  .guide p, .guide li { font-size: 14px; line-height: 1.7; color: var(--text-muted); }
+  .guide p { margin-bottom: 10px; }
+  .guide ul, .guide ol { padding-left: 20px; margin-bottom: 10px; }
+  .guide li { margin-bottom: 6px; }
+  .guide strong { color: var(--white); }
+  .guide .tablewrap { overflow-x: auto; margin: 4px 0 10px; }
+  .guide table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .guide th, .guide td { text-align: left; padding: 8px 10px; border: 1px solid var(--border); vertical-align: top; color: var(--text-muted); }
+  .guide th { color: var(--gold); background: var(--bg-elevated); }
+  .guide td.price { font-weight: 700; color: var(--white); }
+  @media (max-width: 420px) { .guide th, .guide td { padding: 8px 6px; font-size: 12.5px; } }
+  .guide .small { font-size: 12px; color: var(--text-dim); }
+  .guide .cta-zone { margin: 18px 0 8px; }
+  .guide .cta {
+    display: block; width: 100%; max-width: 360px; padding: 13px 18px;
+    border: none; border-radius: var(--radius-md); background: var(--gold-bright); color: #0A0A0A;
+    font-family: inherit; font-size: 15px; font-weight: 700;
+  }
+  .guide .cta:disabled { opacity: .5; cursor: not-allowed; }
+  .guide .cta-note { font-size: 12.5px; color: var(--text-dim); margin-top: 8px; }
+</style>
+</head>
+<body>
+
+<button id="theme-toggle-btn" class="theme-toggle-fab">🌙</button>
+
+<div class="page-content">
+<main class="guide">
+  <a class="back" href="index.html">← Retour à l'accueil</a>
+  <h1>Institut SAYÉ LOUIS</h1>
+  <p class="lead">Une formation à tarif social pour les orphelins.</p>
+  <p class="notice"><strong>Projet en préparation.</strong> Cette page présente l'Institut. Il n'est pas encore ouvert au public : aucune demande ne peut être déposée pour le moment.</p>
+
+  <section>
+    <h2>Notre histoire</h2>
+    <p>L'Institut SAYÉ LOUIS a été créé par le fondateur de MAHOUTO+, Mahouto Abdallah, en mémoire de son père, Sayé Louis.</p>
+    <p>Très tôt, son père l'a orienté vers l'apprentissage. C'est cet héritage qui donne sa raison d'être à l'Institut : offrir aux orphelins l'accès à la formation, à un tarif très réduit.</p>
+  </section>
+
+  <section>
+    <h2>Pour qui ?</h2>
+    <p>L'Institut s'adresse aux orphelins, dont les petits-fils de Sayé Louis.</p>
+    <p>Le tarif réduit est accordé après validation d'une demande de parrainage.</p>
+  </section>
+
+  <section>
+    <h2>Comment ça marche</h2>
+    <ol>
+      <li>Un parrain dépose une demande de parrainage.</li>
+      <li>La demande est examinée, puis validée.</li>
+      <li>La place à tarif Institut est ouverte.</li>
+      <li>L'élève suit la formation et reçoit un certificat.</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>Un exemple de tarif</h2>
+    <!-- TARIFS : seuls endroits à modifier pour changer les montants affichés (en FCFA). -->
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Formation</th><th>Académie Majesté Presse</th><th>Institut SAYÉ LOUIS</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>Sérigraphie</td>
+            <td class="price" id="tarif-academie">250&nbsp;000&nbsp;FCFA</td>
+            <td class="price" id="tarif-institut">50&nbsp;000&nbsp;FCFA</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>D'autres formations (informatique, graphisme…) viendront ensuite.</p>
+    <p class="small">Les montants sont donnés à titre d'exemple.</p>
+  </section>
+
+  <section>
+    <h2>Soutenir l'Institut</h2>
+    <p>Des donateurs pourront financer des places à tarif Institut pour des orphelins. Au début, les dons seront enregistrés à la main, par contact direct.</p>
+    <p>Les modalités seront annoncées prochainement.</p>
+  </section>
+
+  <section>
+    <h2>Protection des enfants</h2>
+    <ul>
+      <li>Les informations demandées seront limitées au strict nécessaire.</li>
+      <li>Les justificatifs resteront privés.</li>
+      <li>Aucune photo et aucun nom d'enfant ne seront affichés publiquement.</li>
+    </ul>
+  </section>
+
+  <div class="cta-zone">
+    <button type="button" class="cta" disabled aria-disabled="true" aria-describedby="cta-note">Demander un parrainage</button>
+    <p class="cta-note" id="cta-note">Bientôt disponible</p>
+  </div>
+</main>
+</div>
+
+<nav class="bottom-nav">
+  <a class="nav-item" href="index.html"><span class="icon">🏠</span>Accueil</a>
+  <a class="nav-item" href="discussions.html"><span class="icon">💬</span>Messages</a>
+  <a class="nav-item" href="ai.html"><span class="icon">🧠</span>MAHOUTO AI</a>
+  <a class="nav-item" href="school.html"><span class="icon">🎓</span>School</a>
+  <a class="nav-item" href="profil.html"><span class="icon">👤</span>Profil</a>
+</nav>
+
+<script src="pwa-install.js"></script>
+</body>
+</html>
