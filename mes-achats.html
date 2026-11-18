@@ -123,7 +123,7 @@
         : `<span class="emoji">${(formation && formation.emoji) || "🎓"}</span>`}
       <div class="info">
         <div class="nom">${purchase.course_name}</div>
-        <div class="meta">${money(purchase.amount)} · Acheté le ${formatDate(purchase.created_at)}</div>
+        <div class="meta">${MahoutoPurchaseList.isInstitutPlace(purchase) ? "Place Institut SAYÉ LOUIS · accordée le " + formatDate(purchase.created_at) : money(purchase.amount) + " · Acheté le " + formatDate(purchase.created_at)}</div>
       </div>
       ${purchase.status === "paid"
         ? `<a class="access-btn" href="formation-detail.html?course=${encodeURIComponent(purchase.course_id)}">Ouvrir</a>`

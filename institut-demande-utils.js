@@ -27,10 +27,12 @@
 
   /**
    * Valide la saisie du formulaire.
-   * input : { prenom, age, lien, formation, motif } (textes tels que saisis).
+   * input : { prenom, age, lien, formation, motif } (textes tels que saisis). formations : liste [id, libellé] facultative
+   * (lue dans institut_formations) ; à défaut, la liste constante U.FORMATIONS.
    * Renvoie { ok:true, value:{ prenom, age, lien, formation, motif } } ou { ok:false, errors:{ champ: message } }.
    */
-  function validateDemande(input) {
+  function validateDemande(input, formations) {
+    var formationList = Array.isArray(formations) && formations.length ? formations : U.FORMATIONS;
     var s = input && typeof input === "object" ? input : {};
     var errors = {}, value = {};
 
@@ -55,7 +57,7 @@
       delete value.lien;
     }
 
-    if (typeof s.formation !== "string" || !listHas(U.FORMATIONS, s.formation)) errors.formation = "Choisissez une formation.";
+    if (typeof s.formation !== "string" || !listHas(formationList, s.formation)) errors.formation = "Choisissez une formation.";
     else value.formation = s.formation;
 
     var motif = U.cleanMultiline(s.motif);

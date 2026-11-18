@@ -173,16 +173,32 @@ function fakeDom() {
   const section = make("section"); section.appendChild(make("h2", "Notre histoire")); section.appendChild(make("p", "STATIQUE 1")); section.appendChild(make("p", "STATIQUE 2"));
   const notice = make("p", "Projet en préparation"), zone = make("div"); const btn = make("button", "Demander un parrainage"); zone.appendChild(btn); zone.appendChild(make("p", "Bientôt disponible"));
   const body = make("main"); [notice, section, zone].forEach((n) => body.appendChild(n));
-  const byId = { histoire: section, "notice-prepa": notice, "cta-zone": zone };
+  const chiffres = make("section"); chiffres.hidden = true;
+  const statPlaces = make("div", "—"), statEleves = make("div", "—");
+  chiffres.appendChild(statPlaces); chiffres.appendChild(statEleves);
+  const tbody = make("tbody"); const staticRow = make("tr", "STATIQUE-TARIF"); tbody.appendChild(staticRow);
+  const noteExemple = make("p", "exemple"); [chiffres, tbody, noteExemple].forEach((n) => body.appendChild(n));
+  const byId = { histoire: section, "notice-prepa": notice, "cta-zone": zone, chiffres, "stat-places": statPlaces, "stat-eleves": statEleves, "note-exemple": noteExemple };
   const created = [];
-  const document = { getElementById: (id) => byId[id] || null, createElement: (tag) => { const n = make(tag); created.push(n); return n; } };
-  return { document, body, section, notice, zone, created };
+  const document = {
+    getElementById: (id) => byId[id] || null,
+    querySelector: (sel) => (sel === "#tarif-table tbody" ? tbody : null),
+    createElement: (tag) => { const n = make(tag); created.push(n); return n; }
+  };
+  return { document, body, section, notice, zone, created, chiffres, statPlaces, statEleves, tbody, staticRow, noteExemple };
 }
-async function runPage(result) {
+// extra : { stats, formations } = réponses de institut_stats et de institut_formations (vides par défaut)
+async function runPage(result, extra) {
   const dom = fakeDom();
   const calls = [];
-  const client = { from: (t) => ({ select: (c) => { calls.push([t, c]); return result instanceof Error ? Promise.reject(result) : Promise.resolve(result); } }) };
-  const win = { InstitutUtils: U, MAHOUTO_CONFIG: { SUPABASE_URL: "https://x.test", SUPABASE_ANON_KEY: "cle-fictive" }, supabase: { createClient: () => client } };
+  const opts = extra || {};
+  const settle = (r) => (r instanceof Error ? Promise.reject(r) : Promise.resolve(r));
+  const chain = (r) => { const o = { eq: () => o, order: () => o, then: (a, b) => settle(r).then(a, b) }; return o; };
+  const client = {
+    from: (t) => ({ select: (c) => { calls.push([t, c]); return t === "institut_contenus" ? settle(result) : chain(opts.formations || { data: [], error: null }); } }),
+    rpc: (name) => { calls.push(["rpc", name]); return settle(opts.stats || { data: [], error: null }); }
+  };
+  const win = { InstitutUtils: U, InstitutPlaceUtils: require("../institut-place-utils"), MAHOUTO_CONFIG: { SUPABASE_URL: "https://x.test", SUPABASE_ANON_KEY: "cle-fictive" }, supabase: { createClient: () => client } };
   const sandbox = { window: win, document: dom.document };
   vm.runInNewContext(read("institut-page.js"), sandbox);
   await new Promise((r) => setImmediate(r));
@@ -192,7 +208,7 @@ const texts = (section) => section.querySelectorAll("p").map((p) => p.textConten
 
 test("institut-page.js : lit institut_contenus ; histoire modifiée → paragraphes en textContent ; 'oui' → cadre retiré et lien actif", async () => {
   const d = await runPage({ data: [{ cle: "histoire", valeur: "Premier.\n\nSecond." }, { cle: "ouvert", valeur: "oui" }], error: null });
-  assert.deepStrictEqual(d.calls, [["institut_contenus", "cle, valeur"]]);
+  assert.deepStrictEqual(d.calls.filter((c) => c[0] === "institut_contenus"), [["institut_contenus", "cle, valeur"]]);
   assert.deepStrictEqual(texts(d.section), ["Premier.", "Second."]);
   assert.strictEqual(d.section.children[0].textContent, "Notre histoire", "le titre est conservé");
   assert.ok(!d.body.children.includes(d.notice), "cadre « Projet en préparation » retiré");
@@ -222,6 +238,41 @@ test("institut-page.js : un texte contenant du HTML reste du TEXTE (jamais inter
   const d = await runPage({ data: [{ cle: "histoire", valeur: evil }], error: null });
   assert.deepStrictEqual(texts(d.section), [evil]);
   assert.deepStrictEqual(d.created.map((n) => n.tagName).sort(), ["p"], "seul un <p> est créé : aucune balise issue du texte");
+});
+
+test("institut-page.js : « En chiffres » : deux nombres affichés ; lecture en échec ou valeurs invalides → section masquée", async () => {
+  const ok = await runPage({ data: [], error: null }, { stats: { data: [{ places_financees: 12, eleves_formes: 5 }], error: null } });
+  assert.deepStrictEqual(ok.calls.filter((c) => c[0] === "rpc"), [["rpc", "institut_stats"]]);
+  assert.strictEqual(ok.chiffres.hidden, false);
+  assert.deepStrictEqual([ok.statPlaces.textContent, ok.statEleves.textContent], ["12", "5"]);
+  for (const stats of [{ data: null, error: { message: "x" } }, { data: [], error: null }, { data: [{ places_financees: "12", eleves_formes: 5 }], error: null }, { data: [{ places_financees: 1.5, eleves_formes: 2 }], error: null }, new Error("réseau")]) {
+    const d = await runPage({ data: [], error: null }, { stats: stats });
+    assert.strictEqual(d.chiffres.hidden, true, "section masquée"); assert.strictEqual(d.statPlaces.textContent, "—");
+  }
+});
+
+test("institut-page.js : tableau de tarif remplacé par les formations actives (nom, prix Académie, prix Institut) ; sinon tableau statique conservé", async () => {
+  const rows = [
+    { formation_id: "f2", prix_institut: 40000, ordre: 2, formations: { nom: "Graphisme", prix: 120000, promotion: null } },
+    { formation_id: "f1", prix_institut: 50000, ordre: 1, formations: { nom: "Sérigraphie", prix: 300000, promotion: 250000 } },
+    { formation_id: "f3", prix_institut: 1000, ordre: 3, formations: null }
+  ];
+  const d = await runPage({ data: [], error: null }, { formations: { data: rows, error: null } });
+  const trs = d.tbody.children;
+  assert.strictEqual(trs.length, 2, "ligne sans nom de formation ignorée, ligne statique remplacée");
+  const cells = trs.map((tr) => tr.children.map((td) => td.textContent));
+  const nb = String.fromCharCode(0xA0);
+  assert.deepStrictEqual(cells[0], ["Sérigraphie", "250" + nb + "000" + nb + "FCFA", "50" + nb + "000" + nb + "FCFA"], "prix Académie = promotion si elle existe");
+  assert.deepStrictEqual(cells[1], ["Graphisme", "120" + nb + "000" + nb + "FCFA", "40" + nb + "000" + nb + "FCFA"]);
+  assert.ok(!d.body.children.includes(d.noteExemple), "la note « à titre d'exemple » disparaît avec les vrais prix");
+  for (const formations of [{ data: [], error: null }, { data: null, error: { message: "x" } }, { data: "n'importe quoi", error: null }, new Error("réseau")]) {
+    const s = await runPage({ data: [], error: null }, { formations: formations });
+    assert.deepStrictEqual(s.tbody.children, [s.staticRow]); assert.ok(s.body.children.includes(s.noteExemple));
+  }
+  // un nom de formation contenant du HTML reste du texte
+  const evil = await runPage({ data: [], error: null }, { formations: { data: [{ formation_id: "x", prix_institut: 10, ordre: 1, formations: { nom: "<img src=x onerror=alert(1)>", prix: 100 } }], error: null } });
+  assert.strictEqual(evil.tbody.children[0].children[0].textContent, "<img src=x onerror=alert(1)>");
+  assert.deepStrictEqual([...new Set(evil.created.map((n) => n.tagName))].sort(), ["td", "tr"]);
 });
 
 test("institut-page.js : sans configuration ou sans client Supabase, la page reste statique (aucune erreur)", () => {

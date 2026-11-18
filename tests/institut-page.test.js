@@ -85,7 +85,7 @@ test("le bouton « Demander un parrainage » est désactivé (disabled + aria-di
   assert.strictEqual((page.match(/<button\b/g) || []).length, 2, "uniquement le bouton de thème et le bouton désactivé");
 });
 
-test("page sans formulaire, sans paiement, sans innerHTML ; seuls scripts autorisés : lecture publique des textes (PR 2)", () => {
+test("page sans formulaire, sans paiement, sans innerHTML ; seuls scripts autorisés : lecture publique des textes, compteurs et formations (PR 2 et 3)", () => {
   assert.ok(!/<form\b|<input\b|<textarea\b|<select\b/i.test(page), "aucun champ de saisie");
   assert.ok(!/innerHTML|outerHTML|insertAdjacentHTML|document\.write|eval\(|new Function/.test(page));
   assert.ok(!/\b(XMLHttpRequest|fedapay|localStorage|sessionStorage)\b/i.test(page));
@@ -94,7 +94,7 @@ test("page sans formulaire, sans paiement, sans innerHTML ; seuls scripts autori
   const srcs = [...page.matchAll(/<script src="([^"]+)"/g)].map((m) => m[1]).sort();
   assert.deepStrictEqual(srcs, [
     "brand.js", "config.js", "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js",
-    "institut-page.js", "institut-utils.js", "pwa-install.js", "theme-toggle.js"
+    "institut-page.js", "institut-place-utils.js", "institut-utils.js", "pwa-install.js", "theme-toggle.js"
   ]);
   const external = [...page.matchAll(/(?:src|href)="(https?:\/\/[^"]+)"/g)].map((m) => m[1]);
   assert.deepStrictEqual(external, ["https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"], "seule ressource externe : le client Supabase");

@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Code d'invitation — Institut SAYÉ LOUIS — MAHOUTO+</title>
+<meta name="description" content="Saisir un code d'invitation de l'Institut SAYÉ LOUIS, un module de MAHOUTO+.">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#FFC107">
+<link rel="manifest" href="manifest.json">
+<script src="brand.js"></script>
+<link rel="icon" href="assets/favicon.png">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+<link rel="stylesheet" href="theme.css">
+<script src="theme-toggle.js"></script>
+<style>
+  .guide { max-width: 720px; margin: 0 auto; padding: 20px 20px 110px; }
+  .guide .back { display: inline-block; font-size: 13px; color: var(--gold); margin-bottom: 14px; }
+  .guide h1 { font-size: 22px; line-height: 1.25; color: var(--gold); margin-bottom: 8px; overflow-wrap: anywhere; }
+  .guide .lead { font-size: 15px; line-height: 1.7; color: var(--text-muted); margin-bottom: 18px; }
+  .guide .notice {
+    font-size: 12.5px; line-height: 1.6; color: var(--text-muted);
+    border: 1px solid var(--border); border-left: 3px solid var(--gold);
+    background: var(--bg-elevated); border-radius: var(--radius-sm);
+    padding: 10px 12px; margin-bottom: 18px;
+  }
+  .guide section {
+    border: 1px solid var(--border); background: var(--bg-card);
+    border-radius: var(--radius-md); padding: 14px 16px 12px; margin-bottom: 12px;
+  }
+  .guide h2 { font-size: 16px; line-height: 1.3; color: var(--white); margin-bottom: 10px; }
+  .guide p { font-size: 14px; line-height: 1.7; color: var(--text-muted); margin-bottom: 10px; }
+  .guide strong { color: var(--white); }
+  .guide label { display: block; font-size: 12.5px; color: var(--text-dim); margin-bottom: 6px; }
+  .guide input[type="text"] {
+    width: 100%; padding: 14px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); color: var(--white);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 22px; letter-spacing: 3px; text-transform: uppercase; text-align: center; min-width: 0;
+  }
+  .guide .invalid { border-color: #EF4444 !important; }
+  .guide .btn {
+    display: block; width: 100%; max-width: 360px; margin-top: 14px; padding: 13px 18px; border: none; border-radius: var(--radius-md);
+    background: var(--gold-bright); color: #0A0A0A; font-family: inherit; font-size: 15px; font-weight: 700; cursor: pointer; text-align: center; text-decoration: none;
+  }
+  .guide .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .guide .status { font-size: 13.5px; line-height: 1.6; margin-top: 10px; color: var(--accent-green); }
+  .guide .status.error { color: #F87171; }
+  .guide .ok-title { color: var(--accent-green); font-weight: 700; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<button id="theme-toggle-btn" class="theme-toggle-fab">🌙</button>
+
+<div class="page-content">
+<main class="guide">
+  <a class="back" href="institut.html">← Retour à l'Institut</a>
+  <h1>J'ai un code d'invitation</h1>
+  <p class="lead">Institut SAYÉ LOUIS : saisissez le code reçu de votre parrain pour ouvrir votre accès à la formation.</p>
+  <p class="status hidden" id="etat" role="status"></p>
+
+  <section id="bloc-chargement"><p>Chargement…</p></section>
+
+  <section id="bloc-connexion" class="hidden">
+    <h2>Connexion</h2>
+    <p>Connectez-vous avec <strong>votre propre compte</strong> : l'accès à la formation s'ouvrira sur ce compte.</p>
+    <button type="button" class="btn" id="btn-connexion">Se connecter</button>
+  </section>
+
+  <section id="bloc-code" class="hidden">
+    <h2>Saisir le code</h2>
+    <p class="notice"><strong>Utilisez le compte de l'élève.</strong> Le code ne peut servir qu'une seule fois et ouvre l'accès sur le compte connecté.</p>
+    <form id="formulaire" novalidate>
+      <label for="f-code">Code d'invitation (8 caractères)</label>
+      <input type="text" id="f-code" maxlength="24" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" placeholder="ABCD-EFGH" aria-describedby="e-code">
+      <div class="status error hidden" id="e-code" role="alert"></div>
+      <button type="submit" class="btn" id="btn-valider">Valider le code</button>
+    </form>
+  </section>
+
+  <section id="bloc-succes" class="hidden">
+    <h2>Place activée</h2>
+    <p class="ok-title" id="msg-succes"></p>
+    <a class="btn" id="lien-formation" href="school.html">Ouvrir la formation</a>
+  </section>
+</main>
+</div>
+
+<nav class="bottom-nav">
+  <a class="nav-item" href="index.html"><span class="icon">🏠</span>Accueil</a>
+  <a class="nav-item" href="discussions.html"><span class="icon">💬</span>Messages</a>
+  <a class="nav-item" href="ai.html"><span class="icon">🧠</span>MAHOUTO AI</a>
+  <a class="nav-item" href="school.html"><span class="icon">🎓</span>School</a>
+  <a class="nav-item" href="profil.html"><span class="icon">👤</span>Profil</a>
+</nav>
+
+<script src="config.js"></script>
+<script src="pseudo.js"></script>
+<script src="login-sheet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="institut-utils.js"></script>
+<script src="institut-place-utils.js"></script>
+<script src="institut-place.js"></script>
+<script src="pwa-install.js"></script>
+</body>
+</html>

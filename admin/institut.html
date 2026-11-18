@@ -64,6 +64,14 @@
   .preview { margin-top: 14px; padding: 14px; }
   .preview p { font-size: 13.5px; line-height: 1.6; color: var(--text-muted); margin-bottom: 8px; white-space: pre-line; overflow-wrap: anywhere; }
   .toggle-box { padding: 14px; margin-bottom: 18px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 6px; }
+  .grid2 input { width: 100%; }
+  .toggle-line { display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--text-muted); margin: 8px 0; }
+  .toggle-line input { width: 18px; height: 18px; accent-color: #D4AF37; }
+  .code-big { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 22px; letter-spacing: 3px; font-weight: bold; color: var(--gold); user-select: all; }
+  .place-box { margin-top: 10px; padding: 10px 12px; border: 1px dashed var(--gold); border-radius: 10px; background: var(--bg); }
+  .place-box .meta { margin-top: 2px; }
+  .warn { color: #F59E0B; font-size: 12px; margin-top: 4px; }
   .hidden { display: none !important; }
 </style>
 </head>
@@ -93,6 +101,8 @@
   <div id="dashboard" class="hidden">
     <div class="tabs" role="tablist">
       <button type="button" role="tab" id="tab-demandes" aria-selected="true" aria-controls="panel-demandes">Demandes</button>
+      <button type="button" role="tab" id="tab-formations" aria-selected="false" aria-controls="panel-formations">Formations</button>
+      <button type="button" role="tab" id="tab-dons" aria-selected="false" aria-controls="panel-dons">Dons</button>
       <button type="button" role="tab" id="tab-petits-fils" aria-selected="false" aria-controls="panel-petits-fils">Petits-fils</button>
       <button type="button" role="tab" id="tab-textes" aria-selected="false" aria-controls="panel-textes">Textes</button>
     </div>
@@ -107,6 +117,33 @@
       </div>
       <div class="status" id="etat-demandes" role="status"></div>
       <div id="liste-demandes"></div>
+    </div>
+
+    <!-- Onglet : formations de l'Institut (reprises de l'Académie) -->
+    <div class="panel hidden" id="panel-formations" role="tabpanel" aria-labelledby="tab-formations">
+      <h2>Formations de l'Institut</h2>
+      <p class="hint">Les formations de l'Académie (table des formations). Pour chacune : « Proposer à l'Institut » et son prix Institut. Une formation ajoutée dans l'Académie apparaît ici automatiquement.</p>
+      <div class="status" id="etat-formations" role="status"></div>
+      <div id="liste-formations"></div>
+    </div>
+
+    <!-- Onglet : dons (privés : visibles des administrateurs seuls) -->
+    <div class="panel hidden" id="panel-dons" role="tabpanel" aria-labelledby="tab-dons">
+      <h2>Dons</h2>
+      <p class="hint">Dons enregistrés à la main. Le nom du donateur et le montant restent dans l'administration : rien n'est affiché publiquement. Chaque place financée par un don est rattachée à un don.</p>
+      <form class="card item" id="form-don" novalidate>
+        <div class="grid2">
+          <div><label class="hint" for="don-montant">Montant (FCFA)</label><input type="text" id="don-montant" inputmode="numeric" maxlength="12" autocomplete="off"></div>
+          <div><label class="hint" for="don-places">Places financées</label><input type="text" id="don-places" inputmode="numeric" maxlength="4" autocomplete="off"></div>
+        </div>
+        <label class="hint" for="don-donateur">Donateur (facultatif, 80 caractères)</label>
+        <input type="text" id="don-donateur" class="grow" maxlength="80" autocomplete="off">
+        <label class="hint" for="don-note">Note (facultative, 300 caractères)</label>
+        <textarea id="don-note" maxlength="300" style="min-height:70px;"></textarea>
+        <div class="actions"><button type="submit" class="btn btn-gold" id="btn-don">Enregistrer le don</button></div>
+      </form>
+      <div class="status" id="etat-dons" role="status"></div>
+      <div id="liste-dons"></div>
     </div>
 
     <!-- Onglet 2 : petits-fils -->
@@ -148,12 +185,14 @@
 <script src="../config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="../institut-utils.js"></script>
+<script src="../institut-place-utils.js"></script>
 <script>
 (function () {
   "use strict";
   const cfg = window.MAHOUTO_CONFIG;
   const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
   const U = window.InstitutUtils;
+  const P = window.InstitutPlaceUtils;
   const BUCKET = "institut-justificatifs";
   const ADMIN_ROLES = ["admin", "super_admin", "founder"];
   const $ = (id) => document.getElementById(id);
@@ -176,13 +215,49 @@
 
   let currentAdminId = null;
 
+  async function copyText(text) {
+    try { if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(text); return true; } } catch (e) { /* repli */ }
+    try {
+      const tmp = document.createElement("textarea");
+      tmp.value = text; tmp.setAttribute("readonly", ""); tmp.style.position = "fixed"; tmp.style.opacity = "0";
+      document.body.appendChild(tmp); tmp.select();
+      const ok = document.execCommand("copy");
+      tmp.remove();
+      return !!ok;
+    } catch (e2) { return false; }
+  }
+
+  // Données de référence partagées par les onglets : formations de l'Académie, formations de l'Institut, dons, places.
+  const refs = { formations: [], byId: {}, inst: {}, dons: [], places: [], placeByDemande: {}, usedByDon: {} };
+  async function loadRefs() {
+    const [f, i, d, pl] = await Promise.all([
+      supabase.from("formations").select("id, nom, prix, promotion, provider, disponible").order("nom"),
+      supabase.from("institut_formations").select("formation_id, prix_institut, actif, ordre"),
+      supabase.from("institut_dons").select("id, montant, places, donateur, note, recu_le, cree_le").order("recu_le", { ascending: false }).order("cree_le", { ascending: false }),
+      supabase.from("institut_places").select("id, demande_id, formation_id, source, don_id, code, reclamee_le, cree_le")
+    ]);
+    const failed = [f, i, d, pl].filter((r) => r.error);
+    refs.formations = f.error ? [] : (f.data || []);
+    refs.byId = {}; refs.formations.forEach((x) => { refs.byId[x.id] = x; });
+    refs.inst = {}; (i.data || []).forEach((x) => { refs.inst[x.formation_id] = x; });
+    refs.dons = d.error ? [] : (d.data || []);
+    refs.places = pl.error ? [] : (pl.data || []);
+    refs.placeByDemande = {}; refs.places.forEach((x) => { refs.placeByDemande[x.demande_id] = x; });
+    refs.usedByDon = P.usedByDon(refs.places);
+    return failed.length ? failed[0].error.message : null;
+  }
+  const nameOf = (id) => (refs.byId[id] && refs.byId[id].nom) || U.formationLabel(id);
+
   // ---------- Onglets ----------
-  const TABS = ["demandes", "petits-fils", "textes"];
+  const TABS = ["demandes", "formations", "dons", "petits-fils", "textes"];
   function showTab(name) {
     TABS.forEach((t) => {
       $("tab-" + t).setAttribute("aria-selected", t === name ? "true" : "false");
       $("panel-" + t).classList.toggle("hidden", t !== name);
     });
+    // Données fraîches à l'ouverture : une place attribuée dans « Demandes » change les places utilisées d'un don.
+    if (name === "dons") loadDons();
+    if (name === "formations") loadFormations();
   }
   TABS.forEach((t) => $("tab-" + t).addEventListener("click", () => showTab(t)));
 
@@ -256,7 +331,7 @@
           el("span", { class: "badge " + d.statut, text: U.statutLabel(d.statut) })
         ]),
         el("div", { class: "meta", text: "Parrain : " + parrain + " · lien : " + U.lienLabel(d.lien) }),
-        el("div", { class: "meta", text: "Formation : " + U.formationLabel(d.formation) + " · déposée le " + U.formatDate(d.cree_le) + (d.traite_le ? " · traitée le " + U.formatDate(d.traite_le) : "") })
+        el("div", { class: "meta", text: "Formation : " + nameOf(d.formation) + " · déposée le " + U.formatDate(d.cree_le) + (d.traite_le ? " · traitée le " + U.formatDate(d.traite_le) : "") })
       ]);
       if (d.motif) card.appendChild(el("div", { class: "text", text: "Motif : " + d.motif }));
       if (d.statut === "refusee" && d.raison_refus) card.appendChild(el("div", { class: "text", text: "Raison du refus : " + d.raison_refus }));
@@ -294,8 +369,75 @@
         actions.appendChild(no);
       }
       card.appendChild(actions);
+      if (d.statut === "validee") card.appendChild(placeSection(d));
       box.appendChild(card);
     });
+  }
+
+  // ---- Place d'une demande validée : état et code, ou formulaire d'attribution ----
+  function placeInfo(place) {
+    const state = P.placeState(place);
+    const code = P.formatCode(place.code);
+    const codeEl = el("div", { class: "code-big", text: code });
+    const copy = el("button", { type: "button", class: "btn btn-view", text: "Copier" });
+    copy.addEventListener("click", async () => {
+      const ok = await copyText(place.code);
+      copy.textContent = ok ? "Copié ✓" : "Copie impossible";
+      setTimeout(() => { copy.textContent = "Copier"; }, 2500);
+    });
+    const when = place.reclamee_le ? "réclamée le " + U.formatDate(place.reclamee_le) : "non réclamée";
+    const src = place.source === "don" ? "financée par un don" : "offerte";
+    return el("div", { class: "place-box" }, [
+      el("div", { class: "who", text: "Place : " + when }),
+      el("div", { class: "meta", text: nameOf(place.formation_id) + " · " + src + " · attribuée le " + U.formatDate(place.cree_le) + " (" + state.label + ")" }),
+      el("div", { class: "actions" }, [codeEl, copy])
+    ]);
+  }
+
+  function placeSection(d) {
+    const place = refs.placeByDemande[d.id];
+    if (place) return placeInfo(place);
+    const holder = el("div", { class: "place-box" });
+    const open = el("button", { type: "button", class: "btn btn-gold", text: "Attribuer une place" });
+    holder.appendChild(el("div", { class: "meta", text: "Demande validée, sans place pour l'instant." }));
+    holder.appendChild(el("div", { class: "actions" }, [open]));
+    open.addEventListener("click", () => {
+      if (holder.querySelector("form")) return;
+      const activeIds = Object.keys(refs.inst).filter((id) => refs.inst[id].actif && refs.byId[id]);
+      if (!activeIds.length) { setStatus("etat-demandes", "Aucune formation n'est proposée par l'Institut : activez-en une dans l'onglet « Formations ».", true); return; }
+      const fSel = el("select", { "aria-label": "Formation" }, activeIds.map((id) => el("option", { value: id, text: nameOf(id) + " — " + U.formatFcfa(refs.inst[id].prix_institut) })));
+      if (activeIds.indexOf(d.formation) !== -1) fSel.value = d.formation;     // présélection : la formation de la demande
+      const sSel = el("select", { "aria-label": "Financement" }, [el("option", { value: "don", text: "Don" }), el("option", { value: "offerte", text: "Offerte par l'administration" })]);
+      const donOptions = refs.dons.filter((x) => P.placesRestantes(x, refs.usedByDon[x.id] || 0) > 0);
+      const donSel = el("select", { "aria-label": "Don" }, donOptions.map((x) => el("option", { value: x.id,
+        text: (x.donateur || "Don") + " · " + U.formatFcfa(x.montant) + " · " + P.placesRestantes(x, refs.usedByDon[x.id] || 0) + " place(s) restante(s)" })));
+      const donLine = el("div", { class: "row-tools" }, [donSel]);
+      const hint = el("div", { class: "warn", text: "" });
+      function syncSource() {
+        const isDon = sSel.value === "don";
+        donLine.classList.toggle("hidden", !isDon);
+        hint.textContent = isDon && !donOptions.length ? "Aucun don n'a de place restante : enregistrez un don dans l'onglet « Dons », ou choisissez « Offerte »." : "";
+      }
+      sSel.addEventListener("change", syncSource); syncSource();
+      const go = el("button", { type: "submit", class: "btn btn-ok", text: "Attribuer" });
+      const cancel = el("button", { type: "button", class: "btn btn-view", text: "Annuler" });
+      const form = el("form", { class: "refus", novalidate: "novalidate" }, [fSel, sSel, donLine, hint, go, cancel]);
+      cancel.addEventListener("click", () => form.remove());
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const source = sSel.value;
+        if (source === "don" && !donSel.value) { setStatus("etat-demandes", "Choisissez le don qui finance cette place.", true); return; }
+        if (!confirm("Attribuer une place « " + nameOf(fSel.value) + " » à la demande de « " + d.prenom + " » (" + (source === "don" ? "financée par un don" : "offerte") + ") ?")) return;
+        go.disabled = true;
+        setStatus("etat-demandes", "Attribution en cours…", false);
+        const { data, error } = await supabase.rpc("institut_attribuer_place", { p_demande: d.id, p_formation: fSel.value, p_source: source, p_don: source === "don" ? donSel.value : null });
+        if (error) { setStatus("etat-demandes", "Impossible d'attribuer la place : " + error.message, true); go.disabled = false; return; }
+        setStatus("etat-demandes", "Place attribuée. Le code s'affiche ci-dessous : transmettez-le au parrain (il le voit aussi dans « Mes demandes »).", false);
+        await loadDemandes(true);
+      });
+      holder.appendChild(form);
+    });
+    return holder;
   }
 
   async function loadDemandes(keepMessage) {
@@ -308,13 +450,109 @@
       return;
     }
     demandes = data || [];
+    const refError = await loadRefs();
+    if (refError) { setStatus("etat-demandes", "Certaines données (formations, dons, places) n'ont pas pu être lues : " + refError + " (le SQL de la PR 3 est-il exécuté ?)", true); }
     parrains = await namesFor(demandes.map((d) => d.parrain_id));
-    if (!keepMessage) setStatus("etat-demandes", "", false);
+    if (!keepMessage && !refError) setStatus("etat-demandes", "", false);
     fillFilter();
     renderDemandes();
   }
   $("filtre-statut").addEventListener("change", renderDemandes);
   $("btn-recharger-demandes").addEventListener("click", () => loadDemandes(false));
+
+  // =========================================================
+  // Onglet « Formations » : formations de l'Académie proposées à l'Institut, avec leur prix Institut
+  // =========================================================
+  function renderFormations() {
+    const box = $("liste-formations");
+    box.textContent = "";
+    if (!refs.formations.length) { box.appendChild(el("p", { class: "hint", text: "Aucune formation dans l'Académie." })); return; }
+    refs.formations.forEach((f) => {
+      const row = refs.inst[f.id] || null;
+      const academie = P.academyPrice(f);
+      const toggle = el("input", { type: "checkbox", id: "fi-" + f.id.replace(/[^A-Za-z0-9_-]/g, "_") });
+      toggle.checked = !!(row && row.actif);
+      const price = el("input", { type: "text", inputmode: "numeric", maxlength: "9", class: "grow", "aria-label": "Prix Institut (FCFA) : " + f.nom, placeholder: "Prix Institut (FCFA)", autocomplete: "off" });
+      price.value = row ? String(row.prix_institut) : "";
+      const save = el("button", { type: "button", class: "btn btn-gold", text: "Enregistrer" });
+      const status = el("div", { class: "status" });
+      const meta = (academie ? "Prix Académie : " + U.formatFcfa(academie) + (f.promotion ? " (promotion)" : "") : "Prix Académie : —") + (f.disponible === false ? " · indisponible dans l'Académie" : "");
+      save.addEventListener("click", async () => {
+        status.classList.remove("error");
+        let raw = price.value.trim();
+        if (!raw && row) raw = String(row.prix_institut);       // décocher sans retaper le prix : on garde l'ancien
+        if (!raw && !toggle.checked) { status.textContent = "Rien à enregistrer : indiquez un prix Institut pour proposer cette formation."; return; }
+        const v = P.validatePrixInstitut(raw, academie);
+        if (!v.ok) { status.classList.add("error"); status.textContent = v.error; return; }
+        save.disabled = true;
+        status.textContent = "Enregistrement…";
+        // Écriture explicite (pas d'upsert) : la base n'autorise la mise à jour que du prix, de l'activation et de l'ordre.
+        const res = row
+          ? await supabase.from("institut_formations").update({ prix_institut: v.value, actif: toggle.checked }).eq("formation_id", f.id).select("formation_id")
+          : await supabase.from("institut_formations").insert({ formation_id: f.id, prix_institut: v.value, actif: toggle.checked }).select("formation_id");
+        save.disabled = false;
+        if (res.error || !res.data || !res.data.length) {
+          status.classList.add("error");
+          status.textContent = "Impossible d'enregistrer : " + (res.error ? res.error.message : "modification refusée (êtes-vous administrateur ?)");
+          return;
+        }
+        status.textContent = "Enregistré." + (v.warning ? " " + v.warning : "");
+        if (v.warning) status.classList.add("error");
+        await loadRefs();
+        renderDemandes();
+      });
+      box.appendChild(el("div", { class: "card item" }, [
+        el("div", { class: "top" }, [el("span", { class: "who", text: f.nom }), el("span", { class: "badge " + (row && row.actif ? "validee" : ""), text: row && row.actif ? "Proposée" : "Non proposée" })]),
+        el("div", { class: "meta", text: "Identifiant : " + f.id + " · " + meta }),
+        el("label", { class: "toggle-line", for: toggle.id }, [toggle, el("span", { text: "Proposer à l'Institut" })]),
+        el("div", { class: "row-tools" }, [price, save]),
+        status
+      ]));
+    });
+  }
+
+  async function loadFormations() {
+    setStatus("etat-formations", "Chargement…", false);
+    const err = await loadRefs();
+    if (err) { setStatus("etat-formations", "Impossible de charger les formations : " + err + " (le SQL de la PR 3 est-il exécuté ?)", true); return; }
+    setStatus("etat-formations", "", false);
+    renderFormations();
+  }
+
+  // =========================================================
+  // Onglet « Dons » : dons enregistrés à la main (administrateurs seuls)
+  // =========================================================
+  function renderDons() {
+    const box = $("liste-dons");
+    box.textContent = "";
+    if (!refs.dons.length) { box.appendChild(el("p", { class: "hint", text: "Aucun don enregistré." })); return; }
+    refs.dons.forEach((x) => {
+      const used = refs.usedByDon[x.id] || 0;
+      box.appendChild(el("div", { class: "card item" }, [
+        el("div", { class: "top" }, [el("span", { class: "who", text: (x.donateur || "Donateur non indiqué") + " · " + U.formatFcfa(x.montant) }), el("span", { class: "badge", text: used + " / " + x.places + " places utilisées" })]),
+        el("div", { class: "meta", text: "Reçu le " + U.formatDate(x.recu_le) + " · " + P.placesRestantes(x, used) + " place(s) restante(s)" }),
+        x.note ? el("div", { class: "text", text: x.note }) : null
+      ]));
+    });
+  }
+  async function loadDons() {
+    const err = await loadRefs();
+    if (err) { setStatus("etat-dons", "Impossible de charger les dons : " + err + " (le SQL de la PR 3 est-il exécuté ?)", true); return; }
+    renderDons();
+  }
+  $("form-don").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const v = P.validateDon({ montant: $("don-montant").value, places: $("don-places").value, donateur: $("don-donateur").value, note: $("don-note").value });
+    if (!v.ok) { setStatus("etat-dons", Object.keys(v.errors).map((k) => v.errors[k]).join(" "), true); return; }
+    $("btn-don").disabled = true;
+    setStatus("etat-dons", "Enregistrement…", false);
+    const { error } = await supabase.from("institut_dons").insert(v.value);
+    $("btn-don").disabled = false;
+    if (error) { setStatus("etat-dons", "Impossible d'enregistrer le don : " + error.message, true); return; }
+    $("form-don").reset();
+    setStatus("etat-dons", "Don enregistré.", false);
+    await loadDons();
+  });
 
   // =========================================================
   // Onglet « Petits-fils »
@@ -468,6 +706,8 @@
     $("loading-state").classList.add("hidden");
     $("dashboard").classList.remove("hidden");
     await Promise.all([loadDemandes(false), loadPetitsFils(), loadTextes()]);
+    renderFormations();
+    renderDons();
   }
   init();
 })();
