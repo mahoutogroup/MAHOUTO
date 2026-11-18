@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Administration — Institut — MAHOUTO+</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#0A0A0A">
+<link rel="manifest" href="../manifest.json">
+<script src="../brand.js"></script>
+<link rel="icon" href="../assets/favicon.png">
+<link rel="stylesheet" href="../theme.css">
+<script src="../theme-toggle.js"></script>
+<style>
+  header { padding: 20px; background: var(--bg-elevated); border-bottom: 1px solid var(--border); }
+  header h1 { font-size: 20px; color: var(--gold); }
+  header p { font-size: 12.5px; color: var(--text-muted); margin-top: 6px; }
+
+  .admin-tabs { display: flex; gap: 10px; padding: 14px 20px 0; flex-wrap: wrap; }
+  .admin-tabs a {
+    font-size: 12.5px; font-weight: bold; color: var(--text-muted);
+    background: var(--bg-card); border-radius: 999px; padding: 8px 16px;
+  }
+  .admin-tabs a.active { color: #0A0A0A; background: var(--gold-bright); }
+
+  #access-denied, #loading-state { text-align: center; color: var(--text-dim); padding: 60px 24px; font-size: 14px; }
+
+  .tabs { display: flex; gap: 8px; padding: 16px 20px 0; flex-wrap: wrap; }
+  .tabs button {
+    font-size: 12.5px; font-weight: bold; padding: 8px 14px; border-radius: 999px; border: none; cursor: pointer;
+    background: var(--bg-card); color: var(--text-muted); font-family: inherit;
+  }
+  .tabs button[aria-selected="true"] { background: var(--gold-bright); color: #0A0A0A; }
+  .panel { padding: 14px 20px 40px; }
+  .panel h2 { font-size: 15px; color: var(--gold); margin-bottom: 10px; }
+  .hint { font-size: 12px; color: var(--text-dim); line-height: 1.5; margin: 4px 0 10px; }
+  .status { font-size: 13px; line-height: 1.5; margin: 8px 0; color: var(--accent-green); min-height: 18px; }
+  .status.error { color: #F87171; }
+  .row-tools { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; align-items: center; }
+  select, input[type="text"], textarea {
+    padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--bg-card); color: var(--white); font-family: inherit; font-size: 14px; min-width: 0;
+  }
+  textarea { width: 100%; min-height: 220px; resize: vertical; line-height: 1.5; }
+  .grow { flex: 1; min-width: 160px; }
+  .btn { font-size: 12.5px; font-weight: bold; padding: 9px 14px; border-radius: 8px; border: none; cursor: pointer; font-family: inherit; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .btn-gold { background: var(--gold-bright); color: #0A0A0A; }
+  .btn-ok { background: rgba(34,197,94,.15); color: var(--accent-green); }
+  .btn-no { background: rgba(239,68,68,.15); color: #F87171; }
+  .btn-view { background: var(--bg); color: var(--text-muted); border: 1px solid var(--border); }
+  .item { margin-bottom: 10px; padding: 14px; }
+  .item .top { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+  .item .who { font-weight: bold; font-size: 14.5px; overflow-wrap: anywhere; }
+  .item .badge { font-size: 11px; font-weight: bold; padding: 2px 9px; border-radius: 999px; background: var(--bg); color: var(--text-muted); white-space: nowrap; }
+  .item .badge.validee { color: var(--accent-green); }
+  .item .badge.refusee { color: #F87171; }
+  .item .meta { font-size: 12px; color: var(--text-dim); margin-top: 4px; line-height: 1.5; overflow-wrap: anywhere; }
+  .item .text { font-size: 13px; color: var(--text-muted); margin-top: 8px; white-space: pre-line; overflow-wrap: anywhere; }
+  .item .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .item .refus { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .counter { font-size: 12px; color: var(--text-dim); margin: 6px 0; }
+  .counter.over { color: #F87171; }
+  .preview { margin-top: 14px; padding: 14px; }
+  .preview p { font-size: 13.5px; line-height: 1.6; color: var(--text-muted); margin-bottom: 8px; white-space: pre-line; overflow-wrap: anywhere; }
+  .toggle-box { padding: 14px; margin-bottom: 18px; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<button id="theme-toggle-btn" class="theme-toggle-fab">🌙</button>
+
+<div class="page-content">
+
+  <header>
+    <h1>🕊 Administration — Institut SAYÉ LOUIS</h1>
+    <p>Demandes de parrainage, petits-fils de Sayé Louis, textes de la page. Données d'enfants : privées, ne les partagez jamais.</p>
+  </header>
+
+  <div class="admin-tabs">
+    <a href="formations.html">Formations</a>
+    <a href="users.html">Utilisateurs</a>
+    <a href="rooms.html">Salons</a>
+    <a href="statistiques.html">Statistiques</a>
+    <a href="signalements.html">Signalements</a>
+    <a href="institut.html" class="active">Institut</a>
+  </div>
+
+  <div id="loading-state">Vérification des droits...</div>
+  <div id="access-denied" class="hidden">🔒 Accès réservé aux administrateurs.</div>
+
+  <div id="dashboard" class="hidden">
+    <div class="tabs" role="tablist">
+      <button type="button" role="tab" id="tab-demandes" aria-selected="true" aria-controls="panel-demandes">Demandes</button>
+      <button type="button" role="tab" id="tab-petits-fils" aria-selected="false" aria-controls="panel-petits-fils">Petits-fils</button>
+      <button type="button" role="tab" id="tab-textes" aria-selected="false" aria-controls="panel-textes">Textes</button>
+    </div>
+
+    <!-- Onglet 1 : demandes -->
+    <div class="panel" id="panel-demandes" role="tabpanel" aria-labelledby="tab-demandes">
+      <h2>Demandes de parrainage</h2>
+      <div class="row-tools">
+        <label for="filtre-statut" class="hint" style="margin:0;">Filtrer :</label>
+        <select id="filtre-statut" aria-label="Filtrer par statut"></select>
+        <button type="button" class="btn btn-view" id="btn-recharger-demandes">Actualiser</button>
+      </div>
+      <div class="status" id="etat-demandes" role="status"></div>
+      <div id="liste-demandes"></div>
+    </div>
+
+    <!-- Onglet 2 : petits-fils -->
+    <div class="panel hidden" id="panel-petits-fils" role="tabpanel" aria-labelledby="tab-petits-fils">
+      <h2>Petits-fils de Sayé Louis</h2>
+      <p class="hint">Admission d'office au tarif Institut. Seul un administrateur marque une personne, une par une : il n'y a jamais d'auto-déclaration.</p>
+      <form class="row-tools" id="form-recherche" novalidate>
+        <input type="text" id="recherche" class="grow" maxlength="40" placeholder="Chercher un utilisateur par nom…" aria-label="Nom de l'utilisateur" autocomplete="off">
+        <button type="submit" class="btn btn-gold">Chercher</button>
+      </form>
+      <div class="status" id="etat-petits-fils" role="status"></div>
+      <div id="resultats-recherche"></div>
+      <h2 style="margin-top:18px;">Personnes marquées</h2>
+      <div id="liste-petits-fils"></div>
+    </div>
+
+    <!-- Onglet 3 : textes -->
+    <div class="panel hidden" id="panel-textes" role="tabpanel" aria-labelledby="tab-textes">
+      <h2>Ouverture de l'Institut</h2>
+      <div class="card toggle-box">
+        <p class="hint" style="margin-top:0;">Fermé : la page garde le cadre « Projet en préparation » et son bouton grisé. Ouvert : le bouton « Demander un parrainage » devient actif pour tous les utilisateurs connectés.</p>
+        <div class="who" id="etat-ouverture" style="font-weight:bold;margin-bottom:8px;">—</div>
+        <button type="button" class="btn btn-gold" id="btn-ouverture" disabled>…</button>
+      </div>
+
+      <h2>Texte « Notre histoire »</h2>
+      <p class="hint">Séparez les paragraphes par une ligne vide. Laissez le champ vide pour retrouver le texte d'origine de la page. Pas de HTML : le texte est affiché tel quel.</p>
+      <textarea id="histoire" aria-label="Texte Notre histoire"></textarea>
+      <div class="counter" id="compteur"></div>
+      <button type="button" class="btn btn-gold" id="btn-enregistrer">Enregistrer</button>
+      <div class="status" id="etat-textes" role="status"></div>
+      <h2 style="margin-top:18px;">Aperçu</h2>
+      <div class="card preview" id="apercu"></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="../config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../institut-utils.js"></script>
+<script>
+(function () {
+  "use strict";
+  const cfg = window.MAHOUTO_CONFIG;
+  const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+  const U = window.InstitutUtils;
+  const BUCKET = "institut-justificatifs";
+  const ADMIN_ROLES = ["admin", "super_admin", "founder"];
+  const $ = (id) => document.getElementById(id);
+
+  function el(tag, props, children) {
+    const n = document.createElement(tag);
+    Object.keys(props || {}).forEach((k) => {
+      if (k === "text") n.textContent = props[k];
+      else if (k === "class") n.className = props[k];
+      else n.setAttribute(k, props[k]);
+    });
+    (children || []).forEach((c) => { if (c) n.appendChild(c); });
+    return n;
+  }
+  function setStatus(id, msg, isError) {
+    const s = $(id);
+    s.textContent = msg || "";
+    s.classList.toggle("error", !!isError);
+  }
+
+  let currentAdminId = null;
+
+  // ---------- Onglets ----------
+  const TABS = ["demandes", "petits-fils", "textes"];
+  function showTab(name) {
+    TABS.forEach((t) => {
+      $("tab-" + t).setAttribute("aria-selected", t === name ? "true" : "false");
+      $("panel-" + t).classList.toggle("hidden", t !== name);
+    });
+  }
+  TABS.forEach((t) => $("tab-" + t).addEventListener("click", () => showTab(t)));
+
+  // ---------- Noms des parrains / utilisateurs (profiles : pseudo seulement, jamais d'e-mail) ----------
+  async function namesFor(ids) {
+    const map = {};
+    const unique = Array.from(new Set(ids.filter(Boolean)));
+    if (!unique.length) return map;
+    const { data } = await supabase.from("profiles").select("id, username").in("id", unique);
+    (data || []).forEach((p) => { map[p.id] = p.username; });
+    return map;
+  }
+
+  // =========================================================
+  // Onglet « Demandes »
+  // =========================================================
+  let demandes = [];
+  let parrains = {};
+
+  function fillFilter() {
+    const sel = $("filtre-statut");
+    const counts = U.countByStatut(demandes);
+    const keep = sel.value;
+    sel.textContent = "";
+    sel.appendChild(el("option", { value: "", text: "Toutes (" + demandes.length + ")" }));
+    U.STATUTS.forEach(([code, label]) => sel.appendChild(el("option", { value: code, text: label + " (" + counts[code] + ")" })));
+    sel.value = keep;
+  }
+
+  async function viewProof(d, card) {
+    setStatus("etat-demandes", "", false);
+    // Fenêtre ouverte tout de suite (sur le clic), pour que le navigateur du téléphone ne la bloque pas.
+    const popup = window.open("about:blank", "_blank");
+    if (popup) popup.opener = null;
+    const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(d.justificatif_path, 60);
+    if (error || !data || !data.signedUrl) {
+      if (popup) popup.close();
+      setStatus("etat-demandes", "Impossible d'ouvrir le justificatif : " + (error && error.message ? error.message : "fichier introuvable") + ".", true);
+      return;
+    }
+    if (popup) { popup.location.href = data.signedUrl; return; }
+    // Fenêtre bloquée : lien à toucher (valable 60 secondes).
+    const old = card.querySelector(".lien-justificatif");
+    if (old) old.remove();
+    const a = el("a", { class: "lien-justificatif", href: data.signedUrl, target: "_blank", rel: "noopener noreferrer", text: "Ouvrir le justificatif (lien valable 60 secondes)" });
+    a.style.display = "block"; a.style.marginTop = "8px"; a.style.color = "var(--gold)";
+    card.appendChild(a);
+  }
+
+  async function setStatut(d, statut, raison) {
+    setStatus("etat-demandes", "Enregistrement…", false);
+    const patch = { statut: statut };
+    if (statut === "refusee") patch.raison_refus = raison;
+    const { data, error } = await supabase.from("institut_demandes").update(patch).eq("id", d.id).select("id, statut");
+    if (error) { setStatus("etat-demandes", "Impossible d'enregistrer : " + error.message, true); return; }
+    if (!data || !data.length) { setStatus("etat-demandes", "Modification refusée : vérifiez que vous êtes bien administrateur.", true); return; }
+    setStatus("etat-demandes", statut === "validee" ? "Demande validée." : "Demande refusée.", false);
+    await loadDemandes(true);
+  }
+
+  function renderDemandes() {
+    const box = $("liste-demandes");
+    box.textContent = "";
+    const list = U.filterByStatut(demandes, $("filtre-statut").value);
+    if (!list.length) { box.appendChild(el("p", { class: "hint", text: "Aucune demande." })); return; }
+    list.forEach((d) => {
+      const parrain = parrains[d.parrain_id] || "Utilisateur";
+      const card = el("div", { class: "card item" }, [
+        el("div", { class: "top" }, [
+          el("span", { class: "who", text: d.prenom + " (" + d.age + " ans)" }),
+          el("span", { class: "badge " + d.statut, text: U.statutLabel(d.statut) })
+        ]),
+        el("div", { class: "meta", text: "Parrain : " + parrain + " · lien : " + U.lienLabel(d.lien) }),
+        el("div", { class: "meta", text: "Formation : " + U.formationLabel(d.formation) + " · déposée le " + U.formatDate(d.cree_le) + (d.traite_le ? " · traitée le " + U.formatDate(d.traite_le) : "") })
+      ]);
+      if (d.motif) card.appendChild(el("div", { class: "text", text: "Motif : " + d.motif }));
+      if (d.statut === "refusee" && d.raison_refus) card.appendChild(el("div", { class: "text", text: "Raison du refus : " + d.raison_refus }));
+
+      const actions = el("div", { class: "actions" });
+      if (d.justificatif_path) {
+        const b = el("button", { type: "button", class: "btn btn-view", text: "Voir le justificatif" });
+        b.addEventListener("click", () => viewProof(d, card));
+        actions.appendChild(b);
+      } else actions.appendChild(el("span", { class: "meta", text: "Aucun justificatif joint." }));
+      if (d.statut !== "validee") {
+        const ok = el("button", { type: "button", class: "btn btn-ok", text: "Valider" });
+        ok.addEventListener("click", () => {
+          if (confirm("Valider la demande pour « " + d.prenom + " » ? Le tarif Institut pourra être ouvert.")) setStatut(d, "validee");
+        });
+        actions.appendChild(ok);
+      }
+      if (d.statut !== "refusee") {
+        const no = el("button", { type: "button", class: "btn btn-no", text: "Refuser" });
+        no.addEventListener("click", () => {
+          if (card.querySelector(".refus")) return;
+          const input = el("input", { type: "text", class: "grow", maxlength: String(U.REFUS_MAX), placeholder: "Raison du refus (courte)", "aria-label": "Raison du refus" });
+          const confirmBtn = el("button", { type: "button", class: "btn btn-no", text: "Confirmer le refus" });
+          const cancelBtn = el("button", { type: "button", class: "btn btn-view", text: "Annuler" });
+          const row = el("div", { class: "refus" }, [input, confirmBtn, cancelBtn]);
+          cancelBtn.addEventListener("click", () => row.remove());
+          confirmBtn.addEventListener("click", () => {
+            const r = U.validateRefus(input.value);
+            if (!r.ok) { setStatus("etat-demandes", r.error, true); return; }
+            if (confirm("Refuser la demande pour « " + d.prenom + " » ?")) setStatut(d, "refusee", r.value);
+          });
+          card.appendChild(row);
+          input.focus();
+        });
+        actions.appendChild(no);
+      }
+      card.appendChild(actions);
+      box.appendChild(card);
+    });
+  }
+
+  async function loadDemandes(keepMessage) {
+    if (!keepMessage) setStatus("etat-demandes", "Chargement…", false);
+    const { data, error } = await supabase.from("institut_demandes")
+      .select("id, parrain_id, prenom, age, lien, formation, motif, justificatif_path, statut, raison_refus, cree_le, traite_le")
+      .order("cree_le", { ascending: false });
+    if (error) {
+      setStatus("etat-demandes", "Impossible de charger les demandes : " + error.message + " (le SQL de l'Institut est-il exécuté ?)", true);
+      return;
+    }
+    demandes = data || [];
+    parrains = await namesFor(demandes.map((d) => d.parrain_id));
+    if (!keepMessage) setStatus("etat-demandes", "", false);
+    fillFilter();
+    renderDemandes();
+  }
+  $("filtre-statut").addEventListener("change", renderDemandes);
+  $("btn-recharger-demandes").addEventListener("click", () => loadDemandes(false));
+
+  // =========================================================
+  // Onglet « Petits-fils »
+  // =========================================================
+  let marked = [];
+
+  async function setPetitFils(userId, name, on) {
+    setStatus("etat-petits-fils", "Enregistrement…", false);
+    const res = on
+      ? await supabase.from("institut_petits_fils").insert({ user_id: userId })
+      : await supabase.from("institut_petits_fils").delete().eq("user_id", userId).select("user_id");
+    if (res.error) {
+      setStatus("etat-petits-fils", (res.error.code === "23505" ? "Cette personne est déjà marquée." : "Impossible d'enregistrer : " + res.error.message), true);
+      return;
+    }
+    setStatus("etat-petits-fils", on ? "« " + name + " » est marquée petit-fils de Sayé Louis." : "Marquage retiré pour « " + name + " ».", false);
+    await loadPetitsFils();
+    $("resultats-recherche").textContent = "";
+  }
+
+  async function loadPetitsFils() {
+    const box = $("liste-petits-fils");
+    const { data, error } = await supabase.from("institut_petits_fils").select("user_id, ajoute_le").order("ajoute_le", { ascending: false });
+    box.textContent = "";
+    if (error) { setStatus("etat-petits-fils", "Impossible de charger la liste : " + error.message, true); return; }
+    marked = data || [];
+    const names = await namesFor(marked.map((m) => m.user_id));
+    if (!marked.length) { box.appendChild(el("p", { class: "hint", text: "Personne n'est marqué pour l'instant." })); return; }
+    marked.forEach((m) => {
+      const name = names[m.user_id] || "Utilisateur";
+      const btn = el("button", { type: "button", class: "btn btn-no", text: "Retirer" });
+      btn.addEventListener("click", () => { if (confirm("Retirer le marquage de « " + name + " » ?")) setPetitFils(m.user_id, name, false); });
+      box.appendChild(el("div", { class: "card item" }, [
+        el("div", { class: "top" }, [el("span", { class: "who", text: name }), el("span", { class: "meta", text: "marqué le " + U.formatDate(m.ajoute_le) })]),
+        el("div", { class: "actions" }, [btn])
+      ]));
+    });
+  }
+
+  $("form-recherche").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const box = $("resultats-recherche");
+    box.textContent = "";
+    const term = U.searchTerm($("recherche").value);
+    if (!term.ok) { setStatus("etat-petits-fils", term.error, true); return; }
+    setStatus("etat-petits-fils", "Recherche…", false);
+    const { data, error } = await supabase.from("profiles").select("id, username, created_at").ilike("username", term.pattern).order("username").limit(20);
+    if (error) { setStatus("etat-petits-fils", "Recherche impossible : " + error.message, true); return; }
+    setStatus("etat-petits-fils", (data || []).length ? "" : "Aucun utilisateur ne correspond.", false);
+    const already = new Set(marked.map((m) => m.user_id));
+    (data || []).forEach((p) => {
+      const btn = el("button", { type: "button", class: "btn btn-gold", text: already.has(p.id) ? "Déjà marqué" : "Marquer petit-fils" });
+      btn.disabled = already.has(p.id);
+      btn.addEventListener("click", () => {
+        if (confirm("Marquer « " + p.username + " » comme petit-fils de Sayé Louis ? Cette personne sera admise d'office au tarif Institut.")) setPetitFils(p.id, p.username, true);
+      });
+      box.appendChild(el("div", { class: "card item" }, [
+        el("div", { class: "top" }, [el("span", { class: "who", text: p.username }), el("span", { class: "meta", text: "inscrit le " + U.formatDate(p.created_at) })]),
+        el("div", { class: "actions" }, [btn])
+      ]));
+    });
+  });
+
+  // =========================================================
+  // Onglet « Textes »
+  // =========================================================
+  let isOpen = false;
+  const histoireEl = $("histoire");
+
+  function renderPreview() {
+    const box = $("apercu");
+    box.textContent = "";
+    const list = U.paragraphs(histoireEl.value);
+    if (!list.length) { box.appendChild(el("p", { text: "(Vide : la page affichera son texte d'origine.)" })); return; }
+    list.forEach((p) => box.appendChild(el("p", { text: p })));
+  }
+  function updateCounter() {
+    const n = U.countChars(histoireEl.value);
+    const c = $("compteur");
+    c.textContent = n + " / " + U.HISTOIRE_MAX + " caractères";
+    c.classList.toggle("over", n > U.HISTOIRE_MAX);
+    $("btn-enregistrer").disabled = n > U.HISTOIRE_MAX;
+    renderPreview();
+  }
+  histoireEl.addEventListener("input", updateCounter);
+
+  function renderOuverture() {
+    $("etat-ouverture").textContent = isOpen ? "L'Institut est OUVERT aux demandes." : "L'Institut est FERMÉ aux demandes (« Bientôt disponible »).";
+    const b = $("btn-ouverture");
+    b.textContent = isOpen ? "Fermer l'Institut aux demandes" : "Ouvrir l'Institut aux demandes";
+    b.disabled = false;
+  }
+
+  async function loadTextes() {
+    const { data, error } = await supabase.from("institut_contenus").select("cle, valeur");
+    if (error) { setStatus("etat-textes", "Impossible de charger les textes : " + error.message + " (le SQL de l'Institut est-il exécuté ?)", true); return; }
+    isOpen = U.isOpenValue(U.contentValue(data, "ouvert"));
+    histoireEl.value = U.contentValue(data, "histoire") || "";
+    renderOuverture();
+    updateCounter();
+  }
+
+  async function saveContent(cle, valeur) {
+    const { data, error } = await supabase.from("institut_contenus").upsert({ cle: cle, valeur: valeur }, { onConflict: "cle" }).select("cle");
+    if (error) return { ok: false, message: error.message };
+    if (!data || !data.length) return { ok: false, message: "modification refusée (êtes-vous administrateur ?)" };
+    return { ok: true };
+  }
+
+  $("btn-enregistrer").addEventListener("click", async () => {
+    const v = U.validateHistoire(histoireEl.value);
+    if (!v.ok) { setStatus("etat-textes", v.error, true); return; }
+    $("btn-enregistrer").disabled = true;
+    setStatus("etat-textes", "Enregistrement…", false);
+    const r = await saveContent("histoire", v.value);
+    setStatus("etat-textes", r.ok ? "Texte enregistré." : "Impossible d'enregistrer : " + r.message, !r.ok);
+    updateCounter();
+  });
+
+  $("btn-ouverture").addEventListener("click", async () => {
+    const next = !isOpen;
+    const msg = next
+      ? "Ouvrir l'Institut aux demandes ? Le bouton « Demander un parrainage » deviendra actif pour tous les utilisateurs connectés."
+      : "Fermer l'Institut aux demandes ? Le bouton redeviendra « Bientôt disponible ». Les demandes déjà déposées sont conservées.";
+    if (!confirm(msg)) return;
+    $("btn-ouverture").disabled = true;
+    const r = await saveContent("ouvert", U.openValue(next));
+    if (r.ok) { isOpen = next; setStatus("etat-textes", next ? "Institut ouvert aux demandes." : "Institut fermé aux demandes.", false); }
+    else setStatus("etat-textes", "Impossible de changer l'ouverture : " + r.message, true);
+    renderOuverture();
+  });
+
+  // =========================================================
+  // Démarrage : même contrôle d'accès que admin/rooms.html (la base — RLS, is_admin() — reste la vraie barrière)
+  // =========================================================
+  async function init() {
+    const { data } = await supabase.auth.getSession();
+    if (!data || !data.session || !data.session.user) {
+      $("loading-state").classList.add("hidden");
+      $("access-denied").classList.remove("hidden");
+      $("access-denied").textContent = "🔒 Connecte-toi avec un compte administrateur pour accéder à cette page.";
+      return;
+    }
+    currentAdminId = data.session.user.id;
+    const { data: profile } = await supabase.from("profiles").select("role").eq("id", currentAdminId).maybeSingle();
+    if (!profile || ADMIN_ROLES.indexOf(profile.role) === -1) {
+      $("loading-state").classList.add("hidden");
+      $("access-denied").classList.remove("hidden");
+      return;
+    }
+    $("loading-state").classList.add("hidden");
+    $("dashboard").classList.remove("hidden");
+    await Promise.all([loadDemandes(false), loadPetitsFils(), loadTextes()]);
+  }
+  init();
+})();
+</script>
+<script src="../pwa-install.js"></script>
+
+</body>
+</html>
