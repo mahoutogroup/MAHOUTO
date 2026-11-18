@@ -5,13 +5,17 @@
    - Si 'ouvert' ≠ 'oui' et que l'utilisateur n'est pas admin : « L'Institut n'est pas encore ouvert aux demandes ».
    - Le justificatif est envoyé AVANT la ligne de demande (bucket privé « institut-justificatifs », chemin
      <uid>/<id>/<nom aléatoire>.<ext>) ; si l'insertion échoue, on tente de supprimer le fichier (sans bruit si refusé).
+   - Formations : lues dans institut_formations (actif = true) jointes à formations (nom) ; si la lecture échoue ou si la
+     liste est vide, on garde la liste constante (Sérigraphie) de institut-utils.js. L'identifiant choisi est enregistré
+     dans institut_demandes.formation.
+   - « Mes demandes » : place accordée avec son CODE D'INVITATION (à donner à l'orphelin, qui le saisit sur SON compte).
    - Données minimales (mineurs) : prénom, âge, lien, formation, motif, justificatif. Rien de public.
    - Aucun innerHTML : createElement / textContent. Aucun journal console de données saisies. Rien de payant ici.
    La vraie barrière est la base de données (RLS) ; ce script donne des messages clairs.
    ========================================================= */
 (function () {
   "use strict";
-  var U = window.InstitutUtils, D = window.InstitutDemandeUtils, cfg = window.MAHOUTO_CONFIG;
+  var U = window.InstitutUtils, D = window.InstitutDemandeUtils, P = window.InstitutPlaceUtils, cfg = window.MAHOUTO_CONFIG;
   var $ = function (id) { return document.getElementById(id); };
 
   function setHidden(id, hidden) { $(id).classList.toggle("hidden", !!hidden); }
@@ -30,7 +34,7 @@
     return n;
   }
 
-  if (!U || !D || !cfg || !window.supabase || typeof window.supabase.createClient !== "function") {
+  if (!U || !D || !P || !cfg || !window.supabase || typeof window.supabase.createClient !== "function") {
     setHidden("bloc-chargement", true);
     setStatus("etat", "Cette page n'a pas pu se charger. Réessayez dans un instant.", true);
     return;
@@ -38,11 +42,48 @@
   var supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
   var ADMIN_ROLES = ["admin", "super_admin", "founder"];
   var user = null, busy = false;
+  var formationList = U.FORMATIONS;   // [id, libellé] : liste lue dans la base, ou constante de repli
+  var formationNames = {};            // id -> nom (pour « Mes demandes »)
 
   function fillSelect(select, list, placeholder) {
     select.textContent = "";
     select.appendChild(el("option", { value: "", text: placeholder }));
     list.forEach(function (pair) { select.appendChild(el("option", { value: pair[0], text: pair[1] })); });
+  }
+
+  // Copie un texte : API moderne si disponible, sinon sélection d'un champ temporaire. Retourne true si copié.
+  async function copyText(text) {
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) { await navigator.clipboard.writeText(text); return true; }
+    } catch (e) { /* repli ci-dessous */ }
+    try {
+      var tmp = document.createElement("textarea");
+      tmp.value = text; tmp.setAttribute("readonly", ""); tmp.style.position = "fixed"; tmp.style.opacity = "0";
+      document.body.appendChild(tmp); tmp.select();
+      var ok = document.execCommand("copy");
+      tmp.remove();
+      return !!ok;
+    } catch (e2) { return false; }
+  }
+
+  // Bloc « place accordée » : code en évidence, bouton « Copier », consigne pour l'orphelin.
+  function placeBlock(place) {
+    var state = P.placeState(place);
+    if (state.key === "reclamee") return el("div", { class: "why", text: "Place utilisée" });
+    var codeText = P.formatCode(place.code);
+    var code = el("div", { class: "code", text: codeText, "aria-label": "Code d'invitation " + codeText });
+    var copyBtn = el("button", { type: "button", class: "btn-mini", text: "Copier" });
+    copyBtn.addEventListener("click", async function () {
+      var ok = await copyText(place.code);
+      copyBtn.textContent = ok ? "Copié ✓" : "Copie impossible";
+      setTimeout(function () { copyBtn.textContent = "Copier"; }, 2500);
+    });
+    return el("div", { class: "place" }, [
+      el("div", { class: "place-title", text: "Place accordée" }),
+      el("div", { class: "code-row" }, [code, copyBtn]),
+      el("div", { class: "hint", text: "Donnez ce code à l'orphelin : il le saisira sur son propre compte." }),
+      el("a", { href: "institut-place.html", class: "hint-link", text: "Page où l'orphelin saisit le code" })
+    ]);
   }
 
   // ---------- Mes demandes ----------
@@ -54,13 +95,32 @@
     box.textContent = "";
     if (res.error) { box.appendChild(el("p", { text: "Impossible de charger vos demandes pour le moment." })); return; }
     if (!res.data.length) { box.appendChild(el("p", { text: "Vous n'avez pas encore déposé de demande." })); return; }
+    // Places (lecture de LEURS places seulement : règle de la base) et noms des formations ; en cas d'échec : affichage simple.
+    var placeByDemande = {};
+    var validated = res.data.filter(function (d) { return d.statut === "validee"; }).map(function (d) { return d.id; });
+    if (validated.length) {
+      try {
+        var pl = await supabase.from("institut_places").select("demande_id, code, reclamee_le").in("demande_id", validated);
+        if (!pl.error && Array.isArray(pl.data)) pl.data.forEach(function (p) { placeByDemande[p.demande_id] = p; });
+      } catch (e) { /* pas de place affichée */ }
+    }
+    try {
+      var ids = Array.from(new Set(res.data.map(function (d) { return d.formation; })));
+      var fr = await supabase.from("formations").select("id, nom").in("id", ids);
+      if (!fr.error && Array.isArray(fr.data)) fr.data.forEach(function (f) { formationNames[f.id] = f.nom; });
+    } catch (e) { /* libellé de repli */ }
     res.data.forEach(function (d) {
       var top = el("div", { class: "top" }, [
         el("span", { class: "who", text: d.prenom + " (" + d.age + " ans)" }),
         el("span", { class: "badge " + d.statut, text: U.statutLabel(d.statut) })
       ]);
-      var card = el("div", { class: "req" }, [top, el("div", { class: "meta", text: U.formationLabel(d.formation) + " · déposée le " + U.formatDate(d.cree_le) })]);
+      var card = el("div", { class: "req" }, [top, el("div", { class: "meta", text: P.formationName(d.formation, formationNames) + " · déposée le " + U.formatDate(d.cree_le) })]);
       if (d.statut === "refusee" && d.raison_refus) card.appendChild(el("div", { class: "why", text: "Raison du refus : " + d.raison_refus }));
+      if (d.statut === "validee") {
+        var place = placeByDemande[d.id];
+        if (place) card.appendChild(placeBlock(place));
+        else card.appendChild(el("div", { class: "why", text: "Validée : la place est en cours d'attribution." }));
+      }
       box.appendChild(card);
     });
   }
@@ -82,7 +142,7 @@
     var check = D.validateDemande({
       prenom: $("f-prenom").value, age: $("f-age").value, lien: $("f-lien").value,
       formation: $("f-formation").value, motif: $("f-motif").value
-    });
+    }, formationList);
     var fileCheck = D.validateFile(file);
     var errors = check.ok ? {} : check.errors;
     if (!fileCheck.ok) errors.fichier = fileCheck.error;
@@ -138,7 +198,18 @@
 
   async function init() {
     fillSelect($("f-lien"), U.LIENS, "Choisir…");
-    fillSelect($("f-formation"), U.FORMATIONS, "Choisir…");
+    // Formations proposées : celles de l'Académie activées pour l'Institut. Échec ou liste vide : liste constante (Sérigraphie).
+    try {
+      var fr = await supabase.from("institut_formations")
+        .select("formation_id, prix_institut, ordre, formations(nom, prix, promotion)")
+        .eq("actif", true).order("ordre", { ascending: true });
+      var choices = fr.error ? [] : P.formationChoices(fr.data);
+      if (choices.length) {
+        formationList = choices.map(function (c) { return [c.id, c.nom]; });
+        choices.forEach(function (c) { formationNames[c.id] = c.nom; });
+      }
+    } catch (e) { formationList = U.FORMATIONS; }
+    fillSelect($("f-formation"), formationList, "Choisir…");
     $("formulaire").addEventListener("submit", submit);
     $("btn-connexion").addEventListener("click", openLogin);
     if (window.MahoutoLogin && window.MahoutoLogin.oauthErrorFromUrl) {

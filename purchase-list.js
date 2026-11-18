@@ -37,7 +37,13 @@
     });
   }
 
-  var api = { MAX_PENDING_AGE_MS: MAX_PENDING_AGE_MS, visiblePurchases: visiblePurchases, isOldPending: isOldPending };
+  // Place de l'Institut SAYÉ LOUIS : formation « payée » à 0 FCFA, sans transaction FedaPay (créée par un code d'invitation).
+  // Affichage seulement : elle donne le même accès qu'un achat, mais n'est pas un achat à 0 FCFA.
+  function isInstitutPlace(p) {
+    return !!p && p.product_type === "formation" && p.status === "paid" && Number(p.amount) === 0 && !p.fedapay_transaction_id;
+  }
+
+  var api = { MAX_PENDING_AGE_MS: MAX_PENDING_AGE_MS, visiblePurchases: visiblePurchases, isOldPending: isOldPending, isInstitutPlace: isInstitutPlace };
   root.MahoutoPurchaseList = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : globalThis);

@@ -49,6 +49,13 @@
   }
   .guide .cta:disabled { opacity: .5; cursor: not-allowed; }
   .guide a.cta { text-align: center; text-decoration: none; }
+  [hidden] { display: none !important; }
+  .guide .stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 10px; }
+  .guide .stat { border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg); padding: 12px; text-align: center; }
+  .guide .stat-n { font-size: 26px; font-weight: 700; color: var(--gold); }
+  .guide .stat-l { font-size: 12px; color: var(--text-muted); margin-top: 4px; line-height: 1.4; }
+  .guide .code-link { margin-top: 6px; font-size: 13px; }
+  .guide .code-link a { color: var(--text-muted); text-decoration: underline; }
   .guide #histoire p { white-space: pre-line; }
   .guide .cta-note { font-size: 12.5px; color: var(--text-dim); margin-top: 8px; }
 </style>
@@ -90,7 +97,7 @@
     <h2>Un exemple de tarif</h2>
     <!-- TARIFS : seuls endroits à modifier pour changer les montants affichés (en FCFA). -->
     <div class="tablewrap">
-      <table>
+      <table id="tarif-table">
         <thead><tr><th>Formation</th><th>Académie Majesté Presse</th><th>Institut SAYÉ LOUIS</th></tr></thead>
         <tbody>
           <tr>
@@ -102,7 +109,16 @@
       </table>
     </div>
     <p>D'autres formations (informatique, graphisme…) viendront ensuite.</p>
-    <p class="small">Les montants sont donnés à titre d'exemple.</p>
+    <p class="small" id="note-exemple">Les montants sont donnés à titre d'exemple.</p>
+  </section>
+
+  <section id="chiffres" hidden>
+    <h2>En chiffres</h2>
+    <div class="stats">
+      <div class="stat"><div class="stat-n" id="stat-places">—</div><div class="stat-l">places financées par des dons</div></div>
+      <div class="stat"><div class="stat-n" id="stat-eleves">—</div><div class="stat-l">élèves formés</div></div>
+    </div>
+    <p class="small">Ces chiffres ne contiennent aucun nom.</p>
   </section>
 
   <section>
@@ -124,6 +140,7 @@
     <button type="button" class="cta" disabled aria-disabled="true" aria-describedby="cta-note">Demander un parrainage</button>
     <p class="cta-note" id="cta-note">Bientôt disponible</p>
   </div>
+  <p class="code-link"><a href="institut-place.html">J'ai un code d'invitation</a></p>
 </main>
 </div>
 
@@ -139,6 +156,7 @@
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="institut-utils.js"></script>
+<script src="institut-place-utils.js"></script>
 <script src="institut-page.js"></script>
 <script src="pwa-install.js"></script>
 </body>

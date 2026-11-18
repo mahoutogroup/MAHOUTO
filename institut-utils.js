@@ -104,6 +104,13 @@
     return p(d.getDate()) + "/" + p(d.getMonth() + 1) + "/" + d.getFullYear();
   }
 
+  /** Montant en FCFA avec espaces insécables : « 50 000 FCFA » (le montant n'est jamais coupé en fin de ligne). */
+  function formatFcfa(n) {
+    var v = Number(n);
+    if (!isFinite(v)) return "—";
+    return String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, "\u00A0") + "\u00A0FCFA";
+  }
+
   var api = {
     HISTOIRE_MAX: HISTOIRE_MAX, MOTIF_MAX: MOTIF_MAX, REFUS_MAX: REFUS_MAX, PRENOM_MAX: PRENOM_MAX,
     AGE_MIN: AGE_MIN, AGE_MAX: AGE_MAX, AGE_MAJEUR: AGE_MAJEUR,
@@ -112,7 +119,7 @@
     countChars: countChars, cleanLine: cleanLine, cleanMultiline: cleanMultiline, paragraphs: paragraphs,
     validateHistoire: validateHistoire, validateRefus: validateRefus,
     isOpenValue: isOpenValue, openValue: openValue, contentValue: contentValue,
-    filterByStatut: filterByStatut, countByStatut: countByStatut, searchTerm: searchTerm, formatDate: formatDate
+    formatFcfa: formatFcfa, filterByStatut: filterByStatut, countByStatut: countByStatut, searchTerm: searchTerm, formatDate: formatDate
   };
   root.InstitutUtils = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;

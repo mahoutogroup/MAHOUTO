@@ -59,6 +59,12 @@
   .guide .req .badge.refusee { color: #F87171; }
   .guide .req .meta { font-size: 12px; color: var(--text-dim); margin-top: 3px; }
   .guide .req .why { font-size: 13px; color: var(--text-muted); margin-top: 6px; overflow-wrap: anywhere; }
+  .guide .place { margin-top: 8px; padding: 10px 12px; border: 1px dashed var(--gold); border-radius: var(--radius-sm); background: var(--bg-elevated); }
+  .guide .place-title { font-weight: 700; color: var(--accent-green); font-size: 13px; }
+  .guide .code-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 6px 0; }
+  .guide .code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 24px; letter-spacing: 3px; font-weight: 700; color: var(--gold); user-select: all; }
+  .guide .btn-mini { font-family: inherit; font-size: 12.5px; font-weight: 700; padding: 8px 14px; border-radius: 8px; border: none; cursor: pointer; background: var(--gold-bright); color: #0A0A0A; }
+  .guide .hint-link { display: inline-block; font-size: 12px; color: var(--gold); margin-top: 2px; }
   .hidden { display: none !important; }
 </style>
 </head>
@@ -151,6 +157,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="institut-utils.js"></script>
 <script src="institut-demande-utils.js"></script>
+<script src="institut-place-utils.js"></script>
 <script src="institut-demande.js"></script>
 <script src="pwa-install.js"></script>
 </body>
