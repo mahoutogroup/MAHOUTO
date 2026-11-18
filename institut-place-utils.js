@@ -3,8 +3,9 @@
    prix Institut, dons, messages. Utilisée par institut-place.html, institut-demande.html, admin/institut.html
    et testée par tests/institut-places.test.js. Dépend de institut-utils.js (InstitutUtils).
 
-   Aucun accès réseau, aucune base, aucun DOM. Les messages ne révèlent jamais quels codes existent :
-   un code inconnu, mal formé ou déjà utilisé donne la MÊME réponse.
+   Aucun accès réseau, aucune base, aucun DOM. Les messages ne révèlent jamais quels codes existent : côté serveur,
+   un code inconnu ou déjà utilisé donne la MÊME réponse (MSG_CODE_INVALIDE). Un code dont le FORMAT est refusé
+   dans le navigateur reçoit un message plus utile (MSG_CODE_FORMAT) : aucun appel serveur, donc aucune information.
    ========================================================= */
 (function (root, factory) {
   if (typeof module === "object" && module.exports) module.exports = factory(require("./institut-utils"));
@@ -21,7 +22,10 @@
   var DON_PLACES_MAX = 1000;
   var DONATEUR_MAX = 80, NOTE_MAX = 300;
 
+  // Réponse du SERVEUR pour un code inexistant ou déjà utilisé : neutre, aucun indice sur les codes qui existent.
   var MSG_CODE_INVALIDE = "Ce code n'est pas valide ou a déjà été utilisé. Vérifiez-le puis réessayez.";
+  // Refus LOCAL (avant tout appel serveur) : seul le format est en cause, on peut donc aider à corriger la saisie.
+  var MSG_CODE_FORMAT = "Ce code ne ressemble pas à un code valide. Il compte 8 caractères (lettres et chiffres). Les lettres O, I et les chiffres 0, 1 ne sont jamais utilisés : vérifiez votre saisie.";
 
   /** Code normalisé : majuscules, sans espaces, tirets ni autres séparateurs. */
   function normalizeCode(raw) {
@@ -38,7 +42,7 @@
   function validateCode(raw) {
     var c = normalizeCode(raw);
     if (!c) return { ok: false, error: "Saisissez le code d'invitation." };
-    if (!CODE_RE.test(c)) return { ok: false, error: MSG_CODE_INVALIDE };
+    if (!CODE_RE.test(c)) return { ok: false, error: MSG_CODE_FORMAT };
     return { ok: true, code: c };
   }
 
@@ -158,7 +162,7 @@
   }
 
   return {
-    CODE_ALPHABET: CODE_ALPHABET, CODE_LENGTH: CODE_LENGTH, CODE_RE: CODE_RE, ERR_PREFIX: ERR_PREFIX, MSG_CODE_INVALIDE: MSG_CODE_INVALIDE,
+    CODE_ALPHABET: CODE_ALPHABET, CODE_LENGTH: CODE_LENGTH, CODE_RE: CODE_RE, ERR_PREFIX: ERR_PREFIX, MSG_CODE_INVALIDE: MSG_CODE_INVALIDE, MSG_CODE_FORMAT: MSG_CODE_FORMAT,
     normalizeCode: normalizeCode, formatCode: formatCode, validateCode: validateCode, claimOutcome: claimOutcome, rpcErrorMessage: rpcErrorMessage,
     formationUrl: formationUrl, academyPrice: academyPrice, validatePrixInstitut: validatePrixInstitut, validateDon: validateDon,
     placesRestantes: placesRestantes, usedByDon: usedByDon, placeState: placeState, formationChoices: formationChoices, formationName: formationName

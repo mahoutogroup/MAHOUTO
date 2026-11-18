@@ -376,7 +376,6 @@
 
   // ---- Place d'une demande validée : état et code, ou formulaire d'attribution ----
   function placeInfo(place) {
-    const state = P.placeState(place);
     const code = P.formatCode(place.code);
     const codeEl = el("div", { class: "code-big", text: code });
     const copy = el("button", { type: "button", class: "btn btn-view", text: "Copier" });
@@ -389,7 +388,7 @@
     const src = place.source === "don" ? "financée par un don" : "offerte";
     return el("div", { class: "place-box" }, [
       el("div", { class: "who", text: "Place : " + when }),
-      el("div", { class: "meta", text: nameOf(place.formation_id) + " · " + src + " · attribuée le " + U.formatDate(place.cree_le) + " (" + state.label + ")" }),
+      el("div", { class: "meta", text: nameOf(place.formation_id) + " · " + src + " · attribuée le " + U.formatDate(place.cree_le) }),
       el("div", { class: "actions" }, [codeEl, copy])
     ]);
   }

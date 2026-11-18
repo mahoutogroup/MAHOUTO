@@ -37,18 +37,52 @@ test("code : format de 8 caractères de l'alphabet sans ambiguïté (ni I, ni O,
   assert.strictEqual(P.CODE_LENGTH, 8);
   ["ABCDEFGH", "abcd-efgh", "A2B3 C4D5", "ZZZZ-2222", "98765432"].forEach((c) => { const r = P.validateCode(c); assert.strictEqual(r.ok, true, c); assert.ok(P.CODE_RE.test(r.code)); });
   ["ABCDEFGI", "ABCDEFGO", "ABCDEFG0", "ABCDEFG1", "ABCDEFG", "ABCDEFGHJ", "ABCD-EFG!", "<script>", "ABCDEFGH' or 1=1"].forEach((c) => {
-    const r = P.validateCode(c); assert.strictEqual(r.ok, false, c); assert.strictEqual(r.error, P.MSG_CODE_INVALIDE, "même message neutre pour : " + c);
+    const r = P.validateCode(c); assert.strictEqual(r.ok, false, c); assert.strictEqual(r.error, P.MSG_CODE_FORMAT, "même message d'aide au format pour : " + c);
   });
   assert.match(P.validateCode("").error, /Saisissez le code/);
   assert.match(P.validateCode("   -  ").error, /Saisissez le code/);
   assert.ok(!/existe|n'existe pas|inconnu|expiré/i.test(P.MSG_CODE_INVALIDE), "aucun indice sur les codes qui existent");
 });
 
+test("format refusé dans le navigateur : message utile (8 caractères, lettres et chiffres, jamais O I 0 1) ; la normalisation ne change pas", () => {
+  const MSG = "Ce code ne ressemble pas à un code valide. Il compte 8 caractères (lettres et chiffres). Les lettres O, I et les chiffres 0, 1 ne sont jamais utilisés : vérifiez votre saisie.";
+  assert.strictEqual(P.MSG_CODE_FORMAT, MSG);
+  ["ABC", "ABCDEFGHJ", "ABCDEFG0", "ABCDEFGI", "abcd-efgO", "AB CD-EF 1H", "<script>", "ABCD-EFG!"].forEach((c) => {
+    const r = P.validateCode(c); assert.deepStrictEqual(r, { ok: false, error: MSG }, c);
+  });
+  assert.match(P.validateCode("").error, /Saisissez le code/, "saisie vide : message inchangé");
+  assert.ok(!/existe|inconnu|déjà été utilisé/i.test(P.MSG_CODE_FORMAT), "aucun indice sur les codes qui existent");
+  // normalisation inchangée : majuscules, espaces et tirets ignorés
+  assert.deepStrictEqual(P.validateCode("ab cd-ef gh"), { ok: true, code: "ABCDEFGH" });
+  assert.strictEqual(P.normalizeCode(" a-b c_d.e f-g h "), "ABCDEFGH");
+  assert.strictEqual(P.formatCode("abcdefgh"), "ABCD-EFGH");
+  // la page affiche exactement ce message avant tout appel serveur
+  const js = read("institut-place.js");
+  assert.match(js, /var check = P\.validateCode\(\$\("f-code"\)\.value\);\s*if \(!check\.ok\) \{ setStatus\("e-code", check\.error, true\);[^}]*return; \}/);
+  assert.ok(js.indexOf("P.validateCode(") < js.indexOf('supabase.rpc("institut_reclamer_place"'), "validation locale avant l'appel");
+  assert.ok(!js.includes("ne ressemble pas"), "le texte vit dans le module testable, pas dans la page");
+});
+
+test("admin/institut.html : « Place non réclamée » n'apparaît qu'une fois dans le cadre de la place (pas de doublon)", () => {
+  const html = read("admin/institut.html");
+  const fn = /function placeInfo\(place\) \{([\s\S]*?)\n  \}\n/.exec(html)[1];
+  assert.ok(!/state\.label|placeState/.test(fn), "le libellé d'état n'est plus répété entre parenthèses");
+  assert.strictEqual((fn.match(/non réclamée/g) || []).length, 1, "une seule occurrence de « non réclamée »");
+  assert.strictEqual((fn.match(/réclamée le/g) || []).length, 1);
+  assert.match(fn, /el\("div", \{ class: "who", text: "Place : " \+ when \}\)/);
+  assert.match(fn, /U\.formatDate\(place\.cree_le\) \}\),/, "la ligne de détail se termine par la date d'attribution");
+  assert.ok(!/innerHTML/.test(fn));
+  // le libellé du module partagé reste disponible (demande du parrain : « Place utilisée »)
+  assert.strictEqual(P.placeState({ code: "X", reclamee_le: null }).label, "Place non réclamée");
+});
+
 test("réponse de la base : succès = identifiant de formation ; chaque « ERREUR:<CODE> » a un message clair ; inconnu = mal formé = déjà utilisé", () => {
   assert.deepStrictEqual(P.claimOutcome("serigraphie"), { ok: true, formationId: "serigraphie" });
   assert.deepStrictEqual(P.claimOutcome("f-1"), { ok: true, formationId: "f-1" });
   const invalid = P.claimOutcome("ERREUR:CODE_INVALIDE");
-  assert.deepStrictEqual(invalid, { ok: false, message: P.MSG_CODE_INVALIDE }, "même message que la validation locale");
+  assert.deepStrictEqual(invalid, { ok: false, message: P.MSG_CODE_INVALIDE }, "réponse du serveur inchangée");
+  assert.strictEqual(P.MSG_CODE_INVALIDE, "Ce code n'est pas valide ou a déjà été utilisé. Vérifiez-le puis réessayez.");
+  assert.notStrictEqual(P.MSG_CODE_FORMAT, P.MSG_CODE_INVALIDE, "le refus local et la réponse du serveur sont deux messages distincts");
   assert.match(P.claimOutcome("ERREUR:TROP_DE_TENTATIVES").message, /Trop de tentatives.*une heure/);
   assert.match(P.claimOutcome("ERREUR:DEJA_POSSEDEE").message, /déjà accès.*n'a pas été utilisé/);
   assert.match(P.claimOutcome("ERREUR:PARRAIN").message, /compte de l'élève/);
@@ -287,11 +321,11 @@ test("mes-achats.html : une place Institut s'affiche « Place Institut SAYÉ LOU
   assert.ok(!/purchases|amount|revenu|chiffre d'affaires/i.test(stats), "aucun total d'achats ni revenu dans statistiques.html");
 });
 
-test("service worker : nouvelles pages et scripts publics en cache hors ligne, version ≥ v111, page admin non mise en cache (convention)", () => {
+test("service worker : nouvelles pages et scripts publics en cache hors ligne, version ≥ v112, page admin non mise en cache (convention)", () => {
   const sw = read("sw.js");
   const shell = /const APP_SHELL = \[([\s\S]*?)\];/.exec(sw)[1];
   ["/institut.html", "/institut-demande.html", "/institut-place.html", "/institut-page.js", "/institut-utils.js", "/institut-demande-utils.js", "/institut-demande.js", "/institut-place.js", "/institut-place-utils.js", "/purchase-list.js"]
     .forEach((f) => assert.ok(shell.includes('"' + f + '"'), f));
   assert.ok(!/admin\/institut/.test(shell));
-  assert.ok(Number(/mahoutoplus-shell-v(\d+)/.exec(sw)[1]) >= 111);
+  assert.ok(Number(/mahoutoplus-shell-v(\d+)/.exec(sw)[1]) >= 112);
 });
