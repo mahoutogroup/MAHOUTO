@@ -33,9 +33,9 @@
     var url = row.avatar_url ? PU.safeHttpsUrl(row.avatar_url, PU.LIMITS.avatar) : null;
     if (url) {
       var img = document.createElement("img");
-      img.alt = "";
-      img.referrerPolicy = "no-referrer";
-      img.loading = "lazy";
+      img.setAttribute("alt", "");
+      img.setAttribute("referrerpolicy", "no-referrer");
+      img.setAttribute("loading", "lazy");
       img.addEventListener("error", function () { box.textContent = initial(row.nom_affiche); });
       img.src = url;
       box.appendChild(img);

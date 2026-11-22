@@ -113,6 +113,10 @@
   .pp .state { font-size: 13px; font-weight: 700; color: var(--gold); margin-bottom: 10px; }
   .pp .status { font-size: 13px; line-height: 1.6; margin-top: 8px; color: var(--accent-green); }
   .pp .status.error { color: #F87171; }
+  .pp .pp-photo { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 6px; }
+  .pp .pp-photo-apercu { width: 72px; height: 72px; border-radius: 50%; overflow: hidden; background: var(--bg-elevated); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 700; color: var(--gold); flex: 0 0 auto; }
+  .pp .pp-photo-apercu img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .pp .pp-photo-actions { display: flex; gap: 8px; flex-wrap: wrap; }
   .pp .adresse-etat { font-size: 12px; color: #F87171; margin-top: 3px; }
   .pp .adresse-etat.ok { color: var(--accent-green); }
   .pp .lien-texte { font-size: 13px; color: var(--white); overflow-wrap: anywhere; margin-bottom: 8px; }
@@ -178,8 +182,18 @@
       <div class="err" id="pp-e-nom" role="alert"></div>
     </div>
     <div class="field">
-      <label for="pp-avatar">Photo : lien https (facultatif)</label>
-      <input type="text" id="pp-avatar" maxlength="500" autocomplete="off" inputmode="url" placeholder="https://">
+      <label for="pp-avatar">Photo (facultative)</label>
+      <div class="pp-photo">
+        <div class="pp-photo-apercu" id="pp-avatar-apercu" aria-hidden="true"></div>
+        <div class="pp-photo-actions">
+          <button type="button" class="pp-btn secondary" id="pp-btn-photo">Choisir une photo</button>
+          <button type="button" class="pp-btn secondary hidden" id="pp-btn-photo-retirer">Retirer la photo</button>
+        </div>
+      </div>
+      <input type="file" id="pp-avatar-fichier" class="hidden" accept="image/jpeg,image/png,image/webp">
+      <input type="text" id="pp-avatar" readonly placeholder="Aucune photo" aria-label="Adresse de la photo (en lecture seule)">
+      <div class="hint">JPEG, PNG ou WebP, 5 Mo au maximum. Cette photo est publique et distincte de la photo de votre compte : rien n'est repris automatiquement.</div>
+      <div class="adresse-etat" id="pp-avatar-etat" role="status"></div>
       <div class="err" id="pp-e-avatar" role="alert"></div>
     </div>
     <div class="field">

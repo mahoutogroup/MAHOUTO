@@ -150,7 +150,7 @@ test("m.js : profil publié → lu par profil_public_lire, affiché en TEXTE BRU
   assert.strictEqual(els.metier.textContent, "Couturier"); assert.strictEqual(els.presentation.textContent, "Ligne 1\nLigne 2"); assert.strictEqual(els.lieu.textContent, "Ville Test");
   const a = els["contact-zone"].children[0];
   assert.deepStrictEqual([a.tagName, a.href, a.target, a.rel, a.textContent], ["a", "https://wa.me/22900000000", "_blank", "noopener noreferrer nofollow", "Écrire sur WhatsApp"]);
-  const img = els.avatar.children[0]; assert.deepStrictEqual([img.tagName, img.src, img.referrerPolicy], ["img", "https://exemple.test/a.png", "no-referrer"]);
+  const img = els.avatar.children[0]; assert.deepStrictEqual([img.tagName, img.src, img.attrs.referrerpolicy, img.attrs.loading, img.attrs.alt], ["img", "https://exemple.test/a.png", "no-referrer", "lazy", ""]);
   assert.strictEqual(JSON.stringify(c.calls), JSON.stringify([["rpc", "profil_public_lire", { p_adresse: "mon-atelier" }]]), "un seul appel : la fonction de lecture par adresse exacte ; aucun select direct, aucune session lue");
   assert.ok(!c.calls.some((x) => x[0] === "from"), "jamais de lecture directe de la table");
 });
@@ -254,9 +254,9 @@ test("profil.html : section « Mon profil public » (activer, adresse + disponib
   assert.match(js, /\$\("pp-adresse"\)\.disabled = published/, "adresse non modifiable une fois publiée");
 });
 
-test("sw.js : cache v116 ; m.html, m.js, profil-public.js et le module dans APP_SHELL ; Institut et paiements non touchés", () => {
+test("sw.js : cache v116 ou plus ; m.html, m.js, profil-public.js et le module dans APP_SHELL ; Institut et paiements non touchés", () => {
   const sw = read("sw.js");
-  assert.match(sw, /CACHE_NAME = "mahoutoplus-shell-v116"/);
+  assert.match(sw, /CACHE_NAME = "mahoutoplus-shell-v(11[6-9]|1[2-9]\d)"/);
   ["/m.html", "/m.js", "/profil-public.js", "/profil-public-utils.js"].forEach((f) => assert.ok(sw.includes('"' + f + '"'), f));
 });
 

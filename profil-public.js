@@ -3,6 +3,10 @@
 
    - Activation VOLONTAIRE : rien n'est publié par défaut. Pour publier, le membre certifie avoir 18 ans ou plus (déclaration
      enregistrée en base ; la base l'exige pour toute page publiée).
+   - Photo : choisie dans le téléphone (JPEG, PNG ou WebP, 5 Mo au maximum, contrôlé AVANT l'envoi), envoyée comme la photo de
+     profil existante : GET /api/attachment?filename=…&context=avatar avec le jeton de session, puis envoi vers Cloudinary avec
+     la signature reçue. L'URL https://res.cloudinary.com/… reçue remplit le champ en lecture seule ; elle n'est enregistrée
+     qu'avec la page (même flux que les autres champs). Jamais reprise automatiquement de la photo du compte.
    - Champs publics : adresse, nom affiché, photo (lien https), métier, présentation, pays ou ville, et AU PLUS UN contact
      (WhatsApp au format international, ou lien https). Jamais demandé ni affiché : nom légal complet, e-mail, rôle.
    - Lecture de SA ligne par la fonction profil_public_mien() ; enregistrement par insertion / mise à jour de la table
@@ -43,13 +47,72 @@
     $("pp-adresse").value = r.adresse || "";
     $("pp-nom").value = r.nom_affiche || "";
     $("pp-avatar").value = r.avatar_url || "";
+    renderPhoto();
     $("pp-metier").value = r.metier || "";
     $("pp-presentation").value = r.presentation || "";
     $("pp-localisation").value = r.localisation || "";
     $("pp-contact-type").value = r.contact_type || "";
     $("pp-contact-valeur").value = r.contact_valeur || "";
     $("pp-majeur").checked = r.majeur_declare === true;
+    $("pp-avatar-etat").textContent = "";
     refreshView();
+  }
+
+  // Aperçu rond de la photo choisie (img créée par DOM, lien https contrôlé) ; repli sur la lettre initiale si l'image ne charge pas.
+  function renderPhoto() {
+    var box = $("pp-avatar-apercu"), url = PU.safeHttpsUrl($("pp-avatar").value, PU.LIMITS.avatar);
+    box.textContent = "";
+    if (url) {
+      var img = document.createElement("img");
+      img.setAttribute("alt", "");
+      img.setAttribute("referrerpolicy", "no-referrer");
+      img.addEventListener("error", function () { box.textContent = initial(); });
+      img.setAttribute("src", url);
+      box.appendChild(img);
+    } else box.textContent = initial();
+    $("pp-btn-photo-retirer").classList.toggle("hidden", !url);
+    $("pp-btn-photo").textContent = url ? "Changer la photo" : "Choisir une photo";
+  }
+  function initial() { var c = Array.from(String($("pp-nom").value || "").trim())[0]; return c ? c.toUpperCase() : "?"; }
+  function setPhotoStatus(msg, isError) {
+    var s = $("pp-avatar-etat");
+    s.textContent = msg || "";
+    s.classList.toggle("ok", !!msg && !isError);
+  }
+
+  // Téléversement : même mécanisme que le changement de photo de profil (profil.html). Le nom d'origine du fichier n'est jamais envoyé.
+  async function uploadPhoto(file) {
+    var check = PU.validateAvatarFile(file);
+    if (!check.ok) { setPhotoStatus(check.error, true); return; }
+    if (busy) return;
+    busy = true; setButtons(true);
+    setPhotoStatus("Envoi de la photo…", false);
+    try {
+      var sessionData = (await supabase.auth.getSession()).data;
+      var token = sessionData && sessionData.session ? sessionData.session.access_token : null;
+      if (!token) throw new Error("Reconnectez-vous puis réessayez.");
+      var query = new URLSearchParams({ filename: PU.avatarFilename(check.ext), context: "avatar" });
+      var signResp = await fetch("/api/attachment?" + query.toString(), { headers: { "Authorization": "Bearer " + token } });
+      var sign = await signResp.json();
+      if (!signResp.ok) throw new Error(sign && sign.error ? sign.error : "Signature indisponible");
+      var form = new FormData();
+      form.append("file", file);
+      form.append("api_key", sign.apiKey);
+      form.append("timestamp", sign.timestamp);
+      form.append("signature", sign.signature);
+      form.append("folder", sign.folder);
+      var upResp = await fetch(sign.uploadUrl, { method: "POST", body: form });
+      var up = await upResp.json();
+      if (!upResp.ok) throw new Error(up && up.error && up.error.message ? up.error.message : "Envoi échoué");
+      var url = PU.cloudinaryImageUrl(up && up.secure_url);
+      if (!url) throw new Error("Réponse inattendue de l'envoi.");
+      $("pp-avatar").value = url;
+      renderPhoto();
+      setPhotoStatus("Photo prête : enregistrez votre page pour l'utiliser.", false);
+    } catch (e) {
+      // Le formulaire (y compris l'ancienne photo) reste intact.
+      setPhotoStatus("L'envoi de la photo a échoué : " + (e && e.message ? e.message : "réessayez dans un instant."), true);
+    } finally { busy = false; setButtons(false); }
   }
   // L'adresse ne se modifie plus une fois la page publiée ; la base l'impose aussi (même après une dépublication).
   function refreshView() {
@@ -97,7 +160,7 @@
     } finally { busy = false; setButtons(false); }
   }
   function setButtons(disabled) {
-    ["pp-btn-enregistrer", "pp-btn-publier", "pp-btn-depublier", "pp-btn-verifier"].forEach(function (id) { $(id).disabled = disabled; });
+    ["pp-btn-enregistrer", "pp-btn-publier", "pp-btn-depublier", "pp-btn-verifier", "pp-btn-photo", "pp-btn-photo-retirer"].forEach(function (id) { $(id).disabled = disabled; });
   }
 
   async function verifier() {
@@ -137,6 +200,18 @@
     $("pp-btn-publier").addEventListener("click", function () { save(true); });
     $("pp-btn-depublier").addEventListener("click", function () { if (confirm("Dépublier votre page ? Elle ne sera plus visible, vous pourrez la republier à tout moment.")) save(false); });
     $("pp-btn-verifier").addEventListener("click", verifier);
+    $("pp-btn-photo").addEventListener("click", function () { if (!busy) $("pp-avatar-fichier").click(); });
+    $("pp-avatar-fichier").addEventListener("change", function () {
+      var f = $("pp-avatar-fichier").files && $("pp-avatar-fichier").files[0] ? $("pp-avatar-fichier").files[0] : null;
+      $("pp-avatar-fichier").value = "";
+      if (f) uploadPhoto(f);
+    });
+    $("pp-btn-photo-retirer").addEventListener("click", function () {
+      $("pp-avatar").value = "";
+      renderPhoto();
+      setPhotoStatus("Photo retirée : enregistrez votre page pour confirmer.", false);
+    });
+    $("pp-nom").addEventListener("input", function () { if (!$("pp-avatar").value) renderPhoto(); });
     $("pp-btn-copier").addEventListener("click", copier);
     $("pp-presentation").addEventListener("input", function () { $("pp-compteur").textContent = PU.countChars($("pp-presentation").value) + " / " + PU.LIMITS.presentation; });
     $("pp-apercu").addEventListener("click", function () { if (row && row.adresse) window.open("/m/" + encodeURIComponent(row.adresse), "_blank", "noopener"); });

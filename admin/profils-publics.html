@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Administration — Profils publics — MAHOUTO+</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#0A0A0A">
+<link rel="manifest" href="../manifest.json">
+<script src="../brand.js"></script>
+<link rel="icon" href="../assets/favicon.png">
+<link rel="stylesheet" href="../theme.css">
+<script src="../theme-toggle.js"></script>
+<style>
+  header { padding: 20px; background: var(--bg-elevated); border-bottom: 1px solid var(--border); }
+  header h1 { font-size: 20px; color: var(--gold); }
+  header p { font-size: 12.5px; color: var(--text-muted); margin-top: 6px; }
+
+  .admin-tabs { display: flex; gap: 10px; padding: 14px 20px 0; flex-wrap: wrap; }
+  .admin-tabs a {
+    font-size: 12.5px; font-weight: bold; color: var(--text-muted);
+    background: var(--bg-card); border-radius: 999px; padding: 8px 16px;
+  }
+  .admin-tabs a.active { color: #0A0A0A; background: var(--gold-bright); }
+
+  #access-denied, #loading-state { text-align: center; color: var(--text-dim); padding: 60px 24px; font-size: 14px; }
+
+  .tabs { display: flex; gap: 8px; padding: 16px 20px 0; flex-wrap: wrap; }
+  .tabs button {
+    font-size: 12.5px; font-weight: bold; padding: 8px 14px; border-radius: 999px; border: none; cursor: pointer;
+    background: var(--bg-card); color: var(--text-muted); font-family: inherit;
+  }
+  .tabs button[aria-selected="true"] { background: var(--gold-bright); color: #0A0A0A; }
+  .panel { padding: 14px 20px 40px; }
+  .panel h2 { font-size: 15px; color: var(--gold); margin-bottom: 10px; }
+  .hint { font-size: 12px; color: var(--text-dim); line-height: 1.5; margin: 4px 0 10px; }
+  .status { font-size: 13px; line-height: 1.5; margin: 8px 0; color: var(--accent-green); min-height: 18px; }
+  .status.error { color: #F87171; }
+  .row-tools { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; align-items: center; }
+  select, input[type="text"], textarea {
+    padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border);
+    background: var(--bg-card); color: var(--white); font-family: inherit; font-size: 14px; min-width: 0;
+  }
+  textarea { width: 100%; min-height: 220px; resize: vertical; line-height: 1.5; }
+  .grow { flex: 1; min-width: 160px; }
+  .btn { font-size: 12.5px; font-weight: bold; padding: 9px 14px; border-radius: 8px; border: none; cursor: pointer; font-family: inherit; }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .btn-gold { background: var(--gold-bright); color: #0A0A0A; }
+  .btn-ok { background: rgba(34,197,94,.15); color: var(--accent-green); }
+  .btn-no { background: rgba(239,68,68,.15); color: #F87171; }
+  .btn-view { background: var(--bg); color: var(--text-muted); border: 1px solid var(--border); }
+  .item { margin-bottom: 10px; padding: 14px; }
+  .item .top { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+  .item .who { font-weight: bold; font-size: 14.5px; overflow-wrap: anywhere; }
+  .item .badge { font-size: 11px; font-weight: bold; padding: 2px 9px; border-radius: 999px; background: var(--bg); color: var(--text-muted); white-space: nowrap; }
+  .item .badge.validee { color: var(--accent-green); }
+  .item .badge.refusee { color: #F87171; }
+  .item .badge.prio { color: #0A0A0A; background: var(--gold-bright); }
+  .item .meta { font-size: 12px; color: var(--text-dim); margin-top: 4px; line-height: 1.5; overflow-wrap: anywhere; }
+  .item .text { font-size: 13px; color: var(--text-muted); margin-top: 8px; white-space: pre-line; overflow-wrap: anywhere; }
+  .item .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .item .refus { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .counter { font-size: 12px; color: var(--text-dim); margin: 6px 0; }
+  .counter.over { color: #F87171; }
+  .preview { margin-top: 14px; padding: 14px; }
+  .preview p { font-size: 13.5px; line-height: 1.6; color: var(--text-muted); margin-bottom: 8px; white-space: pre-line; overflow-wrap: anywhere; }
+  .toggle-box { padding: 14px; margin-bottom: 18px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 6px; }
+  .grid2 input { width: 100%; }
+  .toggle-line { display: flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--text-muted); margin: 8px 0; }
+  .toggle-line input { width: 18px; height: 18px; accent-color: #D4AF37; }
+  .code-big { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 22px; letter-spacing: 3px; font-weight: bold; color: var(--gold); user-select: all; }
+  .place-box { margin-top: 10px; padding: 10px 12px; border: 1px dashed var(--gold); border-radius: 10px; background: var(--bg); }
+  .place-box .meta { margin-top: 2px; }
+  .warn { color: #F59E0B; font-size: 12px; margin-top: 4px; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<button id="theme-toggle-btn" class="theme-toggle-fab">🌙</button>
+
+<div class="page-content">
+
+  <header>
+    <h1>🌐 Administration — Profils publics</h1>
+    <p>Interrupteur général des pages /m/adresse et liste des pages. Aucun identifiant de compte ni e-mail n'est affiché ici.</p>
+  </header>
+
+  <div class="admin-tabs">
+    <a href="formations.html">Formations</a>
+    <a href="users.html">Utilisateurs</a>
+    <a href="rooms.html">Salons</a>
+    <a href="statistiques.html">Statistiques</a>
+    <a href="signalements.html">Signalements</a>
+    <a href="institut.html">Institut</a>
+    <a href="profils-publics.html" class="active">Profils publics</a>
+  </div>
+
+  <div id="loading-state">Vérification des droits...</div>
+  <div id="access-denied" class="hidden">🔒 Accès réservé aux administrateurs.</div>
+
+  <div id="dashboard" class="hidden">
+    <div class="panel">
+      <h2>Interrupteur général</h2>
+      <div class="card toggle-box">
+        <div class="who" id="etat-interrupteur" role="status">Chargement…</div>
+        <p class="hint">Fermé : le public voit « Cette fonction n'est pas encore ouverte » ; les membres préparent et prévisualisent leur page, les administrateurs la voient. Ouvert : toutes les pages publiées et non suspendues deviennent publiques.</p>
+        <div class="actions" style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button type="button" class="btn btn-gold" id="btn-interrupteur" disabled>…</button>
+        </div>
+        <div class="status" id="msg-interrupteur" role="status"></div>
+      </div>
+
+      <h2>Pages</h2>
+      <div class="row-tools">
+        <button type="button" class="btn btn-view" id="btn-recharger">Actualiser</button>
+      </div>
+      <div class="status" id="msg-liste" role="status"></div>
+      <div id="liste-pages"></div>
+    </div>
+  </div>
+
+</div>
+
+<script src="../config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="../profil-public-utils.js"></script>
+<script src="profils-publics.js"></script>
+<script src="../pwa-install.js"></script>
+</body>
+</html>
