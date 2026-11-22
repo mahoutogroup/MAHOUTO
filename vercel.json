@@ -28,6 +28,10 @@
     {
       "source": "/verify/:code",
       "destination": "/verify.html?code=:code"
+    },
+    {
+      "source": "/m/:adresse",
+      "destination": "/m.html?adresse=:adresse"
     }
   ],
   "headers": [
@@ -57,6 +61,24 @@
         {
           "key": "Content-Security-Policy-Report-Only",
           "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com https://www.gstatic.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; media-src 'self' blob: https://res.cloudinary.com; font-src 'self' data:; connect-src 'self' https://kbnhmddwiimkjaehiwyi.supabase.co wss://kbnhmddwiimkjaehiwyi.supabase.co https://api.cloudinary.com https://res.cloudinary.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://unpkg.com https://ai.majestepresse.com; frame-src 'self' blob: https://res.cloudinary.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'"
+        }
+      ]
+    },
+    {
+      "source": "/m/:adresse",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/m.html",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
         }
       ]
     }
