@@ -89,6 +89,34 @@
   }
   #edit-modal .actions { display: flex; gap: 10px; }
   #edit-modal .actions button { flex: 1; }
+  /* Mon profil public (PR 1 du profil public) */
+  .pp { margin: 18px 20px 0; border: 1px solid var(--border); background: var(--bg-card); border-radius: var(--radius-md); padding: 16px 16px 12px; }
+  .pp h2 { font-size: 16px; color: var(--white); margin-bottom: 6px; }
+  .pp p, .pp .hint { font-size: 12.5px; line-height: 1.6; color: var(--text-muted); margin-bottom: 10px; }
+  .pp .field { margin-bottom: 12px; }
+  .pp label { display: block; font-size: 12.5px; color: var(--text-dim); margin-bottom: 4px; }
+  .pp input[type="text"], .pp select, .pp textarea {
+    width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--white); font-family: inherit; font-size: 15px; min-width: 0;
+  }
+  .pp textarea { min-height: 90px; resize: vertical; }
+  .pp .err { font-size: 12px; color: #F87171; margin-top: 3px; }
+  .pp .err:empty { display: none; }
+  .pp .check { display: flex; align-items: flex-start; gap: 10px; color: var(--text-muted); font-size: 13.5px; line-height: 1.5; cursor: pointer; }
+  .pp .check input { margin-top: 3px; width: 18px; height: 18px; flex: 0 0 auto; }
+  .pp .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .pp .row input { flex: 1 1 160px; }
+  .pp .pp-btn { font-family: inherit; font-size: 13.5px; font-weight: 700; padding: 10px 16px; border-radius: 8px; border: none; cursor: pointer; background: var(--gold-bright); color: #0A0A0A; }
+  .pp .pp-btn.secondary { background: var(--bg-elevated); color: var(--white); border: 1px solid var(--border); }
+  .pp .pp-btn:disabled { opacity: .5; cursor: not-allowed; }
+  .pp .actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0 6px; }
+  .pp .state { font-size: 13px; font-weight: 700; color: var(--gold); margin-bottom: 10px; }
+  .pp .status { font-size: 13px; line-height: 1.6; margin-top: 8px; color: var(--accent-green); }
+  .pp .status.error { color: #F87171; }
+  .pp .adresse-etat { font-size: 12px; color: #F87171; margin-top: 3px; }
+  .pp .adresse-etat.ok { color: var(--accent-green); }
+  .pp .lien-texte { font-size: 13px; color: var(--white); overflow-wrap: anywhere; margin-bottom: 8px; }
+  .pp .notice { border: 1px solid var(--border); border-left: 3px solid var(--gold); background: var(--bg-elevated); border-radius: var(--radius-sm); padding: 8px 10px; }
 </style>
 </head>
 <body>
@@ -129,6 +157,79 @@
       <span class="emoji">🚪</span><span class="label" style="color:#F87171;">Se déconnecter</span><span class="sub"></span>
     </button>
   </div>
+
+  <section class="pp hidden" id="pp-section" aria-labelledby="pp-titre">
+    <h2 id="pp-titre">Mon profil public</h2>
+    <p>Une page facultative, visible par tout le monde à l'adresse de votre choix. Rien n'est publié tant que vous ne l'activez pas. Jamais affichés : votre nom légal complet, votre e-mail, votre rôle.</p>
+    <p class="notice hidden" id="pp-note-ferme">Cette fonction n'est pas encore ouverte au public : vous pouvez préparer votre page et la prévisualiser, elle ne sera visible des autres qu'à l'ouverture.</p>
+    <div class="state" id="pp-statut"></div>
+
+    <div class="field">
+      <label for="pp-adresse">Adresse de la page</label>
+      <input type="text" id="pp-adresse" maxlength="30" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="mon-nom">
+      <div class="hint">www.mahouto.com/m/votre-adresse : 3 à 30 caractères (minuscules, chiffres, tirets). Après la première publication, l'adresse ne change plus.</div>
+      <div class="row"><button type="button" class="pp-btn secondary" id="pp-btn-verifier">Vérifier la disponibilité</button></div>
+      <div class="adresse-etat" id="pp-adresse-etat" role="status"></div>
+      <div class="err" id="pp-e-adresse" role="alert"></div>
+    </div>
+    <div class="field">
+      <label for="pp-nom">Nom affiché (60 caractères au maximum)</label>
+      <input type="text" id="pp-nom" maxlength="60" autocomplete="off">
+      <div class="err" id="pp-e-nom" role="alert"></div>
+    </div>
+    <div class="field">
+      <label for="pp-avatar">Photo : lien https (facultatif)</label>
+      <input type="text" id="pp-avatar" maxlength="500" autocomplete="off" inputmode="url" placeholder="https://">
+      <div class="err" id="pp-e-avatar" role="alert"></div>
+    </div>
+    <div class="field">
+      <label for="pp-metier">Métier ou titre (80 caractères, facultatif)</label>
+      <input type="text" id="pp-metier" maxlength="80" autocomplete="off">
+      <div class="err" id="pp-e-metier" role="alert"></div>
+    </div>
+    <div class="field">
+      <label for="pp-presentation">Courte présentation (280 caractères, facultatif)</label>
+      <textarea id="pp-presentation" maxlength="280"></textarea>
+      <div class="hint" id="pp-compteur"></div>
+      <div class="err" id="pp-e-presentation" role="alert"></div>
+    </div>
+    <div class="field">
+      <label for="pp-localisation">Pays ou ville (60 caractères, facultatif)</label>
+      <input type="text" id="pp-localisation" maxlength="60" autocomplete="off">
+      <div class="err" id="pp-e-localisation" role="alert"></div>
+    </div>
+    <div class="field">
+      <label for="pp-contact-type">Un moyen de contact public (facultatif, un seul)</label>
+      <select id="pp-contact-type">
+        <option value="">Aucun contact public</option>
+        <option value="whatsapp">Numéro WhatsApp</option>
+        <option value="lien">Lien https</option>
+      </select>
+      <input type="text" id="pp-contact-valeur" maxlength="300" autocomplete="off" inputmode="url" placeholder="+22900000000 ou https://..." style="margin-top:8px;">
+      <div class="hint">WhatsApp : format international (par exemple +22900000000). Ce contact sera visible de tous.</div>
+      <div class="err" id="pp-e-contact" role="alert"></div>
+    </div>
+    <div class="field">
+      <label class="check" for="pp-majeur"><input type="checkbox" id="pp-majeur"><span>Je certifie avoir 18 ans ou plus.</span></label>
+      <div class="err" id="pp-e-majeur" role="alert"></div>
+    </div>
+
+    <div class="actions">
+      <button type="button" class="pp-btn secondary" id="pp-btn-enregistrer">Enregistrer le brouillon</button>
+      <button type="button" class="pp-btn" id="pp-btn-publier">Publier ma page</button>
+      <button type="button" class="pp-btn secondary hidden" id="pp-btn-depublier">Dépublier</button>
+    </div>
+    <div class="status hidden" id="pp-etat" role="status"></div>
+
+    <div class="hidden" id="pp-liens">
+      <div class="hint">Lien de votre page :</div>
+      <div class="lien-texte" id="pp-lien-texte"></div>
+      <div class="actions">
+        <button type="button" class="pp-btn secondary" id="pp-apercu">Aperçu</button>
+        <button type="button" class="pp-btn secondary" id="pp-btn-copier">Copier le lien</button>
+      </div>
+    </div>
+  </section>
 
 </div>
 
@@ -436,6 +537,8 @@
 
 })();
 </script>
+<script src="profil-public-utils.js"></script>
+<script src="profil-public.js"></script>
 <script src="pwa-install.js"></script>
 
 </body>
