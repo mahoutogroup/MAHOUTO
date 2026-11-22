@@ -15,13 +15,13 @@ const root = path.join(__dirname, "..");
 const read = (f) => fs.readFileSync(path.join(root, f), "utf8");
 const UID = "11111111-2222-4333-8444-555555555555";
 const RID = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
-const ok = (o) => Object.assign({ prenom: "Awa", age: "12", lien: "parent", formation: "serigraphie", motif: "" }, o || {});
+const ok = (o) => Object.assign({ prenom: "Awa", age: "16", situation: "pere", parrainMajeur: true, lien: "parent", formation: "serigraphie", motif: "" }, o || {});
 
 // ---------- validation de la demande ----------
 test("demande valide : valeurs nettoyées, âge converti en nombre", () => {
-  const r = D.validateDemande(ok({ prenom: "  Jean-Paul ", age: " 12 ", motif: "  Il aime dessiner.  " }));
+  const r = D.validateDemande(ok({ prenom: "  Jean-Paul ", age: " 16 ", motif: "  Il aime dessiner.  " }));
   assert.strictEqual(r.ok, true);
-  assert.deepStrictEqual(r.value, { prenom: "Jean-Paul", age: 12, lien: "parent", formation: "serigraphie", motif: "Il aime dessiner." });
+  assert.deepStrictEqual(r.value, { prenom: "Jean-Paul", age: 16, situation: "pere", parrain_majeur: true, lien: "parent", formation: "serigraphie", motif: "Il aime dessiner." });
 });
 
 test("prénom : 1 à 40 lettres (accents, tiret, apostrophe) ; refuse chiffres, adresse, téléphone, vide, trop long", () => {
@@ -34,11 +34,36 @@ test("prénom : 1 à 40 lettres (accents, tiret, apostrophe) ; refuse chiffres, 
   assert.match(D.validateDemande(ok({ prenom: "awa@exemple.test" })).errors.prenom, /Ne saisissez que le prénom/);
 });
 
-test("âge : entier de 3 à 35 ; refuse le reste avec un message", () => {
-  ["3", "12", "35", " 18 ", 7].forEach((a) => assert.strictEqual(D.validateDemande(ok({ age: a })).ok, true, String(a)));
-  ["2", "36", "0", "-3", "12.5", "12,5", "abc", "", "1e1", "1000", null, undefined].forEach((a) => {
+test("âge (règlement) : entier de 14 à 25 ; 13 et 26 refusés ; l'ancienne fourchette 3 à 35 n'est plus acceptée", () => {
+  assert.deepStrictEqual([U.AGE_MIN, U.AGE_MAX, U.AGE_MAJEUR], [14, 25, 18]);
+  ["14", "16", "25", " 18 ", 20].forEach((a) => assert.strictEqual(D.validateDemande(ok({ age: a })).ok, true, String(a)));
+  ["13", "26", "3", "12", "35", "36", "2", "0", "-3", "12.5", "12,5", "abc", "", "1e1", "1000", null, undefined].forEach((a) => {
     const r = D.validateDemande(ok({ age: a })); assert.strictEqual(r.ok, false, String(a)); assert.ok(r.errors.age, String(a));
   });
+  assert.match(D.validateDemande(ok({ age: "13" })).errors.age, /entre 14 et 25/);
+});
+
+test("situation de l'orphelin : obligatoire, seulement pere, mere ou deux_parents", () => {
+  ["pere", "mere", "deux_parents"].forEach((s) => assert.strictEqual(D.validateDemande(ok({ situation: s })).value.situation, s));
+  ["", "papa", "PERE", "pere ", null, undefined, 3, "deux_parent"].forEach((s) => {
+    const r = D.validateDemande(ok({ situation: s })); assert.strictEqual(r.ok, false, String(s)); assert.ok(r.errors.situation, String(s));
+  });
+  assert.deepStrictEqual(U.SITUATIONS.map((x) => x[0]), ["pere", "mere", "deux_parents"]);
+  assert.strictEqual(U.situationLabel("deux_parents"), "A perdu ses deux parents"); assert.strictEqual(U.situationLabel("x"), "Non précisée");
+});
+
+test("déclaration du parrain majeur : obligatoire sous 18 ans (14 à 17), sans objet dès 18 ans ; enregistrée dans la valeur", () => {
+  ["14", "17"].forEach((a) => {
+    const r = D.validateDemande(ok({ age: a, parrainMajeur: false }));
+    assert.strictEqual(r.ok, false, a); assert.match(r.errors.parrainMajeur, /parrain doit être majeur/);
+    ["on", "true", 1, null, undefined].forEach((v) => assert.strictEqual(D.validateDemande(ok({ age: a, parrainMajeur: v })).ok, false, a + " " + String(v)));
+    assert.strictEqual(D.validateDemande(ok({ age: a, parrainMajeur: true })).value.parrain_majeur, true);
+  });
+  ["18", "25"].forEach((a) => {
+    const r = D.validateDemande(ok({ age: a, parrainMajeur: false })); assert.strictEqual(r.ok, true, a); assert.strictEqual(r.value.parrain_majeur, false);
+    assert.strictEqual(D.validateDemande(ok({ age: a, parrainMajeur: true })).value.parrain_majeur, false, "case cochée puis âge changé : jamais true à 18 ans ou plus");
+  });
+  assert.ok(!("parrainMajeur" in D.validateDemande(ok({ age: "x", parrainMajeur: false })).errors), "âge invalide : une seule erreur à la fois");
 });
 
 test("lien et formation : seulement les valeurs de la liste ; « lui-même » seulement si majeur", () => {
@@ -47,7 +72,7 @@ test("lien et formation : seulement les valeurs de la liste ; « lui-même » se
   assert.strictEqual(D.validateDemande(ok({ lien: "lui_meme", age: "17" })).ok, false);
   assert.match(D.validateDemande(ok({ lien: "lui_meme", age: "17" })).errors.lien, /majeur/);
   assert.strictEqual(D.validateDemande(ok({ lien: "lui_meme", age: "18" })).ok, true);
-  assert.strictEqual(D.validateDemande(ok({ lien: "lui_meme", age: "30" })).ok, true);
+  assert.strictEqual(D.validateDemande(ok({ lien: "lui_meme", age: "25" })).ok, true);
   assert.deepStrictEqual(U.FORMATIONS, [["serigraphie", "Sérigraphie"]]);
   ["", "informatique", "serigraphie2", null].forEach((f) => assert.ok(D.validateDemande(ok({ formation: f })).errors.formation, String(f)));
 });
@@ -66,7 +91,7 @@ test("motif : facultatif, 500 caractères au plus ; caractères de contrôle ret
 test("saisie absente ou aberrante : refus sans exception, toutes les erreurs signalées", () => {
   [null, undefined, "texte", 42, {}].forEach((x) => { let r; assert.doesNotThrow(() => { r = D.validateDemande(x); }); assert.strictEqual(r.ok, false); });
   const r = D.validateDemande({});
-  assert.deepStrictEqual(Object.keys(r.errors).sort(), ["age", "formation", "lien", "prenom"]);
+  assert.deepStrictEqual(Object.keys(r.errors).sort(), ["age", "formation", "lien", "prenom", "situation"]);
 });
 
 // ---------- justificatif ----------

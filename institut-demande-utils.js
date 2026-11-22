@@ -27,9 +27,10 @@
 
   /**
    * Valide la saisie du formulaire.
-   * input : { prenom, age, lien, formation, motif } (textes tels que saisis). formations : liste [id, libellé] facultative
+   * input : { prenom, age, situation, parrainMajeur, lien, formation, motif } (textes tels que saisis ; parrainMajeur : case cochée). formations : liste [id, libellé] facultative
    * (lue dans institut_formations) ; à défaut, la liste constante U.FORMATIONS.
-   * Renvoie { ok:true, value:{ prenom, age, lien, formation, motif } } ou { ok:false, errors:{ champ: message } }.
+   * Règlement : âge de 14 à 25 ans ; situation de l'orphelin obligatoire ; sous 18 ans, le parrain certifie être majeur.
+   * Renvoie { ok:true, value:{ prenom, age, situation, parrain_majeur, lien, formation, motif } } ou { ok:false, errors:{ champ: message } }.
    */
   function validateDemande(input, formations) {
     var formationList = Array.isArray(formations) && formations.length ? formations : U.FORMATIONS;
@@ -49,6 +50,15 @@
       if (age < U.AGE_MIN || age > U.AGE_MAX) errors.age = "L'âge doit être compris entre " + U.AGE_MIN + " et " + U.AGE_MAX + " ans.";
       else value.age = age;
     }
+
+    if (typeof s.situation !== "string" || !listHas(U.SITUATIONS, s.situation)) errors.situation = "Indiquez la situation de l'orphelin (père, mère ou les deux parents décédés).";
+    else value.situation = s.situation;
+
+    // Sous 18 ans, le parrain est obligatoirement un adulte : déclaration exigée (et enregistrée). Dès 18 ans : sans objet (false).
+    if (value.age !== undefined && value.age < U.AGE_MAJEUR) {
+      if (s.parrainMajeur === true) value.parrain_majeur = true;
+      else errors.parrainMajeur = "Pour un orphelin de moins de " + U.AGE_MAJEUR + " ans, le parrain doit être majeur : cochez la déclaration.";
+    } else if (value.age !== undefined) value.parrain_majeur = false;
 
     if (typeof s.lien !== "string" || !listHas(U.LIENS, s.lien)) errors.lien = "Choisissez votre lien avec l'enfant.";
     else value.lien = s.lien;
@@ -117,7 +127,7 @@
       return "L'envoi du justificatif a échoué. Réessayez, ou déposez la demande sans justificatif.";
     }
     if (code === "42501" || /row-level security|permission denied/i.test(text)) return "L'Institut n'est pas ouvert aux demandes pour le moment.";
-    if (/Les informations d'une demande/.test(text)) return "Une demande déjà déposée ne peut plus être modifiée.";
+    if (/Les informations (d'une|de la) demande/.test(text)) return "Une demande déjà déposée ne peut plus être modifiée.";
     if (code === "23514") return "Une information saisie n'est pas valide. Vérifiez le formulaire.";
     return "La demande n'a pas pu être enregistrée. Réessayez dans un instant.";
   }

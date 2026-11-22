@@ -53,7 +53,11 @@ test("sections demandées présentes, dans l'ordre, avec l'accroche et 4 étapes
   assert.ok(ol, "liste numérique");
   assert.strictEqual((ol[1].match(/<li>/g) || []).length, 4);
   assert.ok(/parrain dépose une demande/.test(ol[1]) && /examinée/.test(ol[1]) && /validée/.test(ol[1]) && /place à tarif Institut est ouverte/.test(ol[1]) && /certificat/.test(ol[1]));
-  assert.ok(/dont les petits-fils de Sayé Louis/.test(text) && /après validation d'une demande de parrainage/.test(text));
+  assert.ok(/après validation d'une demande de parrainage/.test(text));
+  // règlement : 14 à 25 ans, père / mère / deux parents, priorité aux deux parents, parrain majeur sous 18 ans, petits-fils orphelins ou non
+  assert.ok(/orphelins de 14 à 25 ans/.test(text) && /servis en priorité/.test(text) && /moins de 18 ans, le parrain doit être majeur/.test(text));
+  assert.ok(/petits-fils de Sayé Louis, orphelins ou non, bénéficient du tarif Institut/.test(text));
+  assert.ok(!/3 à 35|35 ans/.test(text), "ancienne fourchette d'âge absente");
   assert.ok(/D'autres formations \(informatique, graphisme…\) viendront ensuite\./.test(text));
   assert.ok(/Les modalités seront annoncées prochainement\./.test(text));
   assert.ok(/Les justificatifs resteront privés/.test(text) && /Aucune photo et aucun nom d'enfant/.test(text));

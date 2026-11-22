@@ -13,7 +13,10 @@
   var MOTIF_MAX = 500;
   var REFUS_MAX = 300;
   var PRENOM_MAX = 40;
-  var AGE_MIN = 3, AGE_MAX = 35, AGE_MAJEUR = 18;
+  var AGE_MIN = 14, AGE_MAX = 25, AGE_MAJEUR = 18;   // règlement : orphelins de 14 à 25 ans (même fourchette que la base)
+
+  // Situation de l'orphelin (obligatoire) : sert à donner la priorité aux orphelins des deux parents quand les places manquent.
+  var SITUATIONS = [["pere", "A perdu son père"], ["mere", "A perdu sa mère"], ["deux_parents", "A perdu ses deux parents"]];
 
   var STATUTS = [["en_attente", "En attente"], ["validee", "Validée"], ["refusee", "Refusée"]];
   var LIENS = [
@@ -29,6 +32,7 @@
     return "";
   }
   function statutLabel(code) { return labelOf(STATUTS, code) || "Statut inconnu"; }
+  function situationLabel(code) { return labelOf(SITUATIONS, code) || "Non précisée"; }
   function lienLabel(code) { return labelOf(LIENS, code) || "—"; }
   function formationLabel(code) { return labelOf(FORMATIONS, code) || String(code == null ? "" : code).slice(0, 40); }
 
@@ -83,6 +87,21 @@
     var arr = Array.isArray(list) ? list : [];
     return statut ? arr.filter(function (d) { return d && d.statut === statut; }) : arr.slice();
   }
+  /**
+   * Ordre d'affichage des demandes. mode "deux_parents" : orphelins des deux parents d'abord (priorité du règlement quand les
+   * places manquent), puis les autres ; l'ordre d'origine (déjà du plus récent au plus ancien) est conservé dans chaque groupe.
+   * Tout autre mode : ordre d'origine. Ne modifie jamais la liste reçue.
+   */
+  function sortDemandes(list, mode) {
+    var arr = (Array.isArray(list) ? list : []).map(function (d, i) { return { d: d, i: i }; });
+    if (mode === "deux_parents") {
+      arr.sort(function (a, b) {
+        var ra = a.d && a.d.situation === "deux_parents" ? 0 : 1, rb = b.d && b.d.situation === "deux_parents" ? 0 : 1;
+        return ra - rb || a.i - b.i;
+      });
+    }
+    return arr.map(function (x) { return x.d; });
+  }
   function countByStatut(list) {
     var out = { en_attente: 0, validee: 0, refusee: 0 };
     (Array.isArray(list) ? list : []).forEach(function (d) { if (d && out[d.statut] !== undefined) out[d.statut]++; });
@@ -114,12 +133,12 @@
   var api = {
     HISTOIRE_MAX: HISTOIRE_MAX, MOTIF_MAX: MOTIF_MAX, REFUS_MAX: REFUS_MAX, PRENOM_MAX: PRENOM_MAX,
     AGE_MIN: AGE_MIN, AGE_MAX: AGE_MAX, AGE_MAJEUR: AGE_MAJEUR,
-    STATUTS: STATUTS, LIENS: LIENS, FORMATIONS: FORMATIONS,
-    statutLabel: statutLabel, lienLabel: lienLabel, formationLabel: formationLabel,
+    STATUTS: STATUTS, SITUATIONS: SITUATIONS, LIENS: LIENS, FORMATIONS: FORMATIONS,
+    statutLabel: statutLabel, situationLabel: situationLabel, lienLabel: lienLabel, formationLabel: formationLabel,
     countChars: countChars, cleanLine: cleanLine, cleanMultiline: cleanMultiline, paragraphs: paragraphs,
     validateHistoire: validateHistoire, validateRefus: validateRefus,
     isOpenValue: isOpenValue, openValue: openValue, contentValue: contentValue,
-    formatFcfa: formatFcfa, filterByStatut: filterByStatut, countByStatut: countByStatut, searchTerm: searchTerm, formatDate: formatDate
+    formatFcfa: formatFcfa, filterByStatut: filterByStatut, sortDemandes: sortDemandes, countByStatut: countByStatut, searchTerm: searchTerm, formatDate: formatDate
   };
   root.InstitutUtils = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;
