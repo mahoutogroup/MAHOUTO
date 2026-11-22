@@ -153,7 +153,7 @@
   async function loadRequests() {
     var box = $("liste-demandes");
     var res = await supabase.from("institut_demandes")
-      .select("id, prenom, age, formation, statut, raison_refus, cree_le")
+      .select("id, prenom, age, situation, formation, statut, raison_refus, cree_le")
       .eq("parrain_id", user.id).order("cree_le", { ascending: false });
     box.textContent = "";
     if (res.error) { box.appendChild(el("p", { text: "Impossible de charger vos demandes pour le moment." })); return; }
@@ -177,7 +177,7 @@
         el("span", { class: "who", text: d.prenom + " (" + d.age + " ans)" }),
         el("span", { class: "badge " + d.statut, text: U.statutLabel(d.statut) })
       ]);
-      var card = el("div", { class: "req" }, [top, el("div", { class: "meta", text: P.formationName(d.formation, formationNames) + " · déposée le " + U.formatDate(d.cree_le) })]);
+      var card = el("div", { class: "req" }, [top, el("div", { class: "meta", text: U.situationLabel(d.situation) + " · " + P.formationName(d.formation, formationNames) + " · déposée le " + U.formatDate(d.cree_le) })]);
       if (d.statut === "refusee" && d.raison_refus) card.appendChild(el("div", { class: "why", text: "Raison du refus : " + d.raison_refus }));
       if (d.statut === "validee") {
         var place = placeByDemande[d.id];
@@ -194,9 +194,17 @@
     });
   }
 
+  // La case « Je certifie être majeur » n'apparaît que si l'âge saisi est inférieur à 18 ans (décochée sinon).
+  function syncMajeur() {
+    var t = $("f-age").value.trim();
+    var minor = /^\d{1,3}$/.test(t) && parseInt(t, 10) < U.AGE_MAJEUR;
+    $("champ-majeur").classList.toggle("hidden", !minor);
+    if (!minor) $("f-parrainMajeur").checked = false;
+  }
+
   // ---------- Envoi ----------
   function showFieldErrors(errors) {
-    ["prenom", "age", "lien", "formation", "motif", "fichier"].forEach(function (k) {
+    ["prenom", "age", "situation", "parrainMajeur", "lien", "formation", "motif", "fichier"].forEach(function (k) {
       $("e-" + k).textContent = errors[k] || "";
       var input = $("f-" + k);
       if (input) input.classList.toggle("invalid", !!errors[k]);
@@ -209,7 +217,7 @@
     setStatus("etat-formulaire", "", false);
     var file = $("f-fichier").files && $("f-fichier").files[0] ? $("f-fichier").files[0] : null;
     var check = D.validateDemande({
-      prenom: $("f-prenom").value, age: $("f-age").value, lien: $("f-lien").value,
+      prenom: $("f-prenom").value, age: $("f-age").value, situation: $("f-situation").value, parrainMajeur: $("f-parrainMajeur").checked, lien: $("f-lien").value,
       formation: $("f-formation").value, motif: $("f-motif").value
     }, formationList);
     var fileCheck = D.validateFile(file);
@@ -240,6 +248,7 @@
         return;
       }
       $("formulaire").reset();
+      syncMajeur();
       showFieldErrors({});
       setStatus("etat-formulaire", "Demande envoyée. Elle sera examinée : son état s'affiche dans « Mes demandes ».", false);
       await loadRequests();
@@ -267,6 +276,8 @@
 
   async function init() {
     fillSelect($("f-lien"), U.LIENS, "Choisir…");
+    fillSelect($("f-situation"), U.SITUATIONS, "Choisir…");
+    $("f-age").addEventListener("input", syncMajeur);
     // Formations proposées : celles de l'Académie activées pour l'Institut. Échec ou liste vide : liste constante (Sérigraphie).
     try {
       var fr = await supabase.from("institut_formations")

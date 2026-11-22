@@ -168,7 +168,7 @@ test("catalogue : formations actives lues (nom, prix) ; id trop long, nom absent
 });
 
 test("liste de demande : l'identifiant choisi est celui de la liste lue dans la base ; repli sur la constante Sérigraphie", () => {
-  const ok = { prenom: "Awa", age: "12", lien: "parent", motif: "" };
+  const ok = { prenom: "Awa", age: "16", situation: "pere", parrainMajeur: true, lien: "parent", motif: "" };
   const dyn = [["fmt-1", "Formation Un"], ["fmt-2", "Formation Deux"]];
   assert.strictEqual(D.validateDemande(Object.assign({ formation: "fmt-2" }, ok), dyn).value.formation, "fmt-2");
   assert.strictEqual(D.validateDemande(Object.assign({ formation: "serigraphie" }, ok), dyn).ok, false, "la constante n'est plus acceptée quand la liste vient de la base");

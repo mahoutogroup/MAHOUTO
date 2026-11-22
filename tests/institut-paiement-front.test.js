@@ -72,7 +72,7 @@ test("front : aucun innerHTML / document.write / eval ; aucun montant envoyé ; 
   assert.ok(d.includes("PAY.safeCheckoutUrl(data.checkoutUrl)"));
 });
 
-test("pages : institut-retour.html noindex, scripts dans l'ordre ; institut-demande.html charge le module ; sw.js v113 + fichiers publics", () => {
+test("pages : institut-retour.html noindex, scripts dans l'ordre ; institut-demande.html charge le module ; sw.js v114 ou plus + fichiers publics", () => {
   const h = read("institut-retour.html");
   assert.match(h, /<meta name="robots" content="noindex">/);
   const srcs = [...h.matchAll(/<script src="([^"]+)"/g)].map((m) => m[1]);
@@ -81,7 +81,7 @@ test("pages : institut-retour.html noindex, scripts dans l'ordre ; institut-dema
   const d = read("institut-demande.html");
   assert.ok(d.indexOf("institut-paiement-utils.js") > d.indexOf("institut-place-utils.js") && d.indexOf("institut-paiement-utils.js") < d.indexOf("institut-demande.js"));
   const sw = read("sw.js");
-  assert.match(sw, /CACHE_NAME = "mahoutoplus-shell-v113"/);
+  assert.match(sw, /CACHE_NAME = "mahoutoplus-shell-v(11[4-9]|1[2-9]\d)"/);
   ["/institut-paiement-utils.js", "/institut-retour.html", "/institut-retour.js"].forEach((f) => assert.ok(sw.includes('"' + f + '"'), f));
   assert.ok(!sw.includes("admin/institut"));
   // le retour ne lit jamais l'URL

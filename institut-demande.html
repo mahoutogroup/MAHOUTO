@@ -43,6 +43,8 @@
   .guide .invalid { border-color: #EF4444 !important; }
   .guide .err { font-size: 12px; color: #F87171; margin-top: 3px; min-height: 0; }
   .guide .err:empty { display: none; }
+  .guide .check { display: flex; align-items: flex-start; gap: 10px; font-size: 13.5px; color: var(--text-muted); line-height: 1.5; cursor: pointer; }
+  .guide .check input { margin-top: 3px; flex: 0 0 auto; width: 18px; height: 18px; }
   .guide .hint { font-size: 12px; color: var(--text-dim); margin-top: 3px; line-height: 1.5; }
   .guide .btn {
     display: block; width: 100%; max-width: 360px; padding: 13px 18px; border: none; border-radius: var(--radius-md);
@@ -102,6 +104,7 @@
   <section id="bloc-formulaire" class="hidden">
     <h2>Déposer une demande</h2>
     <p class="notice"><strong>Ne saisissez que le prénom de l'enfant.</strong> Les informations restent privées.</p>
+    <p class="notice">Règlement : l'Institut accueille les orphelins de 14 à 25 ans. Pour un orphelin de moins de 18 ans, le parrain doit être majeur. Les orphelins des deux parents sont servis en priorité quand les places manquent.</p>
     <form id="formulaire" novalidate>
       <div class="field">
         <label for="f-prenom">Prénom de l'orphelin</label>
@@ -111,7 +114,18 @@
       <div class="field">
         <label for="f-age">Âge (en années)</label>
         <input type="text" id="f-age" inputmode="numeric" maxlength="2" autocomplete="off">
+        <div class="hint">De 14 à 25 ans.</div>
         <div class="err" id="e-age" role="alert"></div>
+      </div>
+      <div class="field">
+        <label for="f-situation">Situation de l'orphelin</label>
+        <select id="f-situation"></select>
+        <div class="err" id="e-situation" role="alert"></div>
+      </div>
+      <div class="field hidden" id="champ-majeur">
+        <label class="check" for="f-parrainMajeur"><input type="checkbox" id="f-parrainMajeur"><span>Je certifie être majeur (18 ans ou plus).</span></label>
+        <div class="hint">Obligatoire quand l'orphelin a moins de 18 ans : le parrain est alors forcément un adulte.</div>
+        <div class="err" id="e-parrainMajeur" role="alert"></div>
       </div>
       <div class="field">
         <label for="f-lien">Votre lien avec l'enfant</label>
