@@ -11,6 +11,10 @@
      (WhatsApp au format international, ou lien https). Jamais demandé ni affiché : nom légal complet, e-mail, rôle.
    - Lecture de SA ligne par la fonction profil_public_mien() ; enregistrement par insertion / mise à jour de la table
      profils_publics (la base garde la forme, l'adresse figée après la première publication, la suspension réservée aux admins).
+   - QR code (PR 3) : encode l'adresse FIXE https://mahouto.com/m/<adresse>?src=qr (jamais window.location), généré dans le
+     navigateur avec qrcode-generator.js (niveau Q), aucun service externe ; PNG d'au moins 1024 px avec marge de 4 modules,
+     SVG, nom mahouto-<adresse>-qr.png / .svg ; « Copier le lien de la page » copie le lien SANS ?src=qr.
+   - Visites : bloc « Visites de votre page » lu par la fonction profil_public_visites_mien (jamais page_views directement).
    - Aucun innerHTML : createElement / textContent. Aucun journal console de données saisies.
    ========================================================= */
 (function () {
@@ -127,6 +131,93 @@
     if (has) $("pp-lien-texte").textContent = PU.publicUrl(row.adresse);
     $("pp-compteur").textContent = PU.countChars($("pp-presentation").value) + " / " + PU.LIMITS.presentation;
     $("pp-note-ferme").classList.toggle("hidden", ouvert);
+    refreshQr(published);
+  }
+
+  // ---------- QR code (visible dès que la page est publiée) ----------
+  var qrState = { adresse: null, qr: null };
+  function makeQr(adresse) {
+    var url = PU.qrUrl(adresse);
+    if (!url || typeof window.qrcode !== "function") return null;
+    try { var qr = window.qrcode(0, "Q"); qr.addData(url); qr.make(); return qr; } catch (e) { return null; }
+  }
+  function renderQrPreview(qr) {
+    var box = $("pp-qr-apercu"), n = qr.getModuleCount(), L = PU.qrLayout(n, 1);
+    box.textContent = "";
+    var NS = "http://www.w3.org/2000/svg";
+    var svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("viewBox", "0 0 " + L.size + " " + L.size);
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", "QR code de votre page");
+    svg.setAttribute("shape-rendering", "crispEdges");
+    var bg = document.createElementNS(NS, "rect");
+    bg.setAttribute("width", String(L.size)); bg.setAttribute("height", String(L.size)); bg.setAttribute("fill", "#ffffff");
+    var path = document.createElementNS(NS, "path"), d = "";
+    for (var r = 0; r < n; r++) for (var c = 0; c < n; c++) if (qr.isDark(r, c)) d += "M" + (c + L.quiet) + " " + (r + L.quiet) + "h1v1h-1z";
+    path.setAttribute("d", d); path.setAttribute("fill", "#000000");
+    svg.appendChild(bg); svg.appendChild(path);
+    box.appendChild(svg);
+  }
+  function refreshQr(published) {
+    var zone = $("pp-qr"), adresse = row && row.adresse ? row.adresse : null;
+    var show = !!(published && adresse && typeof window.qrcode === "function");
+    zone.classList.toggle("hidden", !show);
+    if (!show) { qrState = { adresse: null, qr: null }; return; }
+    if (qrState.adresse === adresse && qrState.qr) return;
+    var qr = makeQr(adresse);
+    if (!qr) { zone.classList.add("hidden"); return; }
+    qrState = { adresse: adresse, qr: qr };
+    renderQrPreview(qr);
+  }
+  function download(blob, filename) {
+    var a = document.createElement("a"), url = URL.createObjectURL(blob);
+    a.setAttribute("href", url); a.setAttribute("download", filename);
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+  }
+  function downloadQr(kind) {
+    var st = $("pp-qr-etat"), qr = qrState.qr, name = PU.qrFilename(qrState.adresse, kind);
+    st.textContent = "";
+    if (!qr || !name) return;
+    try {
+      if (kind === "svg") {
+        var svg = PU.qrSvgString(qr.getModuleCount(), function (r, c) { return qr.isDark(r, c); });
+        if (!svg) throw new Error("svg");
+        download(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }), name);
+        st.textContent = "SVG téléchargé.";
+        return;
+      }
+      var L = PU.qrLayout(qr.getModuleCount(), PU.QR_MIN_PX), canvas = document.createElement("canvas");
+      canvas.width = L.px; canvas.height = L.px;
+      var ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, L.px, L.px);
+      ctx.fillStyle = "#000000";
+      for (var r = 0; r < L.modules; r++) for (var c = 0; c < L.modules; c++) if (qr.isDark(r, c)) ctx.fillRect((c + L.quiet) * L.scale, (r + L.quiet) * L.scale, L.scale, L.scale);
+      canvas.toBlob(function (blob) {
+        if (!blob) { st.textContent = "Le téléchargement a échoué. Réessayez."; return; }
+        download(blob, name);
+        st.textContent = "PNG téléchargé (" + L.px + " × " + L.px + " px).";
+      }, "image/png");
+    } catch (e) { st.textContent = "Le téléchargement a échoué. Réessayez."; }
+  }
+
+  // ---------- Visites de la page ----------
+  async function loadVisites() {
+    var zone = $("pp-visites");
+    if (!(row && row.publie)) { zone.classList.add("hidden"); return; }
+    var res = await supabase.rpc("profil_public_visites_mien", { p_jours: 30 });
+    if (res.error || !Array.isArray(res.data)) { zone.classList.add("hidden"); return; }
+    var s = PU.summarizeVisites(res.data), tot = $("pp-visites-totaux"), list = $("pp-visites-jours");
+    function box(label, value) { var d = document.createElement("div"), b = document.createElement("strong"); b.textContent = String(value); d.appendChild(b); d.appendChild(document.createTextNode(label)); return d; }
+    tot.textContent = ""; list.textContent = "";
+    tot.appendChild(box("visites sur 7 jours", s.total7)); tot.appendChild(box("visites sur 30 jours", s.total30));
+    $("pp-visites-repartition").textContent = "Sur 30 jours : QR code " + s.qr + " · lien " + s.lien + " · autre " + s.autre;
+    s.days7.forEach(function (d) {
+      var li = document.createElement("li"), a = document.createElement("span"), b = document.createElement("span");
+      a.textContent = PU.formatJourCourt(d.jour); b.textContent = d.visites + (d.visites > 1 ? " visites" : " visite");
+      li.appendChild(a); li.appendChild(b); list.appendChild(li);
+    });
+    zone.classList.remove("hidden");
   }
 
   async function load() {
@@ -136,6 +227,7 @@
     if (res.error) { setStatus("Impossible de charger votre page pour le moment (le SQL du profil public est-il exécuté ?).", true); row = null; fillForm(); return; }
     row = Array.isArray(res.data) && res.data.length ? res.data[0] : null;
     fillForm();
+    try { await loadVisites(); } catch (e) { $("pp-visites").classList.add("hidden"); }
   }
 
   // Enregistre. publier : true = publier, false = brouillon / dépublier. Une page déjà publiée le reste (« Enregistrer »).
@@ -187,7 +279,7 @@
       } catch (e2) { ok = false; }
     }
     $("pp-btn-copier").textContent = ok ? "Lien copié ✓" : "Copie impossible";
-    setTimeout(function () { $("pp-btn-copier").textContent = "Copier le lien"; }, 2500);
+    setTimeout(function () { $("pp-btn-copier").textContent = "Copier le lien de la page"; }, 2500);
   }
 
   async function init() {
@@ -213,6 +305,8 @@
     });
     $("pp-nom").addEventListener("input", function () { if (!$("pp-avatar").value) renderPhoto(); });
     $("pp-btn-copier").addEventListener("click", copier);
+    $("pp-qr-png").addEventListener("click", function () { downloadQr("png"); });
+    $("pp-qr-svg").addEventListener("click", function () { downloadQr("svg"); });
     $("pp-presentation").addEventListener("input", function () { $("pp-compteur").textContent = PU.countChars($("pp-presentation").value) + " / " + PU.LIMITS.presentation; });
     $("pp-apercu").addEventListener("click", function () { if (row && row.adresse) window.open("/m/" + encodeURIComponent(row.adresse), "_blank", "noopener"); });
     await load();

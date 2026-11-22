@@ -12,7 +12,7 @@
 })(typeof window !== "undefined" ? window : globalThis, function () {
   "use strict";
 
-  var SITE = "https://www.mahouto.com";
+  var SITE = "https://mahouto.com";   // adresse fixe : jamais window.location, jamais un autre domaine
   var ADRESSE_RE = /^[a-z0-9][a-z0-9-]{1,28}[a-z0-9]$/;
   var LIMITS = { nom: 60, metier: 80, presentation: 280, localisation: 60, avatar: 500, lien: 300 };
   // Même liste fixe que la base (tirets ignorés) ; la base ajoute en plus la liste des pseudos réservés.
@@ -209,6 +209,59 @@
       .map(function (m) { return m.label + " : " + Number(c[m.value]); }).join(" · ");
   }
 
+  // ---------- QR code et visites (PR 3 sur 3) ----------
+  var QR_SOURCE = "qr";   // valeur de ?src= reconnue par analytics.js (SOURCE_RE : minuscules, chiffres, _ et -)
+  var QR_QUIET_MODULES = 4;
+  var QR_MIN_PX = 1024;
+  var QR_TEXTE = "Ce QR code ouvre votre page. L'adresse de la page ne change plus après la première publication : vous pouvez l'imprimer sans risque.";
+  var VISITES_TEXTE = "Nous comptons des visites, pas des personnes : aucun nom, aucune identité de visiteur n'est enregistré.";
+
+  /** Adresse encodée dans le QR : https://mahouto.com/m/<adresse>?src=qr ; null si l'adresse est invalide. */
+  function qrUrl(adresse) { return typeof adresse === "string" && ADRESSE_RE.test(adresse) ? SITE + "/m/" + adresse + "?src=" + QR_SOURCE : null; }
+
+  /** Nom du fichier téléchargé : mahouto-<adresse>-qr.png / .svg ; null si l'adresse ou l'extension est invalide. */
+  function qrFilename(adresse, ext) {
+    return typeof adresse === "string" && ADRESSE_RE.test(adresse) && (ext === "png" || ext === "svg") ? "mahouto-" + adresse + "-qr." + ext : null;
+  }
+
+  /** Mise en page : marge blanche de 4 modules, échelle entière pour une taille d'au moins minPx (1024 par défaut). */
+  function qrLayout(moduleCount, minPx) {
+    var n = Math.floor(Number(moduleCount));
+    if (!isFinite(n) || n < 1) return null;
+    var size = n + QR_QUIET_MODULES * 2;
+    var scale = Math.max(1, Math.ceil((minPx || QR_MIN_PX) / size));
+    return { quiet: QR_QUIET_MODULES, modules: n, size: size, scale: scale, px: size * scale };
+  }
+
+  /** SVG du QR : fond blanc, modules noirs, marge de 4 modules. Uniquement des nombres : aucun texte venant de l'utilisateur. */
+  function qrSvgString(moduleCount, isDark) {
+    var L = qrLayout(moduleCount, 1);
+    if (!L || typeof isDark !== "function") return null;
+    var d = "";
+    for (var r = 0; r < L.modules; r++) for (var c = 0; c < L.modules; c++) if (isDark(r, c)) d += "M" + (c + L.quiet) + " " + (r + L.quiet) + "h1v1h-1z";
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + L.size + " " + L.size + '" width="' + (L.size * 10) + '" height="' + (L.size * 10) +
+      '" shape-rendering="crispEdges"><rect width="' + L.size + '" height="' + L.size + '" fill="#ffffff"/><path d="' + d + '" fill="#000000"/></svg>';
+  }
+
+  /** Date courte « jj/mm » d'un jour « aaaa-mm-jj » ; « — » si invalide. */
+  function formatJourCourt(jour) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(jour || ""));
+    return m ? m[3] + "/" + m[2] : "—";
+  }
+
+  /**
+   * Résumé des visites. rows : lignes de profil_public_visites_mien(30) { jour, visites, qr, lien, autre }, du plus ancien au plus récent.
+   * Renvoie { total7, total30, qr, lien, autre, days7:[{ jour, visites }] } (répartition sur la période reçue). Valeurs invalides = 0.
+   */
+  function summarizeVisites(rows) {
+    var list = Array.isArray(rows) ? rows.filter(function (r) { return r && typeof r === "object"; }) : [];
+    function n(x) { var v = Number(x); return isFinite(v) && v > 0 ? Math.floor(v) : 0; }
+    var out = { total7: 0, total30: 0, qr: 0, lien: 0, autre: 0, days7: [] };
+    list.forEach(function (r) { out.total30 += n(r.visites); out.qr += n(r.qr); out.lien += n(r.lien); out.autre += n(r.autre); });
+    list.slice(-7).forEach(function (r) { out.total7 += n(r.visites); out.days7.push({ jour: String(r.jour || ""), visites: n(r.visites) }); });
+    return out;
+  }
+
   /** Date « jj/mm/aaaa » (heure locale) ; « — » si absente ou invalide. */
   function formatDateFr(iso) {
     if (!iso) return "—";
@@ -288,6 +341,8 @@
     cleanLine: cleanLine, countChars: countChars, normalizeWhatsapp: normalizeWhatsapp, safeHttpsUrl: safeHttpsUrl, whatsappLink: whatsappLink,
     validateProfil: validateProfil, errorMessage: errorMessage, disponibiliteMessage: disponibiliteMessage,
     pageView: pageView, addressFromLocation: addressFromLocation,
+    QR_SOURCE: QR_SOURCE, QR_QUIET_MODULES: QR_QUIET_MODULES, QR_MIN_PX: QR_MIN_PX, QR_TEXTE: QR_TEXTE, VISITES_TEXTE: VISITES_TEXTE,
+    qrUrl: qrUrl, qrFilename: qrFilename, qrLayout: qrLayout, qrSvgString: qrSvgString, formatJourCourt: formatJourCourt, summarizeVisites: summarizeVisites,
     AVATAR_TYPES: AVATAR_TYPES, AVATAR_MAX_BYTES: AVATAR_MAX_BYTES, validateAvatarFile: validateAvatarFile, avatarFilename: avatarFilename,
     cloudinaryImageUrl: cloudinaryImageUrl, formatDateFr: formatDateFr,
     MOTIFS_SIGNALEMENT: MOTIFS_SIGNALEMENT, SIGNALEMENT_DETAIL_MAX: SIGNALEMENT_DETAIL_MAX, SEUIL_A_EXAMINER: SEUIL_A_EXAMINER,

@@ -244,7 +244,7 @@ test("m.js : « Connectez-vous pour signaler cette page » ouvre la fenêtre de 
 test("m.js : fenêtre de signalement — 6 motifs, précisions de 300 caractères avec compteur, avertissement exact, bouton Envoyer", async () => {
   const d = await runPage({ session: true });
   d.els["btn-signaler"].click();
-  const overlay = d.body.children[0]; assert.strictEqual(overlay.id, "sg-overlay");
+  const overlay = d.body.children.find((c) => c.id === "sg-overlay"); assert.ok(overlay);
   const radios = findAll(overlay, (n) => n.tagName === "input" && n.attrs.type === "radio");
   assert.deepStrictEqual(radios.map((r) => r.attrs.value), ["spam", "usurpation", "arnaque", "inapproprie", "donnees_personnelles", "autre"]);
   const text = overlay.textContent;
@@ -253,13 +253,13 @@ test("m.js : fenêtre de signalement — 6 motifs, précisions de 300 caractère
   const ta = findAll(overlay, (n) => n.tagName === "textarea")[0]; assert.strictEqual(ta.attrs.maxlength, "300");
   ta.value = "abcde"; ta.listeners.input(); assert.ok(overlay.textContent.includes("5 / 300"));
   assert.ok(findAll(overlay, (n) => n.tagName === "button" && n.textContent === "Envoyer").length === 1);
-  d.els["btn-signaler"].click(); assert.strictEqual(d.body.children.length, 1, "une seule fenêtre à la fois");
-  findAll(overlay, (n) => n.tagName === "button" && n.textContent === "Annuler")[0].click(); assert.strictEqual(d.body.children.length, 0, "Annuler ferme la fenêtre");
+  d.els["btn-signaler"].click(); assert.strictEqual(d.body.children.filter((c) => c.id === "sg-overlay").length, 1, "une seule fenêtre à la fois");
+  findAll(overlay, (n) => n.tagName === "button" && n.textContent === "Annuler")[0].click(); assert.strictEqual(d.body.children.filter((c) => c.id === "sg-overlay").length, 0, "Annuler ferme la fenêtre");
 });
 
 async function sendReport(d, motifIndex, detail) {
   d.els["btn-signaler"].click();
-  const overlay = d.body.children[0];
+  const overlay = d.body.children.find((c) => c.id === "sg-overlay");
   if (motifIndex !== null) { const r = findAll(overlay, (n) => n.tagName === "input")[motifIndex]; r.listeners.change(); }
   if (detail !== undefined) findAll(overlay, (n) => n.tagName === "textarea")[0].value = detail;
   const send = findAll(overlay, (n) => n.tagName === "button" && n.textContent === "Envoyer")[0];

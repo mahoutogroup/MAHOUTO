@@ -38,6 +38,7 @@
   var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   var ITEM_RE = /^[A-Za-z0-9_-]{1,80}$/;
   var SOURCE_RE = /^[a-z0-9_-]{1,40}$/;
+  var ADDRESS_RE = /^[a-z0-9][a-z0-9-]{1,28}[a-z0-9]$/;   // adresse d'une page publique /m/<adresse> (profil public)
   var BOT_RE = /googlebot|bingbot|yandex|baiduspider|duckduckbot|slurp|facebookexternalhit|facebot|twitterbot|linkedinbot|telegrambot|applebot|petalbot|semrush|ahrefs|mj12bot|headlesschrome|lighthouse|pagespeed|gtmetrix|prerender|phantomjs|\b(?:bot|crawler|spider)\b|curl\/|wget\/|python-requests|node-fetch|axios\/|go-http-client/i;
 
   // ---------- Décisions « ne rien faire » ----------
@@ -100,6 +101,12 @@
     } else if (path === "/formation-detail.html") {
       v = q.get("course");
       if (v && ITEM_RE.test(v)) { type = "formation"; item = v; }
+    } else if (path === "/m.html" || /^\/m\/[^\/]+\/?$/.test(path)) {
+      // Page publique d'un membre : une seule ligne /m.html, l'adresse dans « item » (jamais une identité). Le chargement de ce
+      // script sur cette page est décidé par m.js : jamais pour un aperçu, une page introuvable, non disponible ou fermée.
+      v = path === "/m.html" ? q.get("adresse") : path.split("/")[2];
+      v = v ? String(v).toLowerCase() : "";
+      if (ADDRESS_RE.test(v)) { type = "other"; item = v; path = "/m.html"; }
     }
     return { path: path, type: type, item: item };
   }

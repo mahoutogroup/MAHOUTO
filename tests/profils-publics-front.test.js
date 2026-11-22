@@ -26,7 +26,7 @@ test("adresses réservées refusées (liste fixe, tirets ignorés) : admin, api,
     const r = PU.validateAdresse(a); assert.strictEqual(r.ok, false, a); assert.strictEqual(r.code, "reservee", a);
   });
   assert.strictEqual(PU.validateAdresse("admin-atelier").ok, true, "un mot réservé dans une adresse plus longue reste permis");
-  assert.strictEqual(PU.publicUrl("mon-atelier"), "https://www.mahouto.com/m/mon-atelier");
+  assert.strictEqual(PU.publicUrl("mon-atelier"), "https://mahouto.com/m/mon-atelier");
 });
 
 test("champs : nom 1 à 60 ; métier 80 ; présentation 280 ; lieu 60 ; valeurs nettoyées, vides = null", () => {
@@ -229,13 +229,13 @@ test("m.html : noindex (meta), chemins absolus (adresse /m/...), scripts dans l'
   assert.ok(v.headers.some((x) => x.source === "/m.html" && x.headers.some((hh) => hh.key === "X-Robots-Tag")));
 });
 
-test("vercel.json : réécriture /m/:adresse → m.html sans nouvelle fonction api/ (12 fonctions) ; autres réécritures intactes", () => {
+test("vercel.json : réécriture /m/:adresse → aperçu de partage (produit-og, type profil) sans nouvelle fonction api/ (12 fonctions) ; autres réécritures intactes", () => {
   const v = JSON.parse(read("vercel.json"));
-  assert.deepStrictEqual(v.rewrites.find((r) => r.source === "/m/:adresse"), { source: "/m/:adresse", destination: "/m.html?adresse=:adresse" });
+  assert.deepStrictEqual(v.rewrites.find((r) => r.source === "/m/:adresse"), { source: "/m/:adresse", destination: "/api/produit-og?type=profil&adresse=:adresse" });
   ["/p/:id", "/f/:id", "/s/:id", "/e/:slug", "/r/:id", "/verify/:code"].forEach((s) => assert.ok(v.rewrites.some((r) => r.source === s), s));
   const list = (d) => fs.readdirSync(path.join(root, d)).filter((f) => f.endsWith(".js") && !f.startsWith("_"));
   assert.strictEqual(list("api").length + list("api/admin").length, 12, "limite Vercel Hobby");
-  assert.ok(!fs.readdirSync(path.join(root, "api")).some((f) => /profil|^m\./.test(f)));
+  assert.ok(!fs.readdirSync(path.join(root, "api")).some((f) => !f.startsWith("_") && /profil|^m\./.test(f)), "aucune nouvelle fonction directement dans api/ : seulement des modules préfixés par _");
 });
 
 test("profil.html : section « Mon profil public » (activer, adresse + disponibilité, champs, 18 ans, aperçu, lien, dépublier) ; profiles et le reste du fichier inchangés", () => {

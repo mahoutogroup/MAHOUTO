@@ -113,6 +113,14 @@
   .pp .state { font-size: 13px; font-weight: 700; color: var(--gold); margin-bottom: 10px; }
   .pp .status { font-size: 13px; line-height: 1.6; margin-top: 8px; color: var(--accent-green); }
   .pp .status.error { color: #F87171; }
+  .pp .pp-sous-titre { font-size: 14px; color: var(--white); margin: 16px 0 8px; }
+  .pp .pp-qr-apercu { width: 200px; max-width: 100%; background: #ffffff; border-radius: 8px; padding: 4px; margin-bottom: 8px; }
+  .pp .pp-qr-apercu svg { width: 100%; height: auto; display: block; }
+  .pp .pp-visites-totaux { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 6px; }
+  .pp .pp-visites-totaux div { flex: 1 1 120px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); padding: 8px 10px; font-size: 12px; color: var(--text-muted); }
+  .pp .pp-visites-totaux strong { display: block; font-size: 20px; color: var(--gold); }
+  .pp .pp-visites-jours { list-style: none; padding: 0; margin: 6px 0 10px; font-size: 13px; color: var(--text-muted); }
+  .pp .pp-visites-jours li { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px solid var(--border); }
   .pp .pp-photo { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 6px; }
   .pp .pp-photo-apercu { width: 72px; height: 72px; border-radius: 50%; overflow: hidden; background: var(--bg-elevated); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 26px; font-weight: 700; color: var(--gold); flex: 0 0 auto; }
   .pp .pp-photo-apercu img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -171,7 +179,7 @@
     <div class="field">
       <label for="pp-adresse">Adresse de la page</label>
       <input type="text" id="pp-adresse" maxlength="30" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="mon-nom">
-      <div class="hint">www.mahouto.com/m/votre-adresse : 3 à 30 caractères (minuscules, chiffres, tirets). Après la première publication, l'adresse ne change plus.</div>
+      <div class="hint">mahouto.com/m/votre-adresse : 3 à 30 caractères (minuscules, chiffres, tirets). Après la première publication, l'adresse ne change plus.</div>
       <div class="row"><button type="button" class="pp-btn secondary" id="pp-btn-verifier">Vérifier la disponibilité</button></div>
       <div class="adresse-etat" id="pp-adresse-etat" role="status"></div>
       <div class="err" id="pp-e-adresse" role="alert"></div>
@@ -241,8 +249,27 @@
       <div class="lien-texte" id="pp-lien-texte"></div>
       <div class="actions">
         <button type="button" class="pp-btn secondary" id="pp-apercu">Aperçu</button>
-        <button type="button" class="pp-btn secondary" id="pp-btn-copier">Copier le lien</button>
+        <button type="button" class="pp-btn secondary" id="pp-btn-copier">Copier le lien de la page</button>
       </div>
+    </div>
+
+    <div class="hidden" id="pp-qr">
+      <h3 class="pp-sous-titre">QR code de votre page</h3>
+      <div class="pp-qr-apercu" id="pp-qr-apercu"></div>
+      <p class="hint">Ce QR code ouvre votre page. L'adresse de la page ne change plus après la première publication : vous pouvez l'imprimer sans risque.</p>
+      <div class="actions">
+        <button type="button" class="pp-btn secondary" id="pp-qr-png">Télécharger le QR (PNG)</button>
+        <button type="button" class="pp-btn secondary" id="pp-qr-svg">Télécharger le QR (SVG)</button>
+      </div>
+      <div class="adresse-etat" id="pp-qr-etat" role="status"></div>
+    </div>
+
+    <div class="hidden" id="pp-visites">
+      <h3 class="pp-sous-titre">Visites de votre page</h3>
+      <div class="pp-visites-totaux" id="pp-visites-totaux"></div>
+      <div class="hint" id="pp-visites-repartition"></div>
+      <ul class="pp-visites-jours" id="pp-visites-jours"></ul>
+      <p class="hint">Nous comptons des visites, pas des personnes : aucun nom, aucune identité de visiteur n'est enregistré.</p>
     </div>
   </section>
 
@@ -552,6 +579,7 @@
 
 })();
 </script>
+<script src="qrcode-generator.js"></script>
 <script src="profil-public-utils.js"></script>
 <script src="profil-public.js"></script>
 <script src="pwa-install.js"></script>
