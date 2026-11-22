@@ -23,7 +23,7 @@ function blocks(text) {
 }
 const fn = (name) => { const m = new RegExp("create or replace function public\\." + name + "\\([\\s\\S]*?\\n\\$\\$;").exec(sql); assert.ok(m, name); return m[0]; };
 const FUNCTIONS = ["profils_publics_ouvert", "profils_publics_adresse_reservee", "profils_publics_garde", "profil_public_mien", "profil_public_adresse_disponible",
-  "profil_public_statut", "profils_publics_admin_lister", "profils_publics_admin_suspendre", "profils_publics_admin_adresse"];
+  "profil_public_statut", "profil_public_lire", "profils_publics_admin_lister", "profils_publics_admin_lire", "profils_publics_admin_suspendre", "profils_publics_admin_adresse"];
 
 test("blocs numérotés 1 à 11, courts, listés dans la note de tête ; rollback 1 à 3", () => {
   const b = blocks(raw);
@@ -97,12 +97,14 @@ test("interrupteur : table de réglages, ouvert = non par défaut, lecture publi
   assert.match(fn("profils_publics_ouvert"), /coalesce\(\(select r\.valeur = 'oui'[\s\S]*, false\)/);
 });
 
-test("droits par colonne : lecture publique SANS user_id / majeur_declare / suspendu ; jamais de droit sur suspendu, user_id, publie_le ; aucun delete", () => {
-  const sel = /grant select \(([^)]*)\)\s+on public\.profils_publics to anon, authenticated;/.exec(sql);
+test("AUCUNE lecture directe pour anon : pas de droit sur la table, pas de politique de lecture publique ; authenticated ne lit que la colonne id", () => {
+  assert.match(sql, /revoke all on public\.profils_publics from anon, authenticated;/);
+  assert.ok(!/grant [^;]*on public\.profils_publics to [^;]*\banon\b/i.test(sql), "aucun droit pour anon sur la table");
+  assert.ok(!/profils_publics_lecture_publique" on public\.profils_publics\s+for/.test(sql), "aucune politique de lecture publique");
+  assert.match(sql, /drop policy if exists "profils_publics_lecture_publique" on public\.profils_publics;/, "l'ancienne politique est supprimée si elle existe");
+  const sel = /grant select \(([^)]*)\)\s+on public\.profils_publics to (\w+(?:, \w+)*);/.exec(sql);
   assert.ok(sel);
-  const cols = sel[1].split(",").map((x) => x.trim());
-  assert.deepStrictEqual(cols, ["id", "adresse", "nom_affiche", "avatar_url", "metier", "presentation", "localisation", "contact_type", "contact_valeur", "publie"]);
-  ["user_id", "majeur_declare", "suspendu", "publie_le", "cree_le", "modifie_le"].forEach((c) => assert.ok(!cols.includes(c), c + " ne doit pas être lisible"));
+  assert.deepStrictEqual([sel[1].trim(), sel[2]], ["id", "authenticated"], "seule la colonne id, seulement pour authenticated");
   ["insert", "update"].forEach((op) => {
     const g = new RegExp("grant " + op + " \\(([^)]*)\\)\\s+on public\\.profils_publics to authenticated;").exec(sql);
     assert.ok(g, op);
@@ -111,16 +113,27 @@ test("droits par colonne : lecture publique SANS user_id / majeur_declare / susp
     assert.ok(c.includes("majeur_declare") && c.includes("publie") && c.includes("adresse"));
   });
   assert.ok(!/grant (all|delete)/i.test(sql));
-  assert.match(sql, /revoke all on public\.profils_publics from anon, authenticated;/);
   assert.match(sql, /alter table public\.profils_publics enable row level security;/);
 });
 
-test("règles RLS : lecture publique (publiée, non suspendue, fonction ouverte), propriétaire et admin ; aucune politique de suppression", () => {
+test("profil_public_lire : UNE page par adresse exacte, security definer, publiée + non suspendue + ouverte, aucune colonne sensible, aucune recherche partielle", () => {
+  const f = fn("profil_public_lire");
+  assert.match(f, /returns table \(id uuid, adresse text, nom_affiche text, avatar_url text, metier text, presentation text,\s+localisation text, contact_type text, contact_valeur text\)/);
+  assert.ok(/security definer/.test(f) && /set search_path = public, pg_temp/.test(f));
+  assert.match(f, /where p_adresse ~ '\^\[a-z0-9\]\[a-z0-9-\]\{1,28\}\[a-z0-9\]\$'/);
+  assert.match(f, /and p\.adresse = p_adresse/);
+  assert.match(f, /and p\.publie\s+and not p\.suspendu\s+and public\.profils_publics_ouvert\(\)\s+limit 1;/);
+  ["user_id", "majeur_declare", "suspendu", "publie_le", "cree_le", "modifie_le"].forEach((c) => assert.ok(!new RegExp("\\bp\\." + c + "\\b").test(f.replace(/and not p\.suspendu/, "")) && !new RegExp("," + " " + c).test(f.split("language sql")[0]), c + " jamais renvoyé"));
+  assert.ok(!/like|ilike|similar|~\*|%|position\(|strpos|starts_with/i.test(f.replace(/'\^\[a-z0-9\]\[a-z0-9-\]\{1,28\}\[a-z0-9\]\$'/, "")), "aucune recherche partielle");
+  assert.match(sql, /revoke all on function public\.profil_public_lire\(text\) from public;\s+grant execute on function public\.profil_public_lire\(text\) to anon, authenticated;/);
+});
+
+test("règles RLS : propriétaire et admin seulement (lecture, mise à jour), insertion propriétaire ; aucune politique pour anon ni de suppression", () => {
   const pols = [...sql.matchAll(/create policy "(\w+)" on public\.profils_publics\s+for (\w+) to (anon, authenticated|authenticated)\b/g)].map((m) => [m[1], m[2], m[3].trim()]);
-  assert.deepStrictEqual(pols, [["profils_publics_lecture_publique", "select", "anon, authenticated"], ["profils_publics_proprietaire_select", "select", "authenticated"],
+  assert.deepStrictEqual(pols, [["profils_publics_proprietaire_select", "select", "authenticated"],
     ["profils_publics_admin_select", "select", "authenticated"], ["profils_publics_proprietaire_insert", "insert", "authenticated"],
     ["profils_publics_proprietaire_update", "update", "authenticated"], ["profils_publics_admin_update", "update", "authenticated"]]);
-  assert.match(sql, /using \(publie and not suspendu and public\.profils_publics_ouvert\(\)\)/);
+  assert.match(sql, /for select to authenticated using \(user_id = auth\.uid\(\)\)/);
   assert.match(sql, /for insert to authenticated with check \(user_id = auth\.uid\(\)\)/);
   assert.ok(!/for delete/.test(sql));
 });
@@ -147,18 +160,18 @@ test("adresses réservées : liste fixe (admin, api, support, mahouto, majeste, 
 });
 
 test("fonctions : security definer + search_path fixé pour celles qui lisent hors RLS ; droits retirés à public ; anon exclu des fonctions du propriétaire et des admins", () => {
-  ["profil_public_mien", "profil_public_adresse_disponible", "profil_public_statut", "profils_publics_admin_lister", "profils_publics_admin_suspendre", "profils_publics_admin_adresse"].forEach((f) => {
+  ["profil_public_mien", "profil_public_adresse_disponible", "profil_public_statut", "profil_public_lire", "profils_publics_admin_lister", "profils_publics_admin_lire", "profils_publics_admin_suspendre", "profils_publics_admin_adresse"].forEach((f) => {
     const b = fn(f);
     assert.ok(/security definer/.test(b) && /set search_path = public, pg_temp/.test(b), f);
   });
   FUNCTIONS.filter((f) => f !== "profils_publics_garde").forEach((f) => assert.match(sql, new RegExp("revoke all on function public\\." + f + "\\([^)]*\\) from public")));
-  ["profil_public_mien()", "profil_public_adresse_disponible(text)", "profils_publics_admin_lister()", "profils_publics_admin_suspendre(uuid, boolean)", "profils_publics_admin_adresse(uuid, text)"].forEach((f) => {
+  ["profil_public_mien()", "profil_public_adresse_disponible(text)", "profils_publics_admin_lister()", "profils_publics_admin_lire(text)", "profils_publics_admin_suspendre(uuid, boolean)", "profils_publics_admin_adresse(uuid, text)"].forEach((f) => {
     assert.match(sql, new RegExp("revoke all on function public\\." + f.replace(/[()]/g, "\\$&") + " from public, anon;"));
     assert.match(sql, new RegExp("grant execute on function public\\." + f.replace(/[()]/g, "\\$&") + " to authenticated;"));
   });
   assert.match(sql, /grant execute on function public\.profil_public_statut\(text\) to anon, authenticated;/);
   assert.ok(!/suspendu/.test(fn("profil_public_mien")), "la fonction du propriétaire ne renvoie jamais suspendu");
-  ["profils_publics_admin_lister", "profils_publics_admin_suspendre", "profils_publics_admin_adresse"].forEach((f) => assert.match(fn(f), /if not public\.is_admin\(\) then\s+raise exception/));
+  ["profils_publics_admin_lister", "profils_publics_admin_lire", "profils_publics_admin_suspendre", "profils_publics_admin_adresse"].forEach((f) => assert.match(fn(f), /if not public\.is_admin\(\) then\s+raise exception/));
 });
 
 test("rollback : confirmation 'NON', perte signalée, ne touche ni profiles ni les pseudos réservés ; vérification : lecture seule et complète", () => {
@@ -170,4 +183,6 @@ test("rollback : confirmation 'NON', perte signalée, ne touche ni profiles ni l
   assert.ok(!/profiles|reserved_usernames|is_reserved_username/.test(rb));
   assert.ok(!/\b(insert|update|delete|drop|alter|create|truncate|grant|revoke)\b/i.test(v.replace(/'[^']*'/g, "''")), "vérification en lecture seule");
   ["has_column_privilege", "pg_policies", "pg_constraint", "relrowsecurity", "has_function_privilege", "pg_trigger"].forEach((k) => assert.ok(v.includes(k), k));
+  assert.match(v, /has_column_privilege\('anon'/); assert.ok(v.includes("'public.profil_public_lire(text)'") && v.includes("profils_publics_lecture_publique"), "contrôles de lecture publique supprimée");
+  assert.ok(rb.includes("drop function if exists public.profil_public_lire(text);") && rb.includes("drop function if exists public.profils_publics_admin_lire(text);"));
 });

@@ -24,19 +24,22 @@
 --   BLOC 5  - Contraintes de format de chaque champ, un seul contact, majorite exigee pour publier.
 --   BLOC 6  - Fonction adresses reservees (liste fixe + liste des pseudos reserves).
 --   BLOC 7  - Fonction de garde et declencheur (adresse figee, publication, suspension, dates).
---   BLOC 8  - RLS et droits par colonne (lecture publique limitee, proprietaire, administrateurs).
+--   BLOC 8  - RLS et droits : AUCUNE lecture directe pour anon, lecture reservee au proprietaire et aux administrateurs.
 --   BLOC 9  - Fonctions du proprietaire : lire sa page, tester une adresse.
---   BLOC 10 - Fonction publique : etat d une adresse (introuvable, non disponible, non ouverte).
---   BLOC 11 - Fonctions des administrateurs : lister, suspendre, changer une adresse.
+--   BLOC 10 - Fonctions publiques : lire UNE page par son adresse exacte, etat d une adresse (introuvable, non disponible, non ouverte).
+--   BLOC 11 - Fonctions des administrateurs : lister, lire une page par adresse, suspendre, changer une adresse.
 --
 -- CHOIX DOCUMENTES
---   - Les lectures publiques passent par des droits PAR COLONNE : anon et authenticated ne peuvent lire que id,
---     adresse, nom_affiche, avatar_url, metier, presentation, localisation, contact_type, contact_valeur, publie.
---     user_id, majeur_declare, suspendu, publie_le, cree_le, modifie_le ne sont jamais lisibles directement.
+--   - Le public ne lit JAMAIS la table directement : anon n a aucun droit sur profils_publics, et il n existe plus de
+--     politique de lecture publique. Une page ne se lit que par la fonction profil_public_lire(adresse), qui
+--     renvoie au plus UNE ligne, pour une adresse exacte, si la page est publiee, non suspendue et la fonction ouverte.
+--     Aucune liste, aucune recherche partielle. user_id, majeur_declare, suspendu, publie_le ne sont jamais renvoyes.
+--   - authenticated n a, sur la table, que le droit de lire la colonne id (utile pour mettre a jour sa page par id) :
+--     les politiques limitent cette lecture a sa propre ligne (administrateurs : toutes les lignes).
 --   - Le proprietaire lit sa ligne complete (avec majeur_declare) par la fonction profil_public_mien(). Il ne lit
 --     jamais suspendu et ne peut pas le modifier.
---   - Tant que ouvert = non, la lecture publique ne renvoie rien. Le proprietaire et les administrateurs voient
---     leur page (apercu).
+--   - Tant que ouvert = non, profil_public_lire ne renvoie rien. Le proprietaire (profil_public_mien) et les
+--     administrateurs (profils_publics_admin_lire) voient leur page par fonction (apercu).
 --   - Adresse figee : des la premiere publication (colonne publie_le), seule une personne administratrice peut la changer.
 --     Ainsi, depublier puis changer l adresse ne permet pas de contourner la regle.
 --
@@ -274,25 +277,21 @@ create trigger profils_publics_garde_trg
   for each row execute function public.profils_publics_garde();
 
 
--- BLOC 8 - RLS et droits par colonne : lecture publique limitee, le proprietaire gere sa ligne, les administrateurs aussi
+-- BLOC 8 - RLS et droits : aucune lecture directe pour anon ; proprietaire et administrateurs seuls, limites par les politiques
 alter table public.profils_publics enable row level security;
 
 revoke all on public.profils_publics from anon, authenticated;
 
-grant select (id, adresse, nom_affiche, avatar_url, metier, presentation, localisation, contact_type, contact_valeur, publie)
-  on public.profils_publics to anon, authenticated;
+drop policy if exists "profils_publics_lecture_publique" on public.profils_publics;
+
+grant select (id)
+  on public.profils_publics to authenticated;
 
 grant insert (adresse, nom_affiche, avatar_url, metier, presentation, localisation, contact_type, contact_valeur, publie, majeur_declare)
   on public.profils_publics to authenticated;
 
 grant update (adresse, nom_affiche, avatar_url, metier, presentation, localisation, contact_type, contact_valeur, publie, majeur_declare)
   on public.profils_publics to authenticated;
-
-drop policy if exists "profils_publics_lecture_publique" on public.profils_publics;
-
-create policy "profils_publics_lecture_publique" on public.profils_publics
-  for select to anon, authenticated
-  using (publie and not suspendu and public.profils_publics_ouvert());
 
 drop policy if exists "profils_publics_proprietaire_select" on public.profils_publics;
 
@@ -371,7 +370,29 @@ revoke all on function public.profil_public_adresse_disponible(text) from public
 grant execute on function public.profil_public_adresse_disponible(text) to authenticated;
 
 
--- BLOC 10 - Fonction publique : etat d une adresse quand la lecture directe ne renvoie rien (non ouverte, non disponible, introuvable)
+-- BLOC 10 - Fonctions publiques : lire UNE page par son adresse exacte, et etat d une adresse quand rien n est renvoye
+create or replace function public.profil_public_lire(p_adresse text)
+ returns table (id uuid, adresse text, nom_affiche text, avatar_url text, metier text, presentation text,
+                localisation text, contact_type text, contact_valeur text)
+ language sql
+ stable
+ security definer
+ set search_path = public, pg_temp
+as $$
+  select p.id, p.adresse, p.nom_affiche, p.avatar_url, p.metier, p.presentation, p.localisation, p.contact_type, p.contact_valeur
+    from public.profils_publics p
+   where p_adresse ~ '^[a-z0-9][a-z0-9-]{1,28}[a-z0-9]$'
+     and p.adresse = p_adresse
+     and p.publie
+     and not p.suspendu
+     and public.profils_publics_ouvert()
+   limit 1;
+$$;
+
+revoke all on function public.profil_public_lire(text) from public;
+
+grant execute on function public.profil_public_lire(text) to anon, authenticated;
+
 create or replace function public.profil_public_statut(p_adresse text)
  returns text
  language plpgsql
@@ -401,7 +422,7 @@ revoke all on function public.profil_public_statut(text) from public;
 grant execute on function public.profil_public_statut(text) to anon, authenticated;
 
 
--- BLOC 11 - Fonctions des administrateurs : lister (toutes colonnes), suspendre ou reactiver, changer une adresse
+-- BLOC 11 - Fonctions des administrateurs : lister (toutes colonnes), lire une page par adresse, suspendre ou reactiver, changer une adresse
 create or replace function public.profils_publics_admin_lister()
  returns table (id uuid, user_id uuid, adresse text, nom_affiche text, publie boolean, majeur_declare boolean,
                 suspendu boolean, publie_le timestamptz, cree_le timestamptz, modifie_le timestamptz)
@@ -423,6 +444,28 @@ $$;
 revoke all on function public.profils_publics_admin_lister() from public, anon;
 
 grant execute on function public.profils_publics_admin_lister() to authenticated;
+
+create or replace function public.profils_publics_admin_lire(p_adresse text)
+ returns table (id uuid, adresse text, nom_affiche text, avatar_url text, metier text, presentation text,
+                localisation text, contact_type text, contact_valeur text, publie boolean)
+ language plpgsql
+ stable
+ security definer
+ set search_path = public, pg_temp
+as $$
+begin
+  if not public.is_admin() then
+    raise exception 'Reserve aux administrateurs.';
+  end if;
+  return query
+    select p.id, p.adresse, p.nom_affiche, p.avatar_url, p.metier, p.presentation, p.localisation, p.contact_type, p.contact_valeur, p.publie
+      from public.profils_publics p where p.adresse = p_adresse limit 1;
+end;
+$$;
+
+revoke all on function public.profils_publics_admin_lire(text) from public, anon;
+
+grant execute on function public.profils_publics_admin_lire(text) to authenticated;
 
 create or replace function public.profils_publics_admin_suspendre(p_id uuid, p_suspendu boolean)
  returns boolean

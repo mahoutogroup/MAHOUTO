@@ -146,13 +146,16 @@
   }
 
   /**
-   * Écran de la page publique. input : { row (ligne lue ou null), ouvert (booléen), statut (réponse de profil_public_statut ou null), readFailed }
+   * Écran de la page publique. input : { row (ligne lue ou null), preview (true si la ligne vient de l'aperçu propriétaire ou administrateur),
+   * ouvert (booléen), statut (réponse de profil_public_statut ou null), readFailed }
    * Renvoie { view: 'profil'|'introuvable'|'non_disponible'|'non_ouverte'|'erreur', banner: null|'non_publie'|'ferme' }.
-   * Une ligne n'est renvoyée que pour la personne propriétaire et les administrateurs quand la page n'est pas publique : bandeau d'aperçu.
+   * Une ligne du public (profil_public_lire) est toujours une page publiée et ouverte : pas de bandeau. Une ligne d'aperçu (fonctions du
+   * propriétaire ou des administrateurs) peut être non publiée ou la fonction fermée : bandeau d'aperçu.
    */
   function pageView(input) {
     var o = input || {};
     if (o.readFailed) return { view: "erreur", banner: null };
+    if (o.row && o.preview !== true) return { view: "profil", banner: null };
     if (o.row) {
       if (!o.row.publie) return { view: "profil", banner: "non_publie" };
       if (o.ouvert !== true) return { view: "profil", banner: "ferme" };

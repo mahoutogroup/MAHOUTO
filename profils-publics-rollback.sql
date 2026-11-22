@@ -33,11 +33,15 @@ end $$;
 -- BLOC 2 - Fonctions
 drop function if exists public.profils_publics_admin_adresse(uuid, text);
 
+drop function if exists public.profils_publics_admin_lire(text);
+
 drop function if exists public.profils_publics_admin_suspendre(uuid, boolean);
 
 drop function if exists public.profils_publics_admin_lister();
 
 drop function if exists public.profil_public_statut(text);
+
+drop function if exists public.profil_public_lire(text);
 
 drop function if exists public.profil_public_adresse_disponible(text);
 

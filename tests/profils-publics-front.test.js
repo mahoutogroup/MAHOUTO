@@ -74,9 +74,10 @@ test("publier : la certification des 18 ans est obligatoire (brouillon : non) ; 
 
 test("pageView : profil, introuvable, non disponible, non ouverte, erreur ; bandeaux d'aperçu pour la personne propriétaire", () => {
   const row = { publie: true };
-  assert.deepStrictEqual(PU.pageView({ row, ouvert: true }), { view: "profil", banner: null });
-  assert.deepStrictEqual(PU.pageView({ row: { publie: false }, ouvert: true }), { view: "profil", banner: "non_publie" });
-  assert.deepStrictEqual(PU.pageView({ row, ouvert: false }), { view: "profil", banner: "ferme" });
+  assert.deepStrictEqual(PU.pageView({ row: {}, ouvert: false }), { view: "profil", banner: null }, "ligne du public (profil_public_lire) : toujours publiée et ouverte");
+  assert.deepStrictEqual(PU.pageView({ row, preview: true, ouvert: true }), { view: "profil", banner: null });
+  assert.deepStrictEqual(PU.pageView({ row: { publie: false }, preview: true, ouvert: true }), { view: "profil", banner: "non_publie" });
+  assert.deepStrictEqual(PU.pageView({ row, preview: true, ouvert: false }), { view: "profil", banner: "ferme" });
   assert.strictEqual(PU.pageView({ row: null, statut: "non_ouverte" }).view, "non_ouverte");
   assert.strictEqual(PU.pageView({ row: null, statut: "non_disponible" }).view, "non_disponible");
   assert.strictEqual(PU.pageView({ row: null, statut: "introuvable" }).view, "introuvable");
@@ -120,15 +121,28 @@ async function runPage(pathname, client) {
   await new Promise((r) => setTimeout(r, 20));
   return { els, doc };
 }
+// Faux client : AUCUN accès direct à la table n'est possible (from() lève une erreur) ; tout passe par des fonctions.
+// o : { lire (lignes de profil_public_lire), session, mien, admin, ouvert, statut, readError, statutError }
 const clientFor = (row, o) => {
   const opts = o || {}, calls = [];
-  const chain = { select: (c) => { calls.push(["select", c]); return chain; }, eq: (k, v) => { calls.push(["eq", k, v]); return chain; }, maybeSingle: async () => (opts.readError ? { data: null, error: { message: "x" } } : { data: row, error: null }) };
-  return { calls, from: (t) => { calls.push(["from", t]); return chain; }, rpc: async (n, a) => { calls.push(["rpc", n, a]); if (n === "profils_publics_ouvert") return { data: opts.ouvert === true, error: null }; if (n === "profil_public_statut") return { data: opts.statut || "introuvable", error: opts.statutError ? { message: "x" } : null }; return { data: null, error: { message: "inconnue" } }; } };
+  const rows = (x) => (x ? [x] : []);
+  return { calls,
+    from: (t) => { calls.push(["from", t]); throw new Error("lecture directe de la table interdite : " + t); },
+    auth: { getSession: async () => { calls.push(["getSession"]); return { data: { session: opts.session ? { user: { id: "u1" } } : null } }; } },
+    rpc: async (n, a) => {
+      calls.push(["rpc", n, a]);
+      if (n === "profil_public_lire") return opts.readError ? { data: null, error: { message: "x" } } : { data: rows(row), error: null };
+      if (n === "profil_public_mien") return opts.session ? { data: rows(opts.mien), error: null } : { data: null, error: { code: "42501" } };
+      if (n === "profils_publics_admin_lire") return opts.admin ? { data: rows(opts.admin), error: null } : { data: null, error: { message: "Reserve aux administrateurs." } };
+      if (n === "profils_publics_ouvert") return { data: opts.ouvert === true, error: null };
+      if (n === "profil_public_statut") return { data: opts.statut || "introuvable", error: opts.statutError ? { message: "x" } : null };
+      return { data: null, error: { message: "inconnue" } };
+    } };
 };
 const ROW = { id: "p1", adresse: "mon-atelier", nom_affiche: "Atelier <b>Test</b>", avatar_url: "https://exemple.test/a.png", metier: "Couturier", presentation: "Ligne 1\nLigne 2", localisation: "Ville Test", contact_type: "whatsapp", contact_valeur: "+22900000000", publie: true };
 const shown = (e) => !e.classes.has("hidden");
 
-test("m.js : profil publié → affiché en TEXTE BRUT (le HTML saisi reste du texte), contact WhatsApp en lien sûr, colonnes publiques seulement", async () => {
+test("m.js : profil publié → lu par profil_public_lire, affiché en TEXTE BRUT (le HTML saisi reste du texte), contact WhatsApp en lien sûr", async () => {
   const c = clientFor(ROW, { ouvert: true });
   const { els, doc } = await runPage("/m/mon-atelier", c);
   assert.ok(shown(els.profil) && !shown(els.etat) && !shown(els.chargement) && !shown(els.bandeau));
@@ -137,10 +151,8 @@ test("m.js : profil publié → affiché en TEXTE BRUT (le HTML saisi reste du t
   const a = els["contact-zone"].children[0];
   assert.deepStrictEqual([a.tagName, a.href, a.target, a.rel, a.textContent], ["a", "https://wa.me/22900000000", "_blank", "noopener noreferrer nofollow", "Écrire sur WhatsApp"]);
   const img = els.avatar.children[0]; assert.deepStrictEqual([img.tagName, img.src, img.referrerPolicy], ["img", "https://exemple.test/a.png", "no-referrer"]);
-  const sel = c.calls.find((x) => x[0] === "select")[1];
-  assert.strictEqual(sel, "id, adresse, nom_affiche, avatar_url, metier, presentation, localisation, contact_type, contact_valeur, publie");
-  assert.ok(!/user_id|majeur_declare|suspendu|\*/.test(sel), "jamais user_id, majeur_declare, suspendu");
-  assert.deepStrictEqual(c.calls.filter((x) => x[0] === "eq"), [["eq", "adresse", "mon-atelier"]]);
+  assert.strictEqual(JSON.stringify(c.calls), JSON.stringify([["rpc", "profil_public_lire", { p_adresse: "mon-atelier" }]]), "un seul appel : la fonction de lecture par adresse exacte ; aucun select direct, aucune session lue");
+  assert.ok(!c.calls.some((x) => x[0] === "from"), "jamais de lecture directe de la table");
 });
 
 test("m.js : liens dangereux ignorés (javascript:, http:) — aucun lien de contact ni photo affichés", async () => {
@@ -162,16 +174,44 @@ test("m.js : états — introuvable, non disponible (suspendu), fonction non ouv
   assert.match(await msg("/m/mon-atelier", clientFor(null, { statutError: true })), /Impossible de charger/);
 });
 
-test("m.js : aperçu pour la personne propriétaire — brouillon ou fonction fermée → page affichée avec bandeau", async () => {
-  let r = await runPage("/m/mon-atelier", clientFor(Object.assign({}, ROW, { publie: false }), { ouvert: true }));
+test("m.js : aperçu — propriétaire (profil_public_mien) et administrateur (profils_publics_admin_lire), toujours par fonctions, avec bandeau", async () => {
+  // propriétaire : brouillon, fonction ouverte
+  let c = clientFor(null, { session: true, mien: Object.assign({}, ROW, { publie: false, majeur_declare: true }), ouvert: true });
+  let r = await runPage("/m/mon-atelier", c);
   assert.ok(shown(r.els.profil) && shown(r.els.bandeau)); assert.match(r.els.bandeau.textContent, /pas publiée/);
-  r = await runPage("/m/mon-atelier", clientFor(ROW, { ouvert: false }));
+  assert.ok(!c.calls.some((x) => x[0] === "from") && !c.calls.some((x) => x[1] === "profil_public_statut"), "aucune lecture directe, pas d'état public");
+  // propriétaire : publié mais fonction fermée
+  r = await runPage("/m/mon-atelier", clientFor(null, { session: true, mien: ROW, ouvert: false }));
   assert.ok(shown(r.els.profil) && shown(r.els.bandeau)); assert.match(r.els.bandeau.textContent, /pas encore ouverte/);
+  // la page du propriétaire n'est pas celle demandée : on n'affiche pas la sienne à la place
+  c = clientFor(null, { session: true, mien: ROW, ouvert: true, statut: "introuvable" });
+  r = await runPage("/m/autre-adresse", c);
+  assert.ok(shown(r.els.etat) && !shown(r.els.profil)); assert.ok(c.calls.some((x) => x[1] === "profils_publics_admin_lire"));
+  // administrateur
+  c = clientFor(null, { session: true, mien: null, admin: Object.assign({}, ROW, { publie: false }), ouvert: true });
+  r = await runPage("/m/mon-atelier", c);
+  assert.ok(shown(r.els.profil) && shown(r.els.bandeau)); assert.strictEqual(JSON.stringify(c.calls.filter((x) => x[1] === "profils_publics_admin_lire")), JSON.stringify([["rpc", "profils_publics_admin_lire", { p_adresse: "mon-atelier" }]]));
+  // administrateur, page publiée suspendue : visible en aperçu seulement par lui
+  r = await runPage("/m/mon-atelier", clientFor(null, { session: true, admin: ROW, ouvert: true }));
+  assert.ok(shown(r.els.profil) && !shown(r.els.bandeau), "ligne d'aperçu publiée et ouverte : pas de bandeau");
+});
+
+test("m.js : sans session, aucune fonction du propriétaire ni des administrateurs n'est appelée (elles refusent les visiteurs) ; membre sans aperçu → état public", async () => {
+  let c = clientFor(null, { statut: "non_disponible" });
+  let r = await runPage("/m/mon-atelier", c);
+  assert.deepStrictEqual(c.calls.map((x) => x[0] === "rpc" ? x[1] : x[0]), ["profil_public_lire", "getSession", "profil_public_statut"]);
+  assert.strictEqual(r.els["etat-titre"].textContent, "Ce profil n'est pas disponible.");
+  c = clientFor(null, { session: true, mien: null, admin: null, statut: "non_ouverte" });
+  r = await runPage("/m/mon-atelier", c);
+  assert.strictEqual(r.els["etat-titre"].textContent, "Cette fonction n'est pas encore ouverte.");
+  assert.ok(c.calls.some((x) => x[1] === "profil_public_mien") && c.calls.some((x) => x[1] === "profils_publics_admin_lire"));
 });
 
 test("aucun innerHTML (ni outerHTML, insertAdjacentHTML, document.write, eval) dans m.js, profil-public.js et le module", () => {
   ["m.js", "profil-public.js", "profil-public-utils.js"].forEach((f) => assert.ok(!/innerHTML|outerHTML|insertAdjacentHTML|document\.write|\beval\(|new Function/.test(code(f)), f));
   assert.ok(!/console\./.test(code("m.js") + code("profil-public.js")), "aucune donnée dans la console");
+  assert.ok(!/supabase\.from\(/.test(code("m.js")), "m.js ne lit jamais la table directement : uniquement des fonctions");
+  assert.ok(/rpc\("profil_public_lire"/.test(code("m.js")) && /rpc\("profil_public_mien"\)/.test(code("m.js")) && /rpc\("profils_publics_admin_lire"/.test(code("m.js")));
 });
 
 test("m.html : noindex (meta), chemins absolus (adresse /m/...), scripts dans l'ordre, lien de retour, aucun script en ligne ; en-tête X-Robots-Tag", () => {
@@ -214,9 +254,9 @@ test("profil.html : section « Mon profil public » (activer, adresse + disponib
   assert.match(js, /\$\("pp-adresse"\)\.disabled = published/, "adresse non modifiable une fois publiée");
 });
 
-test("sw.js : cache v115 ; m.html, m.js, profil-public.js et le module dans APP_SHELL ; Institut et paiements non touchés", () => {
+test("sw.js : cache v116 ; m.html, m.js, profil-public.js et le module dans APP_SHELL ; Institut et paiements non touchés", () => {
   const sw = read("sw.js");
-  assert.match(sw, /CACHE_NAME = "mahoutoplus-shell-v115"/);
+  assert.match(sw, /CACHE_NAME = "mahoutoplus-shell-v116"/);
   ["/m.html", "/m.js", "/profil-public.js", "/profil-public-utils.js"].forEach((f) => assert.ok(sw.includes('"' + f + '"'), f));
 });
 
