@@ -80,6 +80,17 @@
     if (banner) { $("bandeau").textContent = PU.MESSAGES[banner]; show("bandeau", true); }
   }
 
+  // ---------- Compteur de visites (analytics.js existant : une ligne par visiteur et par 30 minutes, sans cookie ni identité) ----------
+  // Chargé seulement pour une page publique affichée ; « Ne pas me suivre », robots et administrateurs sont écartés par analytics.js.
+  function countVisit() {
+    try {
+      var s = document.createElement("script");
+      s.setAttribute("src", "/analytics.js");
+      s.setAttribute("async", "");
+      document.body.appendChild(s);
+    } catch (e) { /* le comptage est facultatif */ }
+  }
+
   // ---------- Signalement ----------
   var sessionUser;   // undefined = pas encore lu ; null = non connecté (comptes anonymes comptés comme non connectés)
   async function currentUser(supabase) {
@@ -226,6 +237,8 @@
       var v = PU.pageView({ row: row, preview: preview, ouvert: ouvert, statut: statut, readFailed: false });
       if (v.view === "profil") {
         renderProfil(row, v.banner);
+        // Comptage anonyme : seulement pour une page réellement publique (ni aperçu propriétaire ou administrateur, ni bandeau).
+        if (!preview && !v.banner) countVisit();
         // Le signalement est facultatif : un échec ici ne doit jamais masquer la page.
         if (!preview) { try { await setupReport(supabase, row, adresse, v); } catch (e) { /* page affichée sans signalement */ } }
       } else showState(v.view);

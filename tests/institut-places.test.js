@@ -226,7 +226,7 @@ test("index.html : la carte « Institut SAYÉ LOUIS » reste .disabled, « Bient
 
 test("aucun fichier ajouté dans api/ (12 fonctions) et api/fedapay-*.js non modifiés : pas de paiement dans cette PR", () => {
   const list = (d) => fs.readdirSync(path.join(root, d)).filter((f) => f.endsWith(".js")).sort();
-  assert.deepStrictEqual(list("api"), ["_attachment-rules.js", "_brand.js", "_cloudinary-og.js", "_entreprise-abonnement.js", "_entreprise-og.js", "_institut-paiement.js", "_roles.js", "_room-og.js", "_salon-abonnement.js", "_serigraphie.js",
+  assert.deepStrictEqual(list("api"), ["_attachment-rules.js", "_brand.js", "_cloudinary-og.js", "_entreprise-abonnement.js", "_entreprise-og.js", "_institut-paiement.js", "_profil-og.js", "_roles.js", "_room-og.js", "_salon-abonnement.js", "_serigraphie.js",
     "attachment.js", "course.js", "digital-products-download.js", "fedapay-checkout.js", "fedapay-webhook.js", "produit-og.js", "push.js", "share-finalize.js", "share-pending.js", "share-target.js"]);
   assert.deepStrictEqual(list("api/admin"), ["list-users.js", "user-action.js"]);
   const functions = list("api").filter((f) => !f.startsWith("_")).concat(list("api/admin").map((f) => "admin/" + f));

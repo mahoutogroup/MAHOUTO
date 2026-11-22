@@ -48,6 +48,7 @@ import { brandForRequest } from "./_brand.js";
 import { cloudinaryImageParts } from "./_cloudinary-og.js";
 import { handleRoomPreview, ROOM_FIELDS } from "./_room-og.js";
 import { handleEntreprisePreview, ENTREPRISE_FIELDS } from "./_entreprise-og.js";
+import { handleProfilPreview } from "./_profil-og.js";
 
 function escapeHtml(str) {
   return String(str || "")
@@ -434,7 +435,22 @@ async function fetchEntrepriseForPreview(slug) {
   return { row: data || null, error: error || null };
 }
 
+// ---------------------------------------------------------
+// Pages publiques de membres : lien /m/<adresse> (type=profil), aperçu avec le nom, le métier et la photo.
+// Lecture UNIQUEMENT par la fonction profil_public_lire (clé publique anon, jamais service_role, jamais la table) :
+// fermé, non publié, suspendu ou inexistant donnent la même réponse (aperçu générique). Logique dans api/_profil-og.js.
+// ---------------------------------------------------------
+async function fetchProfilForPreview(adresse) {
+  const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
+  const { data, error } = await supabase.rpc("profil_public_lire", { p_adresse: adresse });
+  return { row: Array.isArray(data) && data.length ? data[0] : null, error: error || null };
+}
+
 export default async function handler(req, res) {
+  // Pages publiques de membres : même principe (site et marque fixes, noindex).
+  if (req.query && req.query.type === "profil" && req.query.format !== "json") {
+    return handleProfilPreview(req, res, { fetchProfil: fetchProfilForPreview });
+  }
   // Salons : en-têtes de cache propres (courte durée), site et marque fixes.
   if (req.query && req.query.type === "salon" && req.query.format !== "json") {
     return handleRoomPreview(req, res, { fetchRoom: fetchRoomForPreview });

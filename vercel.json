@@ -31,7 +31,7 @@
     },
     {
       "source": "/m/:adresse",
-      "destination": "/m.html?adresse=:adresse"
+      "destination": "/api/produit-og?type=profil&adresse=:adresse"
     }
   ],
   "headers": [
