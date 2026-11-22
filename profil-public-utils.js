@@ -122,6 +122,40 @@
     return Object.keys(errors).length ? { ok: false, errors: errors } : { ok: true, value: v };
   }
 
+  // Photo téléversée (même mécanisme que la photo de profil) : types et taille contrôlés AVANT l'envoi.
+  var AVATAR_TYPES = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
+  var AVATAR_MAX_BYTES = 5 * 1024 * 1024;   // 5 Mo
+
+  /** Contrôle le fichier choisi. Renvoie { ok:true, type, ext } ou { ok:false, error } (message en français). */
+  function validateAvatarFile(file) {
+    if (!file) return { ok: false, error: "Aucune photo choisie." };
+    var type = String(file.type || "").toLowerCase();
+    if (!Object.prototype.hasOwnProperty.call(AVATAR_TYPES, type)) return { ok: false, error: "Format non accepté : choisissez une photo JPEG, PNG ou WebP." };
+    var size = Number(file.size);
+    if (!isFinite(size) || size <= 0) return { ok: false, error: "Ce fichier est vide." };
+    if (size > AVATAR_MAX_BYTES) return { ok: false, error: "Cette photo est trop lourde (5 Mo au maximum)." };
+    return { ok: true, type: type, ext: AVATAR_TYPES[type] };
+  }
+
+  /** Nom envoyé à la signature : jamais le nom d'origine du fichier (il peut contenir des informations personnelles). */
+  function avatarFilename(ext) { return "photo-profil." + (ext === "png" || ext === "webp" ? ext : "jpg"); }
+
+  /** URL reçue de Cloudinary : https://res.cloudinary.com/… obligatoire, 500 caractères au plus (contrainte de la base). Sinon null. */
+  function cloudinaryImageUrl(url) {
+    var safe = safeHttpsUrl(url, LIMITS.avatar);
+    if (!safe) return null;
+    try { return new URL(safe).hostname === "res.cloudinary.com" ? safe : null; } catch (e) { return null; }
+  }
+
+  /** Date « jj/mm/aaaa » (heure locale) ; « — » si absente ou invalide. */
+  function formatDateFr(iso) {
+    if (!iso) return "—";
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return "—";
+    function p(n) { return (n < 10 ? "0" : "") + n; }
+    return p(d.getDate()) + "/" + p(d.getMonth() + 1) + "/" + d.getFullYear();
+  }
+
   /** Message clair pour une erreur Supabase (enregistrement de la page). */
   function errorMessage(error) {
     var text = String((error && error.message) || ""), code = String((error && error.code) || "");
@@ -191,6 +225,8 @@
     normalizeAdresse: normalizeAdresse, isReserved: isReserved, validateAdresse: validateAdresse, publicUrl: publicUrl,
     cleanLine: cleanLine, countChars: countChars, normalizeWhatsapp: normalizeWhatsapp, safeHttpsUrl: safeHttpsUrl, whatsappLink: whatsappLink,
     validateProfil: validateProfil, errorMessage: errorMessage, disponibiliteMessage: disponibiliteMessage,
-    pageView: pageView, addressFromLocation: addressFromLocation
+    pageView: pageView, addressFromLocation: addressFromLocation,
+    AVATAR_TYPES: AVATAR_TYPES, AVATAR_MAX_BYTES: AVATAR_MAX_BYTES, validateAvatarFile: validateAvatarFile, avatarFilename: avatarFilename,
+    cloudinaryImageUrl: cloudinaryImageUrl, formatDateFr: formatDateFr
   };
 });
