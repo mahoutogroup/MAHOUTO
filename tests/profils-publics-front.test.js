@@ -151,7 +151,8 @@ test("m.js : profil publié → lu par profil_public_lire, affiché en TEXTE BRU
   const a = els["contact-zone"].children[0];
   assert.deepStrictEqual([a.tagName, a.href, a.target, a.rel, a.textContent], ["a", "https://wa.me/22900000000", "_blank", "noopener noreferrer nofollow", "Écrire sur WhatsApp"]);
   const img = els.avatar.children[0]; assert.deepStrictEqual([img.tagName, img.src, img.attrs.referrerpolicy, img.attrs.loading, img.attrs.alt], ["img", "https://exemple.test/a.png", "no-referrer", "lazy", ""]);
-  assert.strictEqual(JSON.stringify(c.calls), JSON.stringify([["rpc", "profil_public_lire", { p_adresse: "mon-atelier" }]]), "un seul appel : la fonction de lecture par adresse exacte ; aucun select direct, aucune session lue");
+  assert.strictEqual(JSON.stringify(c.calls[0]), JSON.stringify(["rpc", "profil_public_lire", { p_adresse: "mon-atelier" }]), "la lecture passe par la fonction de lecture par adresse exacte");
+  assert.deepStrictEqual(c.calls.slice(1).map((x) => x[0] === "rpc" ? x[1] : x[0]), ["getSession"], "ensuite seulement la session (affichage du signalement) : aucun select direct");
   assert.ok(!c.calls.some((x) => x[0] === "from"), "jamais de lecture directe de la table");
 });
 

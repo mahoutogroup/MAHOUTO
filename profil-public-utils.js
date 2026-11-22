@@ -147,6 +147,68 @@
     try { return new URL(safe).hostname === "res.cloudinary.com" ? safe : null; } catch (e) { return null; }
   }
 
+  // ---------- Signalement d'une page (PR 2 sur 3) ----------
+  var MOTIFS_SIGNALEMENT = [
+    { value: "spam", label: "Spam ou publicité" },
+    { value: "usurpation", label: "Usurpation d'identité" },
+    { value: "arnaque", label: "Arnaque ou fraude" },
+    { value: "inapproprie", label: "Contenu inapproprié" },
+    { value: "donnees_personnelles", label: "Données personnelles exposées" },
+    { value: "autre", label: "Autre" }
+  ];
+  var SIGNALEMENT_DETAIL_MAX = 300;
+  var SEUIL_A_EXAMINER = 3;   // signaleurs distincts non traités : simple indicateur, jamais de suspension automatique
+  var SIGNALEMENT_AVERTISSEMENT = "Votre signalement est envoyé à l'équipe de modération. Il n'est jamais montré à la personne signalée.";
+
+  function motifLabel(code) {
+    for (var i = 0; i < MOTIFS_SIGNALEMENT.length; i++) if (MOTIFS_SIGNALEMENT[i].value === code) return MOTIFS_SIGNALEMENT[i].label;
+    return "Motif inconnu";
+  }
+
+  /** Valide la saisie du signalement. Renvoie { ok:true, value:{ motif, detail } } ou { ok:false, errors:{ motif, detail } }. */
+  function validateSignalement(input) {
+    var s = input && typeof input === "object" ? input : {};
+    var errors = {}, v = {};
+    if (typeof s.motif !== "string" || !MOTIFS_SIGNALEMENT.some(function (m) { return m.value === s.motif; })) errors.motif = "Choisissez un motif.";
+    else v.motif = s.motif;
+    var detail = cleanLine(s.detail, SIGNALEMENT_DETAIL_MAX + 50);
+    if (countChars(detail) > SIGNALEMENT_DETAIL_MAX) errors.detail = "Les précisions sont trop longues (" + SIGNALEMENT_DETAIL_MAX + " caractères au maximum).";
+    else v.detail = detail || null;
+    return Object.keys(errors).length ? { ok: false, errors: errors } : { ok: true, value: v };
+  }
+
+  /** Message pour le code renvoyé par profil_public_signaler : ok, deja, propre_page, introuvable, limite, invalide, ferme. */
+  function signalementMessage(code) {
+    switch (code) {
+      case "ok": return { ok: true, text: "Merci, votre signalement a été envoyé à l'équipe de modération." };
+      case "deja": return { ok: false, text: "Vous avez déjà signalé cette page." };
+      case "propre_page": return { ok: false, text: "Vous ne pouvez pas signaler votre propre page." };
+      case "introuvable": return { ok: false, text: "Cette page n'est plus disponible : elle ne peut pas être signalée." };
+      case "limite": return { ok: false, text: "Vous avez atteint la limite de signalements pour aujourd'hui. Réessayez demain." };
+      case "invalide": return { ok: false, text: "Le signalement n'est pas valide. Vérifiez le motif et les précisions." };
+      case "ferme": return { ok: false, text: "Cette fonction n'est pas encore ouverte." };
+      default: return { ok: false, text: "Le signalement n'a pas pu être envoyé. Réessayez dans un instant." };
+    }
+  }
+
+  /**
+   * Que montrer sous la page publique ? 'bouton' (membre connecté qui n'est pas le propriétaire), 'connexion' (visiteur non connecté),
+   * 'aucun' (aperçu, bandeau, page non affichée, propriétaire). input : { view, banner, preview, connected, isOwner }
+   */
+  function reportUi(input) {
+    var o = input || {};
+    if (o.view !== "profil" || o.preview === true || o.banner) return "aucun";
+    if (o.connected !== true) return "connexion";
+    return o.isOwner === true ? "aucun" : "bouton";
+  }
+
+  /** Comptage par motif lisible : « Spam ou publicité : 2 · Arnaque ou fraude : 1 » (ordre de la liste des motifs). */
+  function formatMotifs(counts) {
+    var c = counts && typeof counts === "object" ? counts : {};
+    return MOTIFS_SIGNALEMENT.filter(function (m) { return Number(c[m.value]) > 0; })
+      .map(function (m) { return m.label + " : " + Number(c[m.value]); }).join(" · ");
+  }
+
   /** Date « jj/mm/aaaa » (heure locale) ; « — » si absente ou invalide. */
   function formatDateFr(iso) {
     if (!iso) return "—";
@@ -227,6 +289,9 @@
     validateProfil: validateProfil, errorMessage: errorMessage, disponibiliteMessage: disponibiliteMessage,
     pageView: pageView, addressFromLocation: addressFromLocation,
     AVATAR_TYPES: AVATAR_TYPES, AVATAR_MAX_BYTES: AVATAR_MAX_BYTES, validateAvatarFile: validateAvatarFile, avatarFilename: avatarFilename,
-    cloudinaryImageUrl: cloudinaryImageUrl, formatDateFr: formatDateFr
+    cloudinaryImageUrl: cloudinaryImageUrl, formatDateFr: formatDateFr,
+    MOTIFS_SIGNALEMENT: MOTIFS_SIGNALEMENT, SIGNALEMENT_DETAIL_MAX: SIGNALEMENT_DETAIL_MAX, SEUIL_A_EXAMINER: SEUIL_A_EXAMINER,
+    SIGNALEMENT_AVERTISSEMENT: SIGNALEMENT_AVERTISSEMENT, motifLabel: motifLabel, validateSignalement: validateSignalement,
+    signalementMessage: signalementMessage, reportUi: reportUi, formatMotifs: formatMotifs
   };
 });

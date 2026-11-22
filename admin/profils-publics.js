@@ -8,13 +8,17 @@
    - Liste : fonction profils_publics_admin_lister. On n'affiche JAMAIS l'identifiant du compte ni l'e-mail. « Voir » ouvre
      /m/<adresse> dans un nouvel onglet (aperçu administrateur, même interrupteur fermé). Suspendre / Réactiver : fonction
      profils_publics_admin_suspendre, avec confirmation.
+   - Signalements (PR 2 sur 3) : pages signalées (profils_publics_signalements_admin_lister), badge « À examiner » dès 3 signaleurs
+     distincts non traités (indicateur seulement, jamais de suspension automatique), motifs en compteurs, « Détails »
+     (profils_publics_signalements_admin_detail : motif, précisions, date, sans identité), « Marquer comme traité »
+     (profils_publics_signalements_admin_traiter) avec confirmation. Aucun identifiant de signaleur n'existe dans ces résultats.
    - Tout texte dynamique passe par textContent : aucun innerHTML.
    ========================================================= */
 (function () {
   "use strict";
   var PU = window.ProfilPublicUtils, cfg = window.MAHOUTO_CONFIG;
   var ADMIN_ROLES = ["admin", "super_admin", "founder"];
-  var CONFIRM_OUVRIR = "Cette action rend publiques toutes les pages publiées. Le signalement n'est pas encore disponible. Continuer ?";
+  var CONFIRM_OUVRIR = "Cette action rend publiques toutes les pages publiées. Vérifiez que vous avez testé le signalement. Continuer ?";
   var $ = function (id) { return document.getElementById(id); };
   var supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
   var ouvert = null, busy = false;
@@ -107,8 +111,75 @@
     if (!confirm(question)) return;
     var res = await supabase.rpc("profils_publics_admin_suspendre", { p_id: id, p_suspendu: suspendre });
     if (res.error || res.data !== true) { setStatus("msg-liste", "Action impossible : " + (res.error ? res.error.message : "page introuvable") + ".", true); return; }
-    await loadList();
+    await Promise.all([loadList(), loadSignalements()]);
     setStatus("msg-liste", suspendre ? "Page suspendue." : "Page réactivée.", false);
+    setStatus("msg-signalements", suspendre ? "Page suspendue." : "Page réactivée.", false);
+  }
+
+  // ---------- Signalements ----------
+  function renderSignalements(rows) {
+    var box = $("liste-signalements");
+    box.textContent = "";
+    if (!rows.length) { box.appendChild(el("p", { class: "hint", text: "Aucune page signalée." })); return; }
+    rows.forEach(function (r) {
+      var adresse = typeof r.adresse === "string" ? r.adresse : "";
+      var aExaminer = r.a_examiner === true;
+      var card = el("div", { class: "card item" }, [
+        el("div", { class: "top" }, [
+          el("span", { class: "who", text: String(r.nom_affiche || "") }),
+          el("span", { class: "badge" + (aExaminer ? " prio" : ""), text: aExaminer ? "À examiner" : (Number(r.nb_non_traites) > 0 ? "En attente" : "Traité") })
+        ]),
+        el("div", { class: "meta", text: "/m/" + adresse + " · Publiée : " + yesNo(r.publie) + " · Suspendue : " + yesNo(r.suspendu) }),
+        el("div", { class: "meta", text: r.nb_signaleurs + " signaleur(s) distinct(s) · " + r.nb_non_traites + " non traité(s) · dernier signalement le " + PU.formatDateFr(r.dernier_le) }),
+        el("div", { class: "meta", text: "Motifs : " + (PU.formatMotifs(r.motifs) || "—") })
+      ]);
+      var detailBox = el("div", { class: "text hidden" });
+      var actions = el("div", { class: "actions" });
+      if (PU.ADRESSE_RE.test(adresse)) {
+        var see = el("button", { type: "button", class: "btn btn-view", text: "Voir la page" });
+        see.addEventListener("click", function () { window.open("/m/" + encodeURIComponent(adresse), "_blank", "noopener"); });
+        actions.appendChild(see);
+      }
+      var det = el("button", { type: "button", class: "btn btn-view", text: "Détails" });
+      det.addEventListener("click", function () { toggleDetail(r.page_id, detailBox, det); });
+      actions.appendChild(det);
+      var susp = r.suspendu === true;
+      var sb = el("button", { type: "button", class: "btn " + (susp ? "btn-ok" : "btn-no"), text: susp ? "Réactiver" : "Suspendre" });
+      sb.addEventListener("click", function () { setSuspendu(r.page_id, adresse, !susp); });
+      actions.appendChild(sb);
+      if (Number(r.nb_non_traites) > 0) {
+        var done = el("button", { type: "button", class: "btn btn-gold", text: "Marquer comme traité" });
+        done.addEventListener("click", function () { markTreated(r.page_id, adresse); });
+        actions.appendChild(done);
+      }
+      card.appendChild(actions);
+      card.appendChild(detailBox);
+      box.appendChild(card);
+    });
+  }
+  async function loadSignalements() {
+    setStatus("msg-signalements", "Chargement…", false);
+    var res = await supabase.rpc("profils_publics_signalements_admin_lister");
+    if (res.error) { setStatus("msg-signalements", "Impossible de charger les signalements (le SQL du signalement est-il exécuté ?).", true); return; }
+    setStatus("msg-signalements", "", false);
+    renderSignalements(Array.isArray(res.data) ? res.data : []);
+  }
+  async function toggleDetail(pageId, box, btn) {
+    if (!box.classList.contains("hidden")) { box.classList.add("hidden"); btn.textContent = "Détails"; return; }
+    var res = await supabase.rpc("profils_publics_signalements_admin_detail", { p_page_id: pageId });
+    box.textContent = "";
+    if (res.error) { box.appendChild(el("p", { text: "Impossible de charger les détails." })); }
+    else (Array.isArray(res.data) ? res.data : []).forEach(function (d) {
+      box.appendChild(el("p", { text: PU.formatDateFr(d.cree_le) + " · " + PU.motifLabel(d.motif) + (d.traite === true ? " (traité)" : "") + (d.detail ? " — " + d.detail : "") }));
+    });
+    box.classList.remove("hidden"); btn.textContent = "Masquer les détails";
+  }
+  async function markTreated(pageId, adresse) {
+    if (!confirm("Marquer comme traités tous les signalements de la page /m/" + adresse + " ?")) return;
+    var res = await supabase.rpc("profils_publics_signalements_admin_traiter", { p_page_id: pageId });
+    if (res.error) { setStatus("msg-signalements", "Action impossible : " + res.error.message + ".", true); return; }
+    await loadSignalements();
+    setStatus("msg-signalements", "Signalements marqués comme traités.", false);
   }
 
   // ---------- Démarrage ----------
@@ -130,8 +201,9 @@
     $("loading-state").classList.add("hidden");
     $("dashboard").classList.remove("hidden");
     $("btn-interrupteur").addEventListener("click", toggleSwitch);
-    $("btn-recharger").addEventListener("click", function () { loadSwitch(); loadList(); });
+    $("btn-recharger").addEventListener("click", function () { loadSwitch(); loadSignalements(); loadList(); });
     await loadSwitch();
+    await loadSignalements();
     await loadList();
   }
   init();

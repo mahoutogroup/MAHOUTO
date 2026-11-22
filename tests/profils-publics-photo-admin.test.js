@@ -190,7 +190,7 @@ test("aperçu de la photo sur la page publique : rond, referrerpolicy no-referre
 const ADMIN_ROW = (o) => Object.assign({ id: "p1", user_id: "00000000-0000-4000-8000-0000000000aa", adresse: "mon-atelier", nom_affiche: "Atelier <b>Test</b>", publie: true, majeur_declare: true, suspendu: false, publie_le: "2026-11-20T10:00:00Z", cree_le: "2026-11-19T10:00:00Z", modifie_le: "2026-11-20T10:00:00Z" }, o || {});
 async function runAdmin(opts) {
   const o = Object.assign({ role: "admin", ouvert: "non", rows: [ADMIN_ROW()], session: true, confirmAnswer: true }, opts || {});
-  const dom = makeDom(["loading-state", "access-denied", "dashboard", "etat-interrupteur", "btn-interrupteur", "msg-interrupteur", "btn-recharger", "msg-liste", "liste-pages"], ["access-denied", "dashboard"]);
+  const dom = makeDom(["loading-state", "access-denied", "dashboard", "etat-interrupteur", "btn-interrupteur", "msg-interrupteur", "btn-recharger", "msg-liste", "liste-pages", "msg-signalements", "liste-signalements"], ["access-denied", "dashboard"]);
   const log = { from: [], rpc: [], update: [], confirm: [], open: [], innerHTMLWrites: 0 };
   let valeur = o.ouvert;
   const client = {
@@ -199,7 +199,7 @@ async function runAdmin(opts) {
       const api = { select: () => api, eq: (k, v) => { st.f[k] = v; return api; }, maybeSingle: async () => (t === "profiles" ? { data: { role: o.role }, error: null } : { data: o.readFail ? null : { valeur }, error: o.readFail ? { message: "x" } : null }),
         update: (p) => { st.upd = p; return api; }, then: (res, rej) => Promise.resolve((() => { if (!st.upd) return { data: [], error: null }; log.update.push([t, st.upd, st.f]); if (o.writeDenied) return { data: [], error: null }; valeur = st.upd.valeur; return { data: [{ valeur }], error: null }; })()).then(res, rej) };
       return api; },
-    rpc: async (n, a) => { log.rpc.push([n, a]); if (n === "profils_publics_admin_lister") return o.listFail ? { data: null, error: { message: "x" } } : { data: o.rows, error: null };
+    rpc: async (n, a) => { log.rpc.push([n, a]); if (n === "profils_publics_signalements_admin_lister") return { data: [], error: null }; if (n === "profils_publics_admin_lister") return o.listFail ? { data: null, error: { message: "x" } } : { data: o.rows, error: null };
       if (n === "profils_publics_admin_suspendre") { const r = o.rows.find((x) => x.id === a.p_id); if (r) r.suspendu = a.p_suspendu; return { data: !!r, error: null }; } return { data: null, error: { message: "inconnue" } }; }
   };
   const win = { ProfilPublicUtils: PU, MAHOUTO_CONFIG: { SUPABASE_URL: "https://x.test", SUPABASE_ANON_KEY: "k" }, supabase: { createClient: () => client }, open: (...a) => log.open.push(a) };
@@ -245,7 +245,7 @@ test("admin : état de l'interrupteur affiché et bouton « Ouvrir au public » 
 test("admin : OUVRIR demande la confirmation exacte (refus = rien n'est écrit) ; FERMER = un clic, sans confirmation", async () => {
   let d = await runAdmin({ ouvert: "non", confirmAnswer: false });
   d.els["btn-interrupteur"].click(); await tick(30);
-  assert.deepStrictEqual(d.log.confirm, ["Cette action rend publiques toutes les pages publiées. Le signalement n'est pas encore disponible. Continuer ?"]);
+  assert.deepStrictEqual(d.log.confirm, ["Cette action rend publiques toutes les pages publiées. Vérifiez que vous avez testé le signalement. Continuer ?"]);
   assert.strictEqual(d.log.update.length, 0, "confirmation refusée : aucune écriture"); assert.match(d.els["etat-interrupteur"].textContent, /FERMÉE/);
   d = await runAdmin({ ouvert: "non", confirmAnswer: true });
   d.els["btn-interrupteur"].click(); await tick(30);
