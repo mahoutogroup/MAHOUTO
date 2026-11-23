@@ -173,7 +173,7 @@ test("analytics.js : adresse invalide → aucun item ; « Ne pas me suivre » re
 
 async function runPageMjs(o) {
   const opts = Object.assign({ session: false, mien: null, admin: null, row: { id: "p1", adresse: "mon-atelier", nom_affiche: "Atelier", avatar_url: null, metier: null, presentation: null, localisation: null, contact_type: null, contact_valeur: null }, statut: "introuvable", ouvert: true }, o || {});
-  const els = {}; ["bandeau", "chargement", "etat", "etat-titre", "profil", "avatar", "nom", "metier", "lieu", "presentation", "contact-zone", "signalement-zone", "btn-signaler", "btn-connexion-signaler"].forEach((i) => { els[i] = makeEl(i, true); });
+  const els = {}; ["bandeau", "chargement", "etat", "etat-titre", "profil", "avatar", "nom", "metier", "lieu", "lieu-ligne", "presentation", "contact-zone", "btn-reessayer", "btn-partager", "signalement-zone", "btn-signaler", "btn-connexion-signaler"].forEach((i) => { els[i] = makeEl(i, true); });
   const body = makeEl("body");
   const client = { auth: { getSession: async () => ({ data: { session: opts.session ? { user: { id: "u" } } : null } }) },
     rpc: async (n) => { if (n === "profil_public_lire") return opts.readError ? { data: null, error: { message: "x" } } : { data: opts.row ? [opts.row] : [], error: null };

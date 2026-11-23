@@ -138,27 +138,11 @@
 
   // ---------- QR code (visible dès que la page est publiée) ----------
   var qrState = { adresse: null, qr: null };
-  function makeQr(adresse) {
-    var url = PU.qrUrl(adresse);
-    if (!url || typeof window.qrcode !== "function") return null;
-    try { var qr = window.qrcode(0, "Q"); qr.addData(url); qr.make(); return qr; } catch (e) { return null; }
-  }
+  function makeQr(adresse) { return PU.makeQr(window.qrcode, adresse); }
   function renderQrPreview(qr) {
-    var box = $("pp-qr-apercu"), n = qr.getModuleCount(), L = PU.qrLayout(n, 1);
+    var box = $("pp-qr-apercu");
     box.textContent = "";
-    var NS = "http://www.w3.org/2000/svg";
-    var svg = document.createElementNS(NS, "svg");
-    svg.setAttribute("viewBox", "0 0 " + L.size + " " + L.size);
-    svg.setAttribute("role", "img");
-    svg.setAttribute("aria-label", "QR code de votre page");
-    svg.setAttribute("shape-rendering", "crispEdges");
-    var bg = document.createElementNS(NS, "rect");
-    bg.setAttribute("width", String(L.size)); bg.setAttribute("height", String(L.size)); bg.setAttribute("fill", "#ffffff");
-    var path = document.createElementNS(NS, "path"), d = "";
-    for (var r = 0; r < n; r++) for (var c = 0; c < n; c++) if (qr.isDark(r, c)) d += "M" + (c + L.quiet) + " " + (r + L.quiet) + "h1v1h-1z";
-    path.setAttribute("d", d); path.setAttribute("fill", "#000000");
-    svg.appendChild(bg); svg.appendChild(path);
-    box.appendChild(svg);
+    box.appendChild(PU.qrSvgNode(document, qr, "QR code de votre page"));
   }
   function refreshQr(published) {
     var zone = $("pp-qr"), adresse = row && row.adresse ? row.adresse : null;
@@ -193,12 +177,45 @@
       canvas.width = L.px; canvas.height = L.px;
       var ctx = canvas.getContext("2d");
       ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, L.px, L.px);
-      ctx.fillStyle = "#000000";
-      for (var r = 0; r < L.modules; r++) for (var c = 0; c < L.modules; c++) if (qr.isDark(r, c)) ctx.fillRect((c + L.quiet) * L.scale, (r + L.quiet) * L.scale, L.scale, L.scale);
+      PU.paintQr(ctx, qr, L, 0, 0);
       canvas.toBlob(function (blob) {
         if (!blob) { st.textContent = "Le téléchargement a échoué. Réessayez."; return; }
         download(blob, name);
         st.textContent = "PNG téléchargé (" + L.px + " × " + L.px + " px).";
+      }, "image/png");
+    } catch (e) { st.textContent = "Le téléchargement a échoué. Réessayez."; }
+  }
+
+  // ---------- Carte à imprimer (PNG 1080 × 1350 px) ----------
+  // Aucune requête réseau pour la photo (elle n'est pas dessinée). Le logo est un fichier du site (même origine) : s'il ne charge pas
+  // en quelques secondes, la carte est dessinée sans logo, le téléchargement n'est jamais bloqué.
+  function loadLogo() {
+    return new Promise(function (resolve) {
+      if (typeof Image !== "function") { resolve(null); return; }
+      var done = false, img = new Image();
+      function end(v) { if (!done) { done = true; resolve(v); } }
+      img.onload = function () { end(img); };
+      img.onerror = function () { end(null); };
+      setTimeout(function () { end(null); }, 4000);
+      var brand = window.MAHOUTO_BRAND || {};
+      img.src = "/" + (typeof brand.logo === "string" && /^assets\/[a-z0-9-]+\.png$/.test(brand.logo) ? brand.logo : "assets/logo-mahouto-plus.png");
+    });
+  }
+  async function downloadCarte() {
+    var st = $("pp-qr-etat"), C = window.ProfilPublicCarte, qr = qrState.qr, name = C ? C.cardFilename(qrState.adresse) : null;
+    st.textContent = "";
+    if (!C || !qr || !name || !row) return;
+    st.textContent = "Préparation de la carte…";
+    try {
+      var logo = await loadLogo(), canvas = document.createElement("canvas");
+      canvas.width = C.WIDTH; canvas.height = C.HEIGHT;
+      var brand = window.MAHOUTO_BRAND || {};
+      var info = C.drawCard(canvas.getContext("2d"), { qr: qr, adresse: qrState.adresse, nom: row.nom_affiche, metier: row.metier, localisation: row.localisation, brandName: brand.name, logo: logo });
+      if (!info) throw new Error("carte");
+      canvas.toBlob(function (blob) {
+        if (!blob) { st.textContent = "Le téléchargement a échoué. Réessayez."; return; }
+        download(blob, name);
+        st.textContent = "Carte téléchargée (" + C.WIDTH + " × " + C.HEIGHT + " px).";
       }, "image/png");
     } catch (e) { st.textContent = "Le téléchargement a échoué. Réessayez."; }
   }
@@ -311,6 +328,7 @@
     $("pp-btn-copier").addEventListener("click", copier);
     $("pp-qr-png").addEventListener("click", function () { downloadQr("png"); });
     $("pp-qr-svg").addEventListener("click", function () { downloadQr("svg"); });
+    $("pp-qr-carte").addEventListener("click", function () { downloadCarte(); });
     $("pp-presentation").addEventListener("input", function () { $("pp-compteur").textContent = PU.countChars($("pp-presentation").value) + " / " + PU.LIMITS.presentation; });
     $("pp-apercu").addEventListener("click", function () { if (row && row.adresse) window.open("/m/" + encodeURIComponent(row.adresse), "_blank", "noopener"); });
     await load();

@@ -108,12 +108,12 @@ function fakeEl(id) {
   const el = { id, children: [], attrs: {}, _text: "", listeners: {}, classes: new Set(["hidden"]),
     set textContent(v) { this._text = String(v); this.children = []; }, get textContent() { return this._text + this.children.map((c) => c.textContent).join(""); },
     classList: { add: (c) => el.classes.add(c), remove: (c) => el.classes.delete(c), toggle: (c, on) => { if (on === undefined ? !el.classes.has(c) : on) el.classes.add(c); else el.classes.delete(c); }, contains: (c) => el.classes.has(c) },
-    appendChild(c) { this.children.push(c); return c; }, setAttribute(k, v) { this.attrs[k] = v; }, addEventListener(t, f) { this.listeners[t] = f; } };
+    appendChild(c) { this.children.push(c); return c; }, setAttribute(k, v) { this.attrs[k] = v; }, getAttribute(k) { return this.attrs[k]; }, addEventListener(t, f) { this.listeners[t] = f; } };
   return el;
 }
 async function runPage(pathname, client) {
   const els = {};
-  ["bandeau", "chargement", "etat", "etat-titre", "profil", "avatar", "nom", "metier", "lieu", "presentation", "contact-zone"].forEach((i) => { els[i] = fakeEl(i); });
+  ["bandeau", "chargement", "etat", "etat-titre", "profil", "avatar", "nom", "metier", "lieu", "lieu-ligne", "presentation", "contact-zone", "btn-reessayer", "btn-partager"].forEach((i) => { els[i] = fakeEl(i); });
   ["bandeau", "etat", "profil", "metier", "lieu", "presentation"].forEach((i) => els[i].classes.add("hidden")); els.chargement.classes.delete("hidden");
   const doc = { title: "", getElementById: (i) => els[i], createElement: (t) => Object.assign(fakeEl(null), { tagName: t }) };
   const win = { ProfilPublicUtils: PU, MAHOUTO_CONFIG: { SUPABASE_URL: "https://x.test", SUPABASE_ANON_KEY: "cle-fictive" }, supabase: { createClient: () => client }, location: { pathname, search: "" } };
@@ -149,7 +149,7 @@ test("m.js : profil publié → lu par profil_public_lire, affiché en TEXTE BRU
   assert.strictEqual(els.nom.textContent, "Atelier <b>Test</b>"); assert.strictEqual(doc.title, "Atelier <b>Test</b> — MAHOUTO+");
   assert.strictEqual(els.metier.textContent, "Couturier"); assert.strictEqual(els.presentation.textContent, "Ligne 1\nLigne 2"); assert.strictEqual(els.lieu.textContent, "Ville Test");
   const a = els["contact-zone"].children[0];
-  assert.deepStrictEqual([a.tagName, a.href, a.target, a.rel, a.textContent], ["a", "https://wa.me/22900000000", "_blank", "noopener noreferrer nofollow", "Écrire sur WhatsApp"]);
+  assert.deepStrictEqual([a.tagName, a.href, a.target, a.rel, a.textContent], ["a", "https://wa.me/22900000000", "_blank", "noopener noreferrer nofollow", "Contacter sur WhatsApp"]);
   const img = els.avatar.children[0]; assert.deepStrictEqual([img.tagName, img.src, img.attrs.referrerpolicy, img.attrs.loading, img.attrs.alt], ["img", "https://exemple.test/a.png", "no-referrer", "lazy", ""]);
   assert.strictEqual(JSON.stringify(c.calls[0]), JSON.stringify(["rpc", "profil_public_lire", { p_adresse: "mon-atelier" }]), "la lecture passe par la fonction de lecture par adresse exacte");
   assert.deepStrictEqual(c.calls.slice(1).map((x) => x[0] === "rpc" ? x[1] : x[0]), ["getSession", "profil_public_messages_ouverts"], "ensuite seulement la session (signalement) et l'autorisation d'écrire : aucun select direct");
@@ -222,7 +222,7 @@ test("m.html : noindex (meta), chemins absolus (adresse /m/...), scripts dans l'
   ["/config.js", "/profil-public-utils.js", "/m.js"].forEach((f) => assert.ok(srcs.includes(f), f));
   assert.ok(srcs.indexOf("/profil-public-utils.js") < srcs.indexOf("/m.js"));
   assert.ok(![...h.matchAll(/(?:src|href)="([^"]+)"/g)].some((m) => !/^(\/|https:|#)/.test(m[1])), "tous les chemins sont absolus (la page est servie sous /m/<adresse>)");
-  assert.ok(!/<script>/.test(h)); assert.match(h, /<a class="back" href="\/index\.html">← Retour à l'accueil<\/a>/);
+  assert.ok(!/<script>/.test(h)); assert.match(h, /<a class="marque" href="\/index\.html"[^>]*>/, "en-tête de marque : lien vers l'accueil (remplace « Retour à l'accueil »)");
   ["chargement", "etat", "profil", "bandeau"].forEach((i) => assert.ok(h.includes('id="' + i + '"'), i));
   const v = JSON.parse(read("vercel.json"));
   assert.ok(v.headers.some((x) => x.source === "/m/:adresse" && x.headers.some((hh) => hh.key === "X-Robots-Tag" && /noindex/.test(hh.value))));

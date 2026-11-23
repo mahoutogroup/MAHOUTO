@@ -15,6 +15,10 @@
      profil_public_mien) et seulement sur une page réellement publique (jamais dans l'aperçu) ; visiteur non connecté : texte
      « Connectez-vous pour signaler cette page » (fenêtre de connexion). Envoi par la fonction profil_public_signaler (aucun
      accès direct à la table, aucun select après l'appel, aucun journal console).
+   - Carte de visite (refonte du design) : en-tête de marque, bandeau de couverture en CSS pur, avatar rond, action principale
+     (WhatsApp : le numéro n'est JAMAIS affiché, le lien wa.me suffit ; lien https : seulement le domaine), « Écrire un message »
+     (règles inchangées), « Partager » (feuille basse : QR avec ?src=qr, lien copié SANS ?src=, partage natif, QR en PNG 1024 px ;
+     qrcode-generator.js n'est chargé qu'à son ouverture), pied « Page créée avec MAHOUTO+ ». Aucune requête réseau nouvelle.
    - Tout est affiché en TEXTE BRUT (createElement / textContent) : aucun innerHTML. Seuls liens autorisés : https (photo,
      lien de contact) et wa.me (WhatsApp), ouverts avec rel noopener noreferrer nofollow.
    ========================================================= */
@@ -24,15 +28,43 @@
   var $ = function (id) { return document.getElementById(id); };
   function show(id, on) { $(id).classList.toggle("hidden", !on); }
 
+  var brand = window.MAHOUTO_BRAND || {};
+  var BRAND_NAME = typeof brand.name === "string" && brand.name ? brand.name : "MAHOUTO+";
+
+  // Logo de la marque en petit format (128 px, environ 20 Ko) : jamais le grand fichier (300 Ko) sur une page vue en 4G lente.
+  function smallLogo() {
+    var f = typeof brand.logo === "string" && /^assets\/[a-z0-9-]+\.png$/.test(brand.logo) ? brand.logo : "assets/logo-mahouto-plus.png";
+    return "/" + f.replace(/\.png$/, "-128.png");
+  }
+
+  var ICONS = { whatsapp: "i-chat", lien: "i-lien" };
+  // Icône SVG en ligne du lot de symboles de m.html (trait de 1,75 px) ; sans createElementNS, pas d'icône (le texte suffit).
+  function icon(name) {
+    if (!document.createElementNS) return null;
+    var NS = "http://www.w3.org/2000/svg", svg = document.createElementNS(NS, "svg"), use = document.createElementNS(NS, "use");
+    svg.setAttribute("class", "ic"); svg.setAttribute("aria-hidden", "true"); svg.setAttribute("focusable", "false");
+    use.setAttribute("href", "#" + name);
+    svg.appendChild(use);
+    return svg;
+  }
+
   function showState(key) {
+    var k = PU.MESSAGES[key] ? key : "introuvable";
     show("chargement", false); show("profil", false);
-    $("etat-titre").textContent = PU.MESSAGES[key] || PU.MESSAGES.introuvable;
+    $("etat-titre").textContent = PU.MESSAGES[k];
+    $("etat").setAttribute("data-etat", k);
+    var retry = $("btn-reessayer");
+    show("btn-reessayer", k === "erreur");
+    if (k === "erreur" && !retry.getAttribute("data-pret")) {
+      retry.setAttribute("data-pret", "1");
+      retry.addEventListener("click", function () { window.location.reload(); });
+    }
     show("etat", true);
   }
 
-  function setText(id, text) {
-    var n = $(id);
-    if (text) { n.textContent = text; n.classList.remove("hidden"); } else { n.textContent = ""; n.classList.add("hidden"); }
+  function setText(id, text, wrapId) {
+    var n = $(id), w = $(wrapId || id);
+    if (text) { n.textContent = text; w.classList.remove("hidden"); } else { n.textContent = ""; w.classList.add("hidden"); }
   }
 
   function renderAvatar(row) {
@@ -44,40 +76,47 @@
       img.setAttribute("alt", "");
       img.setAttribute("referrerpolicy", "no-referrer");
       img.setAttribute("loading", "lazy");
-      img.addEventListener("error", function () { box.textContent = initial(row.nom_affiche); });
+      img.setAttribute("decoding", "async");
+      img.addEventListener("error", function () { box.textContent = PU.initialOf(row.nom_affiche); });
       img.src = url;
       box.appendChild(img);
-    } else box.textContent = initial(row.nom_affiche);
+    } else box.textContent = PU.initialOf(row.nom_affiche);
   }
-  function initial(nom) { var c = Array.from(String(nom || "?").trim())[0]; return c ? c.toUpperCase() : "?"; }
 
+  // Action principale : bouton plein or. WhatsApp : seul le lien wa.me porte le numéro (jamais affiché) ; lien : seulement le domaine.
   function renderContact(row) {
     var zone = $("contact-zone");
     zone.textContent = "";
-    var href = null, label = "";
-    if (row.contact_type === "whatsapp") { href = PU.whatsappLink(row.contact_valeur); label = "Écrire sur WhatsApp"; }
-    else if (row.contact_type === "lien") { href = PU.safeHttpsUrl(row.contact_valeur, PU.LIMITS.lien); label = "Ouvrir le lien"; }
-    if (!href) return;
+    var act = PU.contactAction(row);
+    if (!act) return;
     var a = document.createElement("a");
-    a.className = "contact";
-    a.href = href;
+    a.className = "btn btn-or";
+    a.href = act.href;
     a.target = "_blank";
     a.rel = "noopener noreferrer nofollow";
-    a.textContent = label;
+    a.setAttribute("aria-label", act.kind === "whatsapp" ? act.label + " (s'ouvre dans un nouvel onglet)" : act.label + " : " + act.domain + " (s'ouvre dans un nouvel onglet)");
+    var ic = icon(ICONS[act.kind]);
+    if (ic) a.appendChild(ic);
+    var txt = document.createElement("span");
+    txt.className = "txt";
+    txt.textContent = act.label;
+    if (act.domain) {
+      var sub = document.createElement("span");
+      sub.className = "sub";
+      sub.textContent = act.domain;
+      txt.appendChild(sub);
+    }
+    a.appendChild(txt);
     zone.appendChild(a);
-    var note = document.createElement("div");
-    note.className = "contact-note";
-    note.textContent = row.contact_type === "whatsapp" ? row.contact_valeur : href;
-    zone.appendChild(note);
   }
 
   function renderProfil(row, banner) {
     show("chargement", false); show("etat", false);
     $("nom").textContent = row.nom_affiche || "";
-    document.title = (row.nom_affiche || "Profil") + " — MAHOUTO+";
+    document.title = (row.nom_affiche || "Profil") + " — " + BRAND_NAME;
     renderAvatar(row);
     setText("metier", row.metier);
-    setText("lieu", row.localisation);
+    setText("lieu", row.localisation, "lieu-ligne");
     setText("presentation", row.presentation);
     renderContact(row);
     show("profil", true);
@@ -146,7 +185,7 @@
       document.removeEventListener("keydown", onKey);
       if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
     }
-    function onKey(e) { if (e.key === "Escape" && !busy) close(); }
+    function onKey(e) { if (e.key === "Escape" && !busy) close(); else trapTab(sheet, e); }
     detail.addEventListener("input", function () { count.textContent = PU.countChars(detail.value) + " / " + PU.SIGNALEMENT_DETAIL_MAX; });
     overlay.addEventListener("click", function (e) { if (e.target === overlay && !busy) close(); });
     cancel.addEventListener("click", function () { if (!busy) close(); });
@@ -172,6 +211,144 @@
     });
 
     document.body.appendChild(overlay);
+    if (cancel.focus) cancel.focus();
+  }
+
+  // ---------- Partager cette page (feuille basse : QR code, copier, partager, enregistrer) ----------
+  // qrcode-generator.js n'est chargé qu'à l'ouverture de la feuille (jamais au chargement de la page) ; aucun service externe.
+  var qrLibPromise = null;
+  function loadQrLib() {
+    if (typeof window.qrcode === "function") return Promise.resolve();
+    if (!qrLibPromise) qrLibPromise = new Promise(function (resolve, reject) {
+      var s = document.createElement("script");
+      s.setAttribute("src", "/qrcode-generator.js");
+      s.onload = function () { typeof window.qrcode === "function" ? resolve() : reject(new Error("qr")); };
+      s.onerror = function () { qrLibPromise = null; reject(new Error("qr")); };
+      document.body.appendChild(s);
+    });
+    return qrLibPromise;
+  }
+
+  function copyText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(text);
+    return new Promise(function (resolve, reject) {
+      try {
+        var t = document.createElement("textarea");
+        t.value = text; t.setAttribute("readonly", ""); t.style.position = "fixed"; t.style.opacity = "0";
+        document.body.appendChild(t); t.focus(); t.setSelectionRange(0, text.length);
+        var ok = document.execCommand && document.execCommand("copy");
+        document.body.removeChild(t);
+        ok ? resolve() : reject(new Error("copie"));
+      } catch (e) { reject(e); }
+    });
+  }
+
+  function downloadBlob(blob, filename) {
+    var a = document.createElement("a"), url = URL.createObjectURL(blob);
+    a.setAttribute("href", url); a.setAttribute("download", filename);
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+  }
+
+  // Garde le focus clavier dans la feuille (Tab et Maj+Tab bouclent) ; sans effet si le navigateur ne sait pas lister les boutons.
+  function trapTab(sheet, e) {
+    if (e.key !== "Tab" || !sheet.querySelectorAll) return;
+    var items = Array.prototype.filter.call(sheet.querySelectorAll("button, textarea, input, a[href]"), function (n) { return !n.disabled; });
+    if (!items.length) return;
+    var first = items[0], last = items[items.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  }
+
+  function openShareSheet(row, adresse, opener) {
+    if ($("sh-overlay")) return;
+    var qr = null, qrReady = false, flashTimer = null;
+    var title = PU.shareTitle(row.nom_affiche);
+    var link = PU.shareLink(adresse);
+    var status = mk("p", { class: "sh-etat", role: "status", "aria-live": "polite" });
+    var tuile = mk("div", { class: "sh-tuile" }, [mk("span", { class: "sh-attente", text: "Préparation du QR code…" })]);
+    var btnCopy = mk("button", { type: "button", class: "btn btn-or", id: "sh-copier" }, [mk("span", { text: "Copier le lien" })]);
+    var btnShare = mk("button", { type: "button", class: "btn btn-neutre", id: "sh-partager" }, [mk("span", { text: "Partager" })]);
+    var btnSave = mk("button", { type: "button", class: "btn btn-neutre", id: "sh-enregistrer", disabled: "" }, [mk("span", { text: "Enregistrer le QR" })]);
+    var btnClose = mk("button", { type: "button", class: "sh-fermer", id: "sh-fermer", "aria-label": "Fermer" });
+    var ci = icon("i-fermer"); if (ci) btnClose.appendChild(ci);
+    [[btnCopy, "i-copier"], [btnShare, "i-partager"], [btnSave, "i-telecharger"]].forEach(function (p) { var i = icon(p[1]); if (i) p[0].insertBefore(i, p[0].firstChild); });
+    if (!(navigator.share && typeof navigator.share === "function")) btnShare.classList.add("hidden");
+    var overlay = mk("div", { id: "sh-overlay" });
+    var heading = mk("h2", { id: "sh-titre", text: title });
+    var sheet = mk("div", { class: "sh-sheet", role: "dialog", "aria-modal": "true", "aria-labelledby": "sh-titre" });
+    sheet.appendChild(mk("div", { class: "sh-tete" }, [heading, btnClose]));
+    sheet.appendChild(tuile);
+    sheet.appendChild(mk("p", { class: "sh-scan", text: "Scannez pour ouvrir la page" }));
+    sheet.appendChild(mk("p", { class: "sh-lien", id: "sh-lien", text: link ? link.replace(/^https:\/\//, "") : "" }));
+    sheet.appendChild(mk("div", { class: "sh-actions" }, [btnCopy, btnShare, btnSave]));
+    sheet.appendChild(status);
+    overlay.appendChild(sheet);
+
+    function say(text, isError) { status.textContent = text; status.className = "sh-etat" + (isError ? " sh-erreur" : ""); }
+    function close() {
+      if (flashTimer) clearTimeout(flashTimer);
+      document.removeEventListener("keydown", onKey);
+      if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+      if (opener && opener.focus) opener.focus();
+    }
+    function onKey(e) { if (e.key === "Escape") close(); else trapTab(sheet, e); }
+    overlay.addEventListener("click", function (e) { if (e.target === overlay) close(); });
+    btnClose.addEventListener("click", close);
+    document.addEventListener("keydown", onKey);
+
+    btnCopy.addEventListener("click", async function () {
+      if (!link) return;
+      var label = btnCopy.querySelector ? btnCopy.querySelector("span") : null;
+      try {
+        await copyText(link);
+        say("Lien copié", false);
+        if (label) { label.textContent = "Lien copié"; if (flashTimer) clearTimeout(flashTimer); flashTimer = setTimeout(function () { label.textContent = "Copier le lien"; }, 2200); }
+      } catch (e) { say("Copie impossible : touchez le lien ci-dessus pour le sélectionner.", true); }
+    });
+    btnShare.addEventListener("click", async function () {
+      var payload = PU.sharePayload(row.nom_affiche, adresse, BRAND_NAME);
+      if (!payload) return;
+      try { await navigator.share(payload); } catch (e) { /* partage annulé par la personne : ce n'est pas une erreur */ }
+    });
+    btnSave.addEventListener("click", function () {
+      var name = PU.qrFilename(adresse, "png");
+      if (!qrReady || !qr || !name) return;
+      try {
+        var L = PU.qrLayout(qr.getModuleCount(), PU.QR_MIN_PX), canvas = document.createElement("canvas");
+        canvas.width = L.px; canvas.height = L.px;
+        var ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#ffffff"; ctx.fillRect(0, 0, L.px, L.px);
+        PU.paintQr(ctx, qr, L, 0, 0);
+        canvas.toBlob(function (blob) {
+          if (!blob) { say("L'enregistrement a échoué. Réessayez.", true); return; }
+          downloadBlob(blob, name);
+          say("QR code enregistré (" + L.px + " × " + L.px + " px).", false);
+        }, "image/png");
+      } catch (e) { say("L'enregistrement a échoué. Réessayez.", true); }
+    });
+
+    document.body.appendChild(overlay);
+    if (btnClose.focus) btnClose.focus();
+
+    loadQrLib().then(function () {
+      qr = PU.makeQr(window.qrcode, adresse);
+      if (!qr) throw new Error("qr");
+      tuile.textContent = "";
+      tuile.appendChild(PU.qrSvgNode(document, qr, "QR code de la page de " + (PU.cleanLine(row.nom_affiche, 60) || "ce membre")));
+      qrReady = true;
+      btnSave.disabled = false;
+      if (btnSave.removeAttribute) btnSave.removeAttribute("disabled");
+    }).catch(function () {
+      tuile.textContent = "";
+      tuile.appendChild(mk("span", { class: "sh-attente", text: "Le QR code n'a pas pu être préparé." }));
+      say("Le QR code n'a pas pu être préparé. Le lien reste disponible.", true);
+    });
+  }
+
+  function setupShare(row, adresse) {
+    var btn = $("btn-partager");
+    btn.addEventListener("click", function () { openShareSheet(row, adresse, btn); });
   }
 
   function openLoginSheet(supabase, adresse, title) {
@@ -257,7 +434,12 @@
     return null;
   }
 
+  function setupBrand() {
+    ["marque-logo", "cree-logo"].forEach(function (id) { var n = $(id); if (n) n.setAttribute("src", smallLogo()); });
+  }
+
   async function init() {
+    setupBrand();
     if (!PU || !cfg || !window.supabase || typeof window.supabase.createClient !== "function") { showState("erreur"); return; }
     var adresse = PU.addressFromLocation(window.location.pathname, window.location.search);
     if (!adresse) { showState("introuvable"); return; }
@@ -281,6 +463,8 @@
       var v = PU.pageView({ row: row, preview: preview, ouvert: ouvert, statut: statut, readFailed: false });
       if (v.view === "profil") {
         renderProfil(row, v.banner);
+        // « Partager » : toute page affichée (page publique, aperçu propriétaire ou administrateur : il montre ce qui sera partagé).
+        setupShare(row, adresse);
         // Comptage anonyme : seulement pour une page réellement publique (ni aperçu propriétaire ou administrateur, ni bandeau).
         if (!preview && !v.banner) countVisit();
         // Le signalement est facultatif : un échec ici ne doit jamais masquer la page.

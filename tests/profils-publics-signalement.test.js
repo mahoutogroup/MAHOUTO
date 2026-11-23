@@ -177,7 +177,7 @@ const findAll = (root, pred) => { const out = []; walk(root, (n) => { if (pred(n
 async function runPage(o) {
   const opts = Object.assign({ session: true, mien: null, row: ROW, rpcResult: "ok" }, o || {});
   const els = {}; const calls = [], logins = [], keydown = [];
-  ["bandeau", "chargement", "etat", "etat-titre", "profil", "avatar", "nom", "metier", "lieu", "presentation", "contact-zone", "signalement-zone", "btn-signaler", "btn-connexion-signaler"].forEach((i) => { els[i] = makeEl(i, true); });
+  ["bandeau", "chargement", "etat", "etat-titre", "profil", "avatar", "nom", "metier", "lieu", "lieu-ligne", "presentation", "contact-zone", "btn-reessayer", "btn-partager", "signalement-zone", "btn-signaler", "btn-connexion-signaler"].forEach((i) => { els[i] = makeEl(i, true); });
   els.chargement.classes.delete("hidden");
   const body = makeEl("body");
   const doc = { title: "", body, getElementById: (i) => els[i] || findAll(body, (n) => n.id === i)[0] || null, createElement: (t) => Object.assign(makeEl(null), { tagName: t }),
@@ -309,7 +309,7 @@ test("m.js / m.html : aucun innerHTML ni console ; scripts de connexion chargés
   ["/pseudo.js", "/login-sheet.js", "/profil-public-utils.js", "/m.js"].forEach((f) => assert.ok(srcs.includes(f), f));
   assert.ok(srcs.indexOf("/login-sheet.js") < srcs.indexOf("/m.js") && srcs.indexOf("/profil-public-utils.js") < srcs.indexOf("/m.js"));
   assert.ok(!/#sg-overlay[^}]*#[0-9a-fA-F]{3,6}[^}]*background/.test(h) || true);
-  assert.match(h, /#sg-overlay \.sg-sheet \{[^}]*background: var\(--bg-elevated\)/);
+  assert.match(h, /#sg-overlay \.sg-sheet, #sh-overlay \.sh-sheet \{[^}]*background: var\(--bg-elevated\)/);
 });
 
 // ====================== espace administrateur ======================
