@@ -7,6 +7,10 @@
      jamais l'identifiant du compte, la déclaration de majorité ni la suspension.
    - Sans ligne : aperçu pour la personne propriétaire (profil_public_mien) ou un administrateur (profils_publics_admin_lire),
      par fonctions, toujours sans lire la table ; sinon l'état vient de profil_public_statut : introuvable / non disponible / non ouverte.
+   - Écrire un message : seulement si le propriétaire l'a autorisé (profil_public_messages_ouverts) et sur une page réellement
+     publique. Membre connecté non propriétaire : bouton « Écrire un message » (profil_public_ecrire renvoie un code et
+     l'identifiant de la CONVERSATION, jamais l'identifiant du compte) puis dm-chat.html?conv=…&name=… SANS « with » ;
+     visiteur non connecté : « Connectez-vous pour écrire à cette personne ». Aucun select, aucun journal console.
    - Signalement (PR 2 sur 3) : bouton « Signaler cette page » pour un membre connecté qui n'est PAS le propriétaire (reconnu par
      profil_public_mien) et seulement sur une page réellement publique (jamais dans l'aperçu) ; visiteur non connecté : texte
      « Connectez-vous pour signaler cette page » (fenêtre de connexion). Envoi par la fonction profil_public_signaler (aucun
@@ -170,12 +174,12 @@
     document.body.appendChild(overlay);
   }
 
-  function openLoginSheet(supabase, adresse) {
+  function openLoginSheet(supabase, adresse, title) {
     if (!window.MahoutoLogin) return;
     window.MahoutoLogin.open({
       doc: document, win: window, supabase: supabase,
       redirectPath: "m/" + adresse,
-      title: "Se connecter pour signaler une page",
+      title: title || "Se connecter pour signaler une page",
       onSignedIn: async function (u) {
         if (u && window.MahoutoPseudo) { try { await window.MahoutoPseudo.ensureProfileForUser(supabase, u); } catch (e) { /* profil créé plus tard */ } }
         window.location.reload();
@@ -183,17 +187,57 @@
     });
   }
 
+  // Propriétaire de la page ? (reconnu par sa propre page, jamais par un identifiant) ; résultat gardé pour les deux blocs.
+  var ownerCache;
+  async function isOwnerOf(supabase, row, user) {
+    if (!user) return false;
+    if (ownerCache !== undefined) return ownerCache;
+    try { var mien = firstRow((await supabase.rpc("profil_public_mien")).data); ownerCache = !!mien && mien.id === row.id; } catch (e) { ownerCache = false; }
+    return ownerCache;
+  }
+
   async function setupReport(supabase, row, adresse, view) {
-    var user = await currentUser(supabase), isOwner = false;
-    if (user) {
-      try { var mien = firstRow((await supabase.rpc("profil_public_mien")).data); isOwner = !!mien && mien.id === row.id; } catch (e) { isOwner = false; }
-    }
+    var user = await currentUser(supabase), isOwner = await isOwnerOf(supabase, row, user);
     var ui = PU.reportUi({ view: view.view, banner: view.banner, preview: false, connected: !!user, isOwner: isOwner });
     if (ui === "aucun") return;
     show("signalement-zone", true);
     var btn = ui === "bouton" ? $("btn-signaler") : $("btn-connexion-signaler");
     show(btn.id, true);
     btn.addEventListener("click", function () { if (ui === "bouton") openReportSheet(supabase, adresse); else openLoginSheet(supabase, adresse); });
+  }
+
+  // ---------- Écrire un message ----------
+  async function setupMessages(supabase, row, adresse, view) {
+    var res = await supabase.rpc("profil_public_messages_ouverts", { p_adresse: adresse });
+    if (res.error || res.data !== true) return;
+    var user = await currentUser(supabase), isOwner = await isOwnerOf(supabase, row, user);
+    var ui = PU.messagesUi({ view: view.view, banner: view.banner, preview: false, connected: !!user, isOwner: isOwner, messagesOuverts: true });
+    if (ui === "aucun") return;
+    show("ecrire-zone", true);
+    if (ui === "connexion") {
+      show("btn-connexion-ecrire", true);
+      $("btn-connexion-ecrire").addEventListener("click", function () { openLoginSheet(supabase, adresse, "Se connecter pour écrire à cette personne"); });
+      return;
+    }
+    show("btn-ecrire", true); show("ecrire-aide", true);
+    var btn = $("btn-ecrire"), busy = false;
+    function say(text, isError) { var e = $("ecrire-etat"); e.textContent = text; e.classList.toggle("erreur", !!isError); show("ecrire-etat", !!text); }
+    btn.addEventListener("click", async function () {
+      if (busy) return;
+      busy = true; btn.disabled = true; say("Ouverture de la conversation…", false);
+      var out = null;
+      try {
+        var r = await supabase.rpc("profil_public_ecrire", { p_adresse: adresse });
+        out = r.error ? null : firstRow(r.data);
+      } catch (e) { out = null; }
+      var code = out && typeof out.code === "string" ? out.code : null, msg = PU.ecrireMessage(code);
+      var url = code === "ok" ? PU.dmUrl(out.conversation_id, row.nom_affiche) : null;
+      if (url) { say(msg.text, false); window.location.href = url; return; }
+      say(code === "ok" ? PU.ecrireMessage(null).text : msg.text, true);
+      busy = false;
+      // codes définitifs : inutile de réessayer tout de suite
+      btn.disabled = code === "desactive" || code === "limite" || code === "propre_page" || code === "introuvable" || code === "ferme" || code === "invalide";
+    });
   }
 
   function firstRow(data) { return Array.isArray(data) && data.length && data[0] && typeof data[0] === "object" ? data[0] : null; }
@@ -241,6 +285,8 @@
         if (!preview && !v.banner) countVisit();
         // Le signalement est facultatif : un échec ici ne doit jamais masquer la page.
         if (!preview) { try { await setupReport(supabase, row, adresse, v); } catch (e) { /* page affichée sans signalement */ } }
+        // « Écrire un message » est facultatif lui aussi : un échec ici ne masque jamais la page.
+        if (!preview && !v.banner) { try { await setupMessages(supabase, row, adresse, v); } catch (e) { /* page affichée sans bouton d'écriture */ } }
       } else showState(v.view);
     } catch (e) { showState("erreur"); }
   }

@@ -24,7 +24,7 @@
   if (!section || !PU || !cfg || !window.supabase || typeof window.supabase.createClient !== "function") return;
   var supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
   var $ = function (id) { return document.getElementById(id); };
-  var row = null, busy = false, ouvert = false;
+  var row = null, busy = false, ouvert = false, messagesOuverts = false;
 
   function setStatus(msg, isError) {
     var s = $("pp-etat");
@@ -43,6 +43,7 @@
       adresse: $("pp-adresse").value, nom: $("pp-nom").value, avatar: $("pp-avatar").value, metier: $("pp-metier").value,
       presentation: $("pp-presentation").value, localisation: $("pp-localisation").value,
       contactType: $("pp-contact-type").value, contactValeur: $("pp-contact-valeur").value,
+      messagesOuverts: $("pp-messages").checked,   // gardé tel quel à chaque enregistrement (brouillon, publication, dépublication)
       publier: publier === true, majeur: $("pp-majeur").checked
     };
   }
@@ -58,6 +59,7 @@
     $("pp-contact-type").value = r.contact_type || "";
     $("pp-contact-valeur").value = r.contact_valeur || "";
     $("pp-majeur").checked = r.majeur_declare === true;
+    $("pp-messages").checked = messagesOuverts;
     $("pp-avatar-etat").textContent = "";
     refreshView();
   }
@@ -226,6 +228,8 @@
     var res = await supabase.rpc("profil_public_mien");
     if (res.error) { setStatus("Impossible de charger votre page pour le moment (le SQL du profil public est-il exécuté ?).", true); row = null; fillForm(); return; }
     row = Array.isArray(res.data) && res.data.length ? res.data[0] : null;
+    // Case « m'écrire » : lue par profil_public_messages_mien (false s'il n'y a pas encore de page ou si la fonction manque).
+    try { var m = await supabase.rpc("profil_public_messages_mien"); messagesOuverts = !m.error && m.data === true; } catch (e) { messagesOuverts = false; }
     fillForm();
     try { await loadVisites(); } catch (e) { $("pp-visites").classList.add("hidden"); }
   }

@@ -32,7 +32,7 @@ test("adresses réservées refusées (liste fixe, tirets ignorés) : admin, api,
 test("champs : nom 1 à 60 ; métier 80 ; présentation 280 ; lieu 60 ; valeurs nettoyées, vides = null", () => {
   const r = PU.validateProfil(ok({ nom: "  Atelier   Test ", metier: " Couturier ", presentation: "Texte\navec retour", localisation: "Ville Test" }));
   assert.strictEqual(r.ok, true);
-  assert.deepStrictEqual(r.value, { adresse: "mon-atelier", nom_affiche: "Atelier Test", avatar_url: null, metier: "Couturier", presentation: "Texte avec retour", localisation: "Ville Test", contact_type: null, contact_valeur: null, publie: false, majeur_declare: false });
+  assert.deepStrictEqual(r.value, { adresse: "mon-atelier", nom_affiche: "Atelier Test", avatar_url: null, metier: "Couturier", presentation: "Texte avec retour", localisation: "Ville Test", contact_type: null, contact_valeur: null, messages_ouverts: false, publie: false, majeur_declare: false });
   assert.strictEqual(PU.validateProfil(ok({ nom: "n".repeat(60) })).ok, true);
   [["nom", 61, "nom"], ["metier", 81, "metier"], ["presentation", 281, "presentation"], ["localisation", 61, "localisation"]].forEach(([k, n, e]) => {
     const x = PU.validateProfil(ok({ [k]: "x".repeat(n) })); assert.strictEqual(x.ok, false, k); assert.ok(x.errors[e], k);
@@ -152,7 +152,7 @@ test("m.js : profil publié → lu par profil_public_lire, affiché en TEXTE BRU
   assert.deepStrictEqual([a.tagName, a.href, a.target, a.rel, a.textContent], ["a", "https://wa.me/22900000000", "_blank", "noopener noreferrer nofollow", "Écrire sur WhatsApp"]);
   const img = els.avatar.children[0]; assert.deepStrictEqual([img.tagName, img.src, img.attrs.referrerpolicy, img.attrs.loading, img.attrs.alt], ["img", "https://exemple.test/a.png", "no-referrer", "lazy", ""]);
   assert.strictEqual(JSON.stringify(c.calls[0]), JSON.stringify(["rpc", "profil_public_lire", { p_adresse: "mon-atelier" }]), "la lecture passe par la fonction de lecture par adresse exacte");
-  assert.deepStrictEqual(c.calls.slice(1).map((x) => x[0] === "rpc" ? x[1] : x[0]), ["getSession"], "ensuite seulement la session (affichage du signalement) : aucun select direct");
+  assert.deepStrictEqual(c.calls.slice(1).map((x) => x[0] === "rpc" ? x[1] : x[0]), ["getSession", "profil_public_messages_ouverts"], "ensuite seulement la session (signalement) et l'autorisation d'écrire : aucun select direct");
   assert.ok(!c.calls.some((x) => x[0] === "from"), "jamais de lecture directe de la table");
 });
 

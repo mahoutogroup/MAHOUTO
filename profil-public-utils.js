@@ -74,8 +74,8 @@
 
   /**
    * Valide la page en préparation.
-   * input : { adresse, nom, avatar, metier, presentation, localisation, contactType ('' | 'whatsapp' | 'lien'), contactValeur, publier, majeur }
-   * Renvoie { ok:true, value:{ adresse, nom_affiche, avatar_url, metier, presentation, localisation, contact_type, contact_valeur, publie, majeur_declare } }
+   * input : { adresse, nom, avatar, metier, presentation, localisation, contactType ('' | 'whatsapp' | 'lien'), contactValeur, messagesOuverts, publier, majeur }
+   * Renvoie { ok:true, value:{ adresse, nom_affiche, avatar_url, metier, presentation, localisation, contact_type, contact_valeur, messages_ouverts, publie, majeur_declare } }
    * ou { ok:false, errors:{ champ: message } }. Un SEUL contact public au plus ; publier exige la certification des 18 ans.
    */
   function validateProfil(input) {
@@ -115,6 +115,7 @@
       else errors.contact = "Le lien doit commencer par https:// (300 caractères au maximum).";
     } else errors.contact = "Choisissez le type de contact (WhatsApp ou lien).";
 
+    v.messages_ouverts = s.messagesOuverts === true;
     v.publie = s.publier === true;
     v.majeur_declare = s.majeur === true;
     if (v.publie && !v.majeur_declare) errors.majeur = "Pour publier votre page, certifiez avoir 18 ans ou plus.";
@@ -207,6 +208,44 @@
     var c = counts && typeof counts === "object" ? counts : {};
     return MOTIFS_SIGNALEMENT.filter(function (m) { return Number(c[m.value]) > 0; })
       .map(function (m) { return m.label + " : " + Number(c[m.value]); }).join(" · ");
+  }
+
+  // ---------- Écrire un message depuis la page publique ----------
+  var ECRIRE_AIDE = "Votre message sera lu par cette personne. Restez respectueux.";
+  var ECRIRE_CONNEXION = "Connectez-vous pour écrire à cette personne";
+  var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+  /** Message pour le code renvoyé par profil_public_ecrire : ok, non_connecte, invalide, ferme, introuvable, propre_page, desactive, limite. */
+  function ecrireMessage(code) {
+    switch (code) {
+      case "ok": return { ok: true, text: "Ouverture de la conversation…" };
+      case "desactive": return { ok: false, text: "Cette personne n'accepte pas les messages pour le moment." };
+      case "limite": return { ok: false, text: "Vous avez atteint la limite de nouvelles conversations pour aujourd'hui. Réessayez demain." };
+      case "propre_page": return { ok: false, text: "Vous ne pouvez pas vous écrire à vous-même." };
+      case "introuvable": return { ok: false, text: "Cette page n'est plus disponible : vous ne pouvez pas écrire à cette personne." };
+      case "ferme": return { ok: false, text: "Cette fonction n'est pas encore ouverte." };
+      case "non_connecte": return { ok: false, text: "Connectez-vous pour écrire à cette personne." };
+      case "invalide": return { ok: false, text: "Cette adresse n'est pas valide." };
+      default: return { ok: false, text: "La conversation n'a pas pu être ouverte. Réessayez dans un instant." };
+    }
+  }
+
+  /** Adresse de la conversation : conversation et nom seulement, JAMAIS le paramètre « with » (aucun identifiant de compte). Null si invalide. */
+  function dmUrl(conversationId, nom) {
+    if (typeof conversationId !== "string" || !UUID_RE.test(conversationId)) return null;
+    return "/dm-chat.html?conv=" + encodeURIComponent(conversationId) + "&name=" + encodeURIComponent(cleanLine(nom, 60) || "Utilisateur");
+  }
+
+  /**
+   * Que montrer pour « Écrire un message » ? 'bouton' (membre connecté non propriétaire), 'connexion' (visiteur non connecté),
+   * 'aucun' (page qui n'accepte pas les messages, propriétaire, aperçu, bandeau, page non affichée).
+   * input : { view, banner, preview, connected, isOwner, messagesOuverts }
+   */
+  function messagesUi(input) {
+    var o = input || {};
+    if (o.view !== "profil" || o.preview === true || o.banner || o.messagesOuverts !== true) return "aucun";
+    if (o.connected !== true) return "connexion";
+    return o.isOwner === true ? "aucun" : "bouton";
   }
 
   // ---------- QR code et visites (PR 3 sur 3) ----------
@@ -365,6 +404,7 @@
     cleanLine: cleanLine, countChars: countChars, normalizeWhatsapp: normalizeWhatsapp, safeHttpsUrl: safeHttpsUrl, whatsappLink: whatsappLink,
     validateProfil: validateProfil, errorMessage: errorMessage, disponibiliteMessage: disponibiliteMessage,
     pageView: pageView, addressFromLocation: addressFromLocation,
+    ECRIRE_AIDE: ECRIRE_AIDE, ECRIRE_CONNEXION: ECRIRE_CONNEXION, ecrireMessage: ecrireMessage, dmUrl: dmUrl, messagesUi: messagesUi,
     QR_SOURCE: QR_SOURCE, QR_QUIET_MODULES: QR_QUIET_MODULES, QR_MIN_PX: QR_MIN_PX, QR_TEXTE: QR_TEXTE, VISITES_TEXTE: VISITES_TEXTE,
     OUVERT_INSISTANT_MIN: OUVERT_INSISTANT_MIN, ouvertDepuis: ouvertDepuis,
     qrUrl: qrUrl, qrFilename: qrFilename, qrLayout: qrLayout, qrSvgString: qrSvgString, formatJourCourt: formatJourCourt, summarizeVisites: summarizeVisites,
