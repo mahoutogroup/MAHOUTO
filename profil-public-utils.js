@@ -301,6 +301,30 @@
     return out;
   }
 
+  // ---------- Rappel « fonction OUVERTE » (admin) ----------
+  var OUVERT_INSISTANT_MIN = 120;       // à partir de 2 h : message plus insistant
+  var OUVERT_MAX_MIN = 7 * 24 * 60;     // au-delà de 7 jours : plus de durée précise
+
+  function formatDuree(minutes) {
+    if (minutes < 1) return "moins d'1 min";
+    var h = Math.floor(minutes / 60), m = minutes % 60;
+    return h > 0 ? h + " h " + m + " min" : m + " min";
+  }
+
+  /**
+   * Texte du bandeau « fonction OUVERTE » à partir de maj_le (date de la dernière modification de l'interrupteur) et de l'heure
+   * du navigateur (nowMs). Renvoie { known, minutes, level: 'normal'|'insistant', text }.
+   * maj_le absent, invalide ou dans le futur (horloge du téléphone en retard sur la base) : « La fonction est OUVERTE » sans durée.
+   */
+  function ouvertDepuis(majLe, nowMs) {
+    var t = typeof majLe === "string" ? Date.parse(majLe) : NaN, now = Number(nowMs);
+    if (!isFinite(t) || !isFinite(now) || now < t) return { known: false, minutes: null, level: "normal", text: "La fonction est OUVERTE" };
+    var minutes = Math.floor((now - t) / 60000);
+    if (minutes > OUVERT_MAX_MIN) return { known: true, minutes: minutes, level: "insistant", text: "La fonction est OUVERTE depuis plus de 7 jours : si ce n'est pas voulu, fermez-la maintenant." };
+    if (minutes >= OUVERT_INSISTANT_MIN) return { known: true, minutes: minutes, level: "insistant", text: "La fonction est OUVERTE depuis plus de 2 h (" + formatDuree(minutes) + ") : si ce n'est pas voulu, fermez-la maintenant." };
+    return { known: true, minutes: minutes, level: "normal", text: "La fonction est OUVERTE depuis " + formatDuree(minutes) + ". Pensez à la refermer après vos tests." };
+  }
+
   /** Date « jj/mm/aaaa » (heure locale) ; « — » si absente ou invalide. */
   function formatDateFr(iso) {
     if (!iso) return "—";
@@ -382,6 +406,7 @@
     pageView: pageView, addressFromLocation: addressFromLocation,
     ECRIRE_AIDE: ECRIRE_AIDE, ECRIRE_CONNEXION: ECRIRE_CONNEXION, ecrireMessage: ecrireMessage, dmUrl: dmUrl, messagesUi: messagesUi,
     QR_SOURCE: QR_SOURCE, QR_QUIET_MODULES: QR_QUIET_MODULES, QR_MIN_PX: QR_MIN_PX, QR_TEXTE: QR_TEXTE, VISITES_TEXTE: VISITES_TEXTE,
+    OUVERT_INSISTANT_MIN: OUVERT_INSISTANT_MIN, ouvertDepuis: ouvertDepuis,
     qrUrl: qrUrl, qrFilename: qrFilename, qrLayout: qrLayout, qrSvgString: qrSvgString, formatJourCourt: formatJourCourt, summarizeVisites: summarizeVisites,
     AVATAR_TYPES: AVATAR_TYPES, AVATAR_MAX_BYTES: AVATAR_MAX_BYTES, validateAvatarFile: validateAvatarFile, avatarFilename: avatarFilename,
     cloudinaryImageUrl: cloudinaryImageUrl, formatDateFr: formatDateFr,

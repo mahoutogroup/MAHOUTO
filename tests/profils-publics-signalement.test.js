@@ -317,7 +317,7 @@ const SROW = (o) => Object.assign({ page_id: "11111111-1111-4111-8111-1111111111
   motifs: { spam: 2, arnaque: 1 }, dernier_le: "2026-11-25T10:00:00Z", a_examiner: true }, o || {});
 async function runAdmin(o) {
   const opts = Object.assign({ sRows: [SROW()], pages: [], confirmAnswer: true }, o || {});
-  const ids = ["loading-state", "access-denied", "dashboard", "etat-interrupteur", "btn-interrupteur", "msg-interrupteur", "btn-recharger", "msg-liste", "liste-pages", "msg-signalements", "liste-signalements"];
+  const ids = ["loading-state", "access-denied", "dashboard", "etat-interrupteur", "btn-interrupteur", "msg-interrupteur", "btn-recharger", "msg-liste", "liste-pages", "msg-signalements", "liste-signalements", "bandeau-ouvert", "bandeau-ouvert-texte", "btn-fermer-bandeau"];
   const els = {}; ids.forEach((i) => { els[i] = makeEl(i, i === "access-denied" || i === "dashboard"); });
   const log = { rpc: [], confirm: [], open: [] };
   const client = { auth: { getSession: async () => ({ data: { session: { user: { id: "u1" } } } }) },
@@ -330,7 +330,7 @@ async function runAdmin(o) {
       if (n === "profils_publics_admin_lister") return { data: opts.pages, error: null };
       return { data: null, error: { message: "inconnue" } }; } };
   const win = { ProfilPublicUtils: PU, MAHOUTO_CONFIG: { SUPABASE_URL: "https://x.test", SUPABASE_ANON_KEY: "k" }, supabase: { createClient: () => client }, open: (...a) => log.open.push(a) };
-  vm.runInNewContext(read("admin/profils-publics.js"), { window: win, document: { getElementById: (i) => els[i], createElement: (t) => Object.assign(makeEl(null), { tagName: t }) }, confirm: (m) => { log.confirm.push(m); return opts.confirmAnswer; }, Array, String });
+  vm.runInNewContext(read("admin/profils-publics.js"), { window: win, document: { getElementById: (i) => els[i], createElement: (t) => Object.assign(makeEl(null), { tagName: t }) }, confirm: (m) => { log.confirm.push(m); return opts.confirmAnswer; }, Array, String, Date, setInterval: () => 0 });
   await tick(40);
   return { els, log };
 }
