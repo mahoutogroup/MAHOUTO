@@ -1,0 +1,42 @@
+/* Blocage de membres (dm-chat.html, messages-prives.html) : variables de theme.css, thèmes sombre et clair. */
+.chat-menu-wrap { position: relative; margin-left: auto; flex: none; }
+.chat-menu-btn { width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; border: none; border-radius: 50%; background: transparent; color: var(--white); cursor: pointer; }
+.chat-menu-btn:hover { background: var(--bg-card); }
+.chat-menu-btn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+.chat-menu { position: absolute; right: 0; top: 48px; z-index: 60; min-width: 220px; padding: 6px; border: 1px solid var(--border); border-radius: 14px; background: var(--bg-elevated); box-shadow: 0 10px 28px rgba(0,0,0,.35); }
+.chat-menu button { display: flex; align-items: center; width: 100%; min-height: 44px; padding: 10px 14px; border: none; border-radius: 10px; background: transparent; color: var(--white); font-family: inherit; font-size: 15px; text-align: left; cursor: pointer; }
+.chat-menu button:hover { background: var(--bg-card); }
+.chat-menu button.bl-danger-item { color: var(--bl-danger); }
+.block-notice { margin: 0; padding: 10px 16px; border-top: 1px solid var(--border); background: var(--bg-elevated); color: var(--text-muted); font-size: 13.5px; line-height: 1.5; }
+.chat-menu-btn:focus-visible, .chat-menu button:focus-visible, .bl-btn:focus-visible, .bl-unblock:focus-visible, #open-blocked:focus-visible, #bl-fermer:focus-visible { outline: 3px solid var(--gold-bright); outline-offset: 2px; }
+body.light-theme .chat-menu-btn:focus-visible, body.light-theme .chat-menu button:focus-visible, body.light-theme .bl-btn:focus-visible, body.light-theme .bl-unblock:focus-visible, body.light-theme #open-blocked:focus-visible, body.light-theme #bl-fermer:focus-visible { outline-color: #856500; }
+:root { --bl-danger: #F87171; }
+body.light-theme { --bl-danger: #B91C1C; }
+
+/* Fenêtre de confirmation */
+.bl-overlay { position: fixed; inset: 0; z-index: 95; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(0,0,0,.6); }
+.bl-box { width: 100%; max-width: 400px; padding: 20px; border: 1px solid var(--border); border-radius: 18px; background: var(--bg-elevated); color: var(--white); }
+.bl-box h2 { margin: 0 0 8px; font-size: 18px; }
+.bl-box p { margin: 0 0 18px; font-size: 14.5px; line-height: 1.55; color: var(--text-muted); }
+.bl-actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
+.bl-btn { min-height: 44px; padding: 10px 18px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-card); color: var(--white); font-family: inherit; font-size: 15px; cursor: pointer; }
+.bl-btn.bl-danger { border-color: var(--bl-danger); color: var(--bl-danger); font-weight: 700; }
+
+/* Liste « Membres bloqués » (messages-prives.html) */
+#open-blocked { display: inline-flex; align-items: center; min-height: 44px; padding: 8px 6px; border: none; background: none; color: var(--text-muted); font-family: inherit; font-size: 13.5px; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.header-links { display: flex; justify-content: flex-end; }
+#blocked-panel { position: fixed; inset: 0; z-index: 70; display: flex; flex-direction: column; background: var(--bg); color: var(--white); overflow-y: auto; }
+#blocked-panel .bl-head { display: flex; align-items: center; gap: 8px; padding: 12px 66px 12px 12px; border-bottom: 1px solid var(--border); background: var(--bg-elevated); }
+#bl-fermer { width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; border: none; border-radius: 50%; background: transparent; color: var(--white); cursor: pointer; font-size: 22px; }
+#blocked-panel h2 { font-size: 18px; }
+#blocked-panel .bl-intro { padding: 14px 16px 6px; font-size: 13.5px; line-height: 1.55; color: var(--text-muted); }
+#blocked-panel .bl-status { padding: 4px 16px; min-height: 22px; font-size: 14px; color: var(--text-muted); }
+#blocked-panel ul { list-style: none; padding: 0 16px; margin: 0; }
+.bl-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+.bl-info { min-width: 0; }
+.bl-nom { font-weight: 700; font-size: 15.5px; overflow-wrap: anywhere; }
+.bl-date { font-size: 12.5px; color: var(--text-muted); margin-top: 2px; }
+.bl-unblock { flex: none; min-height: 44px; padding: 8px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-card); color: var(--white); font-family: inherit; font-size: 14px; cursor: pointer; }
+.bl-unblock:disabled { opacity: .55; cursor: not-allowed; }
+#blocked-panel .bl-empty { padding: 40px 24px; text-align: center; color: var(--text-muted); font-size: 14.5px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
