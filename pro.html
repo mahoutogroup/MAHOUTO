@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MAHOUTO+</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta name="theme-color" content="#FFC107">
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/assets/favicon.png">
+<style>
+  html, body { height: 100%; margin: 0; background: #0A0A0A; color: #fff; font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+  body { display: flex; align-items: center; justify-content: center; text-align: center; padding: 24px; }
+  a { color: #FFD700; }
+</style>
+</head>
+<body>
+<!-- Adresse spéciale /pro : enregistre l'indicateur local puis ouvre l'accueil. Rien n'est affiché de plus, aucune requête, aucune donnée. -->
+<p>Ouverture de MAHOUTO+… <a href="/">Continuer</a></p>
+<script src="/xpro.js"></script>
+<script>
+  (function () {
+    try { var s = null; try { s = window.localStorage; } catch (e) { s = null; } window.XPro.markPro(s); } catch (e) { /* l'accueil s'ouvre normalement */ }
+    window.location.replace("/");
+  })();
+</script>
+</body>
+</html>
