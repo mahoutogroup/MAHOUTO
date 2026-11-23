@@ -333,7 +333,7 @@ test("dm-chat.html : tous les usages de PEER_ID passent par des fonctions appel�
   // usages : déclaration, loadPeerProfile, présence, init (résolution)
   const where = [...js.matchAll(/PEER_ID/g)].map((m) => m.index);
   const fnOf = (i) => { const before = js.slice(0, i), m = [...before.matchAll(/(?:async )?function (\w+)\(/g)].pop(); return i < idx("async function") ? "déclaration" : (m ? m[1] : "?"); };
-  const names = where.map(fnOf); assert.deepStrictEqual(names.filter((n) => n !== "init" && n !== "déclaration" && n !== "resolvePeerFromConversation").sort(), ["loadPeerProfile", "subscribeToPresence"], names.join(","));
+  const names = where.map(fnOf); assert.deepStrictEqual(names.filter((n) => n !== "init" && n !== "déclaration" && n !== "resolvePeerFromConversation").sort(), ["enterConversation", "loadPeerProfile", "subscribeToPresence"], names.join(","));   // enterConversation : montage du blocage (PR messagerie-blocage), toujours APRÈS la résolution
   assert.match(js, /get_public_profile", \{ uid: PEER_ID \}/); assert.match(js, /hasOwnProperty\.call\(state, PEER_ID\)/);
   // ces deux fonctions ne sont appelées que depuis enterConversation
   ["loadPeerProfile", "subscribeToPresence"].forEach((n) => { const calls = [...js.matchAll(new RegExp("(?<!function )\\b" + n + "\\(\\)", "g"))].map((m) => m.index); assert.strictEqual(calls.length, 1, n); assert.ok(calls[0] > enter && calls[0] < init, n + " appelée depuis enterConversation"); });

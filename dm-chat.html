@@ -15,6 +15,7 @@
 <link rel="stylesheet" href="audio-player.css">
 <link rel="stylesheet" href="video-player.css">
 <link rel="stylesheet" href="message-format.css">
+<link rel="stylesheet" href="messagerie-blocage.css">
 <script src="theme-toggle.js"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; font-family: Arial, sans-serif; }
@@ -204,6 +205,13 @@
     <h1 id="peer-name">Conversation</h1>
     <span class="peer-status" id="peer-status">Hors ligne</span>
   </div>
+  <div class="chat-menu-wrap">
+    <button type="button" id="chat-menu-btn" class="chat-menu-btn" aria-label="Plus d'actions" aria-haspopup="menu" aria-expanded="false" aria-controls="chat-menu"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="5" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="12" cy="19" r="1.2"/></svg></button>
+    <div id="chat-menu" class="chat-menu hidden" role="menu" aria-label="Actions de la conversation">
+      <button type="button" role="menuitem" id="menu-bloquer" class="bl-danger-item">Bloquer ce membre</button>
+      <button type="button" role="menuitem" id="menu-debloquer" class="hidden">Débloquer ce membre</button>
+    </div>
+  </div>
 </header>
 
 <div id="avatar-viewer" class="hidden">
@@ -243,6 +251,7 @@
   </div>
 </div>
 
+<p id="block-notice" class="block-notice hidden" role="status"></p>
 <form id="composer" class="hidden">
   <button type="button" id="attach-btn" title="Envoyer un fichier" style="background:var(--bg-card);border:none;border-radius:20px;width:42px;flex:none;color:var(--gold-bright);font-size:17px;cursor:pointer;">📎</button>
   <button type="button" id="mic-btn" title="Message vocal">🎤</button>
@@ -259,6 +268,7 @@
 <script src="message-editor.js"></script>
 <script src="message-format.js"></script>
 <script src="report.js"></script>
+<script src="messagerie-blocage.js"></script>
 <script src="link-preview.js"></script>
 <script src="audio-player.js"></script>
 <script src="video-player.js"></script>
@@ -308,6 +318,10 @@
   let myUsername = null;
 
   function setStatus(text) { statusMessage.textContent = text || ""; }
+
+  // Blocage de membres : message d'erreur NEUTRE (identique dans les deux sens, ne dit jamais qui a bloqué) et interface de blocage.
+  const NEUTRAL_SEND_ERROR = "Impossible d'envoyer ce message.";
+  let blockUi = null;
 
   // Notifie l'autre personne (push) après un envoi réussi — jamais
   // bloquant, jamais visible si ça échoue (voir push-notifications.js).
@@ -594,6 +608,18 @@
     messagesEl.classList.remove("hidden");
     composer.classList.remove("hidden");
 
+    if (window.MessagerieBlocage) {
+      blockUi = window.MessagerieBlocage.mountChat({
+        doc: document, supabase, peerId: PEER_ID,
+        els: {
+          menuBtn: document.getElementById("chat-menu-btn"), menu: document.getElementById("chat-menu"),
+          blockBtn: document.getElementById("menu-bloquer"), unblockBtn: document.getElementById("menu-debloquer"),
+          notice: document.getElementById("block-notice"), status: statusMessage, composerInput: messageInput,
+          controls: [messageInput, composer.querySelector('button[type="submit"]'), document.getElementById("attach-btn"), document.getElementById("mic-btn")]
+        }
+      });
+      blockUi.refresh();
+    }
     await loadPeerProfile();
     await loadHiddenMessageIds();
     await loadHistory();
@@ -659,6 +685,7 @@
     e.preventDefault();
     const content = messageInput.value.trim();
     if (!content || !currentUser) return;
+    if (blockUi && blockUi.isBlocked()) return;
 
     messageInput.value = "";
     autoGrow();
@@ -668,7 +695,7 @@
       content: content
     }).select("*").single();
 
-    if (error) { console.error(error); setStatus("Message non envoyé."); }
+    if (error) { console.error(error); setStatus(NEUTRAL_SEND_ERROR); }
     else if (data) { renderMessage(data); notifyPeerOfMessage(content.slice(0, 120)); }
   });
 
@@ -940,7 +967,7 @@
       setStatus("");
     } catch (err) {
       console.error(err);
-      setStatus("Envoi du message vocal impossible : " + err.message);
+      setStatus(window.MessagerieBlocage && window.MessagerieBlocage.isBlockError(err) ? NEUTRAL_SEND_ERROR : "Envoi du message vocal impossible : " + err.message);
     }
   }
 

@@ -11,6 +11,7 @@
 <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
 <link rel="preload" as="image" href="assets/logo-mahouto-plus.png">
 <link rel="stylesheet" href="theme.css">
+<link rel="stylesheet" href="messagerie-blocage.css">
 <script src="theme-toggle.js"></script>
 <style>
   html, body { background: var(--bg); color: var(--white); }
@@ -116,7 +117,19 @@
     🔍
     <input id="search-input" type="text" placeholder="Chercher quelqu'un par pseudo...">
   </div>
+  <div class="header-links"><button type="button" id="open-blocked" aria-haspopup="dialog" aria-expanded="false" aria-controls="blocked-panel">Membres bloqués</button></div>
 </header>
+
+<section id="blocked-panel" class="hidden" role="dialog" aria-modal="true" aria-labelledby="bl-titre-page">
+  <div class="bl-head">
+    <button type="button" id="bl-fermer" aria-label="Fermer la liste des membres bloqués">←</button>
+    <h2 id="bl-titre-page">Membres bloqués</h2>
+  </div>
+  <p class="bl-intro">Ces membres ne peuvent plus vous écrire, et vous ne pouvez plus leur écrire. Vos anciens échanges restent lisibles.</p>
+  <p class="bl-status" id="bl-status" role="status"></p>
+  <ul id="bl-liste" aria-label="Membres bloqués"></ul>
+  <p class="bl-empty hidden" id="bl-vide">Vous n'avez bloqué personne.</p>
+</section>
 
 <div id="search-results" class="hidden"></div>
 
@@ -134,6 +147,7 @@
 
 <script src="config.js"></script>
 <script src="offline-cache.js"></script>
+<script src="messagerie-blocage.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
 (function () {
@@ -405,7 +419,16 @@
   (async function init() {
     if (!(await ensureLoggedIn())) {
       convListEl.innerHTML = '<div id="empty-state">Connecte-toi depuis l\'accueil pour voir tes messages privés.</div>';
+      document.getElementById("open-blocked").classList.add("hidden");   // la liste des blocages est réservée aux membres connectés
       return;
+    }
+    // Liste « Membres bloqués » : fonctions dm_mes_blocages et dm_debloquer, texte écrit avec textContent
+    if (window.MessagerieBlocage) {
+      window.MessagerieBlocage.mountBlockedList({
+        doc: document, supabase,
+        els: { openBtn: document.getElementById("open-blocked"), panel: document.getElementById("blocked-panel"), closeBtn: document.getElementById("bl-fermer"),
+               list: document.getElementById("bl-liste"), empty: document.getElementById("bl-vide"), status: document.getElementById("bl-status") }
+      });
     }
     await loadConversations();
   })();
