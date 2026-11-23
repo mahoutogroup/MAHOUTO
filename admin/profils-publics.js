@@ -12,6 +12,9 @@
      distincts non traités (indicateur seulement, jamais de suspension automatique), motifs en compteurs, « Détails »
      (profils_publics_signalements_admin_detail : motif, précisions, date, sans identité), « Marquer comme traité »
      (profils_publics_signalements_admin_traiter) avec confirmation. Aucun identifiant de signaleur n'existe dans ces résultats.
+   - Rappel (finitions) : tant que l'interrupteur est OUVERT, un bandeau rouge indique depuis combien de temps (calcul dans le
+     navigateur à partir de maj_le, mise à jour chaque minute, plus insistant après 2 h) avec « Fermer maintenant », qui
+     réutilise le même code que le bouton de fermeture (un clic, sans confirmation). Jamais de durée aberrante (PU.ouvertDepuis).
    - Tout texte dynamique passe par textContent : aucun innerHTML.
    ========================================================= */
 (function () {
@@ -21,7 +24,7 @@
   var CONFIRM_OUVRIR = "Cette action rend publiques toutes les pages publiées. Vérifiez que vous avez testé le signalement. Continuer ?";
   var $ = function (id) { return document.getElementById(id); };
   var supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
-  var ouvert = null, busy = false;
+  var ouvert = null, busy = false, majLe = null, tick = null;
 
   function el(tag, props, children) {
     var n = document.createElement(tag);
@@ -38,7 +41,18 @@
   }
 
   // ---------- Interrupteur ----------
+  // Bandeau rouge « OUVERTE depuis X h Y min » : visible seulement si l'interrupteur est ouvert.
+  function renderBanner() {
+    var box = $("bandeau-ouvert");
+    if (ouvert !== true) { box.classList.add("hidden"); return; }
+    var info = PU.ouvertDepuis(majLe, Date.now());
+    $("bandeau-ouvert-texte").textContent = info.text;
+    box.classList.toggle("insistant", info.level === "insistant");
+    $("btn-fermer-bandeau").disabled = busy;
+    box.classList.remove("hidden");
+  }
   function renderSwitch() {
+    renderBanner();
     var btn = $("btn-interrupteur");
     if (ouvert === null) { $("etat-interrupteur").textContent = "État inconnu (lecture impossible)."; btn.disabled = true; btn.textContent = "Indisponible"; return; }
     $("etat-interrupteur").textContent = ouvert ? "Fonction OUVERTE au public." : "Fonction FERMÉE au public.";
@@ -47,9 +61,9 @@
     btn.disabled = busy;
   }
   async function loadSwitch() {
-    var res = await supabase.from("profils_publics_reglages").select("valeur").eq("cle", "ouvert").maybeSingle();
-    if (res.error || !res.data) { ouvert = null; setStatus("msg-interrupteur", "Impossible de lire l'interrupteur (le SQL du profil public est-il exécuté ?).", true); }
-    else { ouvert = res.data.valeur === "oui"; setStatus("msg-interrupteur", "", false); }
+    var res = await supabase.from("profils_publics_reglages").select("valeur, maj_le").eq("cle", "ouvert").maybeSingle();
+    if (res.error || !res.data) { ouvert = null; majLe = null; setStatus("msg-interrupteur", "Impossible de lire l'interrupteur (le SQL du profil public est-il exécuté ?).", true); }
+    else { ouvert = res.data.valeur === "oui"; majLe = res.data.maj_le || null; setStatus("msg-interrupteur", "", false); }
     renderSwitch();
   }
   async function toggleSwitch() {
@@ -59,9 +73,9 @@
     busy = true; renderSwitch();
     setStatus("msg-interrupteur", "Enregistrement…", false);
     try {
-      var res = await supabase.from("profils_publics_reglages").update({ valeur: target }).eq("cle", "ouvert").select("valeur");
+      var res = await supabase.from("profils_publics_reglages").update({ valeur: target }).eq("cle", "ouvert").select("valeur, maj_le");
       if (res.error || !Array.isArray(res.data) || !res.data.length) { setStatus("msg-interrupteur", "Modification refusée ou impossible (droits administrateur requis).", true); }
-      else { ouvert = res.data[0].valeur === "oui"; setStatus("msg-interrupteur", ouvert ? "Fonction ouverte au public." : "Fonction fermée au public.", false); }
+      else { ouvert = res.data[0].valeur === "oui"; majLe = res.data[0].maj_le || null; setStatus("msg-interrupteur", ouvert ? "Fonction ouverte au public." : "Fonction fermée au public.", false); }
     } catch (e) {
       setStatus("msg-interrupteur", "Modification impossible pour le moment. Réessayez.", true);
     } finally { busy = false; renderSwitch(); }
@@ -201,6 +215,8 @@
     $("loading-state").classList.add("hidden");
     $("dashboard").classList.remove("hidden");
     $("btn-interrupteur").addEventListener("click", toggleSwitch);
+    $("btn-fermer-bandeau").addEventListener("click", toggleSwitch);   // même code que la fermeture existante : un clic, sans confirmation
+    if (!tick) tick = setInterval(renderBanner, 60000);                 // durée remise à jour chaque minute
     $("btn-recharger").addEventListener("click", function () { loadSwitch(); loadSignalements(); loadList(); });
     await loadSwitch();
     await loadSignalements();
