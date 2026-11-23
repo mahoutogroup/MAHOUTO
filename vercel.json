@@ -32,6 +32,10 @@
     {
       "source": "/m/:adresse",
       "destination": "/api/produit-og?type=profil&adresse=:adresse"
+    },
+    {
+      "source": "/pro",
+      "destination": "/pro.html"
     }
   ],
   "headers": [
@@ -75,6 +79,24 @@
     },
     {
       "source": "/m.html",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/pro",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/pro.html",
       "headers": [
         {
           "key": "X-Robots-Tag",
