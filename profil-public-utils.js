@@ -301,6 +301,86 @@
     return out;
   }
 
+  // ---------- Carte de visite : action de contact, partage, dessin du QR ----------
+  var CONTACT_LIBELLES = { whatsapp: "Contacter sur WhatsApp", lien: "Visiter le lien" };
+
+  /** Domaine seul d'un lien https (sans « www. », sans chemin ni paramètres) ; null si le lien n'est pas un https sûr. */
+  function domainOf(url) {
+    var safe = safeHttpsUrl(url, LIMITS.lien);
+    if (!safe) return null;
+    try { return new URL(safe).hostname.replace(/^www\./, "") || null; } catch (e) { return null; }
+  }
+
+  /**
+   * Action principale de la carte. Renvoie { kind:'whatsapp'|'lien', href, label, domain } ou null (aucun contact valide).
+   * WhatsApp : lien wa.me, jamais le numéro affiché. Lien : seulement le domaine est affiché (jamais l'adresse entière).
+   */
+  function contactAction(row) {
+    var r = row && typeof row === "object" ? row : {};
+    if (r.contact_type === "whatsapp") {
+      var w = whatsappLink(r.contact_valeur);
+      return w ? { kind: "whatsapp", href: w, label: CONTACT_LIBELLES.whatsapp, domain: null } : null;
+    }
+    if (r.contact_type === "lien") {
+      var l = safeHttpsUrl(r.contact_valeur, LIMITS.lien), d = l ? domainOf(l) : null;
+      return l && d ? { kind: "lien", href: l, label: CONTACT_LIBELLES.lien, domain: d } : null;
+    }
+    return null;
+  }
+
+  /** Initiale affichée sans photo (première lettre du nom, en majuscule) ; « ? » si le nom est vide. */
+  function initialOf(nom) { var c = Array.from(String(nom == null ? "" : nom).trim())[0]; return c ? c.toUpperCase() : "?"; }
+
+  /** Titre de la feuille de partage. */
+  function shareTitle(nom) { return "Partager la page de " + (cleanLine(nom, LIMITS.nom) || "ce membre"); }
+
+  /**
+   * Lien copié ou envoyé par « Partager » : https://mahouto.com/m/<adresse> SANS ?src=. Choix volontaire : l'aperçu de partage
+   * (api/_profil-og.js) ajoute lui-même src=partage (ou facebook, instagram, tiktok) à l'ouverture par un humain ; un ?src= écrit
+   * ici fausserait la répartition. Seul le QR porte ?src=qr. Null si l'adresse est invalide.
+   */
+  function shareLink(adresse) { return typeof adresse === "string" && ADRESSE_RE.test(adresse) ? publicUrl(adresse) : null; }
+
+  /** Données pour navigator.share : titre et lien seulement. Null si l'adresse est invalide. */
+  function sharePayload(nom, adresse, brandName) {
+    var url = shareLink(adresse);
+    if (!url) return null;
+    var n = cleanLine(nom, LIMITS.nom) || "Profil";
+    return { title: n + " — " + (cleanLine(brandName, 30) || "MAHOUTO+"), url: url };
+  }
+
+  /** Fabrique le QR (niveau Q) de l'adresse du QR ; null si l'adresse ou la bibliothèque est invalide. qrcodeFn = window.qrcode. */
+  function makeQr(qrcodeFn, adresse) {
+    var url = qrUrl(adresse);
+    if (!url || typeof qrcodeFn !== "function") return null;
+    try { var qr = qrcodeFn(0, "Q"); qr.addData(url); qr.make(); return qr; } catch (e) { return null; }
+  }
+
+  /** Peint les modules noirs du QR sur un contexte 2D, à partir de (ox, oy), avec la mise en page L (qrLayout), marge blanche non peinte. */
+  function paintQr(ctx, qr, L, ox, oy) {
+    ctx.fillStyle = "#000000";
+    for (var r = 0; r < L.modules; r++) for (var c = 0; c < L.modules; c++) {
+      if (qr.isDark(r, c)) ctx.fillRect((ox || 0) + (c + L.quiet) * L.scale, (oy || 0) + (r + L.quiet) * L.scale, L.scale, L.scale);
+    }
+  }
+
+  /** Élément SVG du QR (fond blanc, modules noirs, marge de 4 modules) construit avec doc.createElementNS : aucun texte venant de l'utilisateur. */
+  function qrSvgNode(doc, qr, label) {
+    var n = qr.getModuleCount(), L = qrLayout(n, 1), NS = "http://www.w3.org/2000/svg";
+    var svg = doc.createElementNS(NS, "svg");
+    svg.setAttribute("viewBox", "0 0 " + L.size + " " + L.size);
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", label);
+    svg.setAttribute("shape-rendering", "crispEdges");
+    var bg = doc.createElementNS(NS, "rect");
+    bg.setAttribute("width", String(L.size)); bg.setAttribute("height", String(L.size)); bg.setAttribute("fill", "#ffffff");
+    var path = doc.createElementNS(NS, "path"), d = "";
+    for (var r = 0; r < n; r++) for (var c = 0; c < n; c++) if (qr.isDark(r, c)) d += "M" + (c + L.quiet) + " " + (r + L.quiet) + "h1v1h-1z";
+    path.setAttribute("d", d); path.setAttribute("fill", "#000000");
+    svg.appendChild(bg); svg.appendChild(path);
+    return svg;
+  }
+
   // ---------- Rappel « fonction OUVERTE » (admin) ----------
   var OUVERT_INSISTANT_MIN = 120;       // à partir de 2 h : message plus insistant
   var OUVERT_MAX_MIN = 7 * 24 * 60;     // au-delà de 7 jours : plus de durée précise
@@ -407,6 +487,8 @@
     ECRIRE_AIDE: ECRIRE_AIDE, ECRIRE_CONNEXION: ECRIRE_CONNEXION, ecrireMessage: ecrireMessage, dmUrl: dmUrl, messagesUi: messagesUi,
     QR_SOURCE: QR_SOURCE, QR_QUIET_MODULES: QR_QUIET_MODULES, QR_MIN_PX: QR_MIN_PX, QR_TEXTE: QR_TEXTE, VISITES_TEXTE: VISITES_TEXTE,
     OUVERT_INSISTANT_MIN: OUVERT_INSISTANT_MIN, ouvertDepuis: ouvertDepuis,
+    domainOf: domainOf, contactAction: contactAction, initialOf: initialOf, shareTitle: shareTitle, shareLink: shareLink, sharePayload: sharePayload,
+    makeQr: makeQr, paintQr: paintQr, qrSvgNode: qrSvgNode,
     qrUrl: qrUrl, qrFilename: qrFilename, qrLayout: qrLayout, qrSvgString: qrSvgString, formatJourCourt: formatJourCourt, summarizeVisites: summarizeVisites,
     AVATAR_TYPES: AVATAR_TYPES, AVATAR_MAX_BYTES: AVATAR_MAX_BYTES, validateAvatarFile: validateAvatarFile, avatarFilename: avatarFilename,
     cloudinaryImageUrl: cloudinaryImageUrl, formatDateFr: formatDateFr,

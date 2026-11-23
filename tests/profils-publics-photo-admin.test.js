@@ -172,11 +172,11 @@ test("profil-public.js : « Retirer la photo » vide le champ et l'aperçu (lett
 test("aperçu de la photo sur la page publique : rond, referrerpolicy no-referrer, loading lazy, alt vide, repli sur l'initiale si l'image ne charge pas", () => {
   const js = code("m.js"), h = read("m.html");
   assert.match(js, /img\.setAttribute\("alt", ""\)/); assert.match(js, /img\.setAttribute\("referrerpolicy", "no-referrer"\)/); assert.match(js, /img\.setAttribute\("loading", "lazy"\)/);
-  assert.match(js, /img\.addEventListener\("error", function \(\) \{ box\.textContent = initial\(row\.nom_affiche\); \}\)/, "repli sur l'initiale");
-  assert.match(h, /\.pub \.avatar \{[^}]*border-radius: 50%/);
+  assert.match(js, /img\.addEventListener\("error", function \(\) \{ box\.textContent = PU\.initialOf\(row\.nom_affiche\); \}\)/, "repli sur l'initiale");
+  assert.match(h, /\.avatar \{[^}]*border-radius: 50%/);
   assert.ok(!/innerHTML/.test(js));
   // comportement : l'événement error remplace l'image par la lettre initiale
-  const els = {}; ["bandeau", "chargement", "etat", "etat-titre", "profil", "avatar", "nom", "metier", "lieu", "presentation", "contact-zone"].forEach((i) => { els[i] = makeEl(i, true); });
+  const els = {}; ["bandeau", "chargement", "etat", "etat-titre", "profil", "avatar", "nom", "metier", "lieu", "lieu-ligne", "presentation", "contact-zone", "btn-reessayer", "btn-partager"].forEach((i) => { els[i] = makeEl(i, true); });
   const row = { id: "p1", adresse: "mon-atelier", nom_affiche: "Zoé Test", avatar_url: "https://res.cloudinary.com/demo-cloud/image/upload/v1/a.jpg", metier: null, presentation: null, localisation: null, contact_type: null, contact_valeur: null };
   const client = { rpc: async (n) => ({ data: n === "profil_public_lire" ? [row] : null, error: null }), auth: { getSession: async () => ({ data: { session: null } }) } };
   vm.runInNewContext(read("m.js"), { window: { ProfilPublicUtils: PU, MAHOUTO_CONFIG: { SUPABASE_URL: "https://x.test", SUPABASE_ANON_KEY: "k" }, supabase: { createClient: () => client }, location: { pathname: "/m/mon-atelier", search: "" } }, document: { title: "", getElementById: (i) => els[i], createElement: (t) => Object.assign(makeEl(null), { tagName: t }) }, Array, String });

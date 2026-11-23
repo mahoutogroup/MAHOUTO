@@ -157,7 +157,7 @@ const ROW = { id: "p1", adresse: "mon-atelier", nom_affiche: "Atelier Test", ava
 const shown = (e) => !e.classes.has("hidden");
 async function runPage(o) {
   const opts = Object.assign({ session: true, anonymous: false, mien: null, row: ROW, ouverts: true, result: { code: "ok", conversation_id: CONV }, ouvert: true, hold: false }, o || {});
-  const els = {}; ["bandeau", "chargement", "etat", "etat-titre", "profil", "avatar", "nom", "metier", "lieu", "presentation", "contact-zone", "signalement-zone", "btn-signaler", "btn-connexion-signaler",
+  const els = {}; ["bandeau", "chargement", "etat", "etat-titre", "profil", "avatar", "nom", "metier", "lieu", "lieu-ligne", "presentation", "contact-zone", "btn-reessayer", "btn-partager", "signalement-zone", "btn-signaler", "btn-connexion-signaler",
     "ecrire-zone", "btn-ecrire", "btn-connexion-ecrire", "ecrire-aide", "ecrire-etat"].forEach((i) => { els[i] = makeEl(i, true); });
   els.chargement.classes.delete("hidden");
   const calls = [], logins = [], loc = { pathname: "/m.html", search: "?adresse=mon-atelier", href: "" }; let hold = null;
@@ -184,7 +184,7 @@ const ecrireCalls = (d) => d.calls.filter((c) => c[0] === "profil_public_ecrire"
 test("m.js : bouton « Écrire un message » et texte d'aide pour un membre connecté, non propriétaire, sur une page qui accepte les messages", async () => {
   const d = await runPage({});
   assert.ok(shown(d.els["ecrire-zone"]) && shown(d.els["btn-ecrire"]) && shown(d.els["ecrire-aide"]) && !shown(d.els["btn-connexion-ecrire"]));
-  assert.ok(read("m.html").includes(">Écrire un message</button>") && read("m.html").includes("Votre message sera lu par cette personne. Restez respectueux."));
+  assert.ok(read("m.html").includes("<span>Écrire un message</span></button>") && read("m.html").includes("Votre message sera lu par cette personne. Restez respectueux."));
   assert.deepStrictEqual(d.calls.find((c) => c[0] === "profil_public_messages_ouverts")[1] && JSON.parse(JSON.stringify(d.calls.find((c) => c[0] === "profil_public_messages_ouverts")[1])), { p_adresse: "mon-atelier" });
   assert.strictEqual(ecrireCalls(d).length, 0, "rien n'est envoyé avant le clic");
 });
