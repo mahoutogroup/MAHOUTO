@@ -40,6 +40,15 @@
   .pub .contact-note { font-size: 12px; color: var(--text-dim); margin-top: 8px; overflow-wrap: anywhere; }
   .pub .msg { text-align: center; padding: 30px 10px; }
   .pub .msg h1 { font-size: 18px; color: var(--white); }
+  .pub .ecrire { margin-top: 18px; }
+  .pub .btn-ecrire {
+    display: inline-block; max-width: 100%; padding: 11px 22px; border-radius: var(--radius-md); border: 1px solid var(--gold);
+    background: transparent; color: var(--gold); font-family: inherit; font-size: 14.5px; font-weight: 700; cursor: pointer;
+  }
+  .pub .btn-ecrire:disabled { opacity: .5; cursor: not-allowed; }
+  .pub .ecrire-aide { font-size: 12px; color: var(--text-dim); margin-top: 8px; overflow-wrap: anywhere; }
+  .pub .ecrire-etat { font-size: 13px; line-height: 1.5; margin-top: 8px; color: var(--accent-green); overflow-wrap: anywhere; }
+  .pub .ecrire-etat.erreur { color: #F87171; }
   .pub .signalement { margin-top: 22px; padding-top: 12px; border-top: 1px solid var(--border); }
   .pub .sg-link { background: none; border: none; padding: 6px 4px; font-family: inherit; font-size: 12.5px; color: var(--text-dim); text-decoration: underline; cursor: pointer; }
   #sg-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 90; display: flex; align-items: flex-end; justify-content: center; }
@@ -79,6 +88,12 @@
     <div class="lieu hidden" id="lieu"></div>
     <p class="presentation hidden" id="presentation"></p>
     <div id="contact-zone"></div>
+    <div class="ecrire hidden" id="ecrire-zone">
+      <button type="button" class="btn-ecrire hidden" id="btn-ecrire">Écrire un message</button>
+      <button type="button" class="sg-link hidden" id="btn-connexion-ecrire">Connectez-vous pour écrire à cette personne</button>
+      <p class="ecrire-aide hidden" id="ecrire-aide">Votre message sera lu par cette personne. Restez respectueux.</p>
+      <p class="ecrire-etat hidden" id="ecrire-etat" role="status"></p>
+    </div>
     <div class="signalement hidden" id="signalement-zone">
       <button type="button" class="sg-link hidden" id="btn-signaler">Signaler cette page</button>
       <button type="button" class="sg-link hidden" id="btn-connexion-signaler">Connectez-vous pour signaler cette page</button>

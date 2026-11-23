@@ -270,7 +270,9 @@
 
   const params = new URLSearchParams(window.location.search);
   const CONV_ID = params.get("conv");
-  const PEER_ID = params.get("with");
+  // « with » peut être absent (ouverture depuis une page publique : aucun identifiant de compte dans l'adresse) :
+  // dans ce cas le destinataire est retrouvé à partir de la conversation elle-même (voir init).
+  let PEER_ID = params.get("with");
   const PEER_NAME = params.get("name") || "Utilisateur";
 
   const notLoggedInEl = document.getElementById("not-logged-in");
@@ -1076,8 +1078,22 @@
     }
   });
 
+  // Destinataire d'après la conversation (lecture permise aux seuls participants par la politique existante) :
+  // celui des deux comptes qui n'est pas le membre connecté. Null si la conversation est introuvable ou si le membre
+  // n'en est pas participant (aucune différence visible entre les deux cas).
+  async function resolvePeerFromConversation() {
+    try {
+      const { data: conv, error } = await supabase
+        .from("dm_conversations").select("user_one, user_two").eq("id", CONV_ID).maybeSingle();
+      if (error || !conv) return null;
+      if (conv.user_one === currentUser.id) return conv.user_two;
+      if (conv.user_two === currentUser.id) return conv.user_one;
+    } catch (e) { /* introuvable */ }
+    return null;
+  }
+
   (async function init() {
-    if (!CONV_ID || !PEER_ID) {
+    if (!CONV_ID) {
       notLoggedInEl.classList.remove("hidden");
       notLoggedInEl.textContent = "Conversation introuvable.";
       return;
@@ -1089,6 +1105,14 @@
       return;
     }
     currentUser = data.session.user;
+    if (!PEER_ID) {
+      PEER_ID = await resolvePeerFromConversation();
+      if (!PEER_ID) {
+        notLoggedInEl.classList.remove("hidden");
+        notLoggedInEl.textContent = "Conversation introuvable.";
+        return;
+      }
+    }
     await enterConversation();
   })();
 
