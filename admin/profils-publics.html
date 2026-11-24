@@ -85,6 +85,12 @@
     border-radius: 8px; border: none; cursor: pointer; background: #FFFFFF; color: #7F1D1D;
   }
   .alerte-ouvert .btn-fermer-bandeau:disabled { opacity: .6; cursor: not-allowed; }
+  .lbl { display: block; font-size: 12.5px; color: var(--text-muted); margin-bottom: 4px; }
+  #alias-nom, #alias-page { width: 100%; min-height: 44px; }
+  .btn44 { min-height: 44px; padding: 10px 18px; }
+  .btn.btn44, .item .btn44 { font-size: 13.5px; }
+  #liste-alias .item .actions .btn { min-height: 44px; padding: 10px 16px; }
+  @media (max-width: 480px) { .grid2 { grid-template-columns: 1fr; } }
   .hidden { display: none !important; }
 </style>
 </head>
@@ -132,6 +138,19 @@
       <p class="hint">Pages signalées par les membres, les plus signalées d'abord. « À examiner » dès 3 signaleurs distincts non traités : c'est un simple indicateur, aucune suspension automatique. L'identité des signaleurs n'est jamais affichée.</p>
       <div class="status" id="msg-signalements" role="status"></div>
       <div id="liste-signalements"></div>
+
+      <h2>Adresses supplémentaires</h2>
+      <p class="hint">Une adresse supplémentaire (alias) est une porte d'entrée : /m/imprimeur peut ouvrir la page dont l'adresse principale est « serigraphe ». L'adresse principale reste la seule vraie adresse (QR, lien partagé, carte imprimée, visites, signalements). Cinq alias au maximum par page. Un alias n'ouvre la page que si elle est publiée, non suspendue et la fonction ouverte.</p>
+      <div class="card toggle-box">
+        <div class="grid2">
+          <div><label class="lbl" for="alias-nom">Alias (nouvelle adresse)</label><input type="text" id="alias-nom" maxlength="30" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="imprimeur"></div>
+          <div><label class="lbl" for="alias-page">Adresse principale de la page</label><input type="text" id="alias-page" maxlength="30" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="serigraphe"></div>
+        </div>
+        <div class="actions" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;"><button type="button" class="btn btn-gold btn44" id="btn-alias-ajouter">Ajouter l'alias</button></div>
+        <div class="status" id="msg-alias-form" role="status"></div>
+      </div>
+      <div class="status" id="msg-alias" role="status"></div>
+      <div id="liste-alias" aria-label="Adresses supplémentaires"></div>
 
       <h2>Pages</h2>
       <div class="row-tools">

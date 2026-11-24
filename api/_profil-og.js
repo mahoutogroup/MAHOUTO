@@ -19,6 +19,9 @@
 //  - noindex, nofollow : balise meta ET en-tête X-Robots-Tag, l'aperçu de partage ne rend pas les pages indexables ;
 //  - cache court (5 minutes côté CDN) ; lecture en échec : 503 SANS cache (aperçu générique pour les robots), et les
 //    humains sont quand même redirigés vers /m.html pour que la page reste utilisable ;
+//  - alias : si l'adresse n'est pas une page, profil_public_alias_resoudre(p_alias) (clé anonyme) peut renvoyer l'adresse
+//    PRINCIPALE d'une page réellement publique : aperçu et redirection se font alors sur la page principale (lien canonique
+//    https://mahouto.com/m/<principale>) ; sinon comportement inchangé. Aucune requête en plus quand l'adresse est une page ;
 //  - humains : redirection vers /m.html?adresse=<adresse>&src=<source> ; la source (ex. « qr ») est reprise de la chaîne
 //    de requête d'origine, sinon déduite dans le navigateur (Facebook, Instagram, TikTok), sinon « partage ».
 // =========================================================
@@ -209,6 +212,34 @@ export async function handleProfilPreview(req, res, deps) {
   }
   if (result && result.error) {
     return send(res, genericPreview(humanTarget(adresse, source), 503, "no-store"));
+  }
+  // Alias (adresse supplémentaire gérée par les administrateurs) : seulement quand l'adresse n'est PAS une page publique.
+  // profil_public_alias_resoudre ne renvoie que l'adresse principale (jamais autre chose) et seulement si la page est réellement
+  // publique. On sert alors l'aperçu de la page principale (lien canonique = adresse principale) et les humains sont redirigés vers
+  // /m.html?adresse=<principale>. Aucun appel supplémentaire quand l'adresse est déjà une page.
+  if (!(result && result.row) && deps.fetchAlias) {
+    let alias;
+    try {
+      alias = await deps.fetchAlias(adresse);
+    } catch (err) {
+      alias = { adresse: null, error: err || new Error("lecture impossible") };
+    }
+    if (alias && alias.error) {
+      return send(res, genericPreview(humanTarget(adresse, source), 503, "no-store"));
+    }
+    const principale = alias && isValidProfilAdresse(alias.adresse) && alias.adresse !== adresse ? alias.adresse : null;
+    if (principale) {
+      let page;
+      try {
+        page = await deps.fetchProfil(principale);
+      } catch (err) {
+        page = { row: null, error: err || new Error("lecture impossible") };
+      }
+      if (page && page.error) {
+        return send(res, genericPreview(humanTarget(principale, source), 503, "no-store"));
+      }
+      return send(res, buildProfilPreview(page && page.row ? page.row : null, principale, source, principale));
+    }
   }
   return send(res, buildProfilPreview(result && result.row ? result.row : null, adresse, source, raw));
 }

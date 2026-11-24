@@ -446,10 +446,17 @@ async function fetchProfilForPreview(adresse) {
   return { row: Array.isArray(data) && data.length ? data[0] : null, error: error || null };
 }
 
+// Alias d'une page (adresse supplémentaire) : la fonction publique ne renvoie QUE l'adresse principale d'une page réellement publique.
+async function fetchAliasForPreview(alias) {
+  const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
+  const { data, error } = await supabase.rpc("profil_public_alias_resoudre", { p_alias: alias });
+  return { adresse: typeof data === "string" ? data : null, error: error || null };
+}
+
 export default async function handler(req, res) {
   // Pages publiques de membres : même principe (site et marque fixes, noindex).
   if (req.query && req.query.type === "profil" && req.query.format !== "json") {
-    return handleProfilPreview(req, res, { fetchProfil: fetchProfilForPreview });
+    return handleProfilPreview(req, res, { fetchProfil: fetchProfilForPreview, fetchAlias: fetchAliasForPreview });
   }
   // Salons : en-têtes de cache propres (courte durée), site et marque fixes.
   if (req.query && req.query.type === "salon" && req.query.format !== "json") {

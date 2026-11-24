@@ -190,7 +190,7 @@ test("aperçu de la photo sur la page publique : rond, referrerpolicy no-referre
 const ADMIN_ROW = (o) => Object.assign({ id: "p1", user_id: "00000000-0000-4000-8000-0000000000aa", adresse: "mon-atelier", nom_affiche: "Atelier <b>Test</b>", publie: true, majeur_declare: true, suspendu: false, publie_le: "2026-11-20T10:00:00Z", cree_le: "2026-11-19T10:00:00Z", modifie_le: "2026-11-20T10:00:00Z" }, o || {});
 async function runAdmin(opts) {
   const o = Object.assign({ role: "admin", ouvert: "non", rows: [ADMIN_ROW()], session: true, confirmAnswer: true }, opts || {});
-  const dom = makeDom(["loading-state", "access-denied", "dashboard", "etat-interrupteur", "btn-interrupteur", "msg-interrupteur", "btn-recharger", "msg-liste", "liste-pages", "msg-signalements", "liste-signalements", "bandeau-ouvert", "bandeau-ouvert-texte", "btn-fermer-bandeau"], ["access-denied", "dashboard", "bandeau-ouvert"]);
+  const dom = makeDom(["loading-state", "access-denied", "dashboard", "etat-interrupteur", "btn-interrupteur", "msg-interrupteur", "btn-recharger", "msg-liste", "liste-pages", "msg-signalements", "liste-signalements", "bandeau-ouvert", "bandeau-ouvert-texte", "btn-fermer-bandeau", "alias-nom", "alias-page", "btn-alias-ajouter", "msg-alias-form", "msg-alias", "liste-alias"], ["access-denied", "dashboard", "bandeau-ouvert"]);
   const log = { from: [], rpc: [], update: [], confirm: [], open: [], innerHTMLWrites: 0 };
   let valeur = o.ouvert;
   const client = {

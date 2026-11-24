@@ -50,9 +50,10 @@ test("ne change pas : titre de l'onglet et nom du partage = marque du site (m.js
   assert.ok(!/majestepresse\.com/i.test(read("profil-public-utils.js") + read("m.js") + html), "aucune adresse majestepresse.com dans la page publique (le lien et le QR restent sur mahouto.com)");
 });
 
-test("fichiers inchangés par ce complément : api/_profil-og.js (marque fixe), brand.js, manifest.json, carte PNG (empreintes)", () => {
+test("fichiers inchangés par ce complément : brand.js, manifest.json, carte PNG (empreintes) ; api/_profil-og.js garde le site et la marque fixes", () => {
   // Si l'un de ces fichiers doit changer un jour, mettre l'empreinte à jour DÉLIBÉRÉMENT dans la même PR.
-  assert.strictEqual(sha("api/_profil-og.js"), "eccdc65217cb999e80db2d7c653d803383a3ec7165cd1f4efcc2794468bc534d");
+  // api/_profil-og.js : modifié VOLONTAIREMENT par la PR des alias (résolution d'un alias) ; ses invariants de marque sont vérifiés ci-dessous.
+  assert.match(read("api/_profil-og.js"), /export const PROFIL_SITE = "https:\/\/mahouto\.com";/); assert.match(read("api/_profil-og.js"), /export const PROFIL_BRAND = "MAHOUTO\+";/);
   assert.strictEqual(sha("brand.js"), "59218d104c8432e666f4a404cd6c793912220c9373a0505a56fe7847a8774165");
   assert.strictEqual(sha("manifest.json"), "3dbd49434a9c6ad9edab1c823fa8af6dd71e01a927c34c3588a6841e2c01f544");
   assert.strictEqual(sha("profil-public-carte.js"), "9c8647382d35ce8022d176638ca08e0998df3e3826a314217c94f69a7e1550e3");
@@ -60,6 +61,6 @@ test("fichiers inchangés par ce complément : api/_profil-og.js (marque fixe), 
   assert.ok(!/MAHOUTO_BRAND|brand\.js/.test(read("api/_profil-og.js")), "l'aperçu ne dépend pas de la marque du site");
 });
 
-test("sw.js : une seule version pour toute la PR (v125), pas d'incrément supplémentaire", () => {
-  assert.match(read("sw.js"), /CACHE_NAME = "mahoutoplus-shell-v125"/);
+test("sw.js : version 125 ou plus (une seule incrémentation par PR ; la PR des alias passe à 126)", () => {
+  assert.match(read("sw.js"), /CACHE_NAME = "mahoutoplus-shell-v(12[5-9]|1[3-9]\d)"/);
 });

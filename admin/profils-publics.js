@@ -15,6 +15,9 @@
    - Rappel (finitions) : tant que l'interrupteur est OUVERT, un bandeau rouge indique depuis combien de temps (calcul dans le
      navigateur à partir de maj_le, mise à jour chaque minute, plus insistant après 2 h) avec « Fermer maintenant », qui
      réutilise le même code que le bouton de fermeture (un clic, sans confirmation). Jamais de durée aberrante (PU.ouvertDepuis).
+   - Adresses supplémentaires (alias) : liste (profils_publics_admin_alias_lister), formulaire d'ajout
+     (profils_publics_admin_alias_ajouter, un message clair par code), « Retirer » avec confirmation
+     (profils_publics_admin_alias_retirer). L'adresse principale reste la seule vraie adresse.
    - Tout texte dynamique passe par textContent : aucun innerHTML.
    ========================================================= */
 (function () {
@@ -196,6 +199,73 @@
     setStatus("msg-signalements", "Signalements marqués comme traités.", false);
   }
 
+  // ---------- Adresses supplémentaires (alias) ----------
+  // Fonctions profils_publics_admin_alias_ajouter / _retirer / _lister (réservées aux administrateurs côté base). Un alias est une porte
+  // d'entrée : l'adresse principale reste la seule vraie adresse. Aucun identifiant de compte n'existe dans ces résultats.
+  var ALIAS_MESSAGES = {
+    ok: "Adresse supplémentaire ajoutée.",
+    invalide: "Adresse invalide : 3 à 30 caractères, minuscules, chiffres et tirets, sans tiret au début ni à la fin.",
+    reserve: "Cette adresse est réservée : choisissez-en une autre.",
+    deja_pris: "Cette adresse est déjà utilisée (adresse principale ou autre alias).",
+    page_introuvable: "Aucune page n'a cette adresse principale.",
+    limite: "Cette page a déjà 5 adresses supplémentaires (maximum).",
+    non_admin: "Action réservée aux administrateurs."
+  };
+  var ALIAS_RETRAIT = { ok: "Adresse supplémentaire retirée.", absent: "Cette adresse supplémentaire n'existe plus.", non_admin: ALIAS_MESSAGES.non_admin };
+  function renderAlias(rows) {
+    var box = $("liste-alias");
+    box.textContent = "";
+    if (!rows.length) { box.appendChild(el("p", { class: "hint", text: "Aucune adresse supplémentaire pour le moment." })); return; }
+    rows.forEach(function (r) {
+      var alias = typeof r.alias === "string" ? r.alias : "", adresse = typeof r.adresse === "string" ? r.adresse : "";
+      var card = el("div", { class: "card item" }, [
+        el("div", { class: "top" }, [el("span", { class: "who", text: "/m/" + alias + "  →  /m/" + adresse })]),
+        el("div", { class: "meta", text: "Ajoutée le " + PU.formatDateFr(r.cree_le) })
+      ]);
+      var actions = el("div", { class: "actions" });
+      if (PU.ADRESSE_RE.test(alias)) {
+        var see = el("button", { type: "button", class: "btn btn-view", text: "Voir" });
+        see.addEventListener("click", function () { window.open("/m/" + encodeURIComponent(alias), "_blank", "noopener"); });
+        actions.appendChild(see);
+      }
+      var rm = el("button", { type: "button", class: "btn btn-no", text: "Retirer", "aria-label": "Retirer l'adresse supplémentaire " + alias });
+      rm.addEventListener("click", function () { retirerAlias(alias, adresse); });
+      actions.appendChild(rm);
+      card.appendChild(actions);
+      box.appendChild(card);
+    });
+  }
+  async function loadAlias() {
+    setStatus("msg-alias", "Chargement…", false);
+    var res = await supabase.rpc("profils_publics_admin_alias_lister");
+    if (res.error) { setStatus("msg-alias", "Impossible de charger les adresses supplémentaires (le SQL des alias est-il exécuté ?).", true); return; }
+    setStatus("msg-alias", "", false);
+    renderAlias(Array.isArray(res.data) ? res.data : []);
+  }
+  async function ajouterAlias() {
+    if (busy) return;
+    var alias = PU.normalizeAdresse($("alias-nom").value), page = PU.normalizeAdresse($("alias-page").value);
+    if (!PU.ADRESSE_RE.test(alias) || !PU.ADRESSE_RE.test(page)) { setStatus("msg-alias-form", ALIAS_MESSAGES.invalide, true); return; }
+    busy = true; $("btn-alias-ajouter").disabled = true; setStatus("msg-alias-form", "Ajout…", false);
+    var res = await supabase.rpc("profils_publics_admin_alias_ajouter", { p_alias: alias, p_adresse_page: page });
+    var code = res.error || typeof res.data !== "string" ? null : res.data;
+    var msg = code && ALIAS_MESSAGES[code] ? ALIAS_MESSAGES[code] : "L'ajout n'a pas pu être enregistré (le SQL des alias est-il exécuté ?).";
+    setStatus("msg-alias-form", msg, code !== "ok");
+    if (code === "ok") { $("alias-nom").value = ""; await loadAlias(); }
+    busy = false; $("btn-alias-ajouter").disabled = false;
+  }
+  async function retirerAlias(alias, adresse) {
+    if (busy) return;
+    if (!confirm("Retirer l'adresse supplémentaire /m/" + alias + " ? La page /m/" + adresse + " reste inchangée.")) return;
+    busy = true;
+    var res = await supabase.rpc("profils_publics_admin_alias_retirer", { p_alias: alias });
+    var code = res.error || typeof res.data !== "string" ? null : res.data;
+    busy = false;
+    if (!code || !ALIAS_RETRAIT[code]) { setStatus("msg-alias", "Le retrait n'a pas pu être enregistré. Réessayez.", true); return; }
+    await loadAlias();
+    setStatus("msg-alias", ALIAS_RETRAIT[code], code === "non_admin");
+  }
+
   // ---------- Démarrage ----------
   async function init() {
     var sess = await supabase.auth.getSession();
@@ -217,10 +287,12 @@
     $("btn-interrupteur").addEventListener("click", toggleSwitch);
     $("btn-fermer-bandeau").addEventListener("click", toggleSwitch);   // même code que la fermeture existante : un clic, sans confirmation
     if (!tick) tick = setInterval(renderBanner, 60000);                 // durée remise à jour chaque minute
-    $("btn-recharger").addEventListener("click", function () { loadSwitch(); loadSignalements(); loadList(); });
+    $("btn-alias-ajouter").addEventListener("click", ajouterAlias);
+    $("btn-recharger").addEventListener("click", function () { loadSwitch(); loadSignalements(); loadList(); loadAlias(); });
     await loadSwitch();
     await loadSignalements();
     await loadList();
+    await loadAlias();
   }
   init();
 })();
