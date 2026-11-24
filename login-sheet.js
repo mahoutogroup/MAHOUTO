@@ -47,15 +47,15 @@
     var status = Number(error && error.status);
     var text = String((error && error.message) || "");
 
-    if (isNetworkError(error)) return "Pas de connexion internet. Vérifie ton réseau puis réessaie.";
+    if (isNetworkError(error)) return "Pas de connexion internet. Vérifiez votre réseau puis réessayez.";
     if (status === 429 || /rate_limit/i.test(code) || /rate limit|too many/i.test(text)) {
       return context === "verify"
-        ? "Trop de tentatives. Attends quelques minutes avant de réessayer."
-        : "Trop de demandes. Attends quelques minutes avant de redemander un code.";
+        ? "Trop de tentatives. Attendez quelques minutes avant de réessayer."
+        : "Trop de demandes. Attendez quelques minutes avant de redemander un code.";
     }
-    if (code === "user_banned" || /user (is )?banned/i.test(text)) return "Ce compte est désactivé. Contacte-nous pour en savoir plus.";
+    if (code === "user_banned" || /user (is )?banned/i.test(text)) return "Ce compte est désactivé. Contactez-nous pour en savoir plus.";
     if (code === "otp_expired" || /token has expired|invalid.*(token|otp)|otp.*(expired|invalid)/i.test(text)) {
-      return "Code incorrect ou expiré. Vérifie le code ou demande-en un nouveau.";
+      return "Code incorrect ou expiré. Vérifiez le code ou demandez-en un nouveau.";
     }
     if (code === "email_address_invalid" || (code === "validation_failed" && context === "send" && /email/i.test(text))) {
       return "Cette adresse e-mail n'est pas valide.";
@@ -67,12 +67,12 @@
         : "La connexion par e-mail n'est pas disponible pour le moment.";
     }
     if (context === "verify" && (status === 400 || status === 403 || status === 422)) {
-      return "Code incorrect ou expiré. Vérifie le code ou demande-en un nouveau.";
+      return "Code incorrect ou expiré. Vérifiez le code ou demandez-en un nouveau.";
     }
     var detail = code || (isFinite(status) && status ? "HTTP " + status : "inconnu");
     // signup_disabled est volontairement traité comme une erreur générique : un message dédié révélerait
     // qu'une adresse n'a pas de compte.
-    return "Connexion impossible (code : " + detail + "). Réessaie ; si ça continue, contacte-nous.";
+    return "Connexion impossible (code : " + detail + "). Réessayez ; si cela continue, contactez-nous.";
   }
 
   // Erreur renvoyée par Google/Supabase dans l'adresse au retour (?error=… ou #error=…).
@@ -91,8 +91,8 @@
     if (!err) return null;
     var desc = String(params.error_description || "").slice(0, 160);
     if (err === "access_denied" || params.error_code === "access_denied") return "Connexion Google annulée.";
-    if (params.error_code === "user_banned") return "Ce compte est désactivé. Contacte-nous pour en savoir plus.";
-    return "La connexion Google a échoué" + (desc ? " (" + desc + ")" : " (code : " + err + ")") + ". Réessaie ; si ça continue, contacte-nous.";
+    if (params.error_code === "user_banned") return "Ce compte est désactivé. Contactez-nous pour en savoir plus.";
+    return "La connexion Google a échoué" + (desc ? " (" + desc + ")" : " (code : " + err + ")") + ". Réessayez ; si cela continue, contactez-nous.";
   }
 
   // ---------- Destination de retour ----------
@@ -176,7 +176,7 @@
     var googleBtn = el(doc, "button", { type: "button", class: "ls-google", text: "Continuer avec Google" });
     var googleError = el(doc, "p", { class: "ls-error", role: "alert" });
 
-    var emailInput = el(doc, "input", { type: "email", class: "ls-input", inputmode: "email", autocomplete: "email", autocapitalize: "none", spellcheck: "false", placeholder: "toi@exemple.com", "aria-label": "Adresse e-mail" });
+    var emailInput = el(doc, "input", { type: "email", class: "ls-input", inputmode: "email", autocomplete: "email", autocapitalize: "none", spellcheck: "false", placeholder: "vous@exemple.com", "aria-label": "Adresse e-mail" });
     var error1 = el(doc, "p", { class: "ls-error", role: "alert" });
     var cancelBtn = el(doc, "button", { type: "button", text: "Annuler" });
     var sendBtn = el(doc, "button", { type: "submit", class: "ls-primary", text: "Recevoir mon code" });
@@ -195,7 +195,7 @@
 
     var sheet = el(doc, "div", { class: "ls-sheet", role: "dialog", "aria-modal": "true", "aria-label": "Se connecter" }, [
       el(doc, "h3", { text: options.title || "Se connecter pour écrire" }),
-      el(doc, "p", { class: "ls-text", text: "Connecte-toi avec Google, ou avec ton adresse e-mail : nous t'envoyons un code à " + CODE_LENGTH + " chiffres. Si tu n'as pas encore de compte, il sera créé automatiquement." }),
+      el(doc, "p", { class: "ls-text", text: "Connectez-vous avec Google, ou avec votre adresse e-mail : nous vous envoyons un code à " + CODE_LENGTH + " chiffres. Si vous n'avez pas encore de compte, il sera créé automatiquement." }),
       googleBtn, googleError,
       el(doc, "div", { class: "ls-or", text: "— ou —" }),
       step1, step2
@@ -263,7 +263,7 @@
       if (e && e.preventDefault) e.preventDefault();
       if (busy) return;
       var email = String(emailInput.value || "").trim();
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { error1.textContent = "Entre une adresse e-mail valide."; return; }
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { error1.textContent = "Saisissez une adresse e-mail valide."; return; }
       error1.textContent = "";
       busy = true; sendBtn.disabled = true; sendBtn.textContent = "Envoi en cours…";
       try {
@@ -289,7 +289,7 @@
       if (e && e.preventDefault) e.preventDefault();
       if (busy) return;
       var code = String(codeInput.value || "").trim();
-      if (code.length !== CODE_LENGTH) { error2.textContent = "Entre le code à " + CODE_LENGTH + " chiffres reçu par e-mail."; return; }
+      if (code.length !== CODE_LENGTH) { error2.textContent = "Saisissez le code à " + CODE_LENGTH + " chiffres reçu par e-mail."; return; }
       error2.textContent = "";
       busy = true; verifyBtn.disabled = true; verifyBtn.textContent = "Vérification…";
       try {

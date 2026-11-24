@@ -55,9 +55,9 @@ const tick = () => new Promise((r) => setTimeout(r, 5));
     const cases = [
       [{ message: "Failed to fetch", name: "AuthRetryableFetchError" }, "send", /Pas de connexion internet/],
       [{ message: "NetworkError when attempting to fetch resource." }, "verify", /Pas de connexion internet/],
-      [{ status: 429, code: "over_email_send_rate_limit", message: "email rate limit exceeded" }, "send", /Trop de demandes\. Attends quelques minutes avant de redemander un code\./],
-      [{ status: 429, message: "Too many requests" }, "verify", /Trop de tentatives\. Attends quelques minutes/],
-      [{ status: 403, code: "otp_expired", message: "Token has expired or is invalid" }, "verify", /^Code incorrect ou expiré\. Vérifie le code ou demande-en un nouveau\.$/],
+      [{ status: 429, code: "over_email_send_rate_limit", message: "email rate limit exceeded" }, "send", /Trop de demandes\. Attendez quelques minutes avant de redemander un code\./],
+      [{ status: 429, message: "Too many requests" }, "verify", /Trop de tentatives\. Attendez quelques minutes/],
+      [{ status: 403, code: "otp_expired", message: "Token has expired or is invalid" }, "verify", /^Code incorrect ou expiré\. Vérifiez le code ou demandez-en un nouveau\.$/],
       [{ status: 400, message: "Token has expired or is invalid" }, "verify", /^Code incorrect ou expiré/],
       [{ status: 400, code: "validation_failed", message: "Unable to validate email address: invalid format" }, "send", /^Cette adresse e-mail n'est pas valide\.$/],
       [{ code: "email_address_invalid", message: "Email address is invalid" }, "send", /^Cette adresse e-mail n'est pas valide\.$/],
@@ -65,7 +65,7 @@ const tick = () => new Promise((r) => setTimeout(r, 5));
       [{ status: 400, code: "provider_disabled", message: "Unsupported provider: provider is not enabled" }, "google", /^La connexion Google n'est pas disponible pour le moment\.$/],
       [{ code: "email_provider_disabled", message: "Email logins are disabled" }, "send", /^La connexion par e-mail n'est pas disponible pour le moment\.$/],
       [{ status: 400, code: "user_banned", message: "User is banned" }, "verify", /^Ce compte est désactivé\./],
-      [{ status: 500, code: "unexpected_failure", message: "boom" }, "send", /^Connexion impossible \(code : unexpected_failure\)\. Réessaie ; si ça continue, contacte-nous\.$/],
+      [{ status: 500, code: "unexpected_failure", message: "boom" }, "send", /^Connexion impossible \(code : unexpected_failure\)\. Réessayez ; si cela continue, contactez-nous\.$/],
       [{ status: 502, message: "bad gateway" }, "send", /\(code : HTTP 502\)/],
       [{}, "send", /\(code : inconnu\)/],
       [null, "google", /\(code : inconnu\)/]
@@ -85,7 +85,7 @@ const tick = () => new Promise((r) => setTimeout(r, 5));
     assert.strictEqual(Login.oauthErrorFromUrl({ search: "?room=general", hash: "" }), null);
     assert.strictEqual(Login.oauthErrorFromUrl({ search: "?room=general&error=access_denied&error_code=access_denied&error_description=User+denied", hash: "" }), "Connexion Google annulée.");
     assert.strictEqual(Login.oauthErrorFromUrl({ search: "", hash: "#error=access_denied&error_description=x" }), "Connexion Google annulée.");
-    assert.match(Login.oauthErrorFromUrl({ search: "?error=server_error&error_description=Unable+to+exchange+external+code", hash: "" }), /^La connexion Google a échoué \(Unable to exchange external code\)\. Réessaie/);
+    assert.match(Login.oauthErrorFromUrl({ search: "?error=server_error&error_description=Unable+to+exchange+external+code", hash: "" }), /^La connexion Google a échoué \(Unable to exchange external code\)\. Réessayez ; si cela continue, contactez-nous\.$/);
     assert.match(Login.oauthErrorFromUrl({ search: "?error=server_error", hash: "" }), /\(code : server_error\)/);
     assert.match(Login.oauthErrorFromUrl({ search: "?error_code=user_banned&error=forbidden", hash: "" }), /Ce compte est désactivé/);
     assert.ok(Login.oauthErrorFromUrl({ search: "?error=x&error_description=" + "a".repeat(500), hash: "" }).length < 260, "description tronquée");
@@ -146,7 +146,7 @@ const tick = () => new Promise((r) => setTimeout(r, 5));
     const sheet = Login.open({ doc, win: w, supabase: sb, roomId: "general", redirectPath: "chat.html?room=general" });
     const e = sheet.elements;
     e.emailInput.value = "pas-une-adresse"; await e.step1.listeners.submit({ preventDefault() {} });
-    assert.strictEqual(e.error1.textContent, "Entre une adresse e-mail valide.");
+    assert.strictEqual(e.error1.textContent, "Saisissez une adresse e-mail valide.");
     assert.strictEqual(sb.calls.otp.length, 0);
     e.emailInput.value = " toi@exemple.com "; await e.step1.listeners.submit({ preventDefault() {} });
     assert.deepStrictEqual(sb.calls.otp, [{ email: "toi@exemple.com" }], "signInWithOtp({ email }) comme index.html");
@@ -170,10 +170,10 @@ const tick = () => new Promise((r) => setTimeout(r, 5));
     sheet.elements.codeInput.value = "123456";
     await sheet.elements.step2.listeners.submit({ preventDefault() {} });
     assert.deepStrictEqual(sb.calls.verify, [{ email: "a@b.co", token: "123456", type: "email" }]);
-    assert.strictEqual(sheet.elements.error2.textContent, "Code incorrect ou expiré. Vérifie le code ou demande-en un nouveau.");
+    assert.strictEqual(sheet.elements.error2.textContent, "Code incorrect ou expiré. Vérifiez le code ou demandez-en un nouveau.");
     sheet.elements.codeInput.value = "12";
     await sheet.elements.step2.listeners.submit({ preventDefault() {} });
-    assert.strictEqual(sheet.elements.error2.textContent, "Entre le code à " + Login.CODE_LENGTH + " chiffres reçu par e-mail.");
+    assert.strictEqual(sheet.elements.error2.textContent, "Saisissez le code à " + Login.CODE_LENGTH + " chiffres reçu par e-mail.");
     assert.strictEqual(sb.calls.verify.length, 1, "pas d'appel avec un code trop court");
     sheet.close();
 
