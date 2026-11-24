@@ -173,6 +173,7 @@
 <script src="/config.js"></script>
 <script src="/pseudo.js"></script>
 <script src="/login-sheet.js"></script>
+<script src="/invitation.js"></script>
 <script src="/analytics.js" defer></script>
 <script>
   /* Bouton « CRÉER MA CARTE DE VISITE ».
@@ -228,6 +229,10 @@
     }
     Array.prototype.forEach.call(document.querySelectorAll("[data-cta]"), function (a) { a.addEventListener("click", onClick); });
   })();
+</script>
+<script>
+  // Lien d'invitation (?inv=) : le code est gardé 7 jours sur cet appareil (invitation.js), sans rien afficher.
+  try { if (window.MahoutoInvitation) window.MahoutoInvitation.remember(window.location.search, window.localStorage); } catch (e) { /* sans effet */ }
 </script>
 <script>
   // Logo de la marque en petit format (128 px) quand le site est servi sous l'autre marque ; sans effet sinon.

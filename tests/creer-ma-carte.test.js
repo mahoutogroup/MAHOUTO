@@ -69,7 +69,7 @@ test("EXEMPLE de carte : étiqueté « Exemple », contenu fictif, aucun lien (n
 });
 
 test("aucun script ni ressource externe au chargement ; la bibliothèque Supabase (même adresse que le reste du site) n'est chargée qu'AU CLIC", () => {
-  assert.deepStrictEqual([...PAGE.matchAll(/<script src="([^"]+)"/g)].map((m) => m[1]), ["/brand.js", "/theme-toggle.js", "/config.js", "/pseudo.js", "/login-sheet.js", "/analytics.js"], "scripts locaux seulement");
+  assert.deepStrictEqual([...PAGE.matchAll(/<script src="([^"]+)"/g)].map((m) => m[1]), ["/brand.js", "/theme-toggle.js", "/config.js", "/pseudo.js", "/login-sheet.js", "/invitation.js", "/analytics.js"], "scripts locaux seulement");
   assert.ok(!/<script[^>]+src="https?:/i.test(PAGE), "aucune balise script externe");
   assert.ok(!/(src|href)="https?:\/\//i.test(PAGE), "aucune ressource externe (script, image, feuille de style, lien)");
   assert.ok(!/@import|url\(\s*["']?https?:|fonts\.(googleapis|gstatic)|<link[^>]+(\.woff|fonts)/i.test(PAGE), "aucune police externe");
@@ -158,7 +158,7 @@ test("une seule entrée discrète dans l'application : le menu « Mon compte » 
   const h = read("profil.html"); assert.strictEqual((h.match(/creer-ma-carte/g) || []).length, 1);
   assert.match(h, /<a class="card menu-item" id="creer-carte-item" href="creer-ma-carte\.html"><span class="emoji">🪪<\/span><span class="label">Créer ma carte de visite<\/span><span class="sub">→<\/span><\/a>/);
   assert.ok(h.indexOf("creer-carte-item") < h.indexOf("QR Code") && h.indexOf("creer-carte-item") > h.indexOf("mes-achats.html"));
-  fs.readdirSync(root).filter((f) => /\.(html|js)$/.test(f) && !["profil.html", "creer-ma-carte.html", "sw.js"].includes(f)).forEach((f) => assert.ok(!/creer-ma-carte/.test(read(f)) || f.startsWith("tests"), f + " ne mentionne pas la page"));
+  fs.readdirSync(root).filter((f) => /\.(html|js)$/.test(f) && !["profil.html", "creer-ma-carte.html", "sw.js", "invitation.js"].includes(f)).forEach((f) => assert.ok(!/creer-ma-carte/.test(read(f)) || f.startsWith("tests"), f + " ne mentionne pas la page"));
   assert.ok(h.includes('<label class="check" for="pp-majeur"><input type="checkbox" id="pp-majeur"><span>Je certifie avoir 18 ans ou plus.</span></label>'), "profil.html : le reste est intact");
 });
 
