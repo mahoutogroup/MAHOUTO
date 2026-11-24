@@ -71,6 +71,17 @@ select
               from pg_proc p
              where p.oid = to_regprocedure('public.profils_publics_admin_stats_jours(integer)')),
            false) as lecture_seule,
+  coalesce((select position('brand' in lower(p.prosrc)) = 0
+                   and position('page_type = ''other''' in p.prosrc) > 0
+                   and position('/m.html' in p.prosrc) > 0
+              from pg_proc p
+             where p.oid = to_regprocedure('public.profils_publics_admin_stats(integer)')),
+           false)
+    and coalesce((select position('brand' in lower(p.prosrc)) = 0
+                   and position('page_type = ''other''' in p.prosrc) > 0
+              from pg_proc p
+             where p.oid = to_regprocedure('public.profils_publics_admin_stats_jours(integer)')),
+           false) as compte_les_deux_marques,
   coalesce((select pg_get_function_result(p.oid) =
              'TABLE(pages_total integer, pages_publiees integer, pages_brouillon integer, '
              || 'pages_suspendues integer, pages_nouvelles_7j integer, pages_nouvelles_30j integer, '
@@ -81,7 +92,10 @@ select
              where p.oid = to_regprocedure('public.profils_publics_admin_stats(integer)')),
            false) as colonnes_attendues;
 
--- 2. Index optionnel (information)
+-- 2. Index optionnel (information) : existe-t-il, et sans filtre sur brand ?
 select exists (select 1 from pg_indexes
                 where schemaname = 'public' and indexname = 'page_views_profils_idx')
-  as index_optionnel_cree;
+  as index_optionnel_cree,
+  coalesce((select position('brand' in lower(i.indexdef)) = 0 from pg_indexes i
+             where i.schemaname = 'public' and i.indexname = 'page_views_profils_idx'), true)
+  as index_sans_filtre_de_marque;

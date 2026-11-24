@@ -44,7 +44,11 @@
 --   top_pages            : 10 pages au plus (adresse, nom affiche, visites) pour la periode, par
 --                          visites decroissantes puis adresse. Une visite compte sous l adresse
 --                          principale (celle de /m.html), meme si l entree se fait par un alias.
--- Seules les visites de la marque mahouto sont comptees, comme pour les membres.
+-- Les visites des deux marques sont comptees (mahouto et majeste : une page ouverte via
+-- majestepresse.com est enregistree sous la marque majeste). Seuls les filtres page_type = other,
+-- path = /m.html et item_id non nul s appliquent.
+-- ATTENTION : profil_public_visites_mien (la vue du membre) ne compte que la marque mahouto : pour une
+-- meme page, le total vu par l administrateur peut etre superieur a celui vu par le membre.
 --
 -- RETRAIT : profils-publics-stats-rollback.sql (drop function if exists). Rien d autre n est
 -- touche.
@@ -122,7 +126,7 @@ begin
                                              'instagram', 'tiktok'))
     into visites_total, visites_periode, v_qr, v_lien
     from public.page_views v
-   where v.brand = 'mahouto' and v.page_type = 'other' and v.path = '/m.html'
+   where v.page_type = 'other' and v.path = '/m.html'
      and v.item_id is not null;
   visites_par_source := jsonb_build_object('qr', v_qr, 'lien', v_lien,
                                            'autre', visites_periode - v_qr - v_lien);
@@ -132,7 +136,7 @@ begin
     from (select p.adresse, p.nom_affiche as nom, count(*) as n
             from public.page_views v
             join public.profils_publics p on p.adresse = v.item_id
-           where v.brand = 'mahouto' and v.page_type = 'other' and v.path = '/m.html'
+           where v.page_type = 'other' and v.path = '/m.html'
              and v.created_at >= v_debut
            group by p.adresse, p.nom_affiche
            order by count(*) desc, p.adresse
@@ -173,7 +177,7 @@ begin
     ), vues as (
       select (v.created_at at time zone 'Africa/Porto-Novo')::date as j, count(*) as n
         from public.page_views v
-       where v.brand = 'mahouto' and v.page_type = 'other' and v.path = '/m.html'
+       where v.page_type = 'other' and v.path = '/m.html'
          and v.item_id is not null
          and v.created_at >= (v_debut::timestamp at time zone 'Africa/Porto-Novo')
        group by 1
@@ -191,11 +195,12 @@ revoke all on function public.profils_publics_admin_stats_jours(integer) from pu
 grant execute on function public.profils_publics_admin_stats_jours(integer) to authenticated;
 
 
--- BLOC 4 - OPTIONNEL : index partiel sur les seules visites de pages publiques (petit, sans effet
--- sur le reste)
--- A ne creer QUE si le tableau de bord devient lent (beaucoup de lignes dans page_views). Retrait :
--- BLOC 2 du
--- rollback. Ce bloc modifie la base (un index) : il est volontairement separe et facultatif.
+-- BLOC 4 - OPTIONNEL : index partiel sur les seules visites de pages publiques (petit)
+-- A ne creer QUE si le tableau de bord devient lent (beaucoup de lignes dans page_views). Il ne filtre
+-- pas sur brand : les deux marques sont comptees. Ce bloc modifie la base (un index) : il est
+-- volontairement separe et facultatif. Retrait : BLOC 2 du rollback. Si une ancienne version de cet
+-- index (avec un filtre sur brand) a ete creee pour un essai, la retirer d abord : la creation
+-- conditionnelle ci-dessous ne la remplace pas.
 create index if not exists page_views_profils_idx
   on public.page_views (created_at) include (item_id, source)
-  where brand = 'mahouto' and page_type = 'other' and path = '/m.html';
+  where page_type = 'other' and path = '/m.html';

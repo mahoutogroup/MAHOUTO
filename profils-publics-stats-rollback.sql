@@ -13,5 +13,6 @@ drop function if exists public.profils_publics_admin_stats_jours(integer);
 drop function if exists public.profils_publics_admin_stats(integer);
 
 
--- BLOC 2 - Index optionnel (seulement si le BLOC 4 de profils-publics-stats.sql a ete execute)
+-- BLOC 2 - Index optionnel (seulement si le BLOC 4 de profils-publics-stats.sql a ete execute, quelle
+-- que soit la version, avec ou sans filtre sur brand)
 drop index if exists public.page_views_profils_idx;

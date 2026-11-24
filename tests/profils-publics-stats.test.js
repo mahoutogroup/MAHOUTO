@@ -78,10 +78,13 @@ test("SQL : visites — MÊME filtre et MÊME classification que profil_public_v
   const visites = read("profils-publics-finitions.sql");
   assert.ok(visites.includes("v.source in ('direct', 'partage', 'whatsapp', 'facebook',"), "version actuelle de la classification (partage = lien)");
   assert.match(STATS, /v\.source in \('direct', 'partage', 'whatsapp', 'facebook',\s+'instagram', 'tiktok'\)/); assert.match(STATS, /v\.source = 'qr'/); assert.match(STATS, /'autre', visites_periode - v_qr - v_lien/);
-  [STATS, JOURS].forEach((f) => { assert.match(f, /v\.brand = 'mahouto' and v\.page_type = 'other' and v\.path = '\/m\.html'/); assert.ok(f.includes("Africa/Porto-Novo")); });
-  assert.match(visites, /v\.brand = 'mahouto'/); assert.match(visites, /v\.path = '\/m\.html'/);
-  assert.strictEqual((STATS.match(/v\.brand = 'mahouto' and v\.page_type = 'other' and v\.path = '\/m\.html'/g) || []).length, 2, "les deux lectures de page_views filtrent la marque, le type et le chemin");
-  assert.strictEqual((JOURS.match(/v\.brand = 'mahouto' and v\.page_type = 'other' and v\.path = '\/m\.html'/g) || []).length, 1);
+  [STATS, JOURS].forEach((f) => { assert.match(f, /v\.page_type = 'other' and v\.path = '\/m\.html'/); assert.ok(f.includes("Africa/Porto-Novo")); });
+  assert.ok(!/brand/i.test(STATS + JOURS), "AUCUN filtre sur la marque : les visites des deux marques sont comptées (mahouto et majeste)");
+  assert.match(visites, /v\.brand = 'mahouto'/, "garde : la vue du membre (profil_public_visites_mien) garde, elle, le filtre de marque : elle n'est pas modifiée par cette PR");
+  assert.match(visites, /v\.path = '\/m\.html'/);
+  assert.strictEqual((STATS.match(/v\.page_type = 'other' and v\.path = '\/m\.html'/g) || []).length, 2, "les deux lectures de page_views filtrent le type et le chemin");
+  assert.strictEqual((JOURS.match(/v\.page_type = 'other' and v\.path = '\/m\.html'/g) || []).length, 1);
+  assert.strictEqual((STATS.match(/v\.item_id is not null/g) || []).length, 1); assert.strictEqual((JOURS.match(/v\.item_id is not null/g) || []).length, 1);
   assert.match(STATS, /v\.item_id is not null/); assert.match(STATS, /join public\.profils_publics p on p\.adresse = v\.item_id/);
   assert.match(STATS, /order by count\(\*\) desc, p\.adresse\s+limit 10\) t;/); assert.match(STATS, /jsonb_agg\(jsonb_build_object\('adresse', t\.adresse, 'nom', t\.nom, 'visites', t\.n\)\s+order by t\.n desc, t\.adresse\)/);
   assert.match(STATS, /v_debut := \(\(v_fin - \(v_jours - 1\)\)::timestamp at time zone 'Africa\/Porto-Novo'\);/, "p_jours jours calendaires, aujourd'hui compris");
@@ -95,7 +98,10 @@ test("SQL : LECTURE SEULE et ANONYMAT — aucune écriture, aucune table, politi
   assert.ok(!/(create|alter|drop) policy|enable row level|create trigger/i.test(sql));
   assert.ok(!/user_id|visitor_id|ip_|\bip\b|contact|contact_valeur|contact_type|signaleur_id\s*,|majeur_declare/i.test(bodies.replace(/count\(distinct s\.signaleur_id\)/g, "")), "aucun identifiant ni contact lu (seul count(distinct signaleur_id) pour le seuil)");
   assert.ok(!/select[^;]*\bs\.signaleur_id\b(?!\))/.test(bodies.replace(/count\(distinct s\.signaleur_id\)/g, "")), "l'identité des signaleurs n'est jamais lue autrement");
-  assert.strictEqual((B[4].match(/create index/g) || []).length, 1); assert.match(B[4], /create index if not exists page_views_profils_idx\s+on public\.page_views \(created_at\) include \(item_id, source\)\s+where brand = 'mahouto' and page_type = 'other' and path = '\/m\.html';/);
+  assert.strictEqual((B[4].match(/create index/g) || []).length, 1); assert.match(B[4], /create index if not exists page_views_profils_idx\s+on public\.page_views \(created_at\) include \(item_id, source\)\s+where page_type = 'other' and path = '\/m\.html';/);
+  assert.ok(!/brand/.test(strippedSql(B[4])), "l'index partiel ne filtre plus sur la marque");
+  assert.ok(/Les visites des deux marques sont comptees/.test(raw) && !/Seules les visites de la marque mahouto/.test(raw), "l'en-tête annonce les deux marques");
+  assert.ok(/profil_public_visites_mien \(la vue du membre\) ne compte que la marque mahouto/.test(raw), "la différence avec la vue du membre est documentée");
   assert.ok(!/visitor_id/.test(B[4]), "l'index ne touche pas visitor_id");
 });
 
@@ -111,8 +117,8 @@ test("vérification : UNE requête de verdict (colonnes booléennes), lecture se
   const first = sqlVf.split(/;\s*\n/)[0]; assert.match(first, /^\s*select\s+to_regprocedure/); assert.ok(!/^\s*(insert|update|delete|create|drop|alter|grant|revoke|truncate)\b/im.test(sqlVf));
   const cols = [...first.matchAll(/\bas (\w+)(?=,|\s*$)/g)].map((m) => m[1]);
   ["deux_fonctions_presentes", "membres_connectes_autorises", "visiteurs_non_connectes_refuses", "definer_search_path_et_stable", "stats_refuse_sans_is_admin", "jours_refuse_sans_is_admin", "periode_bornee_1_365",
-    "stats_sans_identifiant_ni_contact", "jours_sans_identifiant", "lecture_seule", "colonnes_attendues"].forEach((c) => assert.ok(cols.includes(c), c));
-  assert.strictEqual(cols.length, 11);
+    "stats_sans_identifiant_ni_contact", "jours_sans_identifiant", "lecture_seule", "compte_les_deux_marques", "colonnes_attendues"].forEach((c) => assert.ok(cols.includes(c), c));
+  assert.strictEqual(cols.length, 12); assert.match(sqlVf, /index_sans_filtre_de_marque/);
 });
 
 // ====================== interface : faux DOM ======================
@@ -199,8 +205,8 @@ test("admin : aucun innerHTML, uniquement les fonctions de statistiques, aucun i
   assert.match(h, /aucun nom, aucun identifiant de visiteur, aucune adresse IP/);
 });
 
-test("sw.js : cache v127 ou plus ; aucun fichier de plus dans api/ ; aucun SQL en dehors des trois fichiers", () => {
-  assert.match(read("sw.js"), /CACHE_NAME = "mahoutoplus-shell-v(12[7-9]|1[3-9]\d)"/); assert.match(read("sw.js"), /SHARE_CACHE_NAME = "mahoutoplus-share-v1"/);
+test("sw.js : cache v128 ou plus ; aucun fichier de plus dans api/ ; aucun SQL en dehors des trois fichiers", () => {
+  assert.match(read("sw.js"), /CACHE_NAME = "mahoutoplus-shell-v(12[8-9]|1[3-9]\d)"/); assert.match(read("sw.js"), /SHARE_CACHE_NAME = "mahoutoplus-share-v1"/);
   const list = (d) => fs.readdirSync(path.join(root, d)).filter((f) => f.endsWith(".js") && !f.startsWith("_")); assert.strictEqual(list("api").length + list("api/admin").length, 12);
   assert.ok(!fs.readdirSync(root).some((f) => /\.sql$/.test(f) && /stats/.test(f) && !FILES.includes(f)));
 });
