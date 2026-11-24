@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Règles des pages publiques — MAHOUTO+</title>
+<meta name="description" content="Les règles à respecter pour votre page publique MAHOUTO+ : ce qui est permis, ce qui est interdit, le signalement, la suspension et le blocage.">
+<meta name="theme-color" content="#FFC107">
+<link rel="manifest" href="/manifest.json">
+<script src="/brand.js"></script>
+<link rel="icon" href="/assets/favicon.png">
+<link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+<link rel="stylesheet" href="/theme.css">
+<script src="/theme-toggle.js"></script>
+<style>
+  /* Même langage visuel que la page publique /m/<adresse> : en-tête de marque, carte, variables de theme.css, police système.
+     Aucune ressource externe. Texte atténué = --text-muted (jamais --text-dim, trop pâle). */
+  :root { --reg-accent: var(--gold); --reg-shadow: 0 12px 32px rgba(0,0,0,.45); --reg-focus: var(--gold-bright);
+          --reg-ico-lune: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z'/%3E%3C/svg%3E");
+          --reg-ico-soleil: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='4'/%3E%3Cpath d='M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4'/%3E%3C/svg%3E"); }
+  body.light-theme { --reg-accent: var(--gold-text, #856500); --reg-shadow: 0 10px 28px rgba(60,45,0,.14); --reg-focus: #856500; }
+  html, body { height: auto; min-height: 100%; }
+  body { overflow-x: hidden; min-height: 100vh; min-height: 100dvh; }
+  :focus-visible { outline: 3px solid var(--reg-focus); outline-offset: 2px; }
+
+  .mh { width: 100%; max-width: 600px; margin: 0 auto; padding: 10px 16px 0; }
+  .mh-in { display: flex; align-items: center; justify-content: space-between; min-height: 48px; }
+  .marque { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding-right: 8px; font-weight: 800; font-size: 16px; letter-spacing: .01em; color: var(--white); }
+  .marque img { width: 32px; height: 32px; display: block; }
+  .mh .theme-toggle-fab { position: static; width: 44px; height: 44px; font-size: 0; flex: 0 0 auto; }
+  .mh .theme-toggle-fab::before { content: ""; width: 20px; height: 20px; background: currentColor; -webkit-mask: var(--reg-ico-lune) center / contain no-repeat; mask: var(--reg-ico-lune) center / contain no-repeat; }
+  body.light-theme .mh .theme-toggle-fab::before { -webkit-mask-image: var(--reg-ico-soleil); mask-image: var(--reg-ico-soleil); }
+
+  .regles { width: 100%; max-width: 600px; margin: 0 auto; padding: 8px 16px 48px; flex: 1 0 auto; }
+  .retour { display: inline-flex; align-items: center; min-height: 44px; margin-bottom: 4px; font-size: 14px; font-weight: 700; color: var(--reg-accent); text-decoration: underline; text-underline-offset: 3px; }
+  .panneau { border: 1px solid var(--border); background: var(--bg-card); border-radius: 24px; box-shadow: var(--reg-shadow); padding: 26px 22px 22px; }
+  .panneau h1 { font-size: clamp(24px, 6.5vw, 30px); line-height: 1.2; letter-spacing: -.02em; font-weight: 800; color: var(--white); overflow-wrap: anywhere; text-wrap: balance; }
+  .intro { max-width: 62ch; margin-top: 14px; font-size: 16px; line-height: 1.65; color: var(--text-muted); overflow-wrap: anywhere; }
+  .panneau section { margin-top: 28px; padding-top: 22px; border-top: 1px solid var(--border); }
+  .panneau h2 { font-size: 19px; line-height: 1.3; font-weight: 800; color: var(--reg-accent); overflow-wrap: anywhere; }
+  .panneau p, .panneau li { max-width: 62ch; font-size: 16px; line-height: 1.65; color: var(--text-muted); overflow-wrap: anywhere; hyphens: auto; }
+  .panneau section > p { margin-top: 10px; }
+  .panneau ul { margin: 10px 0 0; padding-left: 22px; }
+  .panneau li { margin-top: 8px; padding-left: 4px; }
+  .panneau li::marker { color: var(--reg-accent); }
+  .maj { margin-top: 28px; font-size: 14px; line-height: 1.5; color: var(--text-muted); }
+  @media (max-width: 359px) { .mh, .regles { padding-left: 12px; padding-right: 12px; } .panneau { padding: 22px 16px 18px; } }
+  @media (min-width: 900px) { .mh { padding-top: 22px; } .regles { padding-top: 14px; padding-bottom: 72px; } }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition-duration: .01ms !important; } }
+</style>
+</head>
+<body>
+
+<header class="mh">
+  <div class="mh-in">
+    <a class="marque" href="/index.html" aria-label="MAHOUTO+, retour à l'accueil"><img id="marque-logo" src="/assets/logo-mahouto-plus-128.png" alt="" width="32" height="32"><span>MAHOUTO+</span></a>
+    <button type="button" id="theme-toggle-btn" class="theme-toggle-fab" aria-label="Changer de thème : clair ou sombre"></button>
+  </div>
+</header>
+
+<main class="regles" id="contenu">
+  <a class="retour" href="/index.html">← Retour à l'accueil</a>
+  <article class="panneau">
+    <h1>Règles des pages publiques</h1>
+    <p class="intro">Votre page publique est votre carte de visite sur MAHOUTO+. Ces règles protègent les membres et les personnes qui visitent les pages.</p>
+
+    <section aria-labelledby="r-permis">
+      <h2 id="r-permis">Ce que vous pouvez faire</h2>
+      <ul>
+        <li>Présenter votre activité, votre métier et votre ville.</li>
+        <li>Ajouter une photo de vous ou de votre marque.</li>
+        <li>Recevoir des contacts par WhatsApp, ou par message dans MAHOUTO+ si vous l'avez autorisé.</li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="r-interdit">
+      <h2 id="r-interdit">Ce qui est interdit</h2>
+      <ul>
+        <li>Se faire passer pour une autre personne ou une autre entreprise.</li>
+        <li>Annoncer des diplômes, des certifications ou des garanties que vous n'avez pas.</li>
+        <li>Proposer des arnaques, de fausses offres ou des demandes d'argent trompeuses.</li>
+        <li>Publier du contenu illégal, violent, haineux ou à caractère sexuel.</li>
+        <li>Utiliser la photo d'une autre personne sans son accord.</li>
+        <li>Publier les coordonnées d'une autre personne sans son accord.</li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="r-conditions">
+      <h2 id="r-conditions">Conditions</h2>
+      <ul>
+        <li>Avoir 18 ans ou plus.</li>
+        <li>Être responsable de ce que contient votre page.</li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="r-signaler">
+      <h2 id="r-signaler">Signaler une page</h2>
+      <p>Tout membre connecté peut signaler une page depuis le lien « Signaler cette page ». Les signalements sont examinés par l'équipe MAHOUTO+, qui vise une réponse sous 48 heures. Aucune page n'est suspendue automatiquement : chaque décision est prise après examen. Le nom de la personne qui signale n'est jamais montré.</p>
+    </section>
+
+    <section aria-labelledby="r-suspension">
+      <h2 id="r-suspension">Suspension</h2>
+      <p>Une page qui ne respecte pas ces règles peut être suspendue. Quand c'est possible et que le cas n'est pas grave, vous êtes d'abord invité à corriger votre page.</p>
+    </section>
+
+    <section aria-labelledby="r-bloquer">
+      <h2 id="r-bloquer">Bloquer un membre</h2>
+      <p>Dans la messagerie privée, vous pouvez bloquer un membre depuis le menu de la conversation. Vous pouvez le débloquer à tout moment dans la liste « Membres bloqués ».</p>
+    </section>
+
+    <p class="maj">Dernière mise à jour : 24 novembre 2026.</p>
+  </article>
+</main>
+
+<script>
+  // Logo de la marque en petit format (128 px) quand le site est servi sous l'autre marque ; sans effet sinon.
+  (function () {
+    try {
+      var b = window.MAHOUTO_BRAND, l = document.getElementById("marque-logo");
+      if (b && /^assets\/[a-z0-9-]+\.png$/.test(b.logo || "") && l) l.setAttribute("src", "/" + b.logo.replace(/\.png$/, "-128.png"));
+    } catch (e) { /* logo par défaut */ }
+  })();
+</script>
+</body>
+</html>

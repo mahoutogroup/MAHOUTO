@@ -113,6 +113,9 @@
   .pp .state { font-size: 13px; font-weight: 700; color: var(--gold); margin-bottom: 10px; }
   .pp .status { font-size: 13px; line-height: 1.6; margin-top: 8px; color: var(--accent-green); }
   .pp .status.error { color: #F87171; }
+  .pp a.pp-regles { display: inline-flex; align-items: center; min-height: 44px; font-size: 14px; font-weight: 700; color: var(--gold); text-decoration: underline; text-underline-offset: 3px; }
+  body.light-theme .pp a.pp-regles { color: var(--gold-text, #856500); }
+  .pp a.pp-regles:focus-visible { outline: 3px solid var(--gold-bright); outline-offset: 2px; }
   .pp .pp-sous-titre { font-size: 14px; color: var(--white); margin: 16px 0 8px; }
   .pp .pp-qr-apercu { width: 200px; max-width: 100%; background: #ffffff; border-radius: 8px; padding: 4px; margin-bottom: 8px; }
   .pp .pp-qr-apercu svg { width: 100%; height: auto; display: block; }
@@ -239,6 +242,9 @@
     <div class="field">
       <label class="check" for="pp-majeur"><input type="checkbox" id="pp-majeur"><span>Je certifie avoir 18 ans ou plus.</span></label>
       <div class="err" id="pp-e-majeur" role="alert"></div>
+    </div>
+    <div class="field">
+      <a class="pp-regles" id="pp-lien-regles" href="/regles-pages-publiques.html">Lire les règles des pages publiques</a>
     </div>
 
     <div class="actions">
