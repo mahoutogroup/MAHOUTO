@@ -59,7 +59,7 @@ function makeEl(id, startHidden) {
 }
 async function runAdmin(o) {
   const opts = Object.assign({ valeur: "oui", maj_le: "2026-11-23T08:00:00Z", now: Date.parse("2026-11-23T08:30:00Z"), readFail: false, writeDenied: false, confirmAnswer: true }, o || {});
-  const ids = ["loading-state", "access-denied", "dashboard", "etat-interrupteur", "btn-interrupteur", "msg-interrupteur", "btn-recharger", "msg-liste", "liste-pages", "msg-signalements", "liste-signalements", "bandeau-ouvert", "bandeau-ouvert-texte", "btn-fermer-bandeau"];
+  const ids = ["loading-state", "access-denied", "dashboard", "etat-interrupteur", "btn-interrupteur", "msg-interrupteur", "btn-recharger", "msg-liste", "liste-pages", "msg-signalements", "liste-signalements", "bandeau-ouvert", "bandeau-ouvert-texte", "btn-fermer-bandeau", "alias-nom", "alias-page", "btn-alias-ajouter", "msg-alias-form", "msg-alias", "liste-alias"];
   const els = {}; ids.forEach((i) => { els[i] = makeEl(i, ["access-denied", "dashboard", "bandeau-ouvert"].includes(i)); });
   const state = { valeur: opts.valeur, maj_le: opts.maj_le, now: opts.now }, log = { update: [], confirm: [], reads: 0 }, timers = [];
   const client = { auth: { getSession: async () => ({ data: { session: { user: { id: "u1" } } } }) },
