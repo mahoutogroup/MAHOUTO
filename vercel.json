@@ -40,6 +40,10 @@
     {
       "source": "/regles-pages-publiques",
       "destination": "/regles-pages-publiques.html"
+    },
+    {
+      "source": "/creer-ma-carte",
+      "destination": "/creer-ma-carte.html"
     }
   ],
   "headers": [
@@ -101,6 +105,24 @@
     },
     {
       "source": "/pro.html",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/creer-ma-carte",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/creer-ma-carte.html",
       "headers": [
         {
           "key": "X-Robots-Tag",
