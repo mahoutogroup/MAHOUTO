@@ -69,7 +69,7 @@ test("EXEMPLE de carte : étiqueté « Exemple », contenu fictif, aucun lien (n
 });
 
 test("aucun script ni ressource externe au chargement ; la bibliothèque Supabase (même adresse que le reste du site) n'est chargée qu'AU CLIC", () => {
-  assert.deepStrictEqual([...PAGE.matchAll(/<script src="([^"]+)"/g)].map((m) => m[1]), ["/brand.js", "/theme-toggle.js", "/config.js", "/pseudo.js", "/login-sheet.js"], "scripts locaux seulement");
+  assert.deepStrictEqual([...PAGE.matchAll(/<script src="([^"]+)"/g)].map((m) => m[1]), ["/brand.js", "/theme-toggle.js", "/config.js", "/pseudo.js", "/login-sheet.js", "/analytics.js"], "scripts locaux seulement");
   assert.ok(!/<script[^>]+src="https?:/i.test(PAGE), "aucune balise script externe");
   assert.ok(!/(src|href)="https?:\/\//i.test(PAGE), "aucune ressource externe (script, image, feuille de style, lien)");
   assert.ok(!/@import|url\(\s*["']?https?:|fonts\.(googleapis|gstatic)|<link[^>]+(\.woff|fonts)/i.test(PAGE), "aucune police externe");
@@ -78,10 +78,70 @@ test("aucun script ni ressource externe au chargement ; la bibliothèque Supabas
   assert.ok(!/innerHTML|outerHTML|insertAdjacentHTML|document\.write|\beval\(/.test(PAGE));
 });
 
-test("aucun cookie, aucun stockage nouveau, aucun suivi : ni analytics.js, ni page_views, ni écriture dans le stockage", () => {
-  assert.ok(!/analytics\.js|page_views|document\.cookie|setItem|sessionStorage|indexedDB|sendBeacon|gtag|fbq|pixel/i.test(PAGE));
+test("suivi : UNIQUEMENT le compteur anonyme existant (analytics.js) ; ni cookie, ni stockage nouveau, ni appel direct à Supabase hors analytics.js, ni autre outil de suivi", () => {
+  const tags = [...PAGE.matchAll(/<script[^>]*analytics[^>]*>/gi)].map((m) => m[0]);
+  assert.deepStrictEqual(tags, ['<script src="/analytics.js" defer>'], "analytics.js présent une seule fois, local, différé (comme les pages comparables)");
+  assert.ok(PAGE.includes('<script src="/analytics.js" defer></script>'), "balise complète, sans contenu en ligne");
+  const own = PAGE.replace(/<script src="[^"]*"[^>]*><\/script>/g, "");   // le code PROPRE de la page (balises src retirées)
+  assert.ok(!/analytics|page_views|\/rest\/v1|sendBeacon|gtag|fbq|pixel|indexedDB|document\.cookie|setItem|sessionStorage|removeItem|\.rpc\(|\.from\(|fetch\(|XMLHttpRequest/i.test(own), "la page n'envoie rien et n'écrit rien elle-même");
+  assert.ok(!/<script[^>]+src="https?:/i.test(PAGE) && !/(src|href)="https?:\/\//i.test(PAGE), "aucune ressource externe nouvelle");
   assert.ok(!/\?ref=|[?&]ref=|parrain|referral/i.test(PAGE), "ni parrainage ni paramètre ref");
   assert.ok(!/pwa-install/.test(PAGE), "pas de bannière d'installation ajoutée");
+  // analytics.js n'écrit que ses 4 clés DÉJÀ existantes (aucune nouvelle clé de stockage, aucun cookie)
+  const js = read("analytics.js"), keys = [...js.matchAll(/var (K_[A-Z]+) = "([a-z_]+)"/g)].map((m) => m[2]).sort();
+  assert.deepStrictEqual(keys, ["mahouto_pv_admin", "mahouto_pv_seen", "mahouto_pv_src", "mahouto_vid"]);
+  assert.ok(!/document\.cookie/.test(js), "analytics.js n'utilise aucun cookie");
+});
+
+// ====================== le compteur sur cette page : ce qui part, une seule fois, silencieusement ======================
+function runAnalytics(o) {
+  const opts = Object.assign({ url: "/creer-ma-carte.html", search: "?src=mp-facture", host: "mahouto.com", dnt: false, failFetch: false, store: null }, o || {});
+  const sent = [], local = opts.store || {}, session = {};
+  const mk = (s) => ({ getItem: (k) => (Object.prototype.hasOwnProperty.call(s, k) ? s[k] : null), setItem: (k, v) => { s[k] = String(v); }, removeItem: (k) => { delete s[k]; } });
+  const win = { MAHOUTO_CONFIG: { SUPABASE_URL: "https://projet-fictif.supabase.test", SUPABASE_ANON_KEY: "cle-fictive" }, MAHOUTO_BRAND: { id: "mahouto" }, addEventListener() {}, requestIdleCallback: (f) => f() };
+  const ctx = { window: win, document: { readyState: "complete", referrer: "" }, navigator: { userAgent: "Mozilla/5.0 (Linux; Android 13; Mobile) Chrome/120", doNotTrack: opts.dnt ? "1" : "0", maxTouchPoints: 5 },
+    location: { pathname: opts.url, search: opts.search, hostname: opts.host }, localStorage: mk(local), sessionStorage: mk(session), URLSearchParams, URL, Date, JSON, Math, Uint8Array, Object, Array, String, Number, Error, RegExp,
+    fetch: (u, init) => { sent.push({ url: u, init }); return opts.failFetch ? Promise.reject(new Error("hors ligne")) : Promise.resolve({ ok: true, json: async () => false }); }, setTimeout };
+  win.location = ctx.location;
+  vm.runInNewContext(read("analytics.js"), ctx);
+  return { sent, local, session };
+}
+const posts = (r) => r.sent.filter((s) => /\/rest\/v1\/page_views$/.test(s.url));
+
+test("compteur : /creer-ma-carte.html?src=mp-facture envoie UNE ligne (marque, chemin, type, source, appareil), sans identité, avec la clé publique seulement", async () => {
+  const r = runAnalytics(); await tick();
+  assert.strictEqual(posts(r).length, 1);
+  const row = JSON.parse(posts(r)[0].init.body);
+  assert.deepStrictEqual(Object.keys(row).sort(), ["brand", "device", "item_id", "page_type", "path", "source", "visitor_id"]);
+  assert.deepStrictEqual([row.brand, row.path, row.page_type, row.item_id, row.source, row.device], ["mahouto", "/creer-ma-carte.html", "other", null, "mp-facture", "mobile"]);
+  assert.match(row.visitor_id, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  const h = posts(r)[0].init.headers; assert.strictEqual(h.Authorization, "Bearer cle-fictive", "clé publique, jamais l'identité d'un membre"); assert.strictEqual(h.Prefer, "return=minimal");
+  // valeurs acceptées par la base (contraintes de page-views-setup.sql)
+  assert.ok(row.path.length >= 1 && row.path.length <= 200 && row.path[0] === "/" && /^[a-z0-9_-]{1,40}$/.test(row.source) && ["mobile", "desktop", "tablet"].includes(row.device) && ["home", "serigraphie_list", "serigraphie_product", "product", "formation", "other"].includes(row.page_type));
+  assert.deepStrictEqual(Object.keys(r.local).sort(), ["mahouto_pv_seen", "mahouto_vid"], "aucune nouvelle clé de stockage");
+  assert.deepStrictEqual(Object.keys(r.session), ["mahouto_pv_src"]);
+});
+
+test("compteur : une 2e visite dans la même demi-heure n'envoie rien (pas de doublon) ; après 30 minutes, elle est recomptée", async () => {
+  const store = {};
+  const a = runAnalytics({ store }); await tick(); assert.strictEqual(posts(a).length, 1);
+  const b = runAnalytics({ store }); await tick(); assert.strictEqual(posts(b).length, 0, "doublon évité");
+  const seen = JSON.parse(store.mahouto_pv_seen); Object.keys(seen).forEach((k) => { seen[k] -= 31 * 60 * 1000; }); store.mahouto_pv_seen = JSON.stringify(seen);
+  const c = runAnalytics({ store }); await tick(); assert.strictEqual(posts(c).length, 1, "recompté après 30 minutes");
+});
+
+test("compteur : autres supports (mp-affiche, mp-tshirt), sans ?src= (direct), source au format invalide (direct), adresse courte sans .html", async () => {
+  const s = async (o) => { const r = runAnalytics(o); await tick(); return posts(r).map((p) => JSON.parse(p.init.body)); };
+  assert.strictEqual((await s({ search: "?src=mp-affiche" }))[0].source, "mp-affiche"); assert.strictEqual((await s({ search: "?src=mp-tshirt" }))[0].source, "mp-tshirt");
+  assert.strictEqual((await s({ search: "" }))[0].source, "direct");
+  assert.strictEqual((await s({ search: "?src=Mp Facture!" }))[0].source, "direct", "format invalide ignoré");
+  assert.strictEqual((await s({ url: "/creer-ma-carte" }))[0].path, "/creer-ma-carte", "l'adresse courte est comptée telle quelle (chemin accepté par la base)");
+});
+
+test("compteur : respecte « Ne pas me suivre » et les domaines inconnus (aperçus) ; un envoi qui échoue ne casse rien (aucun rejet non géré)", async () => {
+  let r = runAnalytics({ dnt: true }); await tick(); assert.strictEqual(r.sent.length, 0);
+  r = runAnalytics({ host: "mon-apercu.vercel.app" }); await tick(); assert.strictEqual(r.sent.length, 0);
+  r = runAnalytics({ failFetch: true }); await tick(30); assert.strictEqual(posts(r).length, 1, "l'envoi est tenté, l'échec est avalé");
 });
 
 test("style et marque : en-tête de marque, thème, pied avec la phrase de liaison protégée (data-brand-fixed), logos 128 px", () => {
@@ -102,8 +162,8 @@ test("une seule entrée discrète dans l'application : le menu « Mon compte » 
   assert.ok(h.includes('<label class="check" for="pp-majeur"><input type="checkbox" id="pp-majeur"><span>Je certifie avoir 18 ans ou plus.</span></label>'), "profil.html : le reste est intact");
 });
 
-test("sw.js : cache v129 ou plus, page dans APP_SHELL (comme les pages comparables), nom du cache de partage inchangé", () => {
-  const sw = read("sw.js"); assert.match(sw, /CACHE_NAME = "mahoutoplus-shell-v(129|1[3-9]\d)"/); assert.match(sw, /SHARE_CACHE_NAME = "mahoutoplus-share-v1"/);
+test("sw.js : cache v131 ou plus (main était à v130), page dans APP_SHELL (comme les pages comparables), nom du cache de partage inchangé", () => {
+  const sw = read("sw.js"); assert.match(sw, /CACHE_NAME = "mahoutoplus-shell-v(13[1-9]|1[4-9]\d)"/); assert.match(sw, /SHARE_CACHE_NAME = "mahoutoplus-share-v1"/); assert.ok(!/analytics\.js/.test(sw), "les pages comparables ne pré-cachent pas analytics.js : pas ajouté");
   assert.strictEqual((sw.match(/"\/creer-ma-carte\.html"/g) || []).length, 1); assert.ok(sw.includes('"/regles-pages-publiques.html"') && sw.includes('"/m.html"'), "les pages comparables sont dans le pré-cache");
 });
 

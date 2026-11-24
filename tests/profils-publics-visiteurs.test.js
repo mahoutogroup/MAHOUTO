@@ -395,7 +395,7 @@ test("regles-pages-publiques.html : paragraphe « Qui a vu ma carte » (opt-in, 
 });
 
 test("sw.js : cache v130 (main était à v129) et profil-visiteurs.js pré-caché ; vercel.json et api/ inchangés", () => {
-  const sw = read("sw.js"); assert.match(sw, /const CACHE_NAME = "mahoutoplus-shell-v130";/); assert.strictEqual((sw.match(/"\/profil-visiteurs\.js"/g) || []).length, 1);
+  const sw = read("sw.js"); assert.match(sw, /const CACHE_NAME = "mahoutoplus-shell-v(130|13[1-9]|1[4-9]\d)";/); assert.strictEqual((sw.match(/"\/profil-visiteurs\.js"/g) || []).length, 1);
   assert.ok(sw.indexOf('"/profil-visiteurs.js"') > sw.indexOf('"/profil-public.js"'));
   const list = (d) => fs.readdirSync(path.join(root, d)).filter((f) => f.endsWith(".js") && !f.startsWith("_")); assert.strictEqual(list("api").length + list("api/admin").length, 12, "12 fonctions sur 12 : aucun fichier ajouté dans api/");
   assert.ok(!fs.readdirSync(path.join(root, "api")).some((f) => /visiteur/i.test(f)));
