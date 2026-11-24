@@ -48,7 +48,7 @@ import { brandForRequest } from "./_brand.js";
 import { cloudinaryImageParts } from "./_cloudinary-og.js";
 import { handleRoomPreview, ROOM_FIELDS } from "./_room-og.js";
 import { handleEntreprisePreview, ENTREPRISE_FIELDS } from "./_entreprise-og.js";
-import { handleProfilPreview } from "./_profil-og.js";
+import { handleProfilPreview, handleProfilJson } from "./_profil-og.js";
 
 function escapeHtml(str) {
   return String(str || "")
@@ -454,6 +454,10 @@ async function fetchAliasForPreview(alias) {
 }
 
 export default async function handler(req, res) {
+  // Carte d'aperçu d'une page de membre dans les messages (format=json) : mêmes lectures que l'aperçu HTML, aucune requête en plus.
+  if (req.query && req.query.type === "profil" && req.query.format === "json") {
+    return handleProfilJson(req, res, { fetchProfil: fetchProfilForPreview, fetchAlias: fetchAliasForPreview });
+  }
   // Pages publiques de membres : même principe (site et marque fixes, noindex).
   if (req.query && req.query.type === "profil" && req.query.format !== "json") {
     return handleProfilPreview(req, res, { fetchProfil: fetchProfilForPreview, fetchAlias: fetchAliasForPreview });
