@@ -22,6 +22,7 @@
 //  - alias : si l'adresse n'est pas une page, profil_public_alias_resoudre(p_alias) (clé anonyme) peut renvoyer l'adresse
 //    PRINCIPALE d'une page réellement publique : aperçu et redirection se font alors sur la page principale (lien canonique
 //    https://mahouto.com/m/<principale>) ; sinon comportement inchangé. Aucune requête en plus quand l'adresse est une page ;
+//  - carte d'aperçu dans les messages : handleProfilJson (type=profil&format=json), mêmes lectures, mêmes règles : voir plus bas ;
 //  - humains : redirection vers /m.html?adresse=<adresse>&src=<source> ; la source (ex. « qr ») est reprise de la chaîne
 //    de requête d'origine, sinon déduite dans le navigateur (Facebook, Instagram, TikTok), sinon « partage ».
 // =========================================================
@@ -192,9 +193,50 @@ function send(res, preview) {
 }
 
 /**
- * Réponse à GET /m/:adresse. deps.fetchProfil(adresse) → { row, error } (appel RPC profil_public_lire, clé anonyme).
+ * Lecture d'une page par son adresse, avec résolution d'un alias — commune à l'aperçu HTML et à l'aperçu JSON (mêmes requêtes).
+ * Renvoie { error, row, adresse } : adresse = l'adresse PRINCIPALE si l'adresse demandée est un alias (sinon l'adresse demandée) ;
+ * row = la ligne renvoyée par profil_public_lire (null = rien de public) ; error = une lecture a échoué.
+ * Alias (adresse supplémentaire gérée par les administrateurs) : seulement quand l'adresse n'est PAS une page publique ;
+ * profil_public_alias_resoudre ne renvoie que l'adresse principale d'une page réellement publique. Aucun appel supplémentaire
+ * quand l'adresse est déjà une page.
+ */
+export async function readProfilPage(adresse, deps) {
+  let result;
+  try {
+    result = await deps.fetchProfil(adresse);
+  } catch (err) {
+    result = { row: null, error: err || new Error("lecture impossible") };
+  }
+  if (result && result.error) return { error: true, row: null, adresse };
+  if (!(result && result.row) && deps.fetchAlias) {
+    let alias;
+    try {
+      alias = await deps.fetchAlias(adresse);
+    } catch (err) {
+      alias = { adresse: null, error: err || new Error("lecture impossible") };
+    }
+    if (alias && alias.error) return { error: true, row: null, adresse };
+    const principale = alias && isValidProfilAdresse(alias.adresse) && alias.adresse !== adresse ? alias.adresse : null;
+    if (principale) {
+      let page;
+      try {
+        page = await deps.fetchProfil(principale);
+      } catch (err) {
+        page = { row: null, error: err || new Error("lecture impossible") };
+      }
+      if (page && page.error) return { error: true, row: null, adresse: principale };
+      return { error: false, row: page && page.row ? page.row : null, adresse: principale };
+    }
+  }
+  return { error: false, row: result && result.row ? result.row : null, adresse };
+}
+
+/**
+ * Réponse à GET /m/:adresse. deps.fetchProfil(adresse) → { row, error } (appel RPC profil_public_lire, clé anonyme) ;
+ * deps.fetchAlias(adresse) → { adresse, error } (appel RPC profil_public_alias_resoudre), optionnel.
  *  - adresse invalide : aperçu générique, AUCUNE lecture ;
  *  - rien de public (inexistante, non publiée, suspendue, fonction fermée) : aperçu générique, même réponse ;
+ *  - alias : aperçu de la page principale (lien canonique = adresse principale), redirection des humains vers la principale ;
  *  - erreur de lecture : 503 sans cache (aperçu générique pour les robots), mais l'humain est redirigé vers /m.html.
  */
 export async function handleProfilPreview(req, res, deps) {
@@ -204,42 +246,56 @@ export async function handleProfilPreview(req, res, deps) {
   const adresse = isValidProfilAdresse(raw) ? raw : null;
   if (!adresse) return send(res, buildProfilPreview(null, null, source, raw));
 
-  let result;
-  try {
-    result = await deps.fetchProfil(adresse);
-  } catch (err) {
-    result = { row: null, error: err || new Error("lecture impossible") };
-  }
-  if (result && result.error) {
-    return send(res, genericPreview(humanTarget(adresse, source), 503, "no-store"));
-  }
-  // Alias (adresse supplémentaire gérée par les administrateurs) : seulement quand l'adresse n'est PAS une page publique.
-  // profil_public_alias_resoudre ne renvoie que l'adresse principale (jamais autre chose) et seulement si la page est réellement
-  // publique. On sert alors l'aperçu de la page principale (lien canonique = adresse principale) et les humains sont redirigés vers
-  // /m.html?adresse=<principale>. Aucun appel supplémentaire quand l'adresse est déjà une page.
-  if (!(result && result.row) && deps.fetchAlias) {
-    let alias;
-    try {
-      alias = await deps.fetchAlias(adresse);
-    } catch (err) {
-      alias = { adresse: null, error: err || new Error("lecture impossible") };
-    }
-    if (alias && alias.error) {
-      return send(res, genericPreview(humanTarget(adresse, source), 503, "no-store"));
-    }
-    const principale = alias && isValidProfilAdresse(alias.adresse) && alias.adresse !== adresse ? alias.adresse : null;
-    if (principale) {
-      let page;
-      try {
-        page = await deps.fetchProfil(principale);
-      } catch (err) {
-        page = { row: null, error: err || new Error("lecture impossible") };
-      }
-      if (page && page.error) {
-        return send(res, genericPreview(humanTarget(principale, source), 503, "no-store"));
-      }
-      return send(res, buildProfilPreview(page && page.row ? page.row : null, principale, source, principale));
-    }
-  }
-  return send(res, buildProfilPreview(result && result.row ? result.row : null, adresse, source, raw));
+  const page = await readProfilPage(adresse, deps);
+  if (page.error) return send(res, genericPreview(humanTarget(page.adresse, source), 503, "no-store"));
+  return send(res, buildProfilPreview(page.row, page.adresse, source, page.adresse === adresse ? raw : page.adresse));
+}
+
+// ---------------------------------------------------------
+// Carte d'aperçu dans les messages (chat.html, dm-chat.html) : GET /api/produit-og?type=profil&adresse=<adresse>&format=json
+// Même lecture et même résolution d'alias que l'aperçu HTML (readProfilPage). Réponse {title, description, image, adresse} :
+// nom affiché, « métier · ville — début de la présentation » (même construction que l'aperçu de partage), photo de la page
+// seulement si elle vient du compte Cloudinary du projet (carré 160 px, métadonnées retirées) sinon chaîne vide, adresse
+// PRINCIPALE. JAMAIS le contact, jamais d'identifiant de compte, jamais un champ absent de l'aperçu de partage public.
+// Page non publique (inexistante, non publiée, suspendue, fonction fermée) : 404 sans aucun contenu de page.
+// Erreur de lecture : 503 sans cache. Cache court (5 minutes), noindex.
+// ---------------------------------------------------------
+export const PROFIL_JSON_CACHE = "public, max-age=60, s-maxage=300";
+
+/** Photo de la carte : carré 160 px recadré, seulement pour une image du compte Cloudinary du projet ; sinon chaîne vide. */
+export function profilCardImage(row) {
+  const url = row && row.avatar_url;
+  if (typeof url !== "string" || /[?#]/.test(url)) return "";
+  const ext = (url.match(/\.([A-Za-z0-9]{2,5})$/) || [])[1];
+  if (ext && !READABLE_EXTENSION.test(ext)) return "";
+  const parts = cloudinaryImageParts(url);
+  return parts ? `${parts.prefix}f_jpg,q_auto,fl_strip_profile,w_160,h_160,c_fill,g_auto/${parts.rest}` : "";
+}
+
+/** Corps JSON de la carte pour une ligne publique, ou null si la ligne ne correspond pas à l'adresse ou n'a pas de nom. */
+export function buildProfilCard(row, adresse) {
+  if (!isValidProfilAdresse(adresse) || !row || row.adresse !== adresse) return null;
+  const nom = cut(row.nom_affiche, 60);
+  if (!nom) return null;
+  return { title: nom, description: profilDescription(row), image: profilCardImage(row), adresse };
+}
+
+function sendJson(res, status, cache, body) {
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
+  res.setHeader("Cache-Control", cache);
+  res.setHeader("X-Robots-Tag", "noindex, nofollow");
+  return res.status(status).json(body);
+}
+
+export async function handleProfilJson(req, res, deps) {
+  if (req.method && req.method !== "GET" && req.method !== "HEAD") return sendJson(res, 405, "no-store", { error: "method_not_allowed" });
+  const query = req && req.query ? req.query : {};
+  const adresse = isValidProfilAdresse(query.adresse) ? query.adresse : null;
+  if (!adresse) return sendJson(res, 404, PROFIL_JSON_CACHE, { error: "not_found" });   // AVANT toute lecture
+
+  const page = await readProfilPage(adresse, deps);
+  if (page.error) return sendJson(res, 503, "no-store", { error: "unavailable" });
+  const card = buildProfilCard(page.row, page.adresse);
+  if (!card) return sendJson(res, 404, PROFIL_JSON_CACHE, { error: "not_found" });
+  return sendJson(res, 200, PROFIL_JSON_CACHE, card);
 }

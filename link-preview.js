@@ -2,15 +2,19 @@
    link-preview.js — carte d'aperçu sous un message contenant un lien vers NOTRE site
 
    Sont aperçus : https://(www.)mahouto.com ou https://(www.)majestepresse.com, routes
-   /p/<id> (produit numérique) et /s/<id> (produit de sérigraphie) UNIQUEMENT.
+   /p/<id> (produit numérique), /s/<id> (produit de sérigraphie) et /m/<adresse> (page publique d'un membre) UNIQUEMENT.
    Toute autre adresse est ignorée : aucun aperçu, aucune requête.
 
    - La page appelle l'API de SON PROPRE domaine (/api/produit-og?...&format=json) : même
      code et même base sur les deux domaines, donc aucune requête entre domaines. Le serveur
      ne reçoit qu'un type et un identifiant (jamais une adresse à télécharger).
    - Chargement à l'affichage (pas à l'envoi), seulement quand le message devient visible
-     (IntersectionObserver), avec cache localStorage de 24 h (clé = adresse du lien).
-   - Échec ou hors ligne : on ne fait rien, le texte et le lien cliquable restent seuls.
+     (IntersectionObserver), avec cache localStorage de 24 h (clé = adresse du lien) ; 5 MINUTES seulement pour une page de
+     membre, pour qu'une page suspendue ou dépubliée disparaisse vite.
+   - Échec ou hors ligne : on ne fait rien, le texte et le lien cliquable restent seuls. Une réponse 404 (page non publique,
+     inconnue) ou 503 n'est JAMAIS mise en cache : une adresse non publique ne laisse aucune trace dans localStorage.
+   - Page de membre : le lien de la carte est TOUJOURS l'adresse écrite dans le message (jamais une adresse venue de la réponse,
+     même pour un alias) ; carte compacte (photo ronde ou initiale, nom, « métier · ville — début de présentation »).
    - Toutes les valeurs affichées passent par textContent ; l'image doit venir de Cloudinary.
 
    Utilisation (dans renderMessage) : MahoutoLinkPreview.attach(bubble, msg.content, messagesEl);
@@ -19,6 +23,7 @@ window.MahoutoLinkPreview = (function () {
   "use strict";
 
   var TTL_MS = 24 * 60 * 60 * 1000;
+  var TTL_PROFIL_MS = 5 * 60 * 1000;   // pages de membres : une suspension ou une dépublication se voit en 5 minutes au plus
   var CACHE_PREFIX = "mahouto_lp:";
   var MAX_CARDS = 2;
 
@@ -29,6 +34,7 @@ window.MahoutoLinkPreview = (function () {
     "www.majestepresse.com": "MAJESTÉ PRESSE"
   };
   var PRODUCT_RE = /^\/p\/([A-Za-z0-9_-]{1,100})\/?$/;
+  var PROFIL_RE = /^\/m\/([a-z0-9][a-z0-9-]{1,28}[a-z0-9])\/?$/;   // même règle que le serveur (api/_profil-og.js) : 3 à 30 caractères
   var SERIGRAPHIE_RE = /^\/s\/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})\/?$/;
 
   var styleAdded = false;
@@ -49,7 +55,14 @@ window.MahoutoLinkPreview = (function () {
       ".mlp-body{padding:8px 10px 10px}" +
       ".mlp-site{font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text-muted);margin-bottom:3px}" +
       ".mlp-title{font-size:14px;font-weight:700;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}" +
-      ".mlp-desc{margin-top:3px;font-size:12px;line-height:1.4;color:var(--text-muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}";
+      ".mlp-desc{margin-top:3px;font-size:12px;line-height:1.4;color:var(--text-muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}" +
+      // version compacte des pages de membres : photo ronde (ou initiale) à gauche, texte à droite ; variables du thème (sombre et clair)
+      ".mlp-profil{display:flex;align-items:center;gap:10px;padding:10px}" +
+      ".mlp-profil .mlp-body{padding:0;min-width:0;flex:1}" +
+      ".mlp-avatar{position:relative;flex:0 0 auto;width:48px;height:48px;border-radius:50%;overflow:hidden;background:var(--bg-elevated);border:1px solid var(--border);" +
+        "display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:700;color:var(--gold)}" +
+      ".mlp-avatar img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}" +   // la photo recouvre l'initiale
+      "body.light-theme .mlp-profil .mlp-avatar{color:var(--gold-text,#856500)}";
     var st = document.createElement("style");
     st.textContent = css;
     document.head.appendChild(st);
@@ -71,22 +84,23 @@ window.MahoutoLinkPreview = (function () {
       var type = null, id = null, m;
       if ((m = PRODUCT_RE.exec(url.pathname))) { type = "produit"; id = m[1]; }
       else if ((m = SERIGRAPHIE_RE.exec(url.pathname))) { type = "serigraphie"; id = m[1]; }
+      else if ((m = PROFIL_RE.exec(url.pathname))) { type = "profil"; id = m[1]; }
       if (!type) continue;
 
       var href = "https://" + host + url.pathname.replace(/\/$/, "");   // adresse reconstruite, sans paramètres
       if (seen[href]) continue;
       seen[href] = true;
-      found.push({ href: href, type: type, id: id, siteName: SITES[host] });
+      found.push({ href: href, type: type, id: id, siteName: SITES[host], ttl: type === "profil" ? TTL_PROFIL_MS : TTL_MS });
     }
     return found;
   }
 
-  function readCache(key) {
+  function readCache(key, ttl) {
     try {
       var raw = localStorage.getItem(CACHE_PREFIX + key);
       if (!raw) return null;
       var entry = JSON.parse(raw);
-      if (!entry || typeof entry.t !== "number" || Date.now() - entry.t > TTL_MS || !entry.d) return null;
+      if (!entry || typeof entry.t !== "number" || Date.now() - entry.t > ttl || !entry.d) return null;
       return entry.d;
     } catch (e) { return null; }
   }
@@ -96,12 +110,14 @@ window.MahoutoLinkPreview = (function () {
   }
 
   function load(link) {
-    var cached = readCache(link.href);
+    var cached = readCache(link.href, link.ttl);
     if (cached) return Promise.resolve(cached);
     if (failed[link.href]) return Promise.reject(new Error("indisponible"));
     if (inflight[link.href]) return inflight[link.href];
 
-    var api = "/api/produit-og?type=" + encodeURIComponent(link.type) + "&id=" + encodeURIComponent(link.id) + "&format=json";
+    var api = link.type === "profil"
+      ? "/api/produit-og?type=profil&adresse=" + encodeURIComponent(link.id) + "&format=json"
+      : "/api/produit-og?type=" + encodeURIComponent(link.type) + "&id=" + encodeURIComponent(link.id) + "&format=json";
     inflight[link.href] = fetch(api, { headers: { "Accept": "application/json" } })
       .then(function (resp) {
         if (!resp.ok) throw new Error("http " + resp.status);
@@ -113,7 +129,8 @@ window.MahoutoLinkPreview = (function () {
           title: json.title.slice(0, 160),
           description: typeof json.description === "string" ? json.description.slice(0, 240) : "",
           image: typeof json.image === "string" && /^https:\/\/res\.cloudinary\.com\//.test(json.image) && json.image.length < 600 ? json.image : "",
-          siteName: link.siteName
+          siteName: link.siteName,
+          profil: link.type === "profil"
         };
         writeCache(link.href, data);
         delete inflight[link.href];
@@ -135,7 +152,24 @@ window.MahoutoLinkPreview = (function () {
     a.rel = "noopener noreferrer";
     a.addEventListener("click", function (ev) { ev.stopPropagation(); });   // n'ouvre pas le menu du message
 
-    if (data.image) {
+    if (data.profil) {
+      a.className = "mlp-card mlp-profil";
+      var av = document.createElement("div");
+      av.className = "mlp-avatar";
+      var initial = document.createElement("span");
+      initial.textContent = (Array.from(data.title)[0] || "?").toUpperCase();
+      av.appendChild(initial);
+      if (data.image) {
+        var photo = document.createElement("img");
+        photo.alt = "";
+        photo.loading = "lazy";
+        photo.referrerPolicy = "no-referrer";
+        photo.addEventListener("error", function () { photo.remove(); });
+        photo.src = data.image;
+        av.appendChild(photo);
+      }
+      a.appendChild(av);
+    } else if (data.image) {
       var img = document.createElement("img");
       img.className = "mlp-img";
       img.alt = "";
