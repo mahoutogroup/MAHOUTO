@@ -36,6 +36,10 @@
     {
       "source": "/pro",
       "destination": "/pro.html"
+    },
+    {
+      "source": "/regles-pages-publiques",
+      "destination": "/regles-pages-publiques.html"
     }
   ],
   "headers": [
