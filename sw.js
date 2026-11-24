@@ -26,6 +26,7 @@ const APP_SHELL = [
   "/profil.html",
   "/profil-public.js",
   "/profil-visiteurs.js",
+  "/invitation.js",
   "/profil-public-utils.js",
   "/profil-public-carte.js",
   "/assets/logo-mahouto-plus-128.png",

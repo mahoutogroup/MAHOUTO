@@ -111,6 +111,16 @@
   body.light-theme .pv a.pv-nom { color: var(--gold-text, #856500); }
   .pv a.pv-nom:focus-visible { outline: 3px solid var(--gold-bright); outline-offset: 2px; }
   .pv .pv-info { font-size: 12.5px; color: var(--text-muted); }
+  /* Inviter des professionnels (lien d'invitation, compteur seulement) */
+  .inv { margin-bottom: 12px; }
+  .inv .inv-regles { list-style: none; padding: 0; margin: 0 0 12px; }
+  .inv .inv-regles li { font-size: 12.5px; line-height: 1.6; color: var(--text-muted); padding: 4px 0 4px 14px; position: relative; }
+  .inv .inv-regles li::before { content: ""; position: absolute; left: 0; top: 11px; width: 6px; height: 6px; border-radius: 50%; background: var(--gold); }
+  .inv .inv-lien { font-size: 13px; color: var(--white); overflow-wrap: anywhere; margin: 0 0 8px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); }
+  .inv .inv-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+  .inv .inv-actions .pp-btn { min-height: 48px; flex: 1 1 140px; }
+  .inv .inv-compteur { font-size: 15px; font-weight: 700; color: var(--gold); margin: 6px 0 0; }
+  body.light-theme .inv .inv-compteur { color: var(--gold-text, #856500); }
   /* Mon profil public (PR 1 du profil public) */
   .pp { margin: 18px 20px 0; border: 1px solid var(--border); background: var(--bg-card); border-radius: var(--radius-md); padding: 16px 16px 12px; }
   .pp h2 { font-size: 16px; color: var(--white); margin-bottom: 6px; }
@@ -326,6 +336,23 @@
       <p class="hint">Les membres que vous avez bloqués n'apparaissent pas. Le détail est dans les règles des pages publiques.</p>
     </div>
     <a class="pp-regles" id="pv-lien-regles" href="/regles-pages-publiques.html">Lire les règles des pages publiques</a>
+  </section>
+
+  <section class="pp inv hidden" id="inv-section" aria-labelledby="inv-titre">
+    <h2 id="inv-titre">Inviter des professionnels</h2>
+    <ul class="inv-regles" id="inv-regles">
+      <li>Ce lien invite un professionnel à créer sa carte de visite sur MAHOUTO+.</li>
+      <li>Il n'y a aucune récompense : vous invitez pour faire connaître la plateforme.</li>
+      <li>Vous ne voyez jamais qui s'est inscrit, seulement combien de personnes ont rejoint grâce à votre lien.</li>
+    </ul>
+    <div class="hint">Votre lien d'invitation :</div>
+    <div class="inv-lien" id="inv-lien"></div>
+    <div class="inv-actions">
+      <button type="button" class="pp-btn secondary" id="inv-copier">Copier le lien</button>
+      <button type="button" class="pp-btn" id="inv-whatsapp">Partager sur WhatsApp</button>
+      <button type="button" class="pp-btn secondary hidden" id="inv-partager-systeme">Partager…</button>
+    </div>
+    <p class="inv-compteur" id="inv-compteur" role="status"></p>
   </section>
 
 </div>
@@ -639,6 +666,7 @@
 <script src="profil-public-carte.js"></script>
 <script src="profil-public.js"></script>
 <script src="profil-visiteurs.js"></script>
+<script src="invitation.js"></script>
 <script src="pwa-install.js"></script>
 
 </body>

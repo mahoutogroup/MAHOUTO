@@ -134,6 +134,9 @@
     $("pp-compteur").textContent = PU.countChars($("pp-presentation").value) + " / " + PU.LIMITS.presentation;
     $("pp-note-ferme").classList.toggle("hidden", ouvert);
     refreshQr(published);
+    // Signale la publication (ou non) à la section « Inviter des professionnels » : elle ne s'affiche que si la page est publiée.
+    // L'état est aussi posé sur la page : la section peut se charger après cet événement (elle le relit à son démarrage).
+    try { document.body.setAttribute("data-pp-publie", published ? "1" : "0"); document.dispatchEvent(new CustomEvent("pp-publication", { detail: { publie: published } })); } catch (e) { /* sans effet */ }
   }
 
   // ---------- QR code (visible dès que la page est publiée) ----------
