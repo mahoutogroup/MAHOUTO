@@ -31,6 +31,8 @@ const PHRASES = [
   "Pour voir cette liste, vous devez avoir activé le réglage vous-même. Les personnes sans compte restent anonymes.",
   "Les visites sont gardées 30 jours au maximum. Si vous désactivez le réglage, votre historique de visites est effacé immédiatement.",
   "Un membre que vous avez bloqué, ou qui vous a bloqué, n'apparaît pas dans la liste.",
+  "Compteur de visites",
+  "Comme les pages des membres, la page de présentation « Créez votre carte de visite » compte des visites anonymes (jamais de nom ni d'identité), et le paramètre ?src= du lien sert uniquement à savoir de quel support (facture, affiche, etc.) vient la visite.",
   "Dernière mise à jour : 24 novembre 2026."
 ];
 
@@ -39,11 +41,11 @@ test("la page contient TOUTES les phrases demandées, mot pour mot, dans l'ordre
   PHRASES.forEach((p) => { const i = TEXT.indexOf(p, from); assert.ok(i >= 0, "phrase absente ou déplacée : " + p.slice(0, 60)); from = i; });
 });
 
-test("structure : 1 h1, 7 sections h2 dans l'ordre, listes de 3, 6, 2 et 5 puces, rien d'autre de rédigé", () => {
+test("structure : 1 h1, 8 sections h2 dans l'ordre, listes de 3, 6, 2 et 5 puces, rien d'autre de rédigé", () => {
   assert.strictEqual((PAGE.match(/<h1[ >]/g) || []).length, 1);
-  assert.deepStrictEqual([...PAGE.matchAll(/<h2[^>]*>([^<]*)<\/h2>/g)].map((m) => m[1]), ["Ce que vous pouvez faire", "Ce qui est interdit", "Conditions", "Signaler une page", "Suspension", "Bloquer un membre", "Qui a vu ma carte"]);
+  assert.deepStrictEqual([...PAGE.matchAll(/<h2[^>]*>([^<]*)<\/h2>/g)].map((m) => m[1]), ["Ce que vous pouvez faire", "Ce qui est interdit", "Conditions", "Signaler une page", "Suspension", "Bloquer un membre", "Qui a vu ma carte", "Compteur de visites"]);
   assert.deepStrictEqual([...PAGE.matchAll(/<ul>([\s\S]*?)<\/ul>/g)].map((m) => (m[1].match(/<li>/g) || []).length), [3, 6, 2, 5]);
-  assert.strictEqual((PAGE.match(/<section aria-labelledby="r-\w+">/g) || []).length, 7);
+  assert.strictEqual((PAGE.match(/<section aria-labelledby="r-\w+">/g) || []).length, 8);
   assert.ok([...PAGE.matchAll(/<h2 id="(r-\w+)"/g)].every((m) => PAGE.includes('aria-labelledby="' + m[1] + '"')), "chaque section est reliée à son titre");
   // tout le texte visible = les phrases fournies + l'en-tête et le lien de retour (rien d'ajouté)
   let rest = TEXT; PHRASES.forEach((p) => { rest = rest.replace(p, ""); });
