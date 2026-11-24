@@ -89,6 +89,28 @@
   }
   #edit-modal .actions { display: flex; gap: 10px; }
   #edit-modal .actions button { flex: 1; }
+  /* Qui a vu ma carte (réglage + liste) */
+  .pv { margin-bottom: 12px; }
+  .pv .pv-regles { list-style: none; padding: 0; margin: 0 0 12px; }
+  .pv .pv-regles li { font-size: 12.5px; line-height: 1.6; color: var(--text-muted); padding: 4px 0 4px 14px; position: relative; }
+  .pv .pv-regles li::before { content: ""; position: absolute; left: 0; top: 11px; width: 6px; height: 6px; border-radius: 50%; background: var(--gold); }
+  .pv .pv-interrupteur { display: flex; align-items: center; gap: 12px; min-height: 56px; margin: 0 0 8px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--white); font-size: 14.5px; line-height: 1.4; cursor: pointer; }
+  .pv .pv-interrupteur input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+  .pv .pv-piste { flex: 0 0 auto; position: relative; width: 52px; height: 30px; border-radius: 15px; background: var(--bg-elevated); border: 2px solid var(--text-muted); transition: background .15s; }
+  .pv .pv-piste::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--text-muted); transition: transform .15s, background .15s; }
+  .pv .pv-interrupteur input:checked + .pv-piste { background: var(--gold); border-color: var(--gold); }
+  .pv .pv-interrupteur input:checked + .pv-piste::after { transform: translateX(22px); background: #0A0A0A; }
+  .pv .pv-interrupteur input:focus-visible + .pv-piste { outline: 3px solid var(--gold-bright); outline-offset: 2px; }
+  .pv .pv-interrupteur input:disabled + .pv-piste { opacity: .5; }
+  .pv .pv-etat { font-size: 13px; line-height: 1.5; color: var(--text-muted); margin: 4px 0 8px; }
+  .pv .pv-etat.erreur { color: #F87171; }
+  .pv .pv-liste { list-style: none; padding: 0; margin: 6px 0 8px; }
+  .pv .pv-liste li { display: flex; flex-direction: column; justify-content: center; min-height: 56px; padding: 6px 0; border-bottom: 1px solid var(--border); }
+  .pv .pv-nom { font-size: 15px; font-weight: 700; color: var(--white); display: inline-flex; align-items: center; min-height: 48px; width: fit-content; max-width: 100%; overflow-wrap: anywhere; }
+  .pv a.pv-nom { color: var(--gold); text-decoration: underline; text-underline-offset: 3px; }
+  body.light-theme .pv a.pv-nom { color: var(--gold-text, #856500); }
+  .pv a.pv-nom:focus-visible { outline: 3px solid var(--gold-bright); outline-offset: 2px; }
+  .pv .pv-info { font-size: 12.5px; color: var(--text-muted); }
   /* Mon profil public (PR 1 du profil public) */
   .pp { margin: 18px 20px 0; border: 1px solid var(--border); background: var(--bg-card); border-radius: var(--radius-md); padding: 16px 16px 12px; }
   .pp h2 { font-size: 16px; color: var(--white); margin-bottom: 6px; }
@@ -284,6 +306,25 @@
       <ul class="pp-visites-jours" id="pp-visites-jours"></ul>
       <p class="hint">Nous comptons des visites, pas des personnes : aucun nom, aucune identité de visiteur n'est enregistré.</p>
     </div>
+  </section>
+
+  <section class="pp pv hidden" id="pv-section" aria-labelledby="pv-titre">
+    <h2 id="pv-titre">Qui a vu ma carte</h2>
+    <ul class="pv-regles" id="pv-regles">
+      <li>Qui voit quoi : si vous consultez la carte d'un membre qui a lui aussi activé ce réglage, il voit votre nom, le nombre de vos visites et le jour de votre dernier passage. Rien d'autre. Les visiteurs sans compte restent anonymes.</li>
+      <li>Réciprocité : pour voir qui a consulté votre carte, vous devez avoir activé ce réglage vous-même.</li>
+      <li>Effacement : si vous le désactivez, votre historique de visites est effacé immédiatement. Les visites sont gardées 30 jours au maximum.</li>
+    </ul>
+    <label class="pv-interrupteur" for="pv-switch"><input type="checkbox" id="pv-switch" role="switch"><span class="pv-piste" aria-hidden="true"></span><span>Montrer mon nom quand je consulte la carte d'un membre</span></label>
+    <div class="pv-etat hidden" id="pv-etat" role="status"></div>
+    <p class="hint hidden" id="pv-invitation">Activez le réglage ci-dessus pour voir les membres qui ont consulté votre carte.</p>
+    <div class="hidden" id="pv-liste-zone">
+      <h3 class="pp-sous-titre">Membres qui ont consulté votre carte</h3>
+      <p class="hint hidden" id="pv-vide">Personne pour le moment. Seuls les membres connectés qui ont activé ce réglage apparaissent ici, pendant 30 jours.</p>
+      <ul class="pv-liste hidden" id="pv-liste"></ul>
+      <p class="hint">Les membres que vous avez bloqués n'apparaissent pas. Le détail est dans les règles des pages publiques.</p>
+    </div>
+    <a class="pp-regles" id="pv-lien-regles" href="/regles-pages-publiques.html">Lire les règles des pages publiques</a>
   </section>
 
 </div>
@@ -596,6 +637,7 @@
 <script src="profil-public-utils.js"></script>
 <script src="profil-public-carte.js"></script>
 <script src="profil-public.js"></script>
+<script src="profil-visiteurs.js"></script>
 <script src="pwa-install.js"></script>
 
 </body>

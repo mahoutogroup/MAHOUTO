@@ -134,16 +134,27 @@
     } catch (e) { /* le comptage est facultatif */ }
   }
 
+  // ---------- « Qui a vu ma carte » : enregistrement discret du passage d'un membre connecté ----------
+  // Jamais attendu (aucun await devant l'appel) et jamais visible : un échec, un refus ou une absence de réponse sont ignorés.
+  // Le membre n'est enregistré que s'il a activé son réglage : c'est la base qui décide (la réponse est toujours « vrai »).
+  async function recordVisit(supabase, adresse) {
+    try {
+      if (!(await currentUser(supabase))) return;
+      await supabase.rpc("profil_public_visiteur_enregistrer", { p_adresse: adresse });
+    } catch (e) { /* ignoré en silence */ }
+  }
+
   // ---------- Signalement ----------
-  var sessionUser;   // undefined = pas encore lu ; null = non connecté (comptes anonymes comptés comme non connectés)
-  async function currentUser(supabase) {
-    if (sessionUser !== undefined) return sessionUser;
-    var session = null;
-    try { session = (await supabase.auth.getSession()).data.session; } catch (e) { session = null; }
-    var u = session && session.user ? session.user : null;
-    var anon = !!u && (u.is_anonymous === true || (u.app_metadata && u.app_metadata.provider === "anonymous"));
-    sessionUser = u && !anon ? u : null;
-    return sessionUser;
+  var sessionPromise;   // une seule lecture de la session, partagée par l'enregistrement du passage, le signalement et le message
+  function currentUser(supabase) {
+    if (!sessionPromise) sessionPromise = (async function () {
+      var session = null;
+      try { session = (await supabase.auth.getSession()).data.session; } catch (e) { session = null; }
+      var u = session && session.user ? session.user : null;
+      var anon = !!u && (u.is_anonymous === true || (u.app_metadata && u.app_metadata.provider === "anonymous"));
+      return u && !anon ? u : null;   // comptes anonymes comptés comme non connectés
+    })();
+    return sessionPromise;
   }
 
   function mk(tag, props, children) {
@@ -467,6 +478,8 @@
         setupShare(row, adresse);
         // Comptage anonyme : seulement pour une page réellement publique (ni aperçu propriétaire ou administrateur, ni bandeau).
         if (!preview && !v.banner) countVisit();
+        // Passage d'un membre connecté : lancé sans attendre, avant le signalement et le message, jamais bloquant.
+        if (!preview && !v.banner) recordVisit(supabase, adresse);
         // Le signalement est facultatif : un échec ici ne doit jamais masquer la page.
         if (!preview) { try { await setupReport(supabase, row, adresse, v); } catch (e) { /* page affichée sans signalement */ } }
         // « Écrire un message » est facultatif lui aussi : un échec ici ne masque jamais la page.

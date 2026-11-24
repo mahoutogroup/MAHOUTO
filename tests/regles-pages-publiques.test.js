@@ -25,6 +25,12 @@ const PHRASES = [
   "Signaler une page", "Tout membre connecté peut signaler une page depuis le lien « Signaler cette page ». Les signalements sont examinés par l'équipe MAHOUTO+, qui vise une réponse sous 48 heures. Aucune page n'est suspendue automatiquement : chaque décision est prise après examen. Le nom de la personne qui signale n'est jamais montré.",
   "Suspension", "Une page qui ne respecte pas ces règles peut être suspendue. Quand c'est possible et que le cas n'est pas grave, vous êtes d'abord invité à corriger votre page.",
   "Bloquer un membre", "Dans la messagerie privée, vous pouvez bloquer un membre depuis le menu de la conversation. Vous pouvez le débloquer à tout moment dans la liste « Membres bloqués ».",
+  "Qui a vu ma carte",
+  "Cette fonction est facultative et désactivée par défaut : rien n'est enregistré sur vous tant que vous ne l'avez pas activée.",
+  "Si vous l'activez, votre nom peut apparaître dans la liste « Qui a vu ma carte » des membres dont vous consultez la carte, à condition qu'ils l'aient eux aussi activée. Ils voient votre nom, le nombre de vos visites et le jour de votre dernier passage, jamais l'heure.",
+  "Pour voir cette liste, vous devez avoir activé le réglage vous-même. Les personnes sans compte restent anonymes.",
+  "Les visites sont gardées 30 jours au maximum. Si vous désactivez le réglage, votre historique de visites est effacé immédiatement.",
+  "Un membre que vous avez bloqué, ou qui vous a bloqué, n'apparaît pas dans la liste.",
   "Dernière mise à jour : 24 novembre 2026."
 ];
 
@@ -33,11 +39,11 @@ test("la page contient TOUTES les phrases demandées, mot pour mot, dans l'ordre
   PHRASES.forEach((p) => { const i = TEXT.indexOf(p, from); assert.ok(i >= 0, "phrase absente ou déplacée : " + p.slice(0, 60)); from = i; });
 });
 
-test("structure : 1 h1, 6 sections h2 dans l'ordre, listes de 3, 6 et 2 puces, rien d'autre de rédigé", () => {
+test("structure : 1 h1, 7 sections h2 dans l'ordre, listes de 3, 6, 2 et 5 puces, rien d'autre de rédigé", () => {
   assert.strictEqual((PAGE.match(/<h1[ >]/g) || []).length, 1);
-  assert.deepStrictEqual([...PAGE.matchAll(/<h2[^>]*>([^<]*)<\/h2>/g)].map((m) => m[1]), ["Ce que vous pouvez faire", "Ce qui est interdit", "Conditions", "Signaler une page", "Suspension", "Bloquer un membre"]);
-  assert.deepStrictEqual([...PAGE.matchAll(/<ul>([\s\S]*?)<\/ul>/g)].map((m) => (m[1].match(/<li>/g) || []).length), [3, 6, 2]);
-  assert.strictEqual((PAGE.match(/<section aria-labelledby="r-\w+">/g) || []).length, 6);
+  assert.deepStrictEqual([...PAGE.matchAll(/<h2[^>]*>([^<]*)<\/h2>/g)].map((m) => m[1]), ["Ce que vous pouvez faire", "Ce qui est interdit", "Conditions", "Signaler une page", "Suspension", "Bloquer un membre", "Qui a vu ma carte"]);
+  assert.deepStrictEqual([...PAGE.matchAll(/<ul>([\s\S]*?)<\/ul>/g)].map((m) => (m[1].match(/<li>/g) || []).length), [3, 6, 2, 5]);
+  assert.strictEqual((PAGE.match(/<section aria-labelledby="r-\w+">/g) || []).length, 7);
   assert.ok([...PAGE.matchAll(/<h2 id="(r-\w+)"/g)].every((m) => PAGE.includes('aria-labelledby="' + m[1] + '"')), "chaque section est reliée à son titre");
   // tout le texte visible = les phrases fournies + l'en-tête et le lien de retour (rien d'ajouté)
   let rest = TEXT; PHRASES.forEach((p) => { rest = rest.replace(p, ""); });
