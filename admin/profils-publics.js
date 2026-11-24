@@ -15,6 +15,9 @@
    - Rappel (finitions) : tant que l'interrupteur est OUVERT, un bandeau rouge indique depuis combien de temps (calcul dans le
      navigateur à partir de maj_le, mise à jour chaque minute, plus insistant après 2 h) avec « Fermer maintenant », qui
      réutilise le même code que le bouton de fermeture (un clic, sans confirmation). Jamais de durée aberrante (PU.ouvertDepuis).
+   - Statistiques : profils_publics_admin_stats et profils_publics_admin_stats_jours (aucune ligne si pas administrateur) : tuiles
+     (pages publiées, pages créées en 7 jours, visites de la période, signalements à examiner), détail, visites par source,
+     courbe SVG par jour, pages les plus vues ; période 7, 30 ou 90 jours. Visites anonymes, aucun identifiant affiché.
    - Adresses supplémentaires (alias) : liste (profils_publics_admin_alias_lister), formulaire d'ajout
      (profils_publics_admin_alias_ajouter, un message clair par code), « Retirer » avec confirmation
      (profils_publics_admin_alias_retirer). L'adresse principale reste la seule vraie adresse.
@@ -266,6 +269,79 @@
     setStatus("msg-alias", ALIAS_RETRAIT[code], code === "non_admin");
   }
 
+  // ---------- Statistiques ----------
+  // Fonctions profils_publics_admin_stats (une ligne de chiffres) et profils_publics_admin_stats_jours (par jour), réservées aux
+  // administrateurs (aucune ligne sinon). Les visites sont anonymes : aucun identifiant de visiteur n'existe dans ces résultats.
+  // Période bornée à 7, 30 ou 90 jours côté interface (la base accepte 1 à 365). Tout texte passe par textContent.
+  var PERIODES = [7, 30, 90], periode = 30, statsSeq = 0;
+  function nb(n) { var v = Number(n); return isFinite(v) ? String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, "\u00A0") : "–"; }
+  function renderTiles(s) {
+    $("st-publiees").textContent = nb(s.pages_publiees);
+    $("st-nouvelles").textContent = nb(s.pages_nouvelles_7j);
+    $("st-visites").textContent = nb(s.visites_periode);
+    $("st-visites-lbl").textContent = "Visites sur " + periode + " jours";
+    $("st-examiner").textContent = nb(s.signalements_a_examiner);
+    var d = $("st-detail"); d.textContent = "";
+    [["Pages au total", s.pages_total], ["Brouillons", s.pages_brouillon], ["Pages suspendues", s.pages_suspendues], ["Pages créées sur 30 jours", s.pages_nouvelles_30j],
+     ["Pages qui acceptent les messages", s.pages_messages_ouverts], ["Adresses supplémentaires (alias)", s.alias_total], ["Signalements non traités", s.signalements_non_traites],
+     ["Visites depuis le début", s.visites_total]].forEach(function (r) { d.appendChild(el("li", {}, [el("span", { text: r[0] }), el("strong", { text: nb(r[1]) })])); });
+  }
+  function renderSources(src, total) {
+    var box = $("st-sources"); box.textContent = "";
+    var s = src && typeof src === "object" ? src : {}, t = Number(total) || 0;
+    [["QR code", "qr"], ["Lien partagé ou ouvert directement", "lien"], ["Autre (moteur de recherche, autre site)", "autre"]].forEach(function (r) {
+      var n = Number(s[r[1]]) || 0, pct = t > 0 ? Math.round((100 * n) / t) : 0;
+      var bar = el("div", { class: "st-bar", role: "img", "aria-label": r[0] + " : " + pct + " %" }, [el("span", {})]);
+      bar.firstChild.style.width = Math.max(0, Math.min(100, pct)) + "%";
+      box.appendChild(el("div", { class: "st-src" }, [el("div", { class: "top" }, [el("span", { text: r[0] }), el("strong", { text: nb(n) + " (" + pct + " %)" })]), bar]));
+    });
+  }
+  function renderTop(top) {
+    var ol = $("st-top"); ol.textContent = "";
+    var rows = Array.isArray(top) ? top.slice(0, 10) : [];
+    if (!rows.length) { ol.appendChild(el("li", {}, [el("span", { text: "Aucune visite sur cette période." })])); return; }
+    rows.forEach(function (r) {
+      var adresse = typeof r.adresse === "string" ? r.adresse : "";
+      ol.appendChild(el("li", {}, [el("span", { class: "nom" }, [document.createTextNode(String(r.nom || "")), el("span", { class: "adr", text: "/m/" + adresse })]), el("strong", { text: nb(r.visites) })]));
+    });
+  }
+  // Courbe SVG sans bibliothèque : une ligne des visites par jour ; texte alternatif avec le total et le maximum.
+  function renderCourbe(rows) {
+    var box = $("st-courbe"), note = $("st-courbe-note"); box.textContent = ""; note.textContent = "";
+    if (!Array.isArray(rows) || !rows.length) { note.textContent = "Courbe indisponible."; return; }
+    var vals = rows.map(function (r) { return Math.max(0, Number(r.visites) || 0); }), max = Math.max.apply(null, vals), total = vals.reduce(function (a, b) { return a + b; }, 0);
+    var NS = "http://www.w3.org/2000/svg", W = 300, H = 80, P = 4, svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("viewBox", "0 0 " + W + " " + H); svg.setAttribute("role", "img"); svg.setAttribute("preserveAspectRatio", "none");
+    svg.setAttribute("aria-label", "Visites par jour sur " + rows.length + " jours : " + total + " au total, maximum " + max + " par jour");
+    var step = rows.length > 1 ? (W - 2 * P) / (rows.length - 1) : 0, pts = vals.map(function (v, i) { return (P + i * step).toFixed(1) + "," + (H - P - (max > 0 ? (v / max) * (H - 2 * P) : 0)).toFixed(1); }).join(" ");
+    var base = document.createElementNS(NS, "line"); base.setAttribute("x1", String(P)); base.setAttribute("x2", String(W - P)); base.setAttribute("y1", String(H - P)); base.setAttribute("y2", String(H - P));
+    base.setAttribute("stroke", "currentColor"); base.setAttribute("stroke-opacity", "0.25"); base.setAttribute("stroke-width", "1");
+    var line = document.createElementNS(NS, "polyline"); line.setAttribute("points", pts); line.setAttribute("fill", "none"); line.setAttribute("stroke", "currentColor");
+    line.setAttribute("stroke-width", "2"); line.setAttribute("stroke-linejoin", "round"); line.setAttribute("stroke-linecap", "round"); line.setAttribute("vector-effect", "non-scaling-stroke");
+    svg.appendChild(base); svg.appendChild(line); box.appendChild(svg);
+    note.textContent = nb(total) + " visites sur " + rows.length + " jours · maximum " + nb(max) + " par jour · du " + PU.formatDateFr(rows[0].jour) + " au " + PU.formatDateFr(rows[rows.length - 1].jour);
+  }
+  function setPeriodButtons() {
+    Array.prototype.forEach.call($("st-periode").querySelectorAll ? $("st-periode").querySelectorAll("button") : [], function (b) { b.setAttribute("aria-pressed", String(Number(b.getAttribute("data-jours")) === periode)); });
+  }
+  async function loadStats() {
+    var seq = ++statsSeq;
+    setStatus("msg-stats", "Chargement…", false);
+    var res = await Promise.all([supabase.rpc("profils_publics_admin_stats", { p_jours: periode }), supabase.rpc("profils_publics_admin_stats_jours", { p_jours: periode })]);
+    if (seq !== statsSeq) return;                       // une période plus récente a été demandée entre-temps
+    var a = res[0], b = res[1];
+    if (a.error) { setStatus("msg-stats", "Impossible de charger les statistiques (le SQL des statistiques est-il exécuté ?).", true); return; }
+    var row = Array.isArray(a.data) && a.data.length && a.data[0] && typeof a.data[0] === "object" ? a.data[0] : null;
+    if (!row) { setStatus("msg-stats", "Aucune statistique : cette page est réservée aux administrateurs.", true); return; }
+    setStatus("msg-stats", "", false);
+    renderTiles(row); renderSources(row.visites_par_source, row.visites_periode); renderTop(row.top_pages);
+    renderCourbe(b.error || !Array.isArray(b.data) ? null : b.data);
+  }
+  function choosePeriod(jours) {
+    var j = Number(jours); if (PERIODES.indexOf(j) === -1) j = 30;
+    periode = j; setPeriodButtons(); loadStats();
+  }
+
   // ---------- Démarrage ----------
   async function init() {
     var sess = await supabase.auth.getSession();
@@ -288,8 +364,10 @@
     $("btn-fermer-bandeau").addEventListener("click", toggleSwitch);   // même code que la fermeture existante : un clic, sans confirmation
     if (!tick) tick = setInterval(renderBanner, 60000);                 // durée remise à jour chaque minute
     $("btn-alias-ajouter").addEventListener("click", ajouterAlias);
-    $("btn-recharger").addEventListener("click", function () { loadSwitch(); loadSignalements(); loadList(); loadAlias(); });
+    Array.prototype.forEach.call($("st-periode").querySelectorAll ? $("st-periode").querySelectorAll("button") : [], function (b) { b.addEventListener("click", function () { choosePeriod(b.getAttribute("data-jours")); }); });
+    $("btn-recharger").addEventListener("click", function () { loadSwitch(); loadStats(); loadSignalements(); loadList(); loadAlias(); });
     await loadSwitch();
+    await loadStats();
     await loadSignalements();
     await loadList();
     await loadAlias();

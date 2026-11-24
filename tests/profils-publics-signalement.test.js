@@ -317,7 +317,7 @@ const SROW = (o) => Object.assign({ page_id: "11111111-1111-4111-8111-1111111111
   motifs: { spam: 2, arnaque: 1 }, dernier_le: "2026-11-25T10:00:00Z", a_examiner: true }, o || {});
 async function runAdmin(o) {
   const opts = Object.assign({ sRows: [SROW()], pages: [], confirmAnswer: true }, o || {});
-  const ids = ["loading-state", "access-denied", "dashboard", "etat-interrupteur", "btn-interrupteur", "msg-interrupteur", "btn-recharger", "msg-liste", "liste-pages", "msg-signalements", "liste-signalements", "bandeau-ouvert", "bandeau-ouvert-texte", "btn-fermer-bandeau", "alias-nom", "alias-page", "btn-alias-ajouter", "msg-alias-form", "msg-alias", "liste-alias"];
+  const ids = ["loading-state", "access-denied", "dashboard", "etat-interrupteur", "btn-interrupteur", "msg-interrupteur", "btn-recharger", "msg-liste", "liste-pages", "msg-signalements", "liste-signalements", "bandeau-ouvert", "bandeau-ouvert-texte", "btn-fermer-bandeau", "alias-nom", "alias-page", "btn-alias-ajouter", "msg-alias-form", "msg-alias", "liste-alias", "st-periode", "msg-stats", "st-tuiles", "st-publiees", "st-nouvelles", "st-visites", "st-visites-lbl", "st-examiner", "st-detail", "st-sources", "st-courbe", "st-courbe-note", "st-top"];
   const els = {}; ids.forEach((i) => { els[i] = makeEl(i, i === "access-denied" || i === "dashboard"); });
   const log = { rpc: [], confirm: [], open: [] };
   const client = { auth: { getSession: async () => ({ data: { session: { user: { id: "u1" } } } }) },
