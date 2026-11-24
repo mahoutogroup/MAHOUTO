@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Créez votre carte de visite en ligne — MAHOUTO+</title>
+<meta name="description" content="Une page à vous, avec une adresse facile à retenir, un QR code et un lien à partager sur WhatsApp.">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#FFC107">
+<link rel="manifest" href="/manifest.json">
+<script src="/brand.js"></script>
+<link rel="icon" href="/assets/favicon.png">
+<link rel="apple-touch-icon" href="/assets/apple-touch-icon.png">
+<link rel="stylesheet" href="/theme.css">
+<script src="/theme-toggle.js"></script>
+<style>
+  /* Même langage visuel que la page publique /m/<adresse> et la page des règles : en-tête de marque, carte, variables de theme.css,
+     police système. Aucune ressource externe. Texte atténué = --text-muted (jamais --text-dim, trop pâle). */
+  :root { --cm-accent: var(--gold); --cm-shadow: 0 12px 32px rgba(0,0,0,.45); --cm-focus: var(--gold-bright); --cm-tint: rgba(212,175,55,.10);
+          --cm-cover-1: #17130a; --cm-cover-2: #2e2409; --cm-cover-line: rgba(255,215,0,.07);
+          --cm-ico-lune: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z'/%3E%3C/svg%3E");
+          --cm-ico-soleil: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='4'/%3E%3Cpath d='M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4'/%3E%3C/svg%3E"); }
+  body.light-theme { --cm-accent: var(--gold-text, #856500); --cm-shadow: 0 10px 28px rgba(60,45,0,.14); --cm-focus: #856500; --cm-tint: rgba(133,101,0,.08);
+          --cm-cover-1: #FFF6D1; --cm-cover-2: #F1D77A; --cm-cover-line: rgba(133,101,0,.10); }
+  html, body { height: auto; min-height: 100%; }
+  body { overflow-x: hidden; min-height: 100vh; min-height: 100dvh; }
+  .hidden { display: none !important; }
+  :focus-visible { outline: 3px solid var(--cm-focus); outline-offset: 2px; }
+
+  .mh { width: 100%; max-width: 600px; margin: 0 auto; padding: 10px 16px 0; }
+  .mh-in { display: flex; align-items: center; justify-content: space-between; min-height: 48px; }
+  .marque { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding-right: 8px; font-weight: 800; font-size: 16px; letter-spacing: .01em; color: var(--white); }
+  .marque img { width: 32px; height: 32px; display: block; }
+  .mh .theme-toggle-fab { position: static; width: 44px; height: 44px; font-size: 0; flex: 0 0 auto; }
+  .mh .theme-toggle-fab::before { content: ""; width: 20px; height: 20px; background: currentColor; -webkit-mask: var(--cm-ico-lune) center / contain no-repeat; mask: var(--cm-ico-lune) center / contain no-repeat; }
+  body.light-theme .mh .theme-toggle-fab::before { -webkit-mask-image: var(--cm-ico-soleil); mask-image: var(--cm-ico-soleil); }
+
+  .cm { width: 100%; max-width: 600px; margin: 0 auto; padding: 8px 16px 40px; flex: 1 0 auto; }
+  .intro { padding: 18px 4px 6px; text-align: center; }
+  .intro h1 { font-size: clamp(26px, 7vw, 34px); line-height: 1.15; letter-spacing: -.02em; font-weight: 800; color: var(--white); overflow-wrap: anywhere; text-wrap: balance; }
+  .intro p { max-width: 46ch; margin: 12px auto 0; font-size: 16.5px; line-height: 1.6; color: var(--text-muted); text-wrap: pretty; }
+
+  .btn-cta { display: flex; align-items: center; justify-content: center; width: 100%; max-width: 420px; min-height: 56px; margin: 20px auto 0; padding: 14px 20px; border-radius: 16px; border: 0;
+    background: linear-gradient(135deg, var(--gold-bright), var(--gold)); color: #0A0A0A; font-family: inherit; font-size: 16px; font-weight: 800; letter-spacing: .02em; text-align: center; text-decoration: none;
+    box-shadow: 0 6px 16px rgba(212,175,55,.28); cursor: pointer; transition: transform .16s ease, box-shadow .16s ease; }
+  .btn-cta:hover { box-shadow: 0 8px 22px rgba(212,175,55,.4); }
+  .btn-cta:active { transform: scale(.98); }
+  .btn-cta[aria-busy="true"] { opacity: .75; }
+
+  .exemple { margin: 26px 0 0; }
+  .exemple-etiquette { display: inline-block; margin: 0 0 8px; padding: 4px 12px; border-radius: 999px; border: 1px dashed var(--cm-accent); color: var(--cm-accent); font-size: 12.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+  .carte { position: relative; overflow: hidden; border: 1px solid var(--border); background: var(--bg-card); border-radius: 24px; box-shadow: var(--cm-shadow); }
+  .couv { height: 96px; background: repeating-linear-gradient(135deg, var(--cm-cover-line) 0 2px, transparent 2px 22px), radial-gradient(120% 140% at 85% -20%, rgba(255,215,0,.34), transparent 60%), linear-gradient(135deg, var(--cm-cover-1), var(--cm-cover-2)); }
+  .av-wrap { display: flex; justify-content: center; height: 48px; }
+  .avatar { width: 96px; height: 96px; margin-top: -48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: linear-gradient(145deg, var(--cm-cover-2), var(--cm-cover-1)); color: var(--gold-bright); font-size: 38px; font-weight: 700; line-height: 1; box-shadow: 0 0 0 4px var(--bg-card), 0 0 0 6px var(--gold); }
+  body.light-theme .avatar { color: var(--gold-text, #856500); }
+  .corps { padding: 16px 20px 6px; text-align: center; }
+  .carte h2 { font-size: 24px; line-height: 1.18; letter-spacing: -.02em; font-weight: 800; color: var(--white); overflow-wrap: anywhere; }
+  .metier { display: inline-block; max-width: 100%; margin-top: 10px; padding: 5px 14px; border: 1px solid var(--cm-accent); border-radius: 999px; background: var(--cm-tint); color: var(--cm-accent); font-size: 14px; line-height: 1.4; font-weight: 700; overflow-wrap: anywhere; }
+  .desc { max-width: 40ch; margin: 14px auto 0; text-align: left; font-size: 15.5px; line-height: 1.6; color: var(--text-muted); overflow-wrap: anywhere; }
+  .faux-actions { display: flex; flex-direction: column; gap: 10px; padding: 18px 20px 4px; }
+  .faux-btn { display: flex; align-items: center; justify-content: center; min-height: 48px; padding: 10px 16px; border-radius: 14px; border: 1.5px solid transparent; font-size: 15px; font-weight: 700; text-align: center; user-select: none; }
+  .faux-or { background: linear-gradient(135deg, var(--gold-bright), var(--gold)); color: #0A0A0A; }
+  .faux-neutre { background: var(--bg-elevated); border-color: var(--border); color: var(--white); }
+  .faux-adresse { margin: 14px 0 0; padding: 12px 20px 18px; border-top: 1px solid var(--border); text-align: center; font-size: 14px; color: var(--text-muted); overflow-wrap: anywhere; }
+  .faux-adresse strong { color: var(--white); font-weight: 700; }
+  .exemple-note { margin-top: 10px; font-size: 13px; line-height: 1.5; text-align: center; color: var(--text-muted); }
+
+  .bloc { margin-top: 34px; }
+  .bloc h2 { font-size: 20px; line-height: 1.3; font-weight: 800; color: var(--cm-accent); overflow-wrap: anywhere; }
+  .avantages { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 10px; }
+  .avantages li { padding: 14px 16px; border: 1px solid var(--border); border-radius: 16px; background: var(--bg-card); }
+  .avantages strong { display: block; font-size: 16px; color: var(--white); }
+  .avantages span { display: block; margin-top: 3px; font-size: 14.5px; line-height: 1.55; color: var(--text-muted); }
+  .etapes { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 12px; counter-reset: etape; }
+  .etapes li { position: relative; padding: 4px 0 4px 52px; min-height: 40px; counter-increment: etape; }
+  .etapes li::before { content: counter(etape); position: absolute; left: 0; top: 2px; width: 38px; height: 38px; border-radius: 50%; border: 2px solid var(--cm-accent); color: var(--cm-accent); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 17px; }
+  .etapes strong { display: block; font-size: 16px; color: var(--white); }
+  .etapes span { display: block; margin-top: 2px; font-size: 14.5px; line-height: 1.55; color: var(--text-muted); }
+  .regles-texte { margin-top: 10px; font-size: 16px; line-height: 1.65; color: var(--text-muted); max-width: 62ch; }
+  .lien { display: inline-flex; align-items: center; min-height: 48px; font-weight: 700; color: var(--cm-accent); text-decoration: underline; text-underline-offset: 3px; }
+  .final { text-align: center; margin-top: 30px; }
+  .final p { font-size: 16px; line-height: 1.6; color: var(--text-muted); }
+
+  .pied { margin-top: 36px; padding: 16px 4px 4px; border-top: 1px solid var(--border); text-align: center; }
+  .legal-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 0 14px; }
+  .legal-links a { display: inline-flex; align-items: center; min-height: 44px; font-size: 13.5px; color: var(--text-muted); text-decoration: underline; text-underline-offset: 3px; }
+  .cree { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 8px; margin-top: 4px; font-size: 13px; line-height: 1.5; color: var(--text-muted); }
+  .cree img { width: 20px; height: 20px; display: block; }
+  .cree .nw { white-space: nowrap; }
+  @media (max-width: 359px) { .mh, .cm { padding-left: 12px; padding-right: 12px; } .corps, .faux-actions { padding-left: 14px; padding-right: 14px; } }
+  @media (min-width: 900px) { .mh { padding-top: 22px; } .cm { padding-top: 14px; padding-bottom: 72px; } }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition-duration: .01ms !important; } }
+</style>
+</head>
+<body>
+
+<header class="mh">
+  <div class="mh-in">
+    <a class="marque" href="/index.html" aria-label="MAHOUTO+, retour à l'accueil"><img id="marque-logo" src="/assets/logo-mahouto-plus-128.png" alt="" width="32" height="32"><span>MAHOUTO+</span></a>
+    <button type="button" id="theme-toggle-btn" class="theme-toggle-fab" aria-label="Changer de thème : clair ou sombre"></button>
+  </div>
+</header>
+
+<main class="cm" id="contenu">
+
+  <section class="intro" aria-labelledby="titre">
+    <h1 id="titre">Créez votre carte de visite en ligne</h1>
+    <p>Une page à vous, avec une adresse facile à retenir, un QR code et un lien à partager sur WhatsApp.</p>
+    <a class="btn-cta" id="cta-haut" href="/profil.html" data-cta>CRÉER MA CARTE DE VISITE</a>
+  </section>
+
+  <section class="exemple" aria-labelledby="titre-exemple">
+    <h2 class="exemple-etiquette" id="titre-exemple">Exemple</h2>
+    <div class="carte" role="group" aria-label="Exemple de carte de visite, avec un contenu fictif">
+      <div class="couv" aria-hidden="true"></div>
+      <div class="av-wrap" aria-hidden="true"><div class="avatar">E</div></div>
+      <div class="corps">
+        <h3 class="nom-exemple">Exemple Atelier</h3>
+        <div class="metier">Sérigraphe — Imprimeur</div>
+        <p class="desc">Impression de t-shirts, d'affiches et de cartes de visite. Devis rapide, livraison dans la ville.</p>
+      </div>
+      <div class="faux-actions" aria-hidden="true">
+        <span class="faux-btn faux-or">Contacter sur WhatsApp</span>
+        <span class="faux-btn faux-neutre">Partager</span>
+      </div>
+      <p class="faux-adresse">Adresse de votre page : <strong>mahouto.com/m/votre-nom</strong></p>
+    </div>
+    <p class="exemple-note">Ceci est un exemple fictif : ce n'est pas la page d'un vrai membre.</p>
+  </section>
+
+  <section class="bloc" aria-labelledby="titre-avantages">
+    <h2 id="titre-avantages">Ce que vous obtenez</h2>
+    <ul class="avantages">
+      <li><strong>Une page prête en quelques minutes</strong><span>Votre nom, votre métier, votre ville, une courte présentation et une photo.</span></li>
+      <li><strong>Une adresse personnalisée</strong><span>Vous choisissez une adresse facile à retenir, et vous pouvez vérifier qu'elle est disponible.</span></li>
+      <li><strong>Un QR code et une carte à imprimer</strong><span>Téléchargez votre QR code, et une carte prête à imprimer, pour vos clients.</span></li>
+      <li><strong>Un partage facile sur WhatsApp</strong><span>Un lien à coller dans vos conversations, et un bouton pour que vos clients vous contactent.</span></li>
+    </ul>
+  </section>
+
+  <section class="bloc" aria-labelledby="titre-etapes">
+    <h2 id="titre-etapes">Comment ça marche</h2>
+    <ol class="etapes">
+      <li><strong>Créez ou ouvrez votre compte</strong><span>Avec Google, ou avec votre adresse e-mail et un code reçu par e-mail.</span></li>
+      <li><strong>Remplissez votre carte</strong><span>Adresse, nom, métier, ville, présentation, photo et un moyen de contact (WhatsApp ou lien).</span></li>
+      <li><strong>Publiez et partagez</strong><span>Certifiez avoir 18 ans ou plus, publiez, puis partagez votre lien ou votre QR code.</span></li>
+    </ol>
+  </section>
+
+  <section class="bloc" aria-labelledby="titre-regles">
+    <h2 id="titre-regles">Vos règles, votre contrôle</h2>
+    <p class="regles-texte">Vous gardez la main : vous pouvez dépublier votre page à tout moment, choisir d'accepter ou non les messages, bloquer un membre dans la messagerie privée et signaler une page qui ne respecte pas les règles.</p>
+    <a class="lien" href="/regles-pages-publiques.html">Lire les règles des pages publiques</a>
+  </section>
+
+  <section class="final" aria-label="Créer ma carte">
+    <p>Prêt à créer votre carte ?</p>
+    <a class="btn-cta" id="cta-bas" href="/profil.html" data-cta>CRÉER MA CARTE DE VISITE</a>
+  </section>
+
+  <footer class="pied">
+    <nav class="legal-links" aria-label="Informations">
+      <a href="/conditions-vente.html">Conditions de vente et retours</a>
+      <a href="/mentions-legales.html">Mentions légales</a>
+      <a href="/regles-pages-publiques.html">Règles des pages publiques</a>
+    </nav>
+    <p class="cree"><img id="cree-logo" src="/assets/logo-mahouto-plus-128.png" alt="" width="20" height="20" loading="lazy" decoding="async"><span data-brand-fixed>Une plateforme MAHOUTO+, par <span class="nw">MAJESTÉ PRESSE</span></span></p>
+  </footer>
+
+</main>
+
+<script src="/config.js"></script>
+<script src="/pseudo.js"></script>
+<script src="/login-sheet.js"></script>
+<script>
+  /* Bouton « CRÉER MA CARTE DE VISITE ».
+     - Membre déjà connecté (session lue dans le stockage existant, comme index.html ; compte anonyme exclu) : lien direct vers profil.html.
+     - Sinon : fenêtre de connexion existante (login-sheet.js, avec retour sur profil.html après Google ; après un code e-mail valide on
+       ouvre profil.html). La bibliothèque Supabase (la même adresse que sur toutes les pages du site) n'est chargée QU'AU CLIC, jamais à
+       l'ouverture de cette page : aucun script externe ici au chargement, aucune requête, aucun suivi, aucun nouveau stockage.
+     - Si quelque chose échoue (bibliothèque indisponible, hors ligne) : on ouvre simplement profil.html (comportement du lien). */
+  (function () {
+    "use strict";
+    var CIBLE = "profil.html", SUPABASE_LIB = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js";
+    var busy = false;
+
+    function memberConnected() {
+      try {
+        for (var i = 0; i < localStorage.length; i++) {
+          var k = localStorage.key(i);
+          if (!k || !/^sb-.+-auth-token$/.test(k)) continue;
+          var s = JSON.parse(localStorage.getItem(k) || "null"), u = s && s.user;
+          if (u && u.id && u.is_anonymous !== true && !(u.app_metadata && u.app_metadata.provider === "anonymous")) return true;
+        }
+      } catch (e) { /* stockage bloqué : on considère la personne non connectée */ }
+      return false;
+    }
+    function loadSupabase() {
+      if (window.supabase && typeof window.supabase.createClient === "function") return Promise.resolve();
+      return new Promise(function (resolve, reject) {
+        var s = document.createElement("script");
+        s.setAttribute("src", SUPABASE_LIB);
+        s.onload = function () { window.supabase && typeof window.supabase.createClient === "function" ? resolve() : reject(new Error("lib")); };
+        s.onerror = function () { reject(new Error("lib")); };
+        document.body.appendChild(s);
+      });
+    }
+    function go() { window.location.href = CIBLE; }
+    async function onClick(e) {
+      if (busy) { e.preventDefault(); return; }
+      if (memberConnected() || !window.MahoutoLogin || !window.MAHOUTO_CONFIG) return;   // lien direct vers profil.html
+      e.preventDefault();
+      var btn = e.currentTarget; busy = true; btn.setAttribute("aria-busy", "true");
+      try {
+        await loadSupabase();
+        var cfg = window.MAHOUTO_CONFIG, supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+        window.MahoutoLogin.open({
+          doc: document, win: window, supabase: supabase, redirectPath: CIBLE, title: "Se connecter pour créer votre carte",
+          onSignedIn: async function (u) {
+            if (u && window.MahoutoPseudo) { try { await window.MahoutoPseudo.ensureProfileForUser(supabase, u); } catch (err) { /* profil créé plus tard */ } }
+            go();
+          }
+        });
+      } catch (err) { go(); }
+      busy = false; btn.removeAttribute("aria-busy");
+    }
+    Array.prototype.forEach.call(document.querySelectorAll("[data-cta]"), function (a) { a.addEventListener("click", onClick); });
+  })();
+</script>
+<script>
+  // Logo de la marque en petit format (128 px) quand le site est servi sous l'autre marque ; sans effet sinon.
+  (function () {
+    try {
+      var b = window.MAHOUTO_BRAND, l = document.getElementById("marque-logo"), c = document.getElementById("cree-logo");
+      if (b && /^assets\/[a-z0-9-]+\.png$/.test(b.logo || "")) { var src = "/" + b.logo.replace(/\.png$/, "-128.png"); if (l) l.setAttribute("src", src); if (c) c.setAttribute("src", src); }
+    } catch (e) { /* logo par défaut */ }
+  })();
+</script>
+</body>
+</html>
