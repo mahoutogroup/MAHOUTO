@@ -85,6 +85,7 @@
   .pied { margin-top: 18px; padding: 14px 20px 10px; border-top: 1px solid var(--border); text-align: center; }
   .cree { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 8px; font-size: 13px; line-height: 1.5; color: var(--text-muted); }
   .cree img { width: 20px; height: 20px; display: block; }
+  .cree .nw { white-space: nowrap; }
   .cree a { color: var(--pub-accent); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; display: inline-flex; align-items: center; min-height: 44px; padding: 0 4px; }
   .regles-lien { text-align: center; }
   .regles-lien a { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 8px 10px; font-size: 14px; color: var(--text-muted); text-decoration: underline; text-underline-offset: 3px; }
@@ -205,7 +206,7 @@
       </div>
     </div>
     <footer class="pied">
-      <p class="cree"><img id="cree-logo" src="/assets/logo-mahouto-plus-128.png" alt="" width="20" height="20" loading="lazy" decoding="async"><span>Page créée avec MAHOUTO+</span><a href="/profil.html">Créer ma page</a></p>
+      <p class="cree"><img id="cree-logo" src="/assets/logo-mahouto-plus-128.png" alt="" width="20" height="20" loading="lazy" decoding="async"><span data-brand-fixed>Une plateforme MAHOUTO+, par <span class="nw">MAJESTÉ PRESSE</span></span><a href="/profil.html">Créer ma page</a></p>
       <p class="regles-lien"><a id="lien-regles" href="/regles-pages-publiques.html">Règles</a></p>
       <div class="signalement hidden" id="signalement-zone">
         <button type="button" class="lien-discret hidden" id="btn-signaler">Signaler cette page</button>

@@ -18,7 +18,7 @@
    - Carte de visite (refonte du design) : en-tête de marque, bandeau de couverture en CSS pur, avatar rond, action principale
      (WhatsApp : le numéro n'est JAMAIS affiché, le lien wa.me suffit ; lien https : seulement le domaine), « Écrire un message »
      (règles inchangées), « Partager » (feuille basse : QR avec ?src=qr, lien copié SANS ?src=, partage natif, QR en PNG 1024 px ;
-     qrcode-generator.js n'est chargé qu'à son ouverture), pied « Page créée avec MAHOUTO+ ». Aucune requête réseau nouvelle.
+     qrcode-generator.js n'est chargé qu'à son ouverture), pied « Une plateforme MAHOUTO+, par MAJESTÉ PRESSE » (texte fixe, identique sur les deux sites : data-brand-fixed, jamais fonction de la marque). Aucune requête réseau nouvelle.
    - Tout est affiché en TEXTE BRUT (createElement / textContent) : aucun innerHTML. Seuls liens autorisés : https (photo,
      lien de contact) et wa.me (WhatsApp), ouverts avec rel noopener noreferrer nofollow.
    ========================================================= */
