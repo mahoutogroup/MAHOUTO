@@ -50,6 +50,7 @@
   .row .bar span { display: block; height: 100%; background: var(--gold-bright); border-radius: 3px; }
   .empty { font-size: 13px; color: var(--text-dim); text-align: center; padding: 10px 0; }
   .error-box { margin: 16px 20px 0; padding: 12px 14px; border-radius: 12px; background: rgba(239,68,68,.12); color: #F87171; font-size: 13px; }
+  .inv-kpis { padding: 0; }
   .note { font-size: 11.5px; color: var(--text-dim); padding: 16px 20px 0; line-height: 1.5; }
 </style>
 </head>
@@ -116,6 +117,17 @@
     <div class="card block">
       <h2>Sources</h2>
       <div class="rows" id="sources"></div>
+    </div>
+
+    <div class="card block" id="invitations-block">
+      <h2>Invitations</h2>
+      <div class="kpis inv-kpis">
+        <div class="card kpi" id="inv-card-codes"><div class="value" id="inv-codes">–</div><div class="label">Codes créés</div></div>
+        <div class="card kpi" id="inv-card-inscrits"><div class="value" id="inv-inscrits">–</div><div class="label">Inscrits grâce aux invitations</div></div>
+        <div class="card kpi" id="inv-card-avec"><div class="value" id="inv-avec">–</div><div class="label">Codes avec au moins 1 inscrit</div></div>
+      </div>
+      <div class="empty hidden" id="inv-message" role="status"></div>
+      <div class="legend"><span>Totaux depuis le début, toutes marques confondues, sans aucun nom ni lien entre personnes.</span></div>
     </div>
 
     <div class="card block">
@@ -244,6 +256,29 @@
     $("kpi-live").textContent = error ? "–" : nf.format(Number(data) || 0);
   }
 
+  // ---------- Invitations (totaux anonymes : invitation_admin_totaux, seulement des nombres) ----------
+  async function loadInvitations() {
+    const msg = $("inv-message");
+    const champs = [["nb_codes", "inv-codes", "inv-card-codes"], ["total_inscrits", "inv-inscrits", "inv-card-inscrits"], ["nb_codes_avec_inscrits", "inv-avec", "inv-card-avec"]];
+    champs.forEach((c) => { $(c[1]).textContent = "–"; $(c[2]).classList.remove("hidden"); });
+    msg.textContent = ""; msg.classList.add("hidden");
+    let res;
+    try { res = await supabase.rpc("invitation_admin_totaux"); } catch (e) { res = { error: e || {} }; }
+    const row = res && !res.error && Array.isArray(res.data) && res.data.length && res.data[0] && typeof res.data[0] === "object" ? res.data[0] : null;
+    if (!row) {
+      const refuse = res && res.error && (res.error.code === "42501" || res.error.status === 403);
+      msg.textContent = refuse ? "Accès refusé : ces totaux sont réservés aux administrateurs." : "Les totaux des invitations ne sont pas disponibles pour le moment. Vérifiez que le script SQL des invitations a bien été exécuté.";
+      msg.classList.remove("hidden");
+      return;
+    }
+    champs.forEach((c) => {
+      const v = row[c[0]], n = Number(v);
+      if (v === undefined || v === null) { $(c[2]).classList.add("hidden"); return; }   // valeur non renvoyée : on n'affiche que ce qui existe
+      $(c[1]).textContent = isFinite(n) && n >= 0 ? nf.format(n) : "–";
+    });
+  }
+  // ---------- fin des invitations ----------
+
   async function loadAll() {
     const mine = ++requestId;
     const r = range(), brand = brandValue();
@@ -315,6 +350,7 @@
     contentEl.classList.remove("hidden");
     startLive();
     await loadAll();
+    loadInvitations().catch(() => { /* le reste de la page n'est jamais bloqué */ });
   }
 
   init();
