@@ -94,7 +94,8 @@
   .pv .pv-regles { list-style: none; padding: 0; margin: 0 0 12px; }
   .pv .pv-regles li { font-size: 12.5px; line-height: 1.6; color: var(--text-muted); padding: 4px 0 4px 14px; position: relative; }
   .pv .pv-regles li::before { content: ""; position: absolute; left: 0; top: 11px; width: 6px; height: 6px; border-radius: 50%; background: var(--gold); }
-  .pv .pv-interrupteur { display: flex; align-items: center; gap: 12px; min-height: 56px; margin: 0 0 8px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--white); font-size: 14.5px; line-height: 1.4; cursor: pointer; }
+  /* position: relative : la case cachée (position: absolute) doit être contenue par ce libellé, donc par .page-content ; sinon son bloc conteneur est la page entière et le document devient défilable bien au-delà du contenu. */
+  .pv .pv-interrupteur { position: relative; display: flex; align-items: center; gap: 12px; min-height: 56px; margin: 0 0 8px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--white); font-size: 14.5px; line-height: 1.4; cursor: pointer; }
   .pv .pv-interrupteur input { position: absolute; opacity: 0; width: 1px; height: 1px; }
   .pv .pv-piste { flex: 0 0 auto; position: relative; width: 52px; height: 30px; border-radius: 15px; background: var(--bg-elevated); border: 2px solid var(--text-muted); transition: background .15s; }
   .pv .pv-piste::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--text-muted); transition: transform .15s, background .15s; }
