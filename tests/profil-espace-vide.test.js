@@ -20,6 +20,7 @@ const find = (sel) => rules.filter((r) => r.sel === sel);
 const CONTENEURS = {
   ".avatar-edit-badge": ".avatar-wrap",
   ".pv .pv-regles li::before": ".pv .pv-regles li",
+  ".inv .inv-regles li::before": ".inv .inv-regles li",
   ".pv .pv-interrupteur input": ".pv .pv-interrupteur",
   ".pv .pv-piste::after": ".pv .pv-piste",
 };
