@@ -97,8 +97,8 @@ test("loadInvitations : accès refusé ou échec → message court vouvoyé, jam
   }
 });
 
-test("sw.js : cache v134 (main était à v133) ; page d'administration toujours hors du pré-cache ; aucun fichier dans api/", () => {
-  const sw = read("sw.js"); assert.match(sw, /const CACHE_NAME = "mahoutoplus-shell-v(134|13[5-9]|1[4-9]\d)";/);
+test("sw.js : cache v135 (main est à v134) ; page d'administration toujours hors du pré-cache ; aucun fichier dans api/", () => {
+  const sw = read("sw.js"); assert.match(sw, /const CACHE_NAME = "mahoutoplus-shell-v(135|13[6-9]|1[4-9]\d)";/);
   assert.ok(!sw.includes("statistiques.html"), "la page d'administration n'est pas pré-cachée");
   const list = (d) => fs.readdirSync(path.join(root, d)).filter((f) => f.endsWith(".js") && !f.startsWith("_")); assert.strictEqual(list("api").length + list("api/admin").length, 12);
   assert.ok(!/service_role|sk_live|sk_test|eyJhbGci/.test(PAGE + read("tests/admin-invitations.test.js").slice(0, 0)), "aucune clé");
