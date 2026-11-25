@@ -323,3 +323,33 @@ test("sw.js : cache v132 (main était à v131), invitation.js pré-caché comme 
   assert.ok(!/inv/.test(an.replace(/investigat|invalid|invit|inversion/gi, "").replace(/[a-z]inv|inv[a-z]/gi, "")), "analytics.js ne connaît pas ?inv=");
   assert.ok(!/service_role|sk_live|sk_test|eyJhbGci|BEGIN (RSA )?PRIVATE KEY/.test([raw, rawRb, rawVf, read("invitation.js")].join("\n")), "aucune clé ni secret");
 });
+
+// ====================== marque : la section d'invitation dit TOUJOURS MAHOUTO+ (le lien pointe toujours vers mahouto.com) ======================
+test("section d'invitation : tout nom de plateforme est protégé par data-brand-fixed (brand.js ne le réécrit pas sur majestepresse.com)", () => {
+  assert.match(read("brand.js"), /p\.closest\("\[data-brand-fixed\]"\)\) return NodeFilter\.FILTER_REJECT/, "brand.js respecte data-brand-fixed");
+  // 1) tout texte qui nomme une plateforme (MAHOUTO, MAJESTÉ) est dans un <span data-brand-fixed>
+  const nu = SEC.replace(/<span data-brand-fixed>[\s\S]*?<\/span>/g, "");
+  assert.ok(!/MAHOUTO|MAJEST|Mahouto|Majest/i.test(nu.replace(/<[^>]+>/g, " ")), "un nom de plateforme n'est pas protégé : " + nu.replace(/<[^>]+>/g, " ").replace(/\s+/g, " "));
+  // 2) et la protection est bien là, avec le bon nom, sans changer la phrase
+  const fixes = [...SEC.matchAll(/<span data-brand-fixed>([^<]*)<\/span>/g)].map((m) => m[1]);
+  assert.deepStrictEqual(fixes, ["MAHOUTO+"], "un seul nom de plateforme, protégé");
+  assert.ok(SEC.includes("<li>Ce lien invite un professionnel à créer sa carte de visite sur <span data-brand-fixed>MAHOUTO+</span>.</li>"));
+  const brut = SEC.replace(/<[^>]+>/g, "").replace(/\s+/g, " ");
+  assert.ok(brut.includes("Ce lien invite un professionnel à créer sa carte de visite sur MAHOUTO+."), "texte visible inchangé");
+  // 3) aucun marqueur de marque ailleurs dans la section (attribut data-brand, classe brand-…)
+  assert.ok(!/data-brand(?!-fixed)|brand-only|hide-on-brand/.test(SEC), "aucune autre dépendance à la marque");
+});
+
+test("invitation.js : lien, aperçu, message WhatsApp et message de partage disent MAHOUTO+ et mahouto.com quelle que soit la marque ; aucune dépendance à brand.js", () => {
+  const js = read("invitation.js").replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|\s)\/\/.*$/gm, "$1");
+  assert.ok(!/MAHOUTO_BRAND|brand\.|window\.location|location\.(host|hostname|origin)|MAJEST/i.test(js), "aucune lecture de la marque ni du domaine courant");
+  const m = INV.texteMessage(INV.lien(OK));
+  assert.strictEqual(m, "Créez votre carte de visite en ligne sur MAHOUTO+ : https://mahouto.com/creer-ma-carte?inv=ABCDEFGH23&src=invitation");
+  assert.ok(!/MAJEST/i.test(m) && !/majestepresse/i.test(INV.lien(OK) + m + INV.lienWhatsapp(INV.lien(OK))));
+  assert.strictEqual(decodeURIComponent(INV.lienWhatsapp(INV.lien(OK)).split("text=")[1]), m, "WhatsApp : le même message");
+  assert.match(INV.lien(OK), /^https:\/\/mahouto\.com\//, "le lien pointe toujours vers mahouto.com");
+  // les textes visibles produits par le code (compteur) ne nomment aucune plateforme
+  [0, 1, 7].forEach((n) => assert.ok(!/MAHOUTO|MAJEST/i.test(INV.texteCompteur(n))));
+  // vouvoiement conservé
+  [m, INV.texteCompteur(0), INV.texteCompteur(3), SEC.replace(/<[^>]+>/g, " ")].forEach((t) => assert.ok(!/(?<![\p{L}])(tu|toi|ton|ta|tes|t')(?![\p{L}])/iu.test(t), "tutoiement : " + t.slice(0, 60)));
+});
