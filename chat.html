@@ -258,6 +258,12 @@
   #locked-screen h2 { color: var(--gold-bright); font-size: 22px; }
   #locked-screen p { color: var(--text-muted); max-width: 300px; }
   #locked-price { color: var(--gold); font-weight: bold; font-size: 18px; }
+  /* Salon en abonnement : jamais le prix à vie, les forfaits actifs à la place (ou « tarifs indisponibles »). */
+  #locked-offer { display: flex; flex-direction: column; gap: 4px; width: 100%; max-width: 320px; }
+  #locked-offer .offer-title { color: var(--gold); font-weight: bold; font-size: 18px; }
+  #locked-offer .offer-line { color: var(--text-muted); font-size: 14px; line-height: 1.4; }
+  #locked-offer .offer-none { color: var(--text-muted); font-size: 14px; line-height: 1.4; }
+  body.light-theme #locked-offer .offer-title { color: var(--gold-text, #856500); }
   #locked-plans { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 320px; }
   #locked-plans button {
     padding: 13px 18px; border: none; border-radius: 12px; background: var(--gold-bright);
@@ -403,6 +409,7 @@
   <h2 id="locked-room-name">Communauté payante</h2>
   <p id="locked-intro">Rejoignez cette communauté pour lire et écrire les messages.</p>
   <div id="locked-price"></div>
+  <div id="locked-offer" class="hidden" aria-live="polite"></div>
   <div id="locked-plans" class="hidden" role="group" aria-label="Forfaits d'abonnement"></div>
   <p id="cgv-line" style="text-align:center;font-size:12px;color:var(--text-dim);padding:0 20px 16px;padding:0;">En payant, vous acceptez les <a href="conditions-vente.html" target="_blank" rel="noopener noreferrer" style="color:var(--gold);text-decoration:underline;">conditions de vente et retours</a>.</p>
   <button id="locked-buy-btn" type="button">Débloquer l'accès</button>
@@ -894,19 +901,49 @@
     return error ? null : (data || null);
   }
 
-  // Forfaits actifs d'un salon en mode abonnement : lecture publique des forfaits ACTIFS seulement.
+  // Forfaits actifs d'un salon en mode abonnement : lecture publique des forfaits ACTIFS seulement (RLS « salon_forfaits_public_read »),
+  // classés par ordre d'affichage. Lus pour l'écran verrouillé (visiteur), le texte de partage (« à partir de ») et le choix du forfait.
+  // Renvoie { rows, error } ; une lecture en erreur n'est jamais gardée (la suivante réessaie).
+  let plansPromise = null;
+  function loadActivePlans(force) {
+    if (!plansPromise || force) {
+      plansPromise = (async () => {
+        try {
+          const { data, error } = await supabase.from("salon_forfaits").select(MahoutoSalonAbonnement.FORFAIT_COLUMNS).order("ordre", { ascending: true });
+          return error ? { rows: null, error: true } : { rows: data || [], error: false };
+        } catch (e) { return { rows: null, error: true }; }
+      })().then((r) => { if (r.error) plansPromise = null; return r; });
+    }
+    return plansPromise;
+  }
+
+  // Salon en abonnement, personne sans forfait : JAMAIS le prix à vie. Un seul forfait actif : « Jour : 500 FCFA pour 1 jour » ;
+  // plusieurs : « Abonnement à partir de X FCFA » et une courte liste ; aucun ou illisibles : « tarifs indisponibles », sans prix chiffré.
+  function renderSubscriptionOffer(rows) {
+    const box = document.getElementById("locked-offer");
+    const s = MahoutoSalonAbonnement.offerSummary(rows);
+    box.textContent = "";
+    const add = (cls, text) => { const d = document.createElement("div"); d.className = cls; d.textContent = text; box.appendChild(d); };
+    add(s.kind === "indisponible" ? "offer-none" : "offer-title", s.title);
+    s.lines.forEach((l) => add("offer-line", l));
+    box.classList.remove("hidden");
+  }
+  async function showSubscriptionOffer() {
+    const { rows } = await loadActivePlans();
+    renderSubscriptionOffer(rows);
+  }
+
+  // Forfaits actifs d'un salon en mode abonnement : choix d'un forfait (visiteur connecté).
   async function showSubscriptionPlans(room, expired) {
     const plansEl = document.getElementById("locked-plans");
     plansEl.textContent = "";
     document.getElementById("locked-buy-btn").classList.add("hidden");
     document.getElementById("locked-price").textContent = "";
     if (expired) setLockedStatus("Votre abonnement a expiré. Renouvelez-le pour retrouver l'accès : vos messages sont conservés.", false);
-    const { data, error } = await supabase
-      .from("salon_forfaits")
-      .select(MahoutoSalonAbonnement.FORFAIT_COLUMNS)
-      .order("ordre", { ascending: true });
+    const { rows: data, error } = await loadActivePlans(true);
     const plans = error ? [] : MahoutoSalonAbonnement.plansFromRows(data);
     if (!plans.length) {
+      renderSubscriptionOffer(null);
       setLockedStatus(error ? "Impossible de charger les forfaits. Réessayez dans un instant." : "Aucun forfait n'est disponible pour le moment.", !!error);
       plansEl.classList.add("hidden");
       return;
@@ -930,7 +967,9 @@
 
     document.getElementById("locked-room-name").textContent = room.name;
     renderLockedIntro(room);
-    document.getElementById("locked-price").textContent = money(room.price);
+    // Salon en abonnement : le prix à vie n'est JAMAIS montré (un forfait « Jour » dure un jour : un visiteur croirait payer 500 FCFA une fois
+    // pour toujours). Les forfaits actifs sont montrés à la place. Salon payant à prix à vie : inchangé.
+    document.getElementById("locked-price").textContent = room.abonnement === true ? "" : money(room.price);
 
     // Salon payant, visiteur sans compte : présentation (nom, prix) et invitation à se connecter.
     // Le paiement exige un compte : le bouton d'achat n'est pas proposé.
@@ -938,6 +977,7 @@
       document.getElementById("locked-buy-btn").classList.add("hidden");
       document.getElementById("locked-login-note").classList.remove("hidden");
       document.getElementById("locked-login-link").classList.remove("hidden");
+      if (room.abonnement === true) showSubscriptionOffer();
       // Retour de paiement sans session (déconnecté pendant le paiement) : l'achat sera retrouvé après connexion.
       if (paymentReturn) setLockedStatus(MahoutoPaymentReturn.MSG_LOST_SESSION, false);
       document.getElementById("locked-screen").classList.remove("hidden");
@@ -975,6 +1015,7 @@
       note.textContent = "Connectez-vous avec Google ou votre e-mail pour acheter.";
       note.classList.remove("hidden");
       document.getElementById("locked-login-link").classList.remove("hidden");
+      if (room.abonnement === true) showSubscriptionOffer();
       return false;
     }
 
@@ -1147,10 +1188,8 @@
   let forfaitMin = null;
   async function prefetchForfaitMin(room) {
     if (!room || room.is_paid !== true || room.abonnement !== true) return;
-    try {
-      const { data, error } = await supabase.from("salon_forfaits").select("montant").gt("montant", 0).order("montant", { ascending: true }).limit(1);
-      if (!error && data && data[0] && Number.isInteger(data[0].montant) && data[0].montant > 0) forfaitMin = data[0].montant;
-    } catch (e) { forfaitMin = null; }
+    const { rows } = await loadActivePlans();
+    forfaitMin = MahoutoSalonAbonnement.minPrice(rows);
   }
   function shareRoom() {
     MahoutoRoomShare.share({

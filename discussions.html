@@ -494,6 +494,7 @@
 <script src="login-sheet.js"></script>
 <script src="room-share.js"></script>
 <script src="salon-abonnement.js"></script>
+<script src="salon-accroche.js"></script>
 <script src="config.js"></script>
 <script src="offline-cache.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
@@ -501,6 +502,21 @@
 (function () {
   const cfg = window.MAHOUTO_CONFIG;
   const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+
+  // Texte de partage d'une communauté en abonnement : « à partir de » le plus petit forfait ACTIF (lecture publique des forfaits actifs,
+  // RLS « salon_forfaits_public_read », aucun droit élargi). Lu une fois, seulement s'il y a un salon payant en abonnement dans la liste ;
+  // lecture impossible ou colonne absente : aucun prix chiffré dans le texte (« sur abonnement »).
+  let forfaitMin = null, forfaitsRequested = false;
+  async function prefetchForfaitMin(rooms) {
+    if (forfaitsRequested || !(rooms || []).some((r) => r && r.is_paid === true && r.abonnement === true)) return;
+    forfaitsRequested = true;
+    try {
+      const { data, error } = await supabase.from("salon_forfaits").select(MahoutoSalonAbonnement.FORFAIT_COLUMNS).order("ordre", { ascending: true });
+      if (error) { forfaitsRequested = false; return; }
+      forfaitMin = MahoutoSalonAbonnement.minPrice(data);
+    } catch (e) { forfaitsRequested = false; }
+  }
+  // ---------- fin du forfait de partage ----------
 
   const loginScreen = document.getElementById("login-screen");
   const appEl = document.getElementById("app");
@@ -577,6 +593,7 @@
         .order("created_at", { ascending: true });
 
       if (roomsError) throw roomsError;
+      prefetchForfaitMin(rooms);   // sans attendre : sert seulement au texte de partage
 
       const { data: readStates } = await supabase
         .from("read_state")
@@ -737,7 +754,8 @@
       shareBtn.textContent = "🔗";
       shareBtn.addEventListener("click", (e) => {
         e.stopPropagation();
-        MahoutoRoomShare.share({ room: room, win: window, doc: document });
+        // Même texte que sur l'écran du salon : accroche (colonne lue avec le salon), puis « à partir de » le plus petit forfait actif.
+        MahoutoRoomShare.share({ room: Object.assign({}, room, { forfait_min: forfaitMin }), win: window, doc: document });
       });
       row.appendChild(shareBtn);
 
@@ -974,7 +992,7 @@
     try {
       const { data: sessionData } = await supabase.auth.getSession();
       const accessToken = sessionData && sessionData.session ? sessionData.session.access_token : null;
-      const signQuery = new URLSearchParams({ filename: file.name || "photo.jpg", context: "room", contextId: roomId });
+      const signQuery = new URLSearchParams({ filename: file.name || "photo.jpg", context: "room", contextId: roomId, purpose: "photo" });
       const signResp = await fetch("/api/attachment?" + signQuery.toString(), {
         headers: accessToken ? { "Authorization": "Bearer " + accessToken } : {}
       });

@@ -353,7 +353,7 @@
           try {
             const { data: sessionData } = await supabase.auth.getSession();
             const accessToken = sessionData && sessionData.session ? sessionData.session.access_token : null;
-            const signQuery = new URLSearchParams({ filename: file.name || "photo.jpg", context: "room", contextId: r.id });
+            const signQuery = new URLSearchParams({ filename: file.name || "photo.jpg", context: "room", contextId: r.id, purpose: "photo" });
             const signResp = await fetch("/api/attachment?" + signQuery.toString(), {
               headers: accessToken ? { "Authorization": "Bearer " + accessToken } : {}
             });
