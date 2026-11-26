@@ -238,8 +238,8 @@ function fakeRes() {
     assert.match(code, /if \(paymentReturn && !paymentVerifying\) verifyPaymentReturn\(\);/);
   });
 
-  await test("chat.html : compte anonyme → pas de bouton d'achat, « Connecte-toi avec Google ou ton e-mail pour acheter. » et fenêtre de connexion ; refus du serveur géré", () => {
-    assert.match(code, /if \(currentUser\.is_anonymous === true\) \{\s*buyBtn\.classList\.add\("hidden"\);[\s\S]*Connecte-toi avec Google ou ton e-mail pour acheter\.[\s\S]*return false;/);
+  await test("chat.html : compte anonyme → pas de bouton d'achat, « Connectez-vous avec Google ou votre e-mail pour acheter. » et fenêtre de connexion ; refus du serveur géré", () => {
+    assert.match(code, /if \(currentUser\.is_anonymous === true\) \{\s*buyBtn\.classList\.add\("hidden"\);[\s\S]*Connectez-vous avec Google ou votre e-mail pour acheter\.[\s\S]*return false;/);
     assert.match(code, /resp\.status === 403 && data\.code === "ANONYMOUS_NOT_ALLOWED"[\s\S]*openLogin\("Se connecter pour acheter"\)/);
     const buy = code.slice(code.indexOf("async function buyRoomAccess"), code.indexOf("async function enterRoom"));
     assert.ok(!/alert\(/.test(buy), "message dans la page, plus de alert");

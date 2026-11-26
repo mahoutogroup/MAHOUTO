@@ -209,6 +209,7 @@
 </div>
 
 <script src="../room-safe.js"></script>
+<script src="../salon-accroche.js"></script>
 <script src="../config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
@@ -280,6 +281,14 @@
           <input type="number" class="r-price" min="0" value="${Number.isFinite(Number(r.price)) && r.price !== null ? Number(r.price) : ""}" placeholder="Ex : 2000" ${r.is_paid ? "" : "disabled"}>
         </div>
 
+        ${"accroche" in r ? `
+        <div class="r-accroche-bloc">
+          <label>Phrase d'accroche (facultatif)</label>
+          <input type="text" class="r-accroche" maxlength="120" autocomplete="off" placeholder="Ex : Conseils, devis et entraide entre sérigraphes">
+          <div class="abo-hint r-accroche-compteur"></div>
+          <div class="abo-hint">Cette phrase s'affiche sur l'écran verrouillé de la communauté, sous le nom et avant le prix, pour les personnes qui n'y ont pas encore accès. Pas de lien ni d'adresse web.</div>
+        </div>` : ""}
+
         <div class="actions">
           <button class="save-btn">Enregistrer</button>
           <button type="button" class="photo-btn">🖼️ Photo</button>
@@ -316,6 +325,16 @@
       const photoBtn = row.querySelector(".photo-btn");
       const deleteBtn = row.querySelector(".delete-btn");
       const statusEl = row.querySelector(".save-status");
+
+      // Phrase d'accroche (champ présent seulement si la colonne existe : salon-accroche.sql). Texte brut, 120 caractères, sans lien.
+      const accrocheInput = row.querySelector(".r-accroche");
+      if (accrocheInput) {
+        accrocheInput.value = MahoutoSalonAccroche.clean(r.accroche);
+        const accrocheCpt = row.querySelector(".r-accroche-compteur");
+        const majCompteur = () => { accrocheCpt.textContent = MahoutoSalonAccroche.counterText(accrocheInput.value); };
+        accrocheInput.addEventListener("input", majCompteur);
+        majCompteur();
+      }
 
       photoBtn.addEventListener("click", () => {
         const input = document.createElement("input");
@@ -377,10 +396,16 @@
         const abonnement = !!(aboBox && aboBox.checked) && is_paid;
         // En mode abonnement le prix vient des forfaits : le prix à vie n'est plus obligatoire.
         if (is_paid && !abonnement && (!Number.isFinite(price) || price <= 0)) {
-          alert("Indique un prix valide pour une communauté payante.");
+          alert("Indiquez un prix valide pour une communauté payante.");
           return;
         }
-        if (abonnement && !r.abonnement && !confirm("Passer ce salon en mode abonnement ? Les membres qui ont déjà payé à vie gardent leur accès ; les nouveaux membres devront choisir un forfait. Vérifie que « Test 1 jour » est désactivé s'il s'agit d'un vrai salon.")) {
+        let accrocheValue = null;
+        if (accrocheInput) {
+          const check = MahoutoSalonAccroche.validate(accrocheInput.value);
+          if (!check.ok) { alert(check.error); return; }
+          accrocheValue = check.value;
+        }
+        if (abonnement && !r.abonnement && !confirm("Passer ce salon en mode abonnement ? Les membres qui ont déjà payé à vie gardent leur accès ; les nouveaux membres devront choisir un forfait. Vérifiez que « Test 1 jour » est désactivé s'il s'agit d'un vrai salon.")) {
           return;
         }
 
@@ -390,6 +415,7 @@
         // « abonnement » n'est envoyé que si la colonne existe (SQL d'abonnement exécuté).
         const payload = { is_paid, price: is_paid && Number.isFinite(price) ? price : null };
         if (aboBox) payload.abonnement = abonnement;
+        if (accrocheInput) payload.accroche = accrocheValue;
         const { error } = await supabase
           .from("rooms")
           .update(payload)
@@ -473,7 +499,7 @@
     }
     if (is_paid && !abonnement && (!Number.isFinite(price) || price <= 0)) {
       statusEl.style.color = "#F87171";
-      statusEl.textContent = "Indique un prix valide pour une communauté payante.";
+      statusEl.textContent = "Indiquez un prix valide pour une communauté payante.";
       return;
     }
 
