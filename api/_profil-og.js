@@ -17,6 +17,8 @@
 //    si c'est une image du compte Cloudinary du projet (métadonnées EXIF/GPS retirées), sinon l'image de la marque ;
 //  - tout ce qui vient de la base est échappé pour le HTML ; aucun innerHTML ;
 //  - noindex, nofollow : balise meta ET en-tête X-Robots-Tag, l'aperçu de partage ne rend pas les pages indexables ;
+//    SEULE EXCEPTION : une page que l'administrateur a rendue indexable (colonne indexable, profil_public_indexable) ET
+//    servie depuis mahouto.com : voir « Indexation » plus bas (aucun noindex, canonical, contenu dans le HTML) ;
 //  - cache court (5 minutes côté CDN) ; lecture en échec : 503 SANS cache (aperçu générique pour les robots), et les
 //    humains sont quand même redirigés vers /m.html pour que la page reste utilisable ;
 //  - alias : si l'adresse n'est pas une page, profil_public_alias_resoudre(p_alias) (clé anonyme) peut renvoyer l'adresse
@@ -248,7 +250,168 @@ export async function handleProfilPreview(req, res, deps) {
 
   const page = await readProfilPage(adresse, deps);
   if (page.error) return send(res, genericPreview(humanTarget(page.adresse, source), 503, "no-store"));
-  return send(res, buildProfilPreview(page.row, page.adresse, source, page.adresse === adresse ? raw : page.adresse));
+  const preview = buildProfilPreview(page.row, page.adresse, source, page.adresse === adresse ? raw : page.adresse);
+  // Indexation : seulement une page réelle (pas un alias), sur mahouto.com, décidée par un administrateur. Toute erreur ou doute = noindex.
+  if (!preview.generic && page.adresse === adresse && deps.fetchIndexable && isIndexableHost(req)) {
+    let verdict = null;
+    try { verdict = await deps.fetchIndexable(adresse); } catch (err) { verdict = null; }
+    if (verdict && !verdict.error && verdict.indexable === true) {
+      return sendIndexable(res, buildProfilIndexable(page.row, adresse), source);
+    }
+  }
+  return send(res, preview);
+}
+
+// ---------------------------------------------------------
+// Indexation par les moteurs de recherche (page par page, décidée par un administrateur).
+//  - la base décide : profil_public_indexable(adresse) = publiée, non suspendue, interrupteur ouvert ET indexable ;
+//  - jamais depuis majestepresse.com ni un domaine de test (*.vercel.app) : l'hôte doit être mahouto.com (repli : noindex) ;
+//  - jamais un alias : seule la page principale est indexable ; canonical TOUJOURS https://mahouto.com/m/<adresse> ;
+//  - titre « Nom, métier à Ville », description et JSON-LD : seulement des champs déjà publics (jamais le contact) ;
+//  - le contenu utile est DANS le HTML initial (nom, métier, ville, présentation, liens) ; pas de redirection automatique
+//    sans ?src= (les robots lisent l'adresse propre ; les liens de QR code et de partage portent ?src= et vont à la carte) ;
+//  - cache court (60 s) : une page dépubliée, suspendue ou retirée redevient noindex aussitôt.
+// ---------------------------------------------------------
+export const PROFIL_INDEX_HOSTS = ["mahouto.com", "www.mahouto.com"];
+export const PROFIL_INDEXABLE_CACHE = "public, max-age=0, s-maxage=60";
+
+/** Hôte de la requête (x-forwarded-host puis host), sans port, en minuscules : vrai seulement pour mahouto.com. */
+export function isIndexableHost(req) {
+  // L'hôte ne sert QU'À RESTREINDRE (repli = noindex) : le site et la marque affichés restent fixes (PROFIL_SITE).
+  const hdr = req && req.headers ? req.headers : {};
+  const host = String(hdr["x-forwarded-host"] || hdr["host"] || "").split(",")[0].trim().toLowerCase().replace(/:\d+$/, "");
+  return PROFIL_INDEX_HOSTS.includes(host);
+}
+
+/** Titre « Nom, métier à Ville » (les parties absentes sont omises). */
+export function profilIndexableTitle(row) {
+  const nom = cut(row && row.nom_affiche, 60), metier = cut(row && row.metier, 80), ville = cut(row && row.localisation, 60);
+  if (nom && metier && ville) return `${nom}, ${metier} à ${ville}`;
+  if (nom && metier) return `${nom}, ${metier}`;
+  if (nom && ville) return `${nom} à ${ville}`;
+  return nom;
+}
+
+// JSON sûr dans une balise script : « < », « > », « & » et les séparateurs de ligne Unicode sont échappés.
+function safeJsonLd(obj) {
+  return JSON.stringify(obj).replace(/</g, "\\u003c").replace(/>/g, "\\u003e").replace(/&/g, "\\u0026").replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
+}
+
+/** Lien de contact PUBLIC de la carte (déjà visible sur la page) : https://wa.me/<numéro> ou lien https ; sinon null. */
+export function profilContactHref(row) {
+  const t = row && row.contact_type, v = row && row.contact_valeur;
+  if (t === "whatsapp" && typeof v === "string" && /^\+[1-9][0-9]{7,14}$/.test(v)) return { href: `https://wa.me/${v.slice(1)}`, label: "Contacter sur WhatsApp" };
+  if (t === "lien" && typeof v === "string" && /^https:\/\/[^\s\u0000-\u001f]{4,300}$/.test(v)) return { href: v, label: "Ouvrir le lien de contact" };
+  return null;
+}
+
+/** Tout ce qu'il faut pour la page indexable, à partir de la ligne publique : champs déjà publics seulement. */
+export function buildProfilIndexable(row, adresse) {
+  const nom = cut(row && row.nom_affiche, 60);
+  const metier = cut(row && row.metier, 80), ville = cut(row && row.localisation, 60);
+  const presentation = cut(row && row.presentation, 280);
+  const canonicalUrl = `${PROFIL_SITE}/m/${adresse}`;
+  const title = profilIndexableTitle(row);
+  const description = profilDescription(row);
+  const photo = profilCardImage(row);
+  const ld = { "@context": "https://schema.org", "@type": "Person", name: nom, url: canonicalUrl };
+  if (metier) ld.jobTitle = metier;
+  if (presentation) ld.description = presentation;
+  if (ville) ld.workLocation = { "@type": "Place", name: ville };
+  if (photo) ld.image = photo;
+  return { adresse, canonicalUrl, title, description, nom, metier, ville, presentation, photo, contact: profilContactHref(row), jsonLd: safeJsonLd(ld),
+    image: profilOgImage(row), cardUrl: `${PROFIL_SITE}/m.html?adresse=${adresse}&src=recherche` };
+}
+
+/** Page HTML d'une carte indexable : contenu dans le HTML initial, canonical mahouto.com, JSON-LD, aucune balise noindex. */
+export function renderProfilIndexablePage(p, source) {
+  const image = p.image || DEFAULT_IMAGE;
+  const redirect = source ? `<script>window.location.replace(${safeJsonLd(humanTarget(p.adresse, source))});</script>\n` : "";
+  const contact = p.contact ? `<p><a class="btn" href="${escapeHtml(p.contact.href)}" rel="nofollow noopener">${escapeHtml(p.contact.label)}</a></p>` : "";
+  const ligne = [p.metier, p.ville].filter(Boolean).join(" · ");
+  return `<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${escapeHtml(p.title)}</title>
+<meta name="description" content="${escapeHtml(p.description)}">
+<link rel="canonical" href="${escapeHtml(p.canonicalUrl)}">
+
+<meta property="og:type" content="profile">
+<meta property="og:site_name" content="${escapeHtml(PROFIL_BRAND)}">
+<meta property="og:title" content="${escapeHtml(p.title)}">
+<meta property="og:description" content="${escapeHtml(p.description)}">
+<meta property="og:url" content="${escapeHtml(p.canonicalUrl)}">
+<meta property="og:image" content="${escapeHtml(image.url)}">
+<meta property="og:image:width" content="${escapeHtml(image.width)}">
+<meta property="og:image:height" content="${escapeHtml(image.height)}">
+<meta name="twitter:card" content="${escapeHtml(image.card || "summary_large_image")}">
+<meta name="twitter:title" content="${escapeHtml(p.title)}">
+<meta name="twitter:description" content="${escapeHtml(p.description)}">
+<meta name="twitter:image" content="${escapeHtml(image.url)}">
+
+<script type="application/ld+json">${p.jsonLd}</script>
+<style>
+:root{color-scheme:dark light}
+body{margin:0;background:#0A0A0A;color:#fff;font-family:system-ui,sans-serif;line-height:1.6}
+main{max-width:640px;margin:0 auto;padding:40px 20px;text-align:center}
+img{width:120px;height:120px;border-radius:50%;object-fit:cover}
+h1{font-size:1.6rem;margin:16px 0 4px}
+.ligne{color:#FFC107;margin:0 0 16px}
+.btn{display:inline-block;margin:6px;padding:12px 20px;border-radius:12px;background:#FFC107;color:#000;font-weight:700;text-decoration:none}
+.sec{background:transparent;color:inherit;border:1px solid #888}
+footer{margin-top:32px;font-size:.9rem}
+a{color:#FFC107}
+@media (prefers-color-scheme:light){body{background:#F7F7F7;color:#111}.ligne,a{color:#856500}.btn{color:#000}.sec{border-color:#555}}
+</style>
+${redirect}</head>
+<body>
+<main>
+${p.photo ? `<img src="${escapeHtml(p.photo)}" alt="" width="120" height="120">` : ""}
+<h1>${escapeHtml(p.nom)}</h1>
+${ligne ? `<p class="ligne">${escapeHtml(ligne)}</p>` : ""}
+${p.presentation ? `<p>${escapeHtml(p.presentation)}</p>` : ""}
+${contact}
+<p><a class="btn sec" href="${escapeHtml(p.cardUrl)}">Ouvrir la carte complète</a></p>
+<footer><a href="${escapeHtml(PROFIL_SITE)}/">${escapeHtml(PROFIL_BRAND)}</a> · <a href="${escapeHtml(PROFIL_SITE)}/regles-pages-publiques">Règles des pages publiques</a></footer>
+</main>
+</body>
+</html>`;
+}
+
+function sendIndexable(res, p, source) {
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.setHeader("Cache-Control", PROFIL_INDEXABLE_CACHE);
+  return res.status(200).send(renderProfilIndexablePage(p, source));
+}
+
+// ---------------------------------------------------------
+// Plan du site des cartes indexables : GET /sitemap-cartes.xml (réécriture vers api/produit-og.js?type=sitemap-cartes).
+// deps.fetchSitemap() → { rows: [{adresse, modifie_le}], error } (fonction profil_public_sitemap, clé publique). Seules les adresses
+// valides sont écrites, toujours en https://mahouto.com/m/<adresse> ; vide s'il n'y a aucune page indexable ; erreur : 503 sans cache.
+// ---------------------------------------------------------
+export function renderProfilSitemap(rows) {
+  const urls = (Array.isArray(rows) ? rows : [])
+    .filter((r) => r && isValidProfilAdresse(r.adresse))
+    .map((r) => {
+      const t = r.modifie_le ? Date.parse(r.modifie_le) : NaN;
+      const lastmod = isFinite(t) ? `<lastmod>${new Date(t).toISOString()}</lastmod>` : "";
+      return `  <url><loc>${escapeHtml(`${PROFIL_SITE}/m/${r.adresse}`)}</loc>${lastmod}</url>`;
+    });
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls.length ? "\n" + urls.join("\n") + "\n" : "\n"}</urlset>\n`;
+}
+
+export async function handleProfilSitemap(req, res, deps) {
+  let result;
+  try { result = await deps.fetchSitemap(); } catch (err) { result = { rows: [], error: err || new Error("lecture impossible") }; }
+  res.setHeader("Content-Type", "application/xml; charset=utf-8");
+  if (result && result.error) {
+    res.setHeader("Cache-Control", "no-store");
+    return res.status(503).send(renderProfilSitemap([]));
+  }
+  res.setHeader("Cache-Control", "public, max-age=0, s-maxage=300");
+  return res.status(200).send(renderProfilSitemap(result && result.rows));
 }
 
 // ---------------------------------------------------------

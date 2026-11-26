@@ -23,7 +23,7 @@ test("la page existe, est en noindex (balise meta ET en-tête), avec réécritur
   assert.deepStrictEqual(v.rewrites.find((r) => r.source === "/creer-ma-carte"), { source: "/creer-ma-carte", destination: "/creer-ma-carte.html" });
   ["/creer-ma-carte", "/creer-ma-carte.html"].forEach((s) => assert.ok(v.headers.some((h) => h.source === s && h.headers.some((x) => x.key === "X-Robots-Tag" && /noindex/.test(x.value))), s + " : X-Robots-Tag noindex"));
   ["/p/:id", "/f/:id", "/s/:id", "/e/:slug", "/r/:id", "/verify/:code", "/m/:adresse", "/pro", "/regles-pages-publiques"].forEach((s) => assert.ok(v.rewrites.some((r) => r.source === s), s + " intacte"));
-  ["/m/:adresse", "/m.html", "/pro", "/pro.html"].forEach((s) => assert.ok(v.headers.some((h) => h.source === s), s + " : en-têtes existants intacts"));
+  ["/m.html", "/pro", "/pro.html"].forEach((s) => assert.ok(v.headers.some((h) => h.source === s), s + " : en-têtes existants intacts"));
   const list = (d) => fs.readdirSync(path.join(root, d)).filter((f) => f.endsWith(".js") && !f.startsWith("_")); assert.strictEqual(list("api").length + list("api/admin").length, 12, "12 fonctions, aucun nouveau fichier api/");
   assert.ok(!fs.readdirSync(root).some((f) => /\.sql$/.test(f) && /creer-ma-carte/.test(f)), "aucun SQL");
   ["robots.txt", "sitemap.xml"].forEach((f) => { if (fs.existsSync(path.join(root, f))) assert.ok(!/creer-ma-carte/.test(read(f)), f + " non touché"); });

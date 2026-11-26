@@ -48,7 +48,7 @@ import { brandForRequest } from "./_brand.js";
 import { cloudinaryImageParts } from "./_cloudinary-og.js";
 import { handleRoomPreview, ROOM_FIELD_SETS } from "./_room-og.js";
 import { handleEntreprisePreview, ENTREPRISE_FIELDS } from "./_entreprise-og.js";
-import { handleProfilPreview, handleProfilJson } from "./_profil-og.js";
+import { handleProfilPreview, handleProfilJson, handleProfilSitemap } from "./_profil-og.js";
 
 function escapeHtml(str) {
   return String(str || "")
@@ -466,14 +466,33 @@ async function fetchAliasForPreview(alias) {
   return { adresse: typeof data === "string" ? data : null, error: error || null };
 }
 
+// Indexation (voir api/_profil-og.js) : la page est-elle indexable ? Fonction publique, un seul booléen (publiée, non suspendue,
+// interrupteur ouvert et décidée par un administrateur). Clé publique anon, jamais service_role.
+async function fetchIndexableForPreview(adresse) {
+  const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
+  const { data, error } = await supabase.rpc("profil_public_indexable", { p_adresse: adresse });
+  return { indexable: data === true, error: error || null };
+}
+
+// Plan du site des cartes indexables : adresse et date de modification seulement (fonction publique, clé anon).
+async function fetchSitemapForPreview() {
+  const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
+  const { data, error } = await supabase.rpc("profil_public_sitemap");
+  return { rows: Array.isArray(data) ? data : [], error: error || null };
+}
+
 export default async function handler(req, res) {
+  // Plan du site des cartes indexables (/sitemap-cartes.xml).
+  if (req.query && req.query.type === "sitemap-cartes") {
+    return handleProfilSitemap(req, res, { fetchSitemap: fetchSitemapForPreview });
+  }
   // Carte d'aperçu d'une page de membre dans les messages (format=json) : mêmes lectures que l'aperçu HTML, aucune requête en plus.
   if (req.query && req.query.type === "profil" && req.query.format === "json") {
     return handleProfilJson(req, res, { fetchProfil: fetchProfilForPreview, fetchAlias: fetchAliasForPreview });
   }
   // Pages publiques de membres : même principe (site et marque fixes, noindex).
   if (req.query && req.query.type === "profil" && req.query.format !== "json") {
-    return handleProfilPreview(req, res, { fetchProfil: fetchProfilForPreview, fetchAlias: fetchAliasForPreview });
+    return handleProfilPreview(req, res, { fetchProfil: fetchProfilForPreview, fetchAlias: fetchAliasForPreview, fetchIndexable: fetchIndexableForPreview });
   }
   // Salons : en-têtes de cache propres (courte durée), site et marque fixes.
   if (req.query && req.query.type === "salon" && req.query.format !== "json") {

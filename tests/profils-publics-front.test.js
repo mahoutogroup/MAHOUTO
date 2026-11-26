@@ -225,7 +225,7 @@ test("m.html : noindex (meta), chemins absolus (adresse /m/...), scripts dans l'
   assert.ok(!/<script>/.test(h)); assert.match(h, /<a class="marque" href="\/index\.html"[^>]*>/, "en-tête de marque : lien vers l'accueil (remplace « Retour à l'accueil »)");
   ["chargement", "etat", "profil", "bandeau"].forEach((i) => assert.ok(h.includes('id="' + i + '"'), i));
   const v = JSON.parse(read("vercel.json"));
-  assert.ok(v.headers.some((x) => x.source === "/m/:adresse" && x.headers.some((hh) => hh.key === "X-Robots-Tag" && /noindex/.test(hh.value))));
+  assert.ok(!v.headers.some((x) => x.source === "/m/:adresse"), "en-tête /m/:adresse posé par la fonction (noindex sauf page indexable)");
   assert.ok(v.headers.some((x) => x.source === "/m.html" && x.headers.some((hh) => hh.key === "X-Robots-Tag")));
 });
 
