@@ -909,7 +909,7 @@
     if (!plansPromise || force) {
       plansPromise = (async () => {
         try {
-          const { data, error } = await supabase.from("salon_forfaits").select(MahoutoSalonAbonnement.FORFAIT_COLUMNS).order("ordre", { ascending: true });
+          const { data, error } = await supabase.from("salon_forfaits").select(MahoutoSalonAbonnement.FORFAIT_COLUMNS).eq("actif", true).order("ordre", { ascending: true });
           return error ? { rows: null, error: true } : { rows: data || [], error: false };
         } catch (e) { return { rows: null, error: true }; }
       })().then((r) => { if (r.error) plansPromise = null; return r; });

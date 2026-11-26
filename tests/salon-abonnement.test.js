@@ -142,26 +142,25 @@ const seedDb = (extra) => makeDb(Object.assign({
 
   // ---------- CONTRAT : la vraie lecture des forfaits traverse le filtre de la page ----------
   await test("CONTRAT : la lecture des forfaits actifs, avec les colonnes demandées par la page, traverse plansFromRows sans rien perdre", async () => {
-    // Même requête que chat.html : colonnes = FORFAIT_COLUMNS ; la base (RLS) ne renvoie que les actifs.
+    // Même requête que chat.html : colonnes = FORFAIT_COLUMNS (avec « actif »). Un administrateur reçoit AUSSI les inactifs (4 lignes).
     const db = seedDb();
-    db.salon_forfaits = db.salon_forfaits.filter((f) => f.actif === true);
     const { data } = await db.client.from("salon_forfaits").select(SA.FORFAIT_COLUMNS).order("ordre", { ascending: true });
-    assert.strictEqual(data.length, 3);
-    assert.ok(data.every((r) => !("actif" in r)), "le champ « actif » n'est PAS demandé : le filtre ne doit pas l'exiger");
+    assert.strictEqual(data.length, 4);
+    assert.ok(data.every((r) => "actif" in r), "le champ « actif » est demandé : le filtre côté client en a besoin");
     const plans = SA.plansFromRows(data);
-    assert.deepStrictEqual(plans.map((p) => p.code), ["test-1-jour", "1-mois", "3-mois"], "aucun forfait rejeté par le filtre de la page");
+    assert.deepStrictEqual(plans.map((p) => p.code), ["test-1-jour", "1-mois", "3-mois"], "le forfait inactif (« ancien ») est écarté, les actifs sont gardés");
     assert.strictEqual(SA.planLabel(plans[1]), "1 mois — " + Number(1111).toLocaleString("fr-FR") + " FCFA");
     // la page utilise bien ce filtre et ces colonnes
     const page = read("chat.html");
-    assert.ok(page.includes(".select(MahoutoSalonAbonnement.FORFAIT_COLUMNS)") && page.includes("MahoutoSalonAbonnement.plansFromRows(data)"));
-    assert.ok(!/isPurchasable|\.actif\b|actif ===/.test(page.slice(page.indexOf("async function showSubscriptionPlans"), page.indexOf("async function checkRoomAccess"))), "la page ne dépend pas d'un champ « actif »");
+    assert.ok(page.includes('.select(MahoutoSalonAbonnement.FORFAIT_COLUMNS).eq("actif", true)') && page.includes("MahoutoSalonAbonnement.plansFromRows(data)"));
+    assert.ok(!/isPurchasable|\.actif\b|actif ===/.test(page.slice(page.indexOf("async function showSubscriptionPlans"), page.indexOf("async function checkRoomAccess"))), "la page ne filtre pas elle-même sur « actif » (salon-abonnement.js s'en charge)");
   });
   await test("filtre d'affichage : champs invalides écartés, tri par ordre puis durée", () => {
     const bad = [null, {}, { code: "x", libelle: "a", jours: 1, montant: 1 }, { code: "ok-1", libelle: "", jours: 1, montant: 1 },
       { code: "ok-2", libelle: "a", jours: 0, montant: 1 }, { code: "ok-3", libelle: "a", jours: 1, montant: 1.5 }, { code: "ok-4", libelle: "a", jours: 1, montant: -3 }, { code: "A B", libelle: "a", jours: 1, montant: 1 }];
     assert.deepStrictEqual(SA.plansFromRows(bad), []);
     assert.deepStrictEqual(SA.plansFromRows(null), []);
-    const sorted = SA.plansFromRows([{ code: "b-b", libelle: "b", jours: 90, montant: 5, ordre: 2 }, { code: "a-a", libelle: "a", jours: 30, montant: 5, ordre: 1 }]);
+    const sorted = SA.plansFromRows([{ code: "b-b", libelle: "b", jours: 90, montant: 5, ordre: 2, actif: true }, { code: "a-a", libelle: "a", jours: 30, montant: 5, ordre: 1, actif: true }]);
     assert.deepStrictEqual(sorted.map((p) => p.code), ["a-a", "b-b"]);
   });
 

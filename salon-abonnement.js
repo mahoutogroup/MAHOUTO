@@ -7,8 +7,8 @@
 
    - Un membre à VIE (achat « paid » existant), le créateur et un admin entrent directement : ils ne voient
      JAMAIS de forfaits et ne peuvent pas payer un abonnement.
-   - Un salon en mode abonnement affiche les forfaits ACTIFS (lus directement : la base ne renvoie que les
-     actifs). Le filtre d'affichage ne regarde que la validité des champs reçus, jamais un champ « actif ».
+   - Un salon en mode abonnement affiche les forfaits ACTIFS. La lecture demande la colonne « actif » et le filtre
+     côté client ne garde que actif === true : un administrateur lit aussi les inactifs (politique admin).
    Aucun rendu HTML ici (le DOM est construit par les pages avec textContent).
    ========================================================= */
 (function (root) {
@@ -17,7 +17,7 @@
   var PRIVILEGED_ROLES = ["admin", "super_admin", "founder"];
   var FORFAIT_CODE_RE = /^[a-z0-9_-]{2,30}$/;
   // Colonnes demandées par les pages. Le contrat (tests) vérifie que le filtre fonctionne sur CES colonnes.
-  var FORFAIT_COLUMNS = "code, libelle, jours, montant, ordre";
+  var FORFAIT_COLUMNS = "code, libelle, jours, montant, ordre, actif";
   var DAY_MS = 24 * 3600 * 1000;
 
   function toMs(iso) {
@@ -59,9 +59,9 @@
     };
   }
 
-  /** Forfait affichable : seulement la validité des champs reçus (la base ne renvoie que les actifs). */
+  /** Forfait affichable : ACTIF (actif === true, colonne lue) et champs valides. Sans colonne « actif » : ignoré. */
   function isDisplayableForfait(f) {
-    return !!f && typeof f.code === "string" && FORFAIT_CODE_RE.test(f.code) &&
+    return !!f && f.actif === true && typeof f.code === "string" && FORFAIT_CODE_RE.test(f.code) &&
       typeof f.libelle === "string" && f.libelle.length > 0 &&
       Number.isInteger(f.jours) && f.jours > 0 && Number.isInteger(f.montant) && f.montant > 0;
   }

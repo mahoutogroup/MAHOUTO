@@ -511,7 +511,7 @@
     if (forfaitsRequested || !(rooms || []).some((r) => r && r.is_paid === true && r.abonnement === true)) return;
     forfaitsRequested = true;
     try {
-      const { data, error } = await supabase.from("salon_forfaits").select(MahoutoSalonAbonnement.FORFAIT_COLUMNS).order("ordre", { ascending: true });
+      const { data, error } = await supabase.from("salon_forfaits").select(MahoutoSalonAbonnement.FORFAIT_COLUMNS).eq("actif", true).order("ordre", { ascending: true });
       if (error) { forfaitsRequested = false; return; }
       forfaitMin = MahoutoSalonAbonnement.minPrice(data);
     } catch (e) { forfaitsRequested = false; }
