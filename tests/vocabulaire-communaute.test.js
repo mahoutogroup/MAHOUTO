@@ -50,9 +50,9 @@ test("aucun « salon payant » / « salons payants » (toutes casses) dans un te
 test("textes de l'écran d'une communauté payante (chat.html)", () => {
   const chat = read("chat.html");
   assert.match(chat, /<h2 id="locked-room-name">Communauté payante<\/h2>/);
-  assert.match(chat, /<p>Rejoins cette communauté pour lire et écrire les messages\.<\/p>/);
+  assert.match(chat, /<p id="locked-intro">Rejoignez cette communauté pour lire et écrire les messages\.<\/p>/);
   assert.match(chat, /🔗 Partager cette communauté<\/button>/);
-  assert.match(chat, /Connecte-toi pour débloquer cette communauté\./);
+  assert.match(chat, /Connectez-vous pour débloquer cette communauté\./);
   assert.match(chat, /openLogin\("Se connecter pour débloquer cette communauté"\)/);
   assert.ok(!/débloquer ce salon/i.test(chat));
 });
@@ -73,7 +73,7 @@ test("retour de paiement, liste des discussions, achats, administration", () => 
   assert.match(read("mes-achats.html"), /"🔒 Mes communautés"/);
   const admin = read("admin/rooms.html");
   assert.strictEqual((admin.match(/Communauté payante \(accès sur achat\)/g) || []).length, 2);
-  assert.match(admin, /Indique un prix valide pour une communauté payante\./);
+  assert.match(admin, /Indiquez un prix valide pour une communauté payante\./);
   assert.match(admin, /Crée des communautés payantes/);
   assert.match(admin, /gère le prix des salons existants/);
 });
