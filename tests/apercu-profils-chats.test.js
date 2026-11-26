@@ -99,9 +99,9 @@ test("JSON profil : en-têtes — cache court (5 minutes au plus), noindex, JSON
   const og = read("api/_profil-og.js"); assert.match(og, /export const PROFIL_SITE = "https:\/\/mahouto\.com";/); assert.match(og, /export const PROFIL_BRAND = "MAHOUTO\+";/); assert.ok(!/headers\.host/.test(og));
   const prod = read("api/produit-og.js");
   assert.match(prod, /req\.query\.type === "profil" && req\.query\.format === "json"\) \{\s*return handleProfilJson\(req, res, \{ fetchProfil: fetchProfilForPreview, fetchAlias: fetchAliasForPreview \}\);/);
-  assert.match(prod, /req\.query\.type === "profil" && req\.query\.format !== "json"\) \{\s*return handleProfilPreview\(req, res, \{ fetchProfil: fetchProfilForPreview, fetchAlias: fetchAliasForPreview \}\);/, "l'aperçu HTML est inchangé");
+  assert.match(prod, /req\.query\.type === "profil" && req\.query\.format !== "json"\) \{\s*return handleProfilPreview\(req, res, \{ fetchProfil: fetchProfilForPreview, fetchAlias: fetchAliasForPreview, fetchIndexable: fetchIndexableForPreview \}\);/, "l'aperçu HTML est inchangé");
   assert.ok(prod.indexOf("return handleProfilJson(req, res") < prod.indexOf("return handleJson(req, res, base, type);"), "routé avant le JSON générique des produits");
-  assert.match(prod, /import \{ handleProfilPreview, handleProfilJson \} from "\.\/_profil-og\.js";/);
+  assert.match(prod, /import \{ handleProfilPreview, handleProfilJson, handleProfilSitemap \} from "\.\/_profil-og\.js";/);
   const list = (d) => fs.readdirSync(path.join(root, d)).filter((f) => f.endsWith(".js") && !f.startsWith("_")); assert.strictEqual(list("api").length + list("api/admin").length, 12, "limite Vercel Hobby");
   assert.ok(!fs.readdirSync(root).some((f) => /\.sql$/.test(f) && /apercu|chats/.test(f)), "aucun SQL");
 });

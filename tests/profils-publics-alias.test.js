@@ -183,7 +183,7 @@ test("serveur : api/produit-og.js — résolution par l'appel RPC profil_public_
   const src = read("api/produit-og.js"); const block = /async function fetchAliasForPreview[\s\S]*?\n}\n/.exec(src)[0];
   assert.match(block, /createClient\(process\.env\.SUPABASE_URL, process\.env\.SUPABASE_ANON_KEY\)/); assert.match(block, /rpc\("profil_public_alias_resoudre", \{ p_alias: alias \}\)/);
   assert.ok(!/service_role|SERVICE_ROLE|\.from\(/.test(block), "jamais service_role ni la table"); assert.match(block, /typeof data === "string" \? data : null/);
-  assert.match(src, /handleProfilPreview\(req, res, \{ fetchProfil: fetchProfilForPreview, fetchAlias: fetchAliasForPreview \}\)/);
+  assert.match(src, /handleProfilPreview\(req, res, \{ fetchProfil: fetchProfilForPreview, fetchAlias: fetchAliasForPreview, fetchIndexable: fetchIndexableForPreview \}\)/);
   const list = (d) => fs.readdirSync(path.join(root, d)).filter((f) => f.endsWith(".js") && !f.startsWith("_")); assert.strictEqual(list("api").length + list("api/admin").length, 12, "limite Vercel Hobby");
   const og = read("api/_profil-og.js"); assert.match(og, /export const PROFIL_SITE = "https:\/\/mahouto\.com";/); assert.match(og, /export const PROFIL_BRAND = "MAHOUTO\+";/); assert.ok(!/headers\.host|MAHOUTO_BRAND/.test(og));
   const v = JSON.parse(read("vercel.json")); assert.deepStrictEqual(v.rewrites.find((r) => r.source === "/m/:adresse"), { source: "/m/:adresse", destination: "/api/produit-og?type=profil&adresse=:adresse" });

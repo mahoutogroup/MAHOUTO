@@ -363,18 +363,22 @@ test("api/produit-og.js : type « profil » — lecture UNIQUEMENT par l'appel R
   const src = read("api/produit-og.js"); const block = /async function fetchProfilForPreview[\s\S]*?\n}\n/.exec(src)[0];
   assert.match(block, /createClient\(process\.env\.SUPABASE_URL, process\.env\.SUPABASE_ANON_KEY\)/); assert.match(block, /\.rpc\("profil_public_lire", \{ p_adresse: adresse \}\)/);
   assert.ok(!/\.from\(|SERVICE_ROLE|service_role/.test(block), "ni lecture directe de la table ni clé service");
-  assert.match(src, /req\.query\.type === "profil" && req\.query\.format !== "json"\)\s*\{\s*return handleProfilPreview\(req, res, \{ fetchProfil: fetchProfilForPreview, fetchAlias: fetchAliasForPreview \}\);/);
+  assert.match(src, /req\.query\.type === "profil" && req\.query\.format !== "json"\)\s*\{\s*return handleProfilPreview\(req, res, \{ fetchProfil: fetchProfilForPreview, fetchAlias: fetchAliasForPreview, fetchIndexable: fetchIndexableForPreview \}\);/);
   assert.ok(src.indexOf('type === "profil"') < src.indexOf('type === "salon"'), "branche ajoutée en tête, sans toucher aux autres");
   // exécution de bout en bout avec un faux client (dossier temporaire)
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "profil-og-test-")); fs.cpSync(path.join(root, "api"), path.join(tmp, "api"), { recursive: true }); ["brand.js", "room-safe.js", "salon-accroche.js"].forEach((f) => fs.copyFileSync(path.join(root, f), path.join(tmp, f)));
   const dir = path.join(tmp, "node_modules", "@supabase", "supabase-js"); fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify({ name: "@supabase/supabase-js", version: "0.0.0", main: "index.js" }));
-  fs.writeFileSync(path.join(dir, "index.js"), "exports.createClient = (url, key) => { globalThis.__CREATED = [url, key]; return { rpc: async (n, a) => { globalThis.__RPC = [n, a]; return globalThis.__ANSWER; }, from() { throw new Error('lecture directe interdite'); } }; };");
+  fs.writeFileSync(path.join(dir, "index.js"), "exports.createClient = (url, key) => { globalThis.__CREATED = [url, key]; return { rpc: async (n, a) => { globalThis.__RPC = [n, a]; (globalThis.__RPCS = globalThis.__RPCS || []).push([n, a]); return globalThis.__ANSWER; }, from() { throw new Error('lecture directe interdite'); } }; };");
   Object.assign(process.env, { SUPABASE_URL: "https://x.test", SUPABASE_ANON_KEY: "anon-fictive" });
   const handler = (await import(pathToFileURL(path.join(tmp, "api", "produit-og.js")).href)).default;
   globalThis.__ANSWER = { data: [ROW()], error: null };
   const res = fakeRes(); await handler({ method: "GET", query: { type: "profil", adresse: "mon-atelier", src: "qr" }, headers: { host: "mahouto.com" } }, res);
-  assert.strictEqual(JSON.stringify(globalThis.__RPC), JSON.stringify(["profil_public_lire", { p_adresse: "mon-atelier" }])); assert.deepStrictEqual(globalThis.__CREATED, ["https://x.test", "anon-fictive"]);
+  globalThis.__RPCS = []; await handler({ method: "GET", query: { type: "profil", adresse: "mon-atelier" }, headers: { host: "mahouto.com" } }, fakeRes());
+  assert.strictEqual(JSON.stringify(globalThis.__RPCS), JSON.stringify([["profil_public_lire", { p_adresse: "mon-atelier" }], ["profil_public_indexable", { p_adresse: "mon-atelier" }]]), "lecture de la page, puis un seul booléen « indexable » (clé publique)");
+  globalThis.__RPCS = []; await handler({ method: "GET", query: { type: "profil", adresse: "mon-atelier" }, headers: { host: "majestepresse.com" } }, fakeRes());
+  assert.strictEqual(JSON.stringify(globalThis.__RPCS), JSON.stringify([["profil_public_lire", { p_adresse: "mon-atelier" }]]), "hors mahouto.com : aucune lecture d\u2019indexation");
+  assert.deepStrictEqual(globalThis.__CREATED, ["https://x.test", "anon-fictive"]);
   assert.strictEqual(meta(String(res.body), "og:title"), "Atelier Test — MAHOUTO+"); assert.strictEqual(res.headers["x-robots-tag"], "noindex, nofollow");
   globalThis.__ANSWER = { data: [], error: null }; const res2 = fakeRes(); await handler({ method: "GET", query: { type: "profil", adresse: "mon-atelier" }, headers: {} }, res2);
   assert.strictEqual(meta(String(res2.body), "og:title"), "MAHOUTO+", "rien de public : aperçu générique");
@@ -386,7 +390,8 @@ test("vercel.json : /m/:adresse → /api/produit-og?type=profil&adresse=:adresse
   const v = JSON.parse(read("vercel.json"));
   assert.deepStrictEqual(v.rewrites.find((r) => r.source === "/m/:adresse"), { source: "/m/:adresse", destination: "/api/produit-og?type=profil&adresse=:adresse" });
   ["/e/:slug", "/r/:id", "/p/:id", "/f/:id", "/s/:id", "/verify/:code"].forEach((s) => assert.ok(v.rewrites.some((r) => r.source === s), s));
-  ["/m/:adresse", "/m.html"].forEach((s) => assert.ok(v.headers.some((h) => h.source === s && h.headers.some((x) => x.key === "X-Robots-Tag" && x.value === "noindex, nofollow")), s));
+  assert.ok(v.headers.some((h) => h.source === "/m.html" && h.headers.some((x) => x.key === "X-Robots-Tag" && x.value === "noindex, nofollow")), "/m.html");
+  assert.ok(!v.headers.some((h) => h.source === "/m/:adresse"), "/m/:adresse : l'en-tête est posé par la fonction (noindex sauf page indexable), plus par vercel.json");
   const list = (d) => fs.readdirSync(path.join(root, d)).filter((f) => f.endsWith(".js")); const fns = list("api").filter((f) => !f.startsWith("_")).concat(list("api/admin"));
   assert.strictEqual(fns.length, 12, "plafond Vercel Hobby"); assert.ok(fs.existsSync(path.join(root, "api", "_profil-og.js")));
 });
