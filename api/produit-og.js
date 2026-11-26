@@ -46,7 +46,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { brandForRequest } from "./_brand.js";
 import { cloudinaryImageParts } from "./_cloudinary-og.js";
-import { handleRoomPreview, ROOM_FIELDS } from "./_room-og.js";
+import { handleRoomPreview, ROOM_FIELD_SETS } from "./_room-og.js";
 import { handleEntreprisePreview, ENTREPRISE_FIELDS } from "./_entreprise-og.js";
 import { handleProfilPreview, handleProfilJson } from "./_profil-og.js";
 
@@ -415,13 +415,26 @@ async function handleJson(req, res, base, type) {
 
 // ---------------------------------------------------------
 // Salons : lien /r/<salon> (type=salon), aperçu avec la photo et le nom du salon.
-// Lecture avec la clé publique (anon), jamais service_role ; champs : name, is_paid, price, photo_url, emoji.
+// Lecture avec la clé publique (anon), jamais service_role ; champs : name, is_paid, price, photo_url, emoji, abonnement, accroche,
+// plus (mode abonnement) le plus petit montant des forfaits ACTIFS (la RLS « salon_forfaits_public_read » ne renvoie que les actifs).
 // Toute la logique (validation, balises, échappement, cache) est dans api/_room-og.js.
 // ---------------------------------------------------------
 async function fetchRoomForPreview(id) {
   const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
-  const { data, error } = await supabase.from("rooms").select(ROOM_FIELDS).eq("id", id).maybeSingle();
-  return { row: data || null, error: error || null };
+  let data = null, error = null;
+  for (const columns of ROOM_FIELD_SETS) {      // colonnes absentes (SQL pas encore exécuté) : repli sur le jeu précédent
+    ({ data, error } = await supabase.from("rooms").select(columns).eq("id", id).maybeSingle());
+    if (!error) break;
+  }
+  if (!data) return { row: null, error: error || null };
+  let forfaitMin = null;
+  if (data.is_paid === true && data.abonnement === true) {
+    try {
+      const forfaits = await supabase.from("salon_forfaits").select("montant").gt("montant", 0).order("montant", { ascending: true }).limit(1);
+      if (!forfaits.error && forfaits.data && forfaits.data[0] && Number.isInteger(forfaits.data[0].montant)) forfaitMin = forfaits.data[0].montant;
+    } catch (e) { forfaitMin = null; }          // forfaits illisibles : aucun prix chiffré dans l'aperçu
+  }
+  return { row: { ...data, forfait_min: forfaitMin }, error: null };
 }
 
 // ---------------------------------------------------------

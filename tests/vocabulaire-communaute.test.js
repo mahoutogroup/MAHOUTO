@@ -95,15 +95,15 @@ test("aperçu de lien et message de partage : payante / gratuit", () => {
   const Og = require("../api/_room-og.js");
   const Share = require("../room-share.js");
   const paid = Og.buildRoomPreview({ name: "VIP", is_paid: true, price: 5000 }, "vip");
-  assert.strictEqual(paid.description, "Communauté payante : " + Number(5000).toLocaleString("fr-FR") + " FCFA — Rejoins cette communauté sur MAHOUTO+");
+  assert.strictEqual(paid.description, "Communauté payante : " + Number(5000).toLocaleString("fr-FR") + " FCFA — Rejoignez cette communauté sur MAHOUTO+");
   assert.strictEqual(paid.redirectLabel, "Ouverture de la communauté…");
   const free = Og.buildRoomPreview({ name: "Général", is_paid: false }, "general");
-  assert.strictEqual(free.description, "Rejoins ce salon sur MAHOUTO+");
+  assert.strictEqual(free.description, "Rejoignez ce salon sur MAHOUTO+");
   assert.strictEqual(free.redirectLabel, "Ouverture du salon…");
-  assert.strictEqual(Share.buildMessage({ name: "VIP", is_paid: true, price: 5000 }), "Rejoins « VIP » sur MAHOUTO+ (communauté payante : " + Number(5000).toLocaleString("fr-FR") + " FCFA).");
-  assert.strictEqual(Share.buildMessage({ name: "Général", is_paid: false }), "Rejoins « Général » sur MAHOUTO+.");
-  assert.strictEqual(Share.buildMessage({ is_paid: true, price: 5000 }).startsWith("Rejoins « cette communauté » "), true);
-  assert.strictEqual(Share.buildMessage({}), "Rejoins « ce salon » sur MAHOUTO+.");
+  assert.strictEqual(Share.buildMessage({ name: "VIP", is_paid: true, price: 5000 }), "Rejoignez « VIP » sur MAHOUTO+ (communauté payante : " + Number(5000).toLocaleString("fr-FR") + " FCFA).");
+  assert.strictEqual(Share.buildMessage({ name: "Général", is_paid: false }), "Rejoignez « Général » sur MAHOUTO+.");
+  assert.strictEqual(Share.buildMessage({ is_paid: true, price: 5000 }).startsWith("Rejoignez « cette communauté » "), true);
+  assert.strictEqual(Share.buildMessage({}), "Rejoignez « ce salon » sur MAHOUTO+.");
 });
 
 test("noms techniques inchangés : product_type « salon », table rooms, lien /r/<salon>, classes CSS", () => {

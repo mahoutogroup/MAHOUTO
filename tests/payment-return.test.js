@@ -138,7 +138,7 @@ function fakeRes() {
     reset({ rooms: { row: VIP } });
     const res = await post({ courseId: "vip", productType: "salon" }, "tok-anon");
     assert.strictEqual(res.statusCode, 403);
-    assert.deepStrictEqual(res.body, { error: "Connecte-toi avec Google ou ton e-mail pour acheter.", code: "ANONYMOUS_NOT_ALLOWED" });
+    assert.deepStrictEqual(res.body, { error: "Connectez-vous avec Google ou votre e-mail pour acheter.", code: "ANONYMOUS_NOT_ALLOWED" });
     assert.deepStrictEqual(global.__calls.map((c) => c.op), ["getUser"], "seul le jeton est vérifié");
     assert.strictEqual(global.__fedapay.length, 0);
   });

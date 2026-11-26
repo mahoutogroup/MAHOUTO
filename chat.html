@@ -1108,6 +1108,7 @@
 
     if (room) document.getElementById("room-title").textContent = "💬 " + room.name;
     currentRoom = room;
+    prefetchForfaitMin(room);   // sans attendre : sert seulement au texte de partage
 
     const hasAccess = await checkRoomAccess(room);
     if (!hasAccess) return;
@@ -1140,10 +1141,20 @@
   }
 
   // Partage du lien du salon (WhatsApp, statut, copie) : feuille native sur mobile, fenêtre de repli sinon.
-  let currentRoom = null;   // ligne de la table rooms (nom, prix…) une fois lue
+  let currentRoom = null;   // ligne de la table rooms (nom, prix, accroche…) une fois lue
+  // Salon en mode abonnement : le texte de partage annonce « à partir de » le plus petit forfait ACTIF (lecture publique des forfaits
+  // actifs, RLS « salon_forfaits_public_read »), lu à l'avance pour que le partage reste immédiat. Inconnu : aucun prix chiffré.
+  let forfaitMin = null;
+  async function prefetchForfaitMin(room) {
+    if (!room || room.is_paid !== true || room.abonnement !== true) return;
+    try {
+      const { data, error } = await supabase.from("salon_forfaits").select("montant").gt("montant", 0).order("montant", { ascending: true }).limit(1);
+      if (!error && data && data[0] && Number.isInteger(data[0].montant) && data[0].montant > 0) forfaitMin = data[0].montant;
+    } catch (e) { forfaitMin = null; }
+  }
   function shareRoom() {
     MahoutoRoomShare.share({
-      room: Object.assign({ name: "Salon" }, currentRoom || {}, { id: ROOM_ID }),
+      room: Object.assign({ name: "Salon" }, currentRoom || {}, { id: ROOM_ID, forfait_min: forfaitMin }),
       win: window, doc: document
     });
   }

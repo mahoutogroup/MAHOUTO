@@ -10,8 +10,10 @@
    Module UMD : testé sans navigateur (tests/salon-accroche.test.js).
    ========================================================= */
 (function (root, factory) {
-  if (typeof module === "object" && module.exports) module.exports = factory();
-  else root.MahoutoSalonAccroche = factory();
+  // Comme room-safe.js : valeur globale ET export, pour que l'import depuis api/_room-og.js marche dans les deux contextes (Node, navigateur).
+  var api = factory();
+  root.MahoutoSalonAccroche = api;
+  if (typeof module === "object" && module.exports) module.exports = api;
 })(typeof window !== "undefined" ? window : globalThis, function () {
   "use strict";
 
@@ -48,6 +50,13 @@
   function display(raw) {
     var v = clean(raw);
     if (!v || LIEN_RE.test(v)) return DEFAULT_TEXT;
+    return Array.from(v).slice(0, MAX).join("");
+  }
+
+  /** Accroche à reprendre dans un texte de partage ou un aperçu : texte propre (≤ 120, sans lien), ou « » s'il n'y en a pas. */
+  function shown(raw) {
+    var v = clean(raw);
+    if (!v || LIEN_RE.test(v)) return "";
     return Array.from(v).slice(0, MAX).join("");
   }
 
@@ -110,5 +119,5 @@
     });
   }
 
-  return { fit: fit, bindField: bindField, MAX: MAX, DEFAULT_TEXT: DEFAULT_TEXT, MSG_LIEN: MSG_LIEN, MSG_LONG: MSG_LONG, clean: clean, length: length, hasLink: hasLink, validate: validate, display: display, counterText: counterText };
+  return { fit: fit, bindField: bindField, MAX: MAX, DEFAULT_TEXT: DEFAULT_TEXT, MSG_LIEN: MSG_LIEN, MSG_LONG: MSG_LONG, clean: clean, shown: shown, length: length, hasLink: hasLink, validate: validate, display: display, counterText: counterText };
 });
