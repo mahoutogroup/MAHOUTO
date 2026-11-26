@@ -26,7 +26,8 @@ import {
   isExtensionAllowed,
   canAccessRoom,
   canAccessDm,
-  getUserRole
+  getUserRole,
+  getExtension
 } from "./_attachment-rules.js";
 
 const DOWNLOAD_TTL_SECONDS = 15 * 60; // 15 minutes — aligné sur digital-products-download.js
@@ -96,6 +97,22 @@ async function handleSign(req, res) {
     const { allowed, room } = await canAccessRoom(admin, user.id, contextId, role);
     if (!allowed) return res.status(403).json({ error: "Salon non autorisé." });
     accessType = room && room.is_paid ? "authenticated" : "upload";
+
+    // Photo DU SALON (admin/rooms.html, discussions.html : purpose=photo) : toujours publique (« upload »), même pour un salon payant.
+    // Une photo « authenticated » (privée) n'est lisible ni par les aperçus de liens (WhatsApp) ni transformable : le logo s'affichait
+    // à la place de la photo. Cette adresse est déjà lisible de tous (rooms.photo_url, lecture publique) : rien n'est exposé en plus.
+    // Les pièces jointes des messages (sans purpose) restent « authenticated » dans un salon payant.
+    // Réservé au créateur du salon et aux administrateurs (la base refuserait de toute façon l'enregistrement), et aux images.
+    if (req.query.purpose === "photo") {
+      const isAdminRole = ["admin", "super_admin", "founder"].includes(role);
+      if (!(room && room.created_by === user.id) && !isAdminRole) {
+        return res.status(403).json({ error: "Seuls le créateur du salon et les administrateurs peuvent changer sa photo." });
+      }
+      if (!["jpg", "jpeg", "png", "webp", "gif"].includes(getExtension(filename))) {
+        return res.status(415).json({ error: "La photo d'un salon doit être une image." });
+      }
+      accessType = "upload";
+    }
   }
 
   return signAndRespond(res, { cloudName, apiKey, apiSecret, folder: "mahoutoplus", accessType });

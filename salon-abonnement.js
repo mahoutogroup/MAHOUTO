@@ -92,6 +92,39 @@
     return Math.min(t - n + 1000, 2147000000);   // setTimeout est limité à ~24,8 jours
   }
 
+  var UNAVAILABLE = "Abonnement : tarifs indisponibles pour le moment";
+  var MAX_OFFER_LINES = 5;
+
+  function money(xof) { return Number(xof).toLocaleString("fr-FR") + " FCFA"; }
+  function durationLabel(jours) { return jours + (jours > 1 ? " jours" : " jour"); }
+
+  /** Une ligne d'offre : « Jour : 500 FCFA pour 1 jour ». */
+  function offerLine(f) { return f.libelle + " : " + money(f.montant) + " pour " + durationLabel(f.jours); }
+
+  /** Plus petit prix des forfaits affichables (entier), ou null s'il n'y en a aucun. */
+  function minPrice(rows) {
+    var plans = plansFromRows(rows);
+    if (!plans.length) return null;
+    return plans.reduce(function (m, f) { return f.montant < m ? f.montant : m; }, plans[0].montant);
+  }
+
+  /**
+   * Offre à montrer à une personne qui n'a pas (encore) de forfait : jamais le prix à vie.
+   * rows = lignes de salon_forfaits (la base ne renvoie que les ACTIFS) ou null si illisibles.
+   * Renvoie { kind, title, lines } :
+   *   « indisponible » : aucun forfait actif ou lecture impossible → « Abonnement : tarifs indisponibles pour le moment » (aucun prix chiffré) ;
+   *   « unique »  : un seul forfait → « Jour : 500 FCFA pour 1 jour » ;
+   *   « multiple » : « Abonnement à partir de X FCFA » + une courte liste (5 forfaits au plus, dans l'ordre d'affichage).
+   */
+  function offerSummary(rows) {
+    var plans = plansFromRows(rows);
+    if (!plans.length) return { kind: "indisponible", title: UNAVAILABLE, lines: [] };
+    if (plans.length === 1) return { kind: "unique", title: offerLine(plans[0]), lines: [] };
+    var lines = plans.slice(0, MAX_OFFER_LINES).map(offerLine);
+    if (plans.length > MAX_OFFER_LINES) lines.push("et d'autres forfaits");
+    return { kind: "multiple", title: "Abonnement à partir de " + money(minPrice(plans)), lines: lines };
+  }
+
   /** Libellé d'un forfait : « 1 mois — 1 111 FCFA ». */
   function planLabel(f) {
     return f.libelle + " — " + Number(f.montant).toLocaleString("fr-FR") + " FCFA";
@@ -101,7 +134,8 @@
     PRIVILEGED_ROLES: PRIVILEGED_ROLES, FORFAIT_COLUMNS: FORFAIT_COLUMNS,
     subscriptionActive: subscriptionActive, subscriptionExpired: subscriptionExpired,
     accessDecision: accessDecision, isDisplayableForfait: isDisplayableForfait, plansFromRows: plansFromRows,
-    remainingLabel: remainingLabel, msUntilExpiry: msUntilExpiry, planLabel: planLabel
+    remainingLabel: remainingLabel, msUntilExpiry: msUntilExpiry, planLabel: planLabel,
+    UNAVAILABLE: UNAVAILABLE, MAX_OFFER_LINES: MAX_OFFER_LINES, durationLabel: durationLabel, offerLine: offerLine, minPrice: minPrice, offerSummary: offerSummary
   };
   root.MahoutoSalonAbonnement = api;
   if (typeof module !== "undefined" && module.exports) module.exports = api;

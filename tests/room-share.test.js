@@ -169,7 +169,7 @@ const win = (nav, origin) => ({ location: { origin: origin || "https://mahouto.c
   await test("discussions.html : bouton 🔗 sur chaque salon (tout le monde, salons payants compris), sans ouvrir le salon", () => {
     assert.match(disc, /<script src="login-sheet\.js"><\/script>\s*<script src="room-share\.js"><\/script>/);
     assert.match(discCode, /shareBtn\.className = "room-share-btn";/);
-    assert.match(discCode, /shareBtn\.addEventListener\("click", \(e\) => \{\s*e\.stopPropagation\(\);\s*MahoutoRoomShare\.share\(\{ room: room, win: window, doc: document \}\);/);
+    assert.match(discCode, /shareBtn\.addEventListener\("click", \(e\) => \{\s*e\.stopPropagation\(\);\s*(?:\/\/[^\n]*\s*)?MahoutoRoomShare\.share\(\{ room: Object\.assign\(\{\}, room, \{ forfait_min: forfaitMin \}\), win: window, doc: document \}\);/);
     assert.ok(!/brandName/.test(discCode));
     assert.match(discCode, /e\.target\.closest\("\.room-manage-btn"\) \|\| e\.target\.closest\("\.room-share-btn"\)/);
     assert.ok(!/innerHTML\s*=\s*`/.test(discCode.slice(discCode.indexOf("function renderRooms"), discCode.indexOf("async function buyRoom"))), "liste des salons toujours sans innerHTML");

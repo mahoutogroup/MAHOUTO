@@ -25,7 +25,7 @@
 
 import "../room-safe.js";
 import "../salon-accroche.js";
-import { cloudinaryImageParts } from "./_cloudinary-og.js";
+import { cloudinaryImageParts, CLOUDINARY_CLOUD } from "./_cloudinary-og.js";
 
 export const ROOM_SITE = "https://mahouto.com";
 export const ROOM_BRAND = "MAHOUTO+";
@@ -61,19 +61,32 @@ function cut(text, max) {
   return t.length > max ? t.slice(0, max - 1).trimEnd() + "…" : t;
 }
 
-// Image d'aperçu 1200x630 (photo du salon) ou logo M+.
-export function roomOgImage(photoUrl) {
+// Image d'aperçu 1200x630 (photo du salon) ou logo M+, et POURQUOI (en-tête X-Preview-Image, lisible avec « curl -I » pour comprendre
+// un aperçu qui montre le logo) : « photo » ; « logo:aucune-photo » ; « logo:photo-privee » (photo « authenticated » : signée, non
+// transformable, illisible pour les aperçus — à renvoyer par « 🖼️ Photo » dans l'administration) ; « logo:photo-refusee » (autre origine,
+// format ou adresse non acceptés).
+// Seules les adresses https du compte Cloudinary du projet (/image/upload/) sont acceptées : jamais une autre origine.
+export function roomOgImageInfo(photoUrl) {
+  if (photoUrl === null || photoUrl === undefined || String(photoUrl).trim() === "") return { image: DEFAULT_IMAGE, source: "logo:aucune-photo" };
   const safe = globalThis.MahoutoRoomSafe.photoUrl(photoUrl);    // https, sans espace ni guillemet…
-  if (!safe || /[?#]/.test(safe)) return DEFAULT_IMAGE;
+  if (!safe) return { image: DEFAULT_IMAGE, source: "logo:photo-refusee" };
+  if (safe.startsWith(`https://res.cloudinary.com/${CLOUDINARY_CLOUD}/image/authenticated/`)) return { image: DEFAULT_IMAGE, source: "logo:photo-privee" };
+  if (/[?#]/.test(safe)) return { image: DEFAULT_IMAGE, source: "logo:photo-refusee" };
   const ext = (safe.match(/\.([A-Za-z0-9]{2,5})$/) || [])[1];
-  if (ext && !READABLE_EXTENSION.test(ext)) return DEFAULT_IMAGE;  // format non lu par WhatsApp
+  if (ext && !READABLE_EXTENSION.test(ext)) return { image: DEFAULT_IMAGE, source: "logo:photo-refusee" };  // format non lu par WhatsApp
   const parts = cloudinaryImageParts(safe);                         // domaine de stockage attendu
-  if (!parts) return DEFAULT_IMAGE;
+  if (!parts) return { image: DEFAULT_IMAGE, source: "logo:photo-refusee" };
   return {
-    url: `${parts.prefix}f_jpg,q_auto,w_1200,h_630,c_pad,b_auto:predominant/${parts.rest}`,
-    width: "1200", height: "630", card: "summary_large_image"
+    image: {
+      url: `${parts.prefix}f_jpg,q_auto,w_1200,h_630,c_pad,b_auto:predominant/${parts.rest}`,
+      width: "1200", height: "630", card: "summary_large_image"
+    },
+    source: "photo"
   };
 }
+
+// Image d'aperçu 1200x630 (photo du salon) ou logo M+.
+export function roomOgImage(photoUrl) { return roomOgImageInfo(photoUrl).image; }
 
 // Prix annoncé d'un salon payant (même règle que room-share.js) : « à partir de X FCFA » en abonnement (plus petit forfait actif connu),
 // jamais le prix à vie dans ce mode ; le prix à vie sinon ; « » si rien de sûr à annoncer.
@@ -117,7 +130,7 @@ export function buildRoomPreview(row, id) {
       redirectLabel: "Salon introuvable. Redirection vers les discussions…"
     };
   }
-  const image = roomOgImage(row.photo_url);
+  const { image, source: imageSource } = roomOgImageInfo(row.photo_url);
   const hasPhoto = image !== DEFAULT_IMAGE;
   const isPaid = row.is_paid === true;
   const name = cut(row.name, 80) || (isPaid ? "Communauté" : "Salon");
@@ -129,7 +142,7 @@ export function buildRoomPreview(row, id) {
     status: 200,
     // Courte durée : un changement de photo ou de nom apparaît vite (WhatsApp garde son propre cache).
     cache: "public, max-age=60, s-maxage=120, stale-while-revalidate=300",
-    title, description, image,
+    title, description, image, imageSource,
     canonicalUrl: `${ROOM_SITE}/r/${encodeURIComponent(id)}`,
     targetUrl,
     redirectLabel: isPaid ? "Ouverture de la communauté…" : "Ouverture du salon…"
@@ -174,6 +187,7 @@ export function renderRoomPreviewPage(p) {
 function send(res, preview) {
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Cache-Control", preview.cache);
+  if (preview.imageSource) res.setHeader("X-Preview-Image", preview.imageSource);   // diagnostic : photo ou logo (et pourquoi)
   return res.status(preview.status).send(renderRoomPreviewPage(preview));
 }
 
