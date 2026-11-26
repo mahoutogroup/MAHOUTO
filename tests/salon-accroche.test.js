@@ -75,7 +75,7 @@ test("longueur maximale : 120 caractères (émojis et accents comptés comme un 
   assert.strictEqual(A.validate("😀".repeat(120)).ok, true, "un émoji compte pour un caractère"); assert.strictEqual(A.validate("😀".repeat(121)).ok, false);
   assert.strictEqual(A.length("😀é"), 2); assert.strictEqual(A.counterText("abc"), "3 / 120"); assert.strictEqual(A.counterText(""), "0 / 120");
   assert.strictEqual(A.display("a".repeat(500)).length, 120, "même une valeur trop longue venue de la base est coupée à 120");
-  assert.match(raw, /char_length\(accroche\) <= 120/); assert.ok(read("admin/rooms.html").includes('class="r-accroche" maxlength="120"'));
+  assert.match(raw, /char_length\(accroche\) <= 120/); assert.ok(read("admin/rooms.html").includes('class="r-accroche" rows="1" maxlength="120"'));
 });
 
 test("texte propre : une seule ligne, espaces multiples réduits, bords rognés ; vide → null (champ facultatif)", () => {
@@ -170,10 +170,10 @@ test("textes laissés de côté (hors écran verrouillé ou partagés avec d'aut
 const ADM = read("admin/rooms.html");
 test("réglages du salon : champ « Phrase d'accroche (facultatif) » avec compteur, limité à 120, aide, enregistré par le même chemin que les autres réglages", () => {
   assert.ok(ADM.includes("<label>Phrase d'accroche (facultatif)</label>"));
-  assert.ok(ADM.includes('<input type="text" class="r-accroche" maxlength="120" autocomplete="off"'));
+  assert.ok(ADM.includes('<textarea class="r-accroche" rows="1" maxlength="120" autocomplete="off"'));
   assert.ok(ADM.includes("Cette phrase s'affiche sur l'écran verrouillé de la communauté, sous le nom et avant le prix"), "texte d'aide : où elle s'affiche");
   assert.ok(ADM.includes('${"accroche" in r ? `'), "champ présent seulement si la colonne existe (SQL exécuté)");
-  assert.ok(ADM.includes("MahoutoSalonAccroche.counterText(accrocheInput.value)") && ADM.includes('accrocheInput.addEventListener("input", majCompteur)'), "compteur en direct");
+  assert.ok(ADM.includes('MahoutoSalonAccroche.bindField(accrocheInput, row.querySelector(".r-accroche-compteur"))'), "compteur en direct, Entrée, collage et hauteur : un seul point d'entrée");
   assert.ok(ADM.includes("accrocheInput.value = MahoutoSalonAccroche.clean(r.accroche);"), "valeur posée en texte, jamais dans du HTML");
   assert.ok(!/accroche[^\n]*innerHTML|\$\{[^}]*accroche[^}]*\}/.test(ADM.replace('${"accroche" in r ? `', "")), "aucune insertion de l'accroche dans un gabarit HTML");
   assert.ok(ADM.includes("const check = MahoutoSalonAccroche.validate(accrocheInput.value);\n          if (!check.ok) { alert(check.error); return; }"), "lien ou longueur : enregistrement refusé avec un message");
@@ -188,8 +188,8 @@ test("réglages du salon : textes vouvoyés (prix, mode abonnement, création) ;
   assert.ok(ADM.includes("désactive-le après ton essai") && ADM.includes("Connecte-toi avec un compte administrateur pour accéder à cette page."), "autres zones (forfaits, accès) non touchées");
 });
 
-test("sw.js : cache v136 (main était à v135), salon-accroche.js pré-caché comme room-safe.js ; aucun fichier dans api/ ; aucune clé", () => {
-  const sw = read("sw.js"); assert.match(sw, /const CACHE_NAME = "mahoutoplus-shell-v(136|13[7-9]|1[4-9]\d)";/); assert.strictEqual((sw.match(/"\/salon-accroche\.js"/g) || []).length, 1); assert.ok(sw.indexOf('"/salon-accroche.js"') > sw.indexOf('"/room-safe.js"'));
+test("sw.js : cache v137 (main est à v136), salon-accroche.js pré-caché comme room-safe.js ; aucun fichier dans api/ ; aucune clé", () => {
+  const sw = read("sw.js"); assert.match(sw, /const CACHE_NAME = "mahoutoplus-shell-v(137|13[8-9]|1[4-9]\d)";/); assert.strictEqual((sw.match(/"\/salon-accroche\.js"/g) || []).length, 1); assert.ok(sw.indexOf('"/salon-accroche.js"') > sw.indexOf('"/room-safe.js"'));
   const list = (d) => fs.readdirSync(path.join(root, d)).filter((f) => f.endsWith(".js") && !f.startsWith("_")); assert.strictEqual(list("api").length + list("api/admin").length, 12, "12 fonctions : aucun fichier ajouté dans api/");
   assert.ok(!/service_role|sk_live|sk_test|eyJhbGci|BEGIN (RSA )?PRIVATE KEY/.test([raw, rawRb, rawVf, read("salon-accroche.js")].join("\n")));
 });

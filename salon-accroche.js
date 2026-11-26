@@ -53,5 +53,62 @@
 
   function counterText(text) { return length(text) + " / " + MAX; }
 
-  return { MAX: MAX, DEFAULT_TEXT: DEFAULT_TEXT, MSG_LIEN: MSG_LIEN, MSG_LONG: MSG_LONG, clean: clean, length: length, hasLink: hasLink, validate: validate, display: display, counterText: counterText };
+  // ---------- Champ de saisie (textarea qui grandit avec le texte, une seule ligne logique) ----------
+  var BREAKS = /[\r\n\t\u2028\u2029]+/g;
+  var bound = [];   // champs reliés : on les réajuste quand la largeur de l'écran change
+
+  /**
+   * Hauteur = hauteur du contenu (aucune barre de défilement) : on repart de « auto », puis on prend scrollHeight + bordures.
+   * Champ vide : une seule ligne (rows="1") ; on ne mesure pas, car l'exemple grisé (placeholder) peut passer sur deux lignes.
+   */
+  function fit(el) {
+    if (!el || !el.style) return;
+    el.style.height = "auto";
+    if (!el.value) return;
+    var extra = (el.offsetHeight - el.clientHeight) || 0;
+    el.style.height = (el.scrollHeight + extra) + "px";
+  }
+
+  function cut(value) {
+    var chars = Array.from(value);
+    return chars.length > MAX ? chars.slice(0, MAX).join("") : value;
+  }
+
+  /**
+   * Relie un <textarea> : Entrée n'insère aucun retour à la ligne ; un texte collé est nettoyé par clean() (une ligne, espaces réduits)
+   * et coupé à 120 caractères ; tout retour à la ligne arrivé autrement (clavier mobile) est remplacé par une espace ; le compteur
+   * (counter, facultatif) et la hauteur sont recalculés à chaque saisie et au chargement.
+   */
+  function bindField(el, counter) {
+    function refresh() { if (counter) counter.textContent = counterText(el.value); fit(el); }
+    el.addEventListener("keydown", function (e) { if (e.key === "Enter") e.preventDefault(); });
+    el.addEventListener("beforeinput", function (e) { if (e.inputType === "insertLineBreak" || e.inputType === "insertParagraph") e.preventDefault(); });
+    el.addEventListener("paste", function (e) {
+      var data = e.clipboardData && typeof e.clipboardData.getData === "function" ? e.clipboardData.getData("text") : null;
+      if (data === null || data === undefined) return;   // sans accès au presse-papiers : le gestionnaire « input » nettoie
+      e.preventDefault();
+      el.setRangeText(clean(data), el.selectionStart, el.selectionEnd, "end");
+      el.value = cut(el.value);
+      refresh();
+    });
+    el.addEventListener("input", function () {
+      if (BREAKS.test(el.value)) { BREAKS.lastIndex = 0; el.value = el.value.replace(BREAKS, " "); }
+      BREAKS.lastIndex = 0;
+      el.value = cut(el.value);
+      refresh();
+    });
+    bound.push(el);
+    refresh();
+    if (typeof requestAnimationFrame === "function") requestAnimationFrame(function () { fit(el); });   // une fois le champ dans la page
+    return { refresh: refresh };
+  }
+
+  if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+    window.addEventListener("resize", function () {
+      bound = bound.filter(function (el) { return el.isConnected !== false; });
+      bound.forEach(fit);
+    });
+  }
+
+  return { fit: fit, bindField: bindField, MAX: MAX, DEFAULT_TEXT: DEFAULT_TEXT, MSG_LIEN: MSG_LIEN, MSG_LONG: MSG_LONG, clean: clean, length: length, hasLink: hasLink, validate: validate, display: display, counterText: counterText };
 });
