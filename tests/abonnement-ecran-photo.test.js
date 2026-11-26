@@ -19,7 +19,7 @@ const root = path.join(__dirname, "..");
 const read = (f) => fs.readFileSync(path.join(root, f), "utf8");
 const CHAT = read("chat.html"), DISC = read("discussions.html");
 const FCFA = (n) => Number(n).toLocaleString("fr-FR") + " FCFA";
-const P = (code, libelle, jours, montant, ordre) => ({ code, libelle, jours, montant, ordre });
+const P = (code, libelle, jours, montant, ordre) => ({ code, libelle, jours, montant, ordre, actif: true });
 const JOUR = P("jour", "Jour", 1, 500, 1), SEM = P("semaine", "Semaine", 7, 2000, 2), MOIS = P("mois", "Mois", 30, 5000, 3);
 const L = "\\p{L}";
 const TUT = new RegExp(`(?<![${L}])(ton|ta|tes|toi|tu|t'[${L}]+|[${L}]+-toi|connecte|rejoins|choisis|réessaie)(?![${L}])`, "iu");
@@ -133,14 +133,14 @@ test("l'écran verrouillé : texte brut (jamais d'innerHTML), vouvoyé, avec le 
 // ====================== discussions.html : texte de partage identique ======================
 function discussionsPrefetch(rep) {
   const log = [];
-  const q = { select(c) { log.push(["select", c]); return q; }, order(k) { log.push(["order", k]); return q; }, then(res, rej) { log.push(["await"]); return Promise.resolve(rep).then(res, rej); } };
+  const q = { select(c) { log.push(["select", c]); return q; }, eq(k, v) { log.push(["eq", k, v]); return q; }, order(k) { log.push(["order", k]); return q; }, then(res, rej) { log.push(["await"]); return Promise.resolve(rep).then(res, rej); } };
   const src = DISC.slice(DISC.indexOf("let forfaitMin = null, forfaitsRequested = false;"), DISC.indexOf("// ---------- fin du forfait de partage ----------"));
   const f = new Function("supabase", "MahoutoSalonAbonnement", src + "\nreturn { run: (r) => prefetchForfaitMin(r), get min() { return forfaitMin; } };");
   return { o: f({ from: (t) => { log.push(["from", t]); return q; } }, Abo), log };
 }
 test("discussions.html : lit le plus petit forfait actif (lecture publique, seulement s'il y a une communauté en abonnement), repli sans prix", async () => {
   let d = discussionsPrefetch({ data: [JOUR, SEM], error: null }); await d.o.run([{ is_paid: false }, { is_paid: true, abonnement: false }]); assert.deepStrictEqual(d.log, [], "aucune lecture sans communauté en abonnement"); assert.strictEqual(d.o.min, null);
-  d = discussionsPrefetch({ data: [SEM, JOUR], error: null }); await d.o.run([{ is_paid: true, abonnement: true }]); assert.strictEqual(JSON.stringify(d.log), JSON.stringify([["from", "salon_forfaits"], ["select", "code, libelle, jours, montant, ordre"], ["order", "ordre"], ["await"]])); assert.strictEqual(d.o.min, 500);
+  d = discussionsPrefetch({ data: [SEM, JOUR], error: null }); await d.o.run([{ is_paid: true, abonnement: true }]); assert.strictEqual(JSON.stringify(d.log), JSON.stringify([["from", "salon_forfaits"], ["select", "code, libelle, jours, montant, ordre, actif"], ["eq", "actif", true], ["order", "ordre"], ["await"]])); assert.strictEqual(d.o.min, 500);
   await d.o.run([{ is_paid: true, abonnement: true }]); assert.strictEqual(d.log.filter((x) => x[0] === "from").length, 1, "lu une seule fois");
   for (const rep of [{ data: null, error: { message: "x" } }, { data: [], error: null }, Promise.reject(new Error("réseau"))]) { const x = discussionsPrefetch(rep); await assert.doesNotReject(x.o.run([{ is_paid: true, abonnement: true }])); assert.strictEqual(x.o.min, null); }
   assert.ok(/<script src="salon-accroche\.js"><\/script>/.test(DISC) && DISC.indexOf("salon-accroche.js") < DISC.indexOf('<script src="config.js">'), "salon-accroche.js chargé par la page");
@@ -237,4 +237,50 @@ test("limites : 12 fonctions, mêmes assistants, cache v139, aucune clé", () =>
   assert.strictEqual(fs.readdirSync(path.join(root, "api")).filter((f) => f.startsWith("_")).length, 11);
   assert.match(read("sw.js"), /const CACHE_NAME = "mahoutoplus-shell-v(139|1[4-9]\d)";/);
   assert.ok(!/service_role|sk_live|sk_test|eyJhbGci/.test(read("salon-abonnement.js") + read("room-share.js")));
+});
+
+// ====================== forfaits INACTIFS : jamais comptés, jamais affichés (un administrateur lit aussi les inactifs) ======================
+const INACTIF = { code: "test-1-jour", libelle: "Test 1 jour", jours: 1, montant: 300, ordre: 0, actif: false };
+const ACTIF = P("jour", "Jour", 1, 500, 1);
+const SANS_COLONNE = { code: "sans-actif", libelle: "Sans colonne", jours: 1, montant: 100, ordre: 0 };
+
+test("inactifs : « à partir de » = 500 FCFA même si le forfait inactif à 300 est renvoyé avec l'actif à 500 ; sans colonne « actif » : ignoré", () => {
+  [[INACTIF, ACTIF], [ACTIF, INACTIF]].forEach((rows) => {
+    assert.strictEqual(Abo.minPrice(rows), 500); assert.deepStrictEqual(Abo.plansFromRows(rows).map((p) => p.code), ["jour"]);
+    assert.deepStrictEqual(Abo.offerSummary(rows), { kind: "unique", title: "Jour : " + FCFA(500) + " pour 1 jour", lines: [] }, "un seul forfait actif : pas de liste, pas de 300");
+  });
+  assert.strictEqual(Abo.offerSummary([INACTIF, ACTIF, SEM]).title, "Abonnement à partir de " + FCFA(500));
+  assert.ok(!Abo.offerSummary([INACTIF, ACTIF, SEM]).lines.join("|").includes("300"), "la liste n'a pas le forfait inactif");
+  assert.strictEqual(Abo.minPrice([SANS_COLONNE]), null, "sans colonne actif : ignoré"); assert.deepStrictEqual(Abo.plansFromRows([SANS_COLONNE]), []);
+  assert.strictEqual(Abo.minPrice([SANS_COLONNE, ACTIF]), 500);
+  [false, "true", 1, 0, null, undefined, "oui"].forEach((a) => assert.deepStrictEqual(Abo.plansFromRows([Object.assign({}, ACTIF, { actif: a })]), [], "actif=" + JSON.stringify(a) + " : seul true compte"));
+  assert.deepStrictEqual(Abo.offerSummary([INACTIF]), { kind: "indisponible", title: Abo.UNAVAILABLE, lines: [] }, "que des inactifs : tarifs indisponibles");
+  assert.ok(/actif/.test(Abo.FORFAIT_COLUMNS) && Abo.FORFAIT_COLUMNS === "code, libelle, jours, montant, ordre, actif");
+});
+
+test("écran verrouillé et boutons de choix : les lignes inactives renvoyées (cas administrateur) ne sont jamais affichées", async () => {
+  const rows = [INACTIF, ACTIF, SEM];
+  for (const user of [null, { id: "a1", is_anonymous: true }]) {
+    const t = locked({ plans: rows, user }); await t.run(ROOM); await tick();
+    const txt = t.get("locked-offer").textContent; assert.ok(txt.startsWith("Abonnement à partir de " + FCFA(500)), txt); assert.ok(!txt.includes("300") && !txt.includes("Test 1 jour"), txt);
+  }
+  const m = locked({ plans: rows, user: { id: "m1" } }); await m.run(ROOM); await tick();
+  assert.deepStrictEqual(m.get("locked-plans").children.map((b) => b.textContent), ["Jour — " + FCFA(500), "Semaine — " + FCFA(2000)], "aucun bouton pour le forfait inactif");
+  const seul = locked({ plans: [INACTIF], user: null }); await seul.run(ROOM); await tick(); assert.strictEqual(seul.get("locked-offer").textContent, Abo.UNAVAILABLE);
+});
+
+test("texte de partage (discussions.html et chat.html) : « à partir de 500 FCFA » même si le forfait inactif à 300 est renvoyé ; requêtes filtrées sur actif", async () => {
+  const d = discussionsPrefetch({ data: [INACTIF, ACTIF], error: null }); await d.o.run([{ is_paid: true, abonnement: true }]); assert.strictEqual(d.o.min, 500);
+  assert.ok(d.log.some((x) => x[0] === "eq" && x[1] === "actif" && x[2] === true), "discussions : .eq(\"actif\", true)");
+  assert.strictEqual(Share.buildMessage({ name: "S", is_paid: true, abonnement: true, forfait_min: d.o.min }), "Rejoignez « S » sur MAHOUTO+ (communauté payante : à partir de " + FCFA(500) + ").");
+  const sel = (f) => (f.match(/\.select\(MahoutoSalonAbonnement\.FORFAIT_COLUMNS\)[^;]*/) || [""])[0];
+  assert.ok(sel(CHAT).includes('.eq("actif", true)') && sel(DISC).includes('.eq("actif", true)'));
+  const sansColonne = discussionsPrefetch({ data: [SANS_COLONNE], error: null }); await sansColonne.o.run([{ is_paid: true, abonnement: true }]); assert.strictEqual(sansColonne.o.min, null);
+});
+
+test("aperçu du lien (api/produit-og.js) : lecture avec la clé publique seule, donc la RLS ne renvoie que les forfaits actifs ; fichier inchangé", () => {
+  const src = read("api/produit-og.js"); const fn = src.slice(src.indexOf("async function fetchRoomForPreview"), src.indexOf("async function fetchRoomForPreview") + 1800);
+  assert.ok(fn.includes("process.env.SUPABASE_ANON_KEY") && !/SERVICE_ROLE/.test(fn), "clé publique (anon), jamais service_role : pas de session administrateur");
+  const sql = read("salons-abonnement.sql"); assert.ok(/create policy "salon_forfaits_public_read"[\s\S]{0,120}to anon, authenticated\s+using \(actif = true\)/.test(sql));
+  assert.ok(/create policy "salon_forfaits_admin_all"[\s\S]{0,120}using \(public\.is_admin\(\)\)/.test(sql), "cause : la politique admin renvoie aussi les inactifs aux administrateurs connectés");
 });

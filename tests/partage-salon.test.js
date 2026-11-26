@@ -76,17 +76,17 @@ test("partage natif et WhatsApp : le texte, puis le lien à la fin ; la fenêtre
 const CHAT = read("chat.html");
 function prefetch(room, rep) {
   const log = [];
-  const q = { select(c) { log.push(["select", c]); return q; }, order(k, o) { log.push(["order", k, o && o.ascending]); return q; },
+  const q = { select(c) { log.push(["select", c]); return q; }, eq(k, v) { log.push(["eq", k, v]); return q; }, order(k, o) { log.push(["order", k, o && o.ascending]); return q; },
     then(res, rej) { log.push(["await"]); return Promise.resolve(rep).then(res, rej); } };
   const supabase = { from: (t) => { log.push(["from", t]); return q; } };
   const src = CHAT.slice(CHAT.indexOf("let plansPromise = null;"), CHAT.indexOf("// Salon en abonnement, personne sans forfait")) + CHAT.slice(CHAT.indexOf("let forfaitMin = null;"), CHAT.indexOf("function shareRoom()"));
   const f = new Function("supabase", "room", "MahoutoSalonAbonnement", src + "\nreturn { run: () => prefetchForfaitMin(room), get min() { return forfaitMin; } };");
   const o = f(supabase, room, require("../salon-abonnement")); return { o, log, room };
 }
-const PLANS = [{ code: "jour", libelle: "Jour", jours: 1, montant: 500, ordre: 1 }, { code: "semaine", libelle: "Semaine", jours: 7, montant: 200, ordre: 2 }];
+const PLANS = [{ code: "jour", libelle: "Jour", jours: 1, montant: 500, ordre: 1, actif: true }, { code: "semaine", libelle: "Semaine", jours: 7, montant: 200, ordre: 2, actif: true }];
 test("chat.html : le plus petit forfait ACTIF est lu à l'avance (lecture publique, aucune écriture), seulement pour un salon payant en abonnement", async () => {
   let t = prefetch({ is_paid: true, abonnement: true }, { data: PLANS, error: null }); await t.o.run();
-  assert.strictEqual(JSON.stringify(t.log), JSON.stringify([["from", "salon_forfaits"], ["select", "code, libelle, jours, montant, ordre"], ["order", "ordre", true], ["await"]]));
+  assert.strictEqual(JSON.stringify(t.log), JSON.stringify([["from", "salon_forfaits"], ["select", "code, libelle, jours, montant, ordre, actif"], ["eq", "actif", true], ["order", "ordre", true], ["await"]]));
   assert.strictEqual(t.o.min, 200, "le plus petit PRIX, pas le premier forfait");
   for (const room of [{ is_paid: false, abonnement: true }, { is_paid: true, abonnement: false }, { is_paid: true }, null]) { const x = prefetch(room, { data: PLANS, error: null }); await x.o.run(); assert.deepStrictEqual(x.log, [], "aucune requête"); assert.strictEqual(x.o.min, null); }
   for (const rep of [{ data: null, error: { message: "x" } }, { data: [], error: null }, { data: [{ code: "x", libelle: "X", jours: 1, montant: "abc" }], error: null }, { data: [{ code: "x", libelle: "X", jours: 1, montant: 0 }], error: null }, { data: [{ code: "x", libelle: "X", jours: 1, montant: 1.5 }], error: null }]) { const x = prefetch({ is_paid: true, abonnement: true }, rep); await x.o.run(); assert.strictEqual(x.o.min, null, JSON.stringify(rep)); }
