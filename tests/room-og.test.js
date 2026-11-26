@@ -44,12 +44,12 @@ const PHOTO = `https://res.cloudinary.com/${CLOUD}/image/upload/v1700000000/maho
     const p = Og.buildRoomPreview({ name: "Les Sérigraphes", is_paid: false, price: null, photo_url: PHOTO, emoji: "💬" }, "serigraphes");
     assert.strictEqual(p.status, 200);
     assert.strictEqual(p.title, "Les Sérigraphes");
-    assert.strictEqual(p.description, "Rejoins ce salon sur MAHOUTO+");
+    assert.strictEqual(p.description, "Rejoignez ce salon sur MAHOUTO+");
     assert.strictEqual(p.targetUrl, "https://mahouto.com/chat.html?room=serigraphes");
     assert.strictEqual(p.canonicalUrl, "https://mahouto.com/r/serigraphes");
     const html = Og.renderRoomPreviewPage(p);
     assert.strictEqual(meta(html, "og:title"), "Les Sérigraphes");
-    assert.strictEqual(meta(html, "og:description"), "Rejoins ce salon sur MAHOUTO+");
+    assert.strictEqual(meta(html, "og:description"), "Rejoignez ce salon sur MAHOUTO+");
     assert.strictEqual(meta(html, "og:image"), `https://res.cloudinary.com/${CLOUD}/image/upload/f_jpg,q_auto,w_1200,h_630,c_pad,b_auto:predominant/v1700000000/mahoutoplus/rooms/photo.jpg`);
     assert.strictEqual(meta(html, "og:image:width"), "1200");
     assert.strictEqual(meta(html, "og:image:height"), "630");
@@ -75,12 +75,12 @@ const PHOTO = `https://res.cloudinary.com/${CLOUD}/image/upload/v1700000000/maho
   await test("salon payant : « Communauté payante : X FCFA » dans la description, avec nom et photo ; aucune autre donnée", () => {
     const price = Number(2000).toLocaleString("fr-FR") + " FCFA";
     const p = Og.buildRoomPreview({ name: "Salon VIP", is_paid: true, price: 2000, photo_url: PHOTO, emoji: "⭐" }, "vip");
-    assert.strictEqual(p.description, "Communauté payante : " + price + " — Rejoins cette communauté sur MAHOUTO+");
+    assert.strictEqual(p.description, "Communauté payante : " + price + " — Rejoignez cette communauté sur MAHOUTO+");
     assert.strictEqual(p.title, "Salon VIP");
     const html = Og.renderRoomPreviewPage(p);
     assert.ok(!/user_id|created_by|username|messages?\b|conversation|profile/i.test(html), "rien de privé dans la page");
-    assert.strictEqual(Og.buildRoomPreview({ name: "X", is_paid: true, price: null }, "x").description, "Communauté payante — Rejoins cette communauté sur MAHOUTO+");
-    assert.strictEqual(Og.buildRoomPreview({ name: "X", is_paid: false, price: 500 }, "x").description, "Rejoins ce salon sur MAHOUTO+", "le prix d'un salon gratuit n'est jamais affiché");
+    assert.strictEqual(Og.buildRoomPreview({ name: "X", is_paid: true, price: null }, "x").description, "Communauté payante — Rejoignez cette communauté sur MAHOUTO+");
+    assert.strictEqual(Og.buildRoomPreview({ name: "X", is_paid: false, price: 500 }, "x").description, "Rejoignez ce salon sur MAHOUTO+", "le prix d'un salon gratuit n'est jamais affiché");
   });
 
   await test("nom de salon hostile : échappé pour HTML dans toutes les balises, aucune injection possible", () => {
@@ -99,7 +99,7 @@ const PHOTO = `https://res.cloudinary.com/${CLOUD}/image/upload/v1700000000/maho
   await test("émoji hostile ou trop long : remplacé par 💬 ; prix non numérique : ignoré", () => {
     const p = Og.buildRoomPreview({ name: "N", is_paid: true, price: "<b>", emoji: "<img onerror=x>" }, "n");
     assert.strictEqual(p.title, "💬 N");
-    assert.strictEqual(p.description, "Communauté payante — Rejoins cette communauté sur MAHOUTO+");
+    assert.strictEqual(p.description, "Communauté payante — Rejoignez cette communauté sur MAHOUTO+");
     assert.strictEqual(Og.buildRoomPreview({ name: "N", emoji: "x".repeat(40) }, "n").title, "💬 N");
     assert.ok(Og.buildRoomPreview({ name: "n".repeat(500) }, "n").title.length < 90, "nom tronqué");
   });
@@ -204,14 +204,16 @@ const PHOTO = `https://res.cloudinary.com/${CLOUD}/image/upload/v1700000000/maho
   // ---------- branchement ----------
   const og = strip(read("api/produit-og.js"));
   await test("api/produit-og.js : branche « salon », clé publique (anon) jamais service_role, champs name/is_paid/price/photo_url/emoji seulement", () => {
-    assert.match(og, /import \{ handleRoomPreview, ROOM_FIELDS \} from "\.\/_room-og\.js";/);
+    assert.match(og, /import \{ handleRoomPreview, ROOM_FIELD_SETS \} from "\.\/_room-og\.js";/);
     assert.match(og, /req\.query\.type === "salon" && req\.query\.format !== "json"/);
     const fn = og.slice(og.indexOf("async function fetchRoomForPreview"), og.indexOf("export default async function handler"));
     assert.match(fn, /createClient\(process\.env\.SUPABASE_URL, process\.env\.SUPABASE_ANON_KEY\)/);
     assert.ok(!/SERVICE_ROLE|service_role/i.test(fn));
-    assert.match(fn, /\.from\("rooms"\)\.select\(ROOM_FIELDS\)\.eq\("id", id\)\.maybeSingle\(\)/);
+    assert.match(fn, /for \(const columns of ROOM_FIELD_SETS\)/);
+    assert.match(fn, /\.from\("rooms"\)\.select\(columns\)\.eq\("id", id\)\.maybeSingle\(\)/);
     assert.strictEqual(Og.ROOM_FIELDS, "name, is_paid, price, photo_url, emoji");
-    assert.ok(!/created_by|user_id/.test(Og.ROOM_FIELDS));
+    assert.deepStrictEqual(Og.ROOM_FIELD_SETS, ["name, is_paid, price, photo_url, emoji, abonnement, accroche", "name, is_paid, price, photo_url, emoji, abonnement", "name, is_paid, price, photo_url, emoji"]);
+    assert.ok(!Og.ROOM_FIELD_SETS.some((s) => /created_by|user_id/.test(s)), "jamais d'identifiant de compte");
   });
 
   await test("pas de nouvelle fonction Vercel : 12 fichiers de routes dans api/ (les modules « _ » ne comptent pas)", () => {

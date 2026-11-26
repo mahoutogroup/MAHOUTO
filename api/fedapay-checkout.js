@@ -120,7 +120,7 @@ export default async function handler(req, res) {
       (authenticatedUser.app_metadata && authenticatedUser.app_metadata.provider === "anonymous")
     ) {
       return res.status(403).json({
-        error: "Connecte-toi avec Google ou ton e-mail pour acheter.",
+        error: "Connectez-vous avec Google ou votre e-mail pour acheter.",
         code: "ANONYMOUS_NOT_ALLOWED"
       });
     }

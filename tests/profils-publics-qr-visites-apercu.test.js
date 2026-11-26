@@ -366,7 +366,7 @@ test("api/produit-og.js : type « profil » — lecture UNIQUEMENT par l'appel R
   assert.match(src, /req\.query\.type === "profil" && req\.query\.format !== "json"\)\s*\{\s*return handleProfilPreview\(req, res, \{ fetchProfil: fetchProfilForPreview, fetchAlias: fetchAliasForPreview \}\);/);
   assert.ok(src.indexOf('type === "profil"') < src.indexOf('type === "salon"'), "branche ajoutée en tête, sans toucher aux autres");
   // exécution de bout en bout avec un faux client (dossier temporaire)
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "profil-og-test-")); fs.cpSync(path.join(root, "api"), path.join(tmp, "api"), { recursive: true }); ["brand.js", "room-safe.js"].forEach((f) => fs.copyFileSync(path.join(root, f), path.join(tmp, f)));
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "profil-og-test-")); fs.cpSync(path.join(root, "api"), path.join(tmp, "api"), { recursive: true }); ["brand.js", "room-safe.js", "salon-accroche.js"].forEach((f) => fs.copyFileSync(path.join(root, f), path.join(tmp, f)));
   const dir = path.join(tmp, "node_modules", "@supabase", "supabase-js"); fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, "package.json"), JSON.stringify({ name: "@supabase/supabase-js", version: "0.0.0", main: "index.js" }));
   fs.writeFileSync(path.join(dir, "index.js"), "exports.createClient = (url, key) => { globalThis.__CREATED = [url, key]; return { rpc: async (n, a) => { globalThis.__RPC = [n, a]; return globalThis.__ANSWER; }, from() { throw new Error('lecture directe interdite'); } }; };");

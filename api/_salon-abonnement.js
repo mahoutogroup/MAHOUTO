@@ -43,20 +43,20 @@ export async function handleSalonCheckout(req, res, ctx) {
     const { supabaseAdmin, user, room } = ctx;
     const body = req.body && typeof req.body === "object" ? req.body : {};
     const forfaitCode = typeof body.forfaitCode === "string" ? body.forfaitCode : "";
-    if (!FORFAIT_CODE_RE.test(forfaitCode)) return fail(res, 400, "Choisis un forfait.");
+    if (!FORFAIT_CODE_RE.test(forfaitCode)) return fail(res, 400, "Choisissez un forfait.");
 
     // Déjà accès : créateur du salon, administrateur, membre à vie → aucun paiement d'abonnement.
-    if (room.created_by === user.id) return fail(res, 409, "Tu as déjà accès à ce salon.");
+    if (room.created_by === user.id) return fail(res, 409, "Vous avez déjà accès à ce salon.");
 
     const { data: profile } = await supabaseAdmin
       .from("profiles").select("username, role").eq("id", user.id).maybeSingle();
-    if (profile && PRIVILEGED_ROLES.includes(profile.role)) return fail(res, 409, "Tu as déjà accès à ce salon.");
+    if (profile && PRIVILEGED_ROLES.includes(profile.role)) return fail(res, 409, "Vous avez déjà accès à ce salon.");
 
     const { data: lifetime, error: lifetimeError } = await supabaseAdmin
       .from("purchases").select("id")
       .eq("user_id", user.id).eq("course_id", room.id).eq("product_type", "salon").eq("status", "paid").maybeSingle();
     if (lifetimeError) { console.error("Lecture achat à vie impossible :", lifetimeError.message); return fail(res, 500, "Erreur serveur."); }
-    if (lifetime) return fail(res, 409, "Tu as déjà accès à vie à ce salon : aucun abonnement n'est nécessaire.");
+    if (lifetime) return fail(res, 409, "Vous avez déjà accès à vie à ce salon : aucun abonnement n'est nécessaire.");
 
     // Le montant et les jours viennent de la base. Forfait inconnu ou inactif : refusé.
     const { data: forfait, error: forfaitError } = await supabaseAdmin
@@ -137,7 +137,7 @@ export async function handleSalonCheckout(req, res, ctx) {
     });
     if (insertError) {
       console.error("ÉCHEC enregistrement du paiement — transaction FedaPay orpheline :", transactionId, insertError.message);
-      return fail(res, 500, "Impossible d'enregistrer le paiement. Réessaie dans un instant.");
+      return fail(res, 500, "Impossible d'enregistrer le paiement. Réessayez dans un instant.");
     }
 
     return res.status(200).json({ checkoutUrl, transactionId });

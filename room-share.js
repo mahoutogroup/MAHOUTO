@@ -22,6 +22,7 @@
 
   var ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
   var MAX_NAME = 80;
+  var MAX_TEXT = 260;   // texte partagé (hors lien) : court, pour un statut WhatsApp
   var SITE = "https://mahouto.com";
   var BRAND = "MAHOUTO+";
 
@@ -37,12 +38,41 @@
 
   function money(xof) { return Number(xof).toLocaleString("fr-FR") + " FCFA"; }
 
-  // Texte d'accompagnement (le lien est transmis à part).
+  /**
+   * Prix à annoncer pour un salon payant : « à partir de X FCFA » en mode abonnement (X = plus petit forfait ACTIF, room.forfait_min,
+   * lu par la page ; inconnu → aucun prix chiffré, jamais le prix à vie qui laisserait croire à un seul paiement définitif) ;
+   * le prix à vie sinon ; rien pour un salon gratuit. Renvoie un texte ou « ».
+   */
+  function priceText(room) {
+    if (!isPaidRoom(room)) return "";
+    if (room.abonnement === true) {
+      var min = Number(room.forfait_min);
+      return Number.isInteger(min) && min > 0 ? "à partir de " + money(min) : "";
+    }
+    return Number(room.price) > 0 ? money(room.price) : "";
+  }
+
+  // Phrase d'accroche du salon (texte brut, 120 caractères, sans lien), ou « » : salon-accroche.js peut être absent (discussions.html).
+  function accrocheOf(room) {
+    var A = root.MahoutoSalonAccroche;
+    return A && typeof A.shown === "function" ? A.shown(room && room.accroche) : "";
+  }
+
+  // Texte d'accompagnement, court (un statut WhatsApp) : l'accroche d'abord, puis « Rejoignez « nom » sur MAHOUTO+ (…) ». Le lien est transmis à part.
   function buildMessage(room) {
     var name = String((room && room.name) || "").replace(/\s+/g, " ").trim().slice(0, MAX_NAME) || (isPaidRoom(room) ? "cette communauté" : "ce salon");
-    var text = "Rejoins « " + name + " » sur " + BRAND;
-    if (room && room.is_paid && Number(room.price) > 0) text += " (communauté payante : " + money(room.price) + ")";
-    return text + ".";
+    var text = "Rejoignez « " + name + " » sur " + BRAND;
+    if (isPaidRoom(room)) {
+      var price = priceText(room);
+      if (price) text += " (communauté payante : " + price + ")";
+      else if (room.abonnement === true) text += " (communauté payante, sur abonnement)";
+    }
+    text += ".";
+    var lead = accrocheOf(room);
+    if (!lead) return text;
+    var room_left = MAX_TEXT - text.length - 1;            // place restante pour l'accroche (elle est coupée, jamais le reste)
+    if (Array.from(lead).length > room_left) lead = room_left >= 20 ? Array.from(lead).slice(0, room_left - 1).join("").trimEnd() + "…" : "";
+    return lead ? lead + "\n" + text : text;
   }
 
   function whatsappUrl(text, url) {
@@ -89,7 +119,7 @@
     var closeBtn = el(doc, "button", { type: "button", text: "Fermer" });
     var sheet = el(doc, "div", { class: "rs-sheet", role: "dialog", "aria-modal": "true", "aria-label": paid ? "Partager cette communauté" : "Partager ce salon" }, [
       el(doc, "h3", { text: paid ? "Partager cette communauté" : "Partager ce salon" }),
-      el(doc, "p", { class: "rs-text", text: text }),
+      el(doc, "p", { class: "rs-text", "data-brand-fixed": "", text: text }),   // « MAHOUTO+ » : le lien pointe toujours vers mahouto.com
       input, status,
       el(doc, "div", { class: "rs-actions" }, [copyBtn, waBtn, closeBtn])
     ]);
@@ -105,7 +135,7 @@
       } catch (e) {
         // Dernier recours : sélectionner le lien pour que la personne le copie à la main.
         if (input.select) input.select();
-        status.textContent = "Copie automatique impossible : le lien est sélectionné, copie-le à la main.";
+        status.textContent = "Copie automatique impossible : le lien est sélectionné, copiez-le à la main.";
       }
     });
     waBtn.addEventListener("click", function () {
@@ -118,7 +148,7 @@
   }
 
   /**
-   * options : { room: { id, name, is_paid, price }, win, doc }
+   * options : { room: { id, name, is_paid, price, abonnement, forfait_min, accroche }, win, doc }
    * Renvoie 'native' (feuille de partage ouverte et validée), 'cancelled' (la personne a annulé),
    * 'sheet' (fenêtre de repli affichée) ou 'invalid' (identifiant de salon non partageable).
    */
@@ -145,7 +175,7 @@
   }
 
   var api = {
-    SITE: SITE, BRAND: BRAND, isValidRoomId: isValidRoomId, buildUrl: buildUrl, buildMessage: buildMessage, whatsappUrl: whatsappUrl,
+    SITE: SITE, BRAND: BRAND, isValidRoomId: isValidRoomId, buildUrl: buildUrl, buildMessage: buildMessage, priceText: priceText, MAX_TEXT: MAX_TEXT, whatsappUrl: whatsappUrl,
     share: share, openSheet: openSheet
   };
   root.MahoutoRoomShare = api;

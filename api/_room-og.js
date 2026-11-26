@@ -15,17 +15,24 @@
 //  - la photo n'est utilisée que si elle passe MahoutoRoomSafe.photoUrl (https, sans caractère
 //    dangereux) ET vient du compte Cloudinary du projet, dans un format lu par WhatsApp ;
 //    sinon : logo M+ ;
-//  - un salon payant montre son nom, sa photo et son prix : jamais un message ni une donnée privée ;
+//  - un salon payant montre son nom, sa photo, son prix et sa phrase d'accroche (ce que l'écran verrouillé montre déjà à un
+//    visiteur non connecté) : jamais un message ni une donnée privée ;
+//  - prix : en mode abonnement « à partir de » le plus petit forfait ACTIF (row.forfait_min, lu par api/produit-og.js avec la clé
+//    publique : la RLS ne renvoie que les forfaits actifs) ; inconnu → aucun prix chiffré ; le prix à vie seulement hors abonnement ;
+//  - l'accroche est un texte brut (une ligne, 120 caractères, sans lien : salon-accroche.js), échappé pour le HTML et les attributs ;
 //  - robots : balises Open Graph / Twitter ; humains : redirection vers la page du salon.
 // =========================================================
 
 import "../room-safe.js";
+import "../salon-accroche.js";
 import { cloudinaryImageParts } from "./_cloudinary-og.js";
 
 export const ROOM_SITE = "https://mahouto.com";
 export const ROOM_BRAND = "MAHOUTO+";
 export const ROOM_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
 export const ROOM_FIELDS = "name, is_paid, price, photo_url, emoji";
+// Jeux de colonnes essayés dans l'ordre : « abonnement » et « accroche » peuvent ne pas exister encore (SQL pas encore exécuté).
+export const ROOM_FIELD_SETS = [`${ROOM_FIELDS}, abonnement, accroche`, `${ROOM_FIELDS}, abonnement`, ROOM_FIELDS];
 
 // Logo M+ par défaut (PNG 512x512 du site).
 const DEFAULT_IMAGE = { url: `${ROOM_SITE}/assets/icon-512.png`, width: "512", height: "512", card: "summary" };
@@ -68,6 +75,31 @@ export function roomOgImage(photoUrl) {
   };
 }
 
+// Prix annoncé d'un salon payant (même règle que room-share.js) : « à partir de X FCFA » en abonnement (plus petit forfait actif connu),
+// jamais le prix à vie dans ce mode ; le prix à vie sinon ; « » si rien de sûr à annoncer.
+export function roomPriceText(row) {
+  if (!row || row.is_paid !== true) return "";
+  if (row.abonnement === true) {
+    const min = Number(row.forfait_min);
+    return Number.isInteger(min) && min > 0 ? `à partir de ${money(min)}` : "";
+  }
+  const price = Number(row.price);
+  return price > 0 ? money(price) : "";
+}
+
+// Description de l'aperçu : l'accroche du salon si elle existe (texte brut, 120 caractères, sans lien), sinon une phrase par défaut
+// vouvoyée. Le HTML est échappé à l'affichage (renderRoomPreviewPage) : ici, du texte brut.
+export function roomDescription(row) {
+  const isPaid = !!row && row.is_paid === true;
+  const accroche = globalThis.MahoutoSalonAccroche.shown(row && row.accroche);
+  const price = roomPriceText(row);
+  if (isPaid) {
+    const tarif = price ? `Communauté payante : ${price}` : (row.abonnement === true ? "Communauté payante, sur abonnement" : "Communauté payante");
+    return accroche ? `${accroche} — ${tarif}` : `${tarif} — Rejoignez cette communauté sur ${ROOM_BRAND}`;
+  }
+  return accroche || `Rejoignez ce salon sur ${ROOM_BRAND}`;
+}
+
 /**
  * Aperçu d'un salon à partir de sa ligne (null = introuvable) ; id déjà validé ou null si invalide.
  * Renvoie { status, cache, title, description, image, canonicalUrl, targetUrl, redirectLabel }.
@@ -91,10 +123,7 @@ export function buildRoomPreview(row, id) {
   const name = cut(row.name, 80) || (isPaid ? "Communauté" : "Salon");
   // Sans photo, l'émoji (validé) accompagne le nom, comme la pastille dans l'application.
   const title = hasPhoto ? name : `${globalThis.MahoutoRoomSafe.emoji(row.emoji)} ${name}`;
-  const price = Number(row.price);
-  const description = isPaid
-    ? `Communauté payante${price > 0 ? ` : ${money(price)}` : ""} — Rejoins cette communauté sur ${ROOM_BRAND}`
-    : `Rejoins ce salon sur ${ROOM_BRAND}`;
+  const description = roomDescription(row);
   const targetUrl = `${ROOM_SITE}/chat.html?room=${encodeURIComponent(id)}`;
   return {
     status: 200,
@@ -170,7 +199,7 @@ export async function handleRoomPreview(req, res, deps) {
       status: 503,
       cache: "no-store",
       title: ROOM_BRAND,
-      description: `Rejoins ce salon sur ${ROOM_BRAND}`,
+      description: `Rejoignez ce salon sur ${ROOM_BRAND}`,
       image: DEFAULT_IMAGE,
       canonicalUrl: `${ROOM_SITE}/r/${encodeURIComponent(id)}`,
       targetUrl: `${ROOM_SITE}/chat.html?room=${encodeURIComponent(id)}`,

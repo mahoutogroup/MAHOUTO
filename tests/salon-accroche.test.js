@@ -162,8 +162,8 @@ test("textes vouvoyés de l'écran verrouillé : liste exacte (avant → après)
 test("textes laissés de côté (hors écran verrouillé ou partagés avec d'autres pages) : inchangés", () => {
   assert.ok(CHAT.includes("Tu lis ce salon en lecture seule. Connecte-toi pour écrire."), "barre du visiteur : autre écran");
   assert.ok(read("payment-return.js").includes("Ton paiement n'est pas encore confirmé."), "module partagé avec d'autres pages");
-  assert.ok(read("api/fedapay-checkout.js").includes("Connecte-toi avec Google ou ton e-mail pour acheter."), "message de l'API : redéploiement séparé");
-  assert.ok(read("api/_salon-abonnement.js").includes("Choisis un forfait."), "message de l'API : redéploiement séparé");
+  assert.ok(read("api/fedapay-checkout.js").includes("Connectez-vous avec Google ou votre e-mail pour acheter."), "message de l'API : vouvoyé par la PR suivante (partage du salon)");
+  assert.ok(read("api/_salon-abonnement.js").includes("Choisissez un forfait."), "message de l'API : vouvoyé par la PR suivante");
 });
 
 // ====================== admin/rooms.html : réglages du salon ======================
