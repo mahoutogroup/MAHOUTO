@@ -47,7 +47,15 @@
     width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border);
     background: var(--bg); color: var(--white); font-size: 15.5px; font-family: inherit;
   }
-  .room-row input::placeholder { color: var(--text-muted); opacity: 1; }
+  .room-row input::placeholder, .room-row textarea::placeholder { color: var(--text-muted); opacity: 1; }
+  /* Phrase d'accroche : une ligne au départ, grandit avec le texte (hauteur calculée par salon-accroche.js), sans barre ni poignée. */
+  .room-row textarea.r-accroche {
+    display: block; width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border);
+    background: var(--bg); color: var(--white); font-size: 15.5px; line-height: 1.35; font-family: inherit;
+    resize: none; overflow: hidden;
+  }
+  /* Les deux lignes sous le champ (compteur, aide) ne se chevauchent plus : on annule la marge négative de .abo-hint ici. */
+  .room-row .r-accroche-bloc .abo-hint { margin-top: 6px; }
   .room-row input:disabled { opacity: .45; }
 
   .room-row .actions { display: flex; gap: 8px; margin-top: 4px; flex-wrap: wrap; }
@@ -284,7 +292,7 @@
         ${"accroche" in r ? `
         <div class="r-accroche-bloc">
           <label>Phrase d'accroche (facultatif)</label>
-          <input type="text" class="r-accroche" maxlength="120" autocomplete="off" placeholder="Ex : Conseils, devis et entraide entre sérigraphes">
+          <textarea class="r-accroche" rows="1" maxlength="120" autocomplete="off" placeholder="Ex : Conseils, devis et entraide entre sérigraphes"></textarea>
           <div class="abo-hint r-accroche-compteur"></div>
           <div class="abo-hint">Cette phrase s'affiche sur l'écran verrouillé de la communauté, sous le nom et avant le prix, pour les personnes qui n'y ont pas encore accès. Pas de lien ni d'adresse web.</div>
         </div>` : ""}
@@ -330,10 +338,7 @@
       const accrocheInput = row.querySelector(".r-accroche");
       if (accrocheInput) {
         accrocheInput.value = MahoutoSalonAccroche.clean(r.accroche);
-        const accrocheCpt = row.querySelector(".r-accroche-compteur");
-        const majCompteur = () => { accrocheCpt.textContent = MahoutoSalonAccroche.counterText(accrocheInput.value); };
-        accrocheInput.addEventListener("input", majCompteur);
-        majCompteur();
+        MahoutoSalonAccroche.bindField(accrocheInput, row.querySelector(".r-accroche-compteur"));   // Entrée sans retour à la ligne, collage nettoyé, hauteur et compteur à jour
       }
 
       photoBtn.addEventListener("click", () => {
