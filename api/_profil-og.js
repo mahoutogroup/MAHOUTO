@@ -32,6 +32,9 @@
 import { cloudinaryImageParts } from "./_cloudinary-og.js";
 
 export const PROFIL_SITE = "https://mahouto.com";
+// Adresse OFFICIELLE pour les moteurs de recherche (canonical, og:url, JSON-LD, plan du site) : l'hôte principal de mahouto.com est www
+// (mahouto.com redirige en 308 vers www.mahouto.com). Les liens de partage, QR codes et images gardent PROFIL_SITE (la redirection suffit).
+export const PROFIL_SITE_SEO = "https://www.mahouto.com";
 export const PROFIL_BRAND = "MAHOUTO+";
 export const PROFIL_ADRESSE_RE = /^[a-z0-9][a-z0-9-]{1,28}[a-z0-9]$/;
 export const PROFIL_SOURCE_RE = /^[a-z0-9_-]{1,40}$/;   // même règle que analytics.js
@@ -266,7 +269,7 @@ export async function handleProfilPreview(req, res, deps) {
 // Indexation par les moteurs de recherche (page par page, décidée par un administrateur).
 //  - la base décide : profil_public_indexable(adresse) = publiée, non suspendue, interrupteur ouvert ET indexable ;
 //  - jamais depuis majestepresse.com ni un domaine de test (*.vercel.app) : l'hôte doit être mahouto.com (repli : noindex) ;
-//  - jamais un alias : seule la page principale est indexable ; canonical TOUJOURS https://mahouto.com/m/<adresse> ;
+//  - jamais un alias : seule la page principale est indexable ; canonical TOUJOURS https://www.mahouto.com/m/<adresse> (hôte principal) ;
 //  - titre « Nom, métier à Ville », description et JSON-LD : seulement des champs déjà publics (jamais le contact) ;
 //  - le contenu utile est DANS le HTML initial (nom, métier, ville, présentation, liens) ; pas de redirection automatique
 //    sans ?src= (les robots lisent l'adresse propre ; les liens de QR code et de partage portent ?src= et vont à la carte) ;
@@ -310,7 +313,7 @@ export function buildProfilIndexable(row, adresse) {
   const nom = cut(row && row.nom_affiche, 60);
   const metier = cut(row && row.metier, 80), ville = cut(row && row.localisation, 60);
   const presentation = cut(row && row.presentation, 280);
-  const canonicalUrl = `${PROFIL_SITE}/m/${adresse}`;
+  const canonicalUrl = `${PROFIL_SITE_SEO}/m/${adresse}`;      // canonical, og:url et url du JSON-LD (dérivés)
   const title = profilIndexableTitle(row);
   const description = profilDescription(row);
   const photo = profilCardImage(row);
@@ -389,7 +392,7 @@ function sendIndexable(res, p, source) {
 // ---------------------------------------------------------
 // Plan du site des cartes indexables : GET /sitemap-cartes.xml (réécriture vers api/produit-og.js?type=sitemap-cartes).
 // deps.fetchSitemap() → { rows: [{adresse, modifie_le}], error } (fonction profil_public_sitemap, clé publique). Seules les adresses
-// valides sont écrites, toujours en https://mahouto.com/m/<adresse> ; vide s'il n'y a aucune page indexable ; erreur : 503 sans cache.
+// valides sont écrites, toujours en https://www.mahouto.com/m/<adresse> ; vide s'il n'y a aucune page indexable ; erreur : 503 sans cache.
 // ---------------------------------------------------------
 export function renderProfilSitemap(rows) {
   const urls = (Array.isArray(rows) ? rows : [])
@@ -397,7 +400,7 @@ export function renderProfilSitemap(rows) {
     .map((r) => {
       const t = r.modifie_le ? Date.parse(r.modifie_le) : NaN;
       const lastmod = isFinite(t) ? `<lastmod>${new Date(t).toISOString()}</lastmod>` : "";
-      return `  <url><loc>${escapeHtml(`${PROFIL_SITE}/m/${r.adresse}`)}</loc>${lastmod}</url>`;
+      return `  <url><loc>${escapeHtml(`${PROFIL_SITE_SEO}/m/${r.adresse}`)}</loc>${lastmod}</url>`;
     });
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls.length ? "\n" + urls.join("\n") + "\n" : "\n"}</urlset>\n`;
 }
