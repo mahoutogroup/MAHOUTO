@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://mahouto.com/sitemap-cartes.xml
+Sitemap: https://www.mahouto.com/sitemap-cartes.xml
