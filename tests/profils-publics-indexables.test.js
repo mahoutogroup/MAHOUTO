@@ -38,12 +38,12 @@ const NOINDEX = (r) => /noindex/.test(r.html) && r.res.headers["X-Robots-Tag"] =
 const INDEXABLE = (r) => !/noindex/i.test(r.html) && !/<meta[^>]*nofollow/i.test(r.html) && r.res.headers["X-Robots-Tag"] === undefined && meta(r.html, "robots") === null;
 const ldOf = (h) => { const m = h.match(/<script type="application\/ld\+json">([^<]*)<\/script>/); return m ? JSON.parse(m[1]) : null; };
 
-test("page indexable (mahouto.com, décidée par la base) : AUCUN noindex (meta ni en-tête), canonical https://www.mahouto.com, titre « Nom, métier à Ville »", async () => {
+test("page indexable (mahouto.com, décidée par la base) : AUCUN noindex (meta ni en-tête), canonical https://mahouto.com, titre « Nom, métier à Ville »", async () => {
   const r = await get(); assert.strictEqual(r.res.code, 200);
   assert.ok(INDEXABLE(r), "aucune trace de noindex : balise meta, en-tête ni texte");
-  assert.match(r.html, /<link rel="canonical" href="https:\/\/www\.mahouto\.com\/m\/mahouto-abdallah">/);
+  assert.match(r.html, /<link rel="canonical" href="https:\/\/mahouto\.com\/m\/mahouto-abdallah">/);
   assert.match(r.html, /<title>Mahouto Abdallah, Sérigraphe à Cotonou<\/title>/);
-  assert.strictEqual(meta(r.html, "og:url"), "https://www.mahouto.com/m/mahouto-abdallah"); assert.strictEqual(meta(r.html, "og:title"), "Mahouto Abdallah, Sérigraphe à Cotonou");
+  assert.strictEqual(meta(r.html, "og:url"), "https://mahouto.com/m/mahouto-abdallah"); assert.strictEqual(meta(r.html, "og:title"), "Mahouto Abdallah, Sérigraphe à Cotonou");
   assert.strictEqual(r.res.headers["Cache-Control"], "public, max-age=0, s-maxage=60", "cache court : un retrait se voit en 1 minute");
   assert.ok(r.calls.join() === "profil:mahouto-abdallah,indexable:mahouto-abdallah", "une lecture de la page, un booléen d'indexation, aucun alias");
 });
@@ -54,7 +54,7 @@ test("page indexable : le contenu utile est DANS le HTML initial (nom, métier, 
   assert.ok(!/http-equiv="refresh"|window\.location|location\.replace/.test(r.html), "aucune redirection pour un robot (adresse propre)");
   assert.ok(!/<script(?![^>]*ld\+json)/.test(r.html), "aucun autre script : le contenu n'est pas ajouté par JavaScript");
   const q = await get({ query: { src: "qr" } }); assert.ok(INDEXABLE(q) && /location\.replace\("https:\/\/mahouto\.com\/m\.html\?adresse=mahouto-abdallah\\u0026src=qr"\)/.test(q.html), "lien de QR code (?src=) : l'humain va à la carte, le canonical reste l'adresse propre");
-  assert.match(q.html, /<link rel="canonical" href="https:\/\/www\.mahouto\.com\/m\/mahouto-abdallah">/);
+  assert.match(q.html, /<link rel="canonical" href="https:\/\/mahouto\.com\/m\/mahouto-abdallah">/);
 });
 
 test("page NON indexable : noindex comme aujourd'hui (meta + en-tête), pas de canonical, pas de contenu de page, aperçu et redirection inchangés", async () => {
@@ -77,18 +77,18 @@ test("un alias n'est jamais indexable (noindex) ; seule la page principale l'est
   assert.ok(NOINDEX(r), "l'alias reste noindex"); assert.ok(!r.calls.some((c) => c.startsWith("indexable:")));
 });
 
-test("hôte : seule mahouto.com (ou www) peut être indexée ; majestepresse.com, domaines de test, hôte absent ou usurpé : noindex ; canonical TOUJOURS https://www.mahouto.com", async () => {
-  for (const host of ["mahouto.com", "www.mahouto.com", "MAHOUTO.COM", "mahouto.com:443"]) { const r = await get({ host }); assert.ok(INDEXABLE(r), host); assert.match(r.html, /<link rel="canonical" href="https:\/\/www\.mahouto\.com\/m\/mahouto-abdallah">/, host + " : canonical https://www.mahouto.com (hôte principal), même servi depuis mahouto.com"); }
+test("hôte : seule mahouto.com (ou www) peut être indexée ; majestepresse.com, domaines de test, hôte absent ou usurpé : noindex ; canonical TOUJOURS https://mahouto.com", async () => {
+  for (const host of ["mahouto.com", "www.mahouto.com", "MAHOUTO.COM", "mahouto.com:443"]) { const r = await get({ host }); assert.ok(INDEXABLE(r), host); assert.match(r.html, /<link rel="canonical" href="https:\/\/mahouto\.com\/m\/mahouto-abdallah">/, host + " : canonical https://mahouto.com (adresse officielle sans www), même servi depuis www.mahouto.com"); }
   for (const host of ["majestepresse.com", "www.majestepresse.com", "mahouto-git-x-team.vercel.app", "mahouto.com.evil.test", "evil-mahouto.com", "localhost:3000", "", null]) { const r = await get({ host }); assert.ok(NOINDEX(r), String(host) + " : noindex"); assert.ok(!r.calls.some((c) => c.startsWith("indexable:")), String(host) + " : aucune lecture d'indexation"); }
   const r = await get({ host: "majestepresse.com", forwarded: "mahouto.com" }); assert.ok(INDEXABLE(r), "x-forwarded-host de Vercel prime");
   const e = await get({ host: "mahouto.com", forwarded: "majestepresse.com" }); assert.ok(NOINDEX(e), "x-forwarded-host majestepresse.com : noindex");
   const src = read("api/_profil-og.js"); assert.ok(!/headers\.host/.test(src), "l'hôte ne sert jamais au site ni à la marque affichés");
-  assert.ok(/export const PROFIL_SITE_SEO = "https:\/\/www\.mahouto\.com";/.test(src) && /export const PROFIL_SITE = "https:\/\/mahouto\.com";/.test(src) && !/majestepresse/.test(src.replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "")), "aucun canonical vers majestepresse.com");
+  assert.ok(/export const PROFIL_SITE_SEO = "https:\/\/mahouto\.com";/.test(src) && /export const PROFIL_SITE = "https:\/\/mahouto\.com";/.test(src) && !/majestepresse/.test(src.replace(/\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "")), "aucun canonical vers majestepresse.com");
 });
 
 test("titre, description et JSON-LD : seulement des champs déjà publics (jamais le contact, jamais d'identifiant) ; parties absentes omises", async () => {
   const r = await get(); const ld = ldOf(r.html);
-  assert.deepStrictEqual(ld, { "@context": "https://schema.org", "@type": "Person", name: "Mahouto Abdallah", url: "https://www.mahouto.com/m/mahouto-abdallah", jobTitle: "Sérigraphe",
+  assert.deepStrictEqual(ld, { "@context": "https://schema.org", "@type": "Person", name: "Mahouto Abdallah", url: "https://mahouto.com/m/mahouto-abdallah", jobTitle: "Sérigraphe",
     description: "Impression textile et sérigraphie à Cotonou.", workLocation: { "@type": "Place", name: "Cotonou" }, image: "https://res.cloudinary.com/hefa5gqf/image/upload/f_jpg,q_auto,fl_strip_profile,w_160,h_160,c_fill,g_auto/v1793189115/mahoutoplus/avatars/photo-profil.jpg" });
   const entetes = [r.html.match(/<title>[^<]*/)[0], meta(r.html, "description"), meta(r.html, "og:description"), meta(r.html, "twitter:description"), r.html.match(/<script type="application\/ld\+json">[^<]*/)[0]].join("\n");
   ["22900001234", "+229", "wa.me", "11111111-2222", "99999999-2222", "user_id", "messages_ouverts", "majeur", "suspendu", "publie", "indexable"].forEach((t) => assert.ok(!entetes.includes(t), "absent du titre, de la description et du JSON-LD : " + t));
@@ -114,7 +114,7 @@ test("plan du site : seulement les adresses valides renvoyées par la base (inde
   const run = async (d) => { const res = fakeRes(); await SERVER.handleProfilSitemap({}, res, d); return res; };
   const ok = await run({ fetchSitemap: async () => ({ rows: [{ adresse: "mahouto-abdallah", modifie_le: "2026-11-20T10:00:00Z" }, { adresse: "Mauvais Alias", modifie_le: null }, { adresse: "x<y>", modifie_le: "x" }, null, { adresse: "autre-carte" }], error: null }) });
   assert.strictEqual(ok.code, 200); assert.strictEqual(ok.headers["Content-Type"], "application/xml; charset=utf-8"); assert.match(ok.headers["Cache-Control"], /s-maxage=300/);
-  assert.deepStrictEqual([...String(ok.body).matchAll(/<loc>([^<]*)<\/loc>/g)].map((m) => m[1]), ["https://www.mahouto.com/m/mahouto-abdallah", "https://www.mahouto.com/m/autre-carte"]);
+  assert.deepStrictEqual([...String(ok.body).matchAll(/<loc>([^<]*)<\/loc>/g)].map((m) => m[1]), ["https://mahouto.com/m/mahouto-abdallah", "https://mahouto.com/m/autre-carte"]);
   assert.match(String(ok.body), /<lastmod>2026-11-20T10:00:00\.000Z<\/lastmod>/); assert.ok(!/majestepresse|vercel\.app/.test(String(ok.body)));
   const vide = await run({ fetchSitemap: async () => ({ rows: [], error: null }) }); assert.strictEqual(vide.code, 200); assert.ok(!/<url>/.test(String(vide.body)) && /<urlset[^>]*>\s*<\/urlset>/.test(String(vide.body)), "valide et vide");
   const panne = await run({ fetchSitemap: async () => ({ rows: [], error: new Error("x") }) }); assert.strictEqual(panne.code, 503); assert.strictEqual(panne.headers["Cache-Control"], "no-store"); assert.ok(!/<url>/.test(String(panne.body)));
@@ -139,7 +139,7 @@ test("vercel.json, robots.txt, m.html : réécriture du plan du site ; /m/:adres
   assert.ok(!v.headers.some((h) => h.source === "/m/:adresse"), "sinon l'en-tête noindex fixe l'emporterait sur la page indexable");
   ["/m.html", "/pro", "/pro.html", "/creer-ma-carte", "/creer-ma-carte.html"].forEach((s) => assert.ok(v.headers.some((h) => h.source === s && h.headers.some((x) => x.key === "X-Robots-Tag" && /noindex/.test(x.value))), s + " reste noindex"));
   assert.match(read("m.html"), /<meta name="robots" content="noindex, nofollow">/, "la carte interactive reste noindex");
-  const robots = read("robots-mahouto.txt"); assert.match(robots, /^User-agent: \*\nAllow: \/\n/); assert.match(robots, /Sitemap: https:\/\/www\.mahouto\.com\/sitemap-cartes\.xml/); assert.ok(!/Disallow/i.test(robots), "ne bloque pas l'exploration : les robots doivent voir les noindex");
+  const robots = read("robots-mahouto.txt"); assert.match(robots, /^User-agent: \*\nAllow: \/\n/); assert.match(robots, /Sitemap: https:\/\/mahouto\.com\/sitemap-cartes\.xml/); assert.ok(!/Disallow/i.test(robots), "ne bloque pas l'exploration : les robots doivent voir les noindex");
   assert.ok(!fs.existsSync(path.join(root, "sitemap.xml")), "aucun autre plan du site");
   assert.match(read("sw.js"), /const CACHE_NAME = "mahoutoplus-shell-v(14\d|1[5-9]\d)";/);
 });
@@ -172,10 +172,11 @@ test("SQL : contraintes de l'éditeur mobile (blocs numérotés, $$, commentaire
   assert.ok(!/eyJ|sk_live|sk_test|apikey/i.test(SQL + ROLL + VERIF + ACT), "aucune clé");
 });
 
-test("adresses de partage et de lien (non officielles pour Google) inchangées : carte complète, QR, aperçu non indexable, image par défaut restent sur mahouto.com", async () => {
+test("adresses de partage et de lien inchangées (sans www) ; aucune adresse www écrite en dur côté code ; isIndexableHost accepte toujours mahouto.com ET www", async () => {
   const r = await get(); assert.ok(r.html.includes('href="https://mahouto.com/m.html?adresse=mahouto-abdallah&amp;src=recherche"'), "lien vers la carte complète");
   const n = await get({ indexable: false }); assert.strictEqual(meta(n.html, "og:url"), "https://mahouto.com/m/mahouto-abdallah", "aperçu de partage (noindex) : adresse de partage");
   assert.ok(n.html.includes("https://mahouto.com/m.html?adresse=mahouto-abdallah"), "redirection des humains inchangée");
-  assert.ok(!/www\.mahouto\.com/.test(n.html), "page non indexable : aucune adresse www");
-  ["profil-public-utils.js", "room-share.js", "invitation.js", "entreprise-utils.js", "api/_room-og.js", "api/_entreprise-og.js"].forEach((f) => assert.ok(!/www\.mahouto\.com/.test(read(f)), f + " : liens de partage non modifiés"));
+  assert.ok(!/www\.mahouto\.com/.test(n.html) && !/www\.mahouto\.com/.test(r.html), "aucune adresse www dans les pages");
+  ["profil-public-utils.js", "room-share.js", "invitation.js", "entreprise-utils.js", "api/_room-og.js", "api/_entreprise-og.js", "api/_profil-og.js"].forEach((f) => assert.ok(!/https:\/\/www\./.test(read(f)), f + " : aucune adresse https://www. écrite en dur"));
+  for (const host of ["mahouto.com", "www.mahouto.com"]) assert.ok(INDEXABLE(await get({ host })), host + " reste indexable");
 });
