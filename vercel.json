@@ -48,6 +48,30 @@
     {
       "source": "/sitemap-cartes.xml",
       "destination": "/api/produit-og?type=sitemap-cartes"
+    },
+    {
+      "source": "/robots.txt",
+      "has": [
+        {
+          "type": "host",
+          "value": "majestepresse.com"
+        }
+      ],
+      "destination": "/robots-majestepresse.txt"
+    },
+    {
+      "source": "/robots.txt",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.majestepresse.com"
+        }
+      ],
+      "destination": "/robots-majestepresse.txt"
+    },
+    {
+      "source": "/robots.txt",
+      "destination": "/robots-mahouto.txt"
     }
   ],
   "headers": [
@@ -122,6 +146,672 @@
         {
           "key": "X-Robots-Tag",
           "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/admin/(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/profil.html",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/discussions.html",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/chat.html",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/dm-chat.html",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/messages-prives.html",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/mes-achats.html",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/certificates.html",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/serigraphie-commande.html",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/serigraphie-confirmation.html",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/serigraphie-vendeur.html",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/share.html",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/get-video-url.html",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/cast-prototype.html",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex, nofollow"
+        }
+      ]
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "mahouto.com"
+        }
+      ],
+      "headers": [
+        {
+          "key": "Link",
+          "value": "<https://mahouto.com/>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.mahouto.com"
+        }
+      ],
+      "headers": [
+        {
+          "key": "Link",
+          "value": "<https://mahouto.com/>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "majestepresse.com"
+        }
+      ],
+      "headers": [
+        {
+          "key": "Link",
+          "value": "<https://majestepresse.com/>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.majestepresse.com"
+        }
+      ],
+      "headers": [
+        {
+          "key": "Link",
+          "value": "<https://majestepresse.com/>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/index.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "mahouto.com"
+        }
+      ],
+      "headers": [
+        {
+          "key": "Link",
+          "value": "<https://mahouto.com/>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/index.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.mahouto.com"
+        }
+      ],
+      "headers": [
+        {
+          "key": "Link",
+          "value": "<https://mahouto.com/>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/index.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "majestepresse.com"
+        }
+      ],
+      "headers": [
+        {
+          "key": "Link",
+          "value": "<https://majestepresse.com/>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/index.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.majestepresse.com"
+        }
+      ],
+      "headers": [
+        {
+          "key": "Link",
+          "value": "<https://majestepresse.com/>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/accueil-majeste.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "mahouto.com"
+        }
+      ],
+      "headers": [
+        {
+          "key": "Link",
+          "value": "<https://mahouto.com/accueil-majeste.html>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/accueil-majeste.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.mahouto.com"
+        }
+      ],
+      "headers": [
+        {
+          "key": "Link",
+          "value": "<https://mahouto.com/accueil-majeste.html>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/accueil-majeste.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "majestepresse.com"
+        }
+      ],
+      "headers": [
+        {
+          "key": "Link",
+          "value": "<https://majestepresse.com/accueil-majeste.html>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/accueil-majeste.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.majestepresse.com"
+        }
+      ],
+      "headers": [
+        {
+          "key": "Link",
+          "value": "<https://majestepresse.com/accueil-majeste.html>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/academie-majestepresse.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "mahouto.com"
+        }
+      ],
+      "headers": [
+        {
+          "key": "Link",
+          "value": "<https://mahouto.com/academie-majestepresse.html>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/academie-majestepresse.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.mahouto.com"
+        }
+      ],
+      "headers": [
+        {
+          "key": "Link",
+          "value": "<https://mahouto.com/academie-majestepresse.html>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/academie-majestepresse.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "majestepresse.com"
+        }
+      ],
+      "headers": [
+        {
+          "key": "Link",
+          "value": "<https://majestepresse.com/academie-majestepresse.html>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/academie-majestepresse.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.majestepresse.com"
+        }
+      ],
+      "headers": [
+        {
+          "key": "Link",
+          "value": "<https://majestepresse.com/academie-majestepresse.html>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/regles-pages-publiques",
+      "has": [
+        {
+          "type": "host",
+          "value": "mahouto.com"
+        }
+      ],
+      "headers": [
+        {
+          "key": "Link",
+          "value": "<https://mahouto.com/regles-pages-publiques>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/regles-pages-publiques",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.mahouto.com"
+        }
+      ],
+      "headers": [
+        {
+          "key": "Link",
+          "value": "<https://mahouto.com/regles-pages-publiques>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/regles-pages-publiques",
+      "has": [
+        {
+          "type": "host",
+          "value": "majestepresse.com"
+        }
+      ],
+      "headers": [
+        {
+          "key": "Link",
+          "value": "<https://majestepresse.com/regles-pages-publiques>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/regles-pages-publiques",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.majestepresse.com"
+        }
+      ],
+      "headers": [
+        {
+          "key": "Link",
+          "value": "<https://majestepresse.com/regles-pages-publiques>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/regles-pages-publiques.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "mahouto.com"
+        }
+      ],
+      "headers": [
+        {
+          "key": "Link",
+          "value": "<https://mahouto.com/regles-pages-publiques>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/regles-pages-publiques.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.mahouto.com"
+        }
+      ],
+      "headers": [
+        {
+          "key": "Link",
+          "value": "<https://mahouto.com/regles-pages-publiques>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/regles-pages-publiques.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "majestepresse.com"
+        }
+      ],
+      "headers": [
+        {
+          "key": "Link",
+          "value": "<https://majestepresse.com/regles-pages-publiques>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/regles-pages-publiques.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.majestepresse.com"
+        }
+      ],
+      "headers": [
+        {
+          "key": "Link",
+          "value": "<https://majestepresse.com/regles-pages-publiques>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/mentions-legales.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "mahouto.com"
+        }
+      ],
+      "headers": [
+        {
+          "key": "Link",
+          "value": "<https://mahouto.com/mentions-legales.html>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/mentions-legales.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.mahouto.com"
+        }
+      ],
+      "headers": [
+        {
+          "key": "Link",
+          "value": "<https://mahouto.com/mentions-legales.html>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/mentions-legales.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "majestepresse.com"
+        }
+      ],
+      "headers": [
+        {
+          "key": "Link",
+          "value": "<https://majestepresse.com/mentions-legales.html>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/mentions-legales.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.majestepresse.com"
+        }
+      ],
+      "headers": [
+        {
+          "key": "Link",
+          "value": "<https://majestepresse.com/mentions-legales.html>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/conditions-vente.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "mahouto.com"
+        }
+      ],
+      "headers": [
+        {
+          "key": "Link",
+          "value": "<https://mahouto.com/conditions-vente.html>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/conditions-vente.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.mahouto.com"
+        }
+      ],
+      "headers": [
+        {
+          "key": "Link",
+          "value": "<https://mahouto.com/conditions-vente.html>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/conditions-vente.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "majestepresse.com"
+        }
+      ],
+      "headers": [
+        {
+          "key": "Link",
+          "value": "<https://majestepresse.com/conditions-vente.html>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/conditions-vente.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.majestepresse.com"
+        }
+      ],
+      "headers": [
+        {
+          "key": "Link",
+          "value": "<https://majestepresse.com/conditions-vente.html>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/conditions-vendeurs.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "mahouto.com"
+        }
+      ],
+      "headers": [
+        {
+          "key": "Link",
+          "value": "<https://mahouto.com/conditions-vendeurs.html>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/conditions-vendeurs.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.mahouto.com"
+        }
+      ],
+      "headers": [
+        {
+          "key": "Link",
+          "value": "<https://mahouto.com/conditions-vendeurs.html>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/conditions-vendeurs.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "majestepresse.com"
+        }
+      ],
+      "headers": [
+        {
+          "key": "Link",
+          "value": "<https://majestepresse.com/conditions-vendeurs.html>; rel=\"canonical\""
+        }
+      ]
+    },
+    {
+      "source": "/conditions-vendeurs.html",
+      "has": [
+        {
+          "type": "host",
+          "value": "www.majestepresse.com"
+        }
+      ],
+      "headers": [
+        {
+          "key": "Link",
+          "value": "<https://majestepresse.com/conditions-vendeurs.html>; rel=\"canonical\""
         }
       ]
     }
