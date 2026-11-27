@@ -139,7 +139,7 @@ test("vercel.json, robots.txt, m.html : réécriture du plan du site ; /m/:adres
   assert.ok(!v.headers.some((h) => h.source === "/m/:adresse"), "sinon l'en-tête noindex fixe l'emporterait sur la page indexable");
   ["/m.html", "/pro", "/pro.html", "/creer-ma-carte", "/creer-ma-carte.html"].forEach((s) => assert.ok(v.headers.some((h) => h.source === s && h.headers.some((x) => x.key === "X-Robots-Tag" && /noindex/.test(x.value))), s + " reste noindex"));
   assert.match(read("m.html"), /<meta name="robots" content="noindex, nofollow">/, "la carte interactive reste noindex");
-  const robots = read("robots.txt"); assert.match(robots, /^User-agent: \*\nAllow: \/\n/); assert.match(robots, /Sitemap: https:\/\/mahouto\.com\/sitemap-cartes\.xml/); assert.ok(!/Disallow/i.test(robots), "ne bloque pas l'exploration : les robots doivent voir les noindex");
+  const robots = read("robots-mahouto.txt"); assert.match(robots, /^User-agent: \*\nAllow: \/\n/); assert.match(robots, /Sitemap: https:\/\/mahouto\.com\/sitemap-cartes\.xml/); assert.ok(!/Disallow/i.test(robots), "ne bloque pas l'exploration : les robots doivent voir les noindex");
   assert.ok(!fs.existsSync(path.join(root, "sitemap.xml")), "aucun autre plan du site");
   assert.match(read("sw.js"), /const CACHE_NAME = "mahoutoplus-shell-v(14\d|1[5-9]\d)";/);
 });

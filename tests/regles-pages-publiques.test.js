@@ -122,7 +122,7 @@ test("adresse /regles-pages-publiques : réécriture correcte, vercel.json valid
   const v = JSON.parse(read("vercel.json"));
   assert.deepStrictEqual(v.rewrites.find((r) => r.source === "/regles-pages-publiques"), { source: "/regles-pages-publiques", destination: "/regles-pages-publiques.html" });
   ["/p/:id", "/f/:id", "/s/:id", "/e/:slug", "/r/:id", "/verify/:code", "/m/:adresse", "/pro"].forEach((s) => assert.ok(v.rewrites.some((r) => r.source === s), s + " intacte"));
-  assert.ok(!v.headers.some((h) => /regles/.test(h.source)), "aucun en-tête noindex pour la page des règles");
+  assert.ok(!v.headers.some((h) => /regles/.test(h.source) && h.headers.some((x) => /robots/i.test(x.key))), "aucun en-tête noindex pour la page des règles (seul le canonical Link par domaine est posé)");
   assert.ok(fs.existsSync(path.join(root, "regles-pages-publiques.html")));
   const list = (d) => fs.readdirSync(path.join(root, d)).filter((f) => f.endsWith(".js") && !f.startsWith("_")); assert.strictEqual(list("api").length + list("api/admin").length, 12, "12 fonctions");
   assert.ok(!fs.readdirSync(root).some((f) => /\.sql$/.test(f) && /regles-pages/.test(f)), "aucun SQL");
