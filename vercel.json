@@ -316,7 +316,7 @@
       "headers": [
         {
           "key": "Link",
-          "value": "<https://majestepresse.com/>; rel=\"canonical\""
+          "value": "<https://www.majestepresse.com/>; rel=\"canonical\""
         }
       ]
     },
@@ -331,7 +331,7 @@
       "headers": [
         {
           "key": "Link",
-          "value": "<https://majestepresse.com/>; rel=\"canonical\""
+          "value": "<https://www.majestepresse.com/>; rel=\"canonical\""
         }
       ]
     },
@@ -376,7 +376,7 @@
       "headers": [
         {
           "key": "Link",
-          "value": "<https://majestepresse.com/>; rel=\"canonical\""
+          "value": "<https://www.majestepresse.com/>; rel=\"canonical\""
         }
       ]
     },
@@ -391,7 +391,7 @@
       "headers": [
         {
           "key": "Link",
-          "value": "<https://majestepresse.com/>; rel=\"canonical\""
+          "value": "<https://www.majestepresse.com/>; rel=\"canonical\""
         }
       ]
     },
@@ -436,7 +436,7 @@
       "headers": [
         {
           "key": "Link",
-          "value": "<https://majestepresse.com/accueil-majeste.html>; rel=\"canonical\""
+          "value": "<https://www.majestepresse.com/accueil-majeste.html>; rel=\"canonical\""
         }
       ]
     },
@@ -451,7 +451,7 @@
       "headers": [
         {
           "key": "Link",
-          "value": "<https://majestepresse.com/accueil-majeste.html>; rel=\"canonical\""
+          "value": "<https://www.majestepresse.com/accueil-majeste.html>; rel=\"canonical\""
         }
       ]
     },
@@ -496,7 +496,7 @@
       "headers": [
         {
           "key": "Link",
-          "value": "<https://majestepresse.com/academie-majestepresse.html>; rel=\"canonical\""
+          "value": "<https://www.majestepresse.com/academie-majestepresse.html>; rel=\"canonical\""
         }
       ]
     },
@@ -511,7 +511,7 @@
       "headers": [
         {
           "key": "Link",
-          "value": "<https://majestepresse.com/academie-majestepresse.html>; rel=\"canonical\""
+          "value": "<https://www.majestepresse.com/academie-majestepresse.html>; rel=\"canonical\""
         }
       ]
     },
@@ -556,7 +556,7 @@
       "headers": [
         {
           "key": "Link",
-          "value": "<https://majestepresse.com/regles-pages-publiques>; rel=\"canonical\""
+          "value": "<https://www.majestepresse.com/regles-pages-publiques>; rel=\"canonical\""
         }
       ]
     },
@@ -571,7 +571,7 @@
       "headers": [
         {
           "key": "Link",
-          "value": "<https://majestepresse.com/regles-pages-publiques>; rel=\"canonical\""
+          "value": "<https://www.majestepresse.com/regles-pages-publiques>; rel=\"canonical\""
         }
       ]
     },
@@ -616,7 +616,7 @@
       "headers": [
         {
           "key": "Link",
-          "value": "<https://majestepresse.com/regles-pages-publiques>; rel=\"canonical\""
+          "value": "<https://www.majestepresse.com/regles-pages-publiques>; rel=\"canonical\""
         }
       ]
     },
@@ -631,7 +631,7 @@
       "headers": [
         {
           "key": "Link",
-          "value": "<https://majestepresse.com/regles-pages-publiques>; rel=\"canonical\""
+          "value": "<https://www.majestepresse.com/regles-pages-publiques>; rel=\"canonical\""
         }
       ]
     },
@@ -676,7 +676,7 @@
       "headers": [
         {
           "key": "Link",
-          "value": "<https://majestepresse.com/mentions-legales.html>; rel=\"canonical\""
+          "value": "<https://www.majestepresse.com/mentions-legales.html>; rel=\"canonical\""
         }
       ]
     },
@@ -691,7 +691,7 @@
       "headers": [
         {
           "key": "Link",
-          "value": "<https://majestepresse.com/mentions-legales.html>; rel=\"canonical\""
+          "value": "<https://www.majestepresse.com/mentions-legales.html>; rel=\"canonical\""
         }
       ]
     },
@@ -736,7 +736,7 @@
       "headers": [
         {
           "key": "Link",
-          "value": "<https://majestepresse.com/conditions-vente.html>; rel=\"canonical\""
+          "value": "<https://www.majestepresse.com/conditions-vente.html>; rel=\"canonical\""
         }
       ]
     },
@@ -751,7 +751,7 @@
       "headers": [
         {
           "key": "Link",
-          "value": "<https://majestepresse.com/conditions-vente.html>; rel=\"canonical\""
+          "value": "<https://www.majestepresse.com/conditions-vente.html>; rel=\"canonical\""
         }
       ]
     },
@@ -796,7 +796,7 @@
       "headers": [
         {
           "key": "Link",
-          "value": "<https://majestepresse.com/conditions-vendeurs.html>; rel=\"canonical\""
+          "value": "<https://www.majestepresse.com/conditions-vendeurs.html>; rel=\"canonical\""
         }
       ]
     },
@@ -811,7 +811,7 @@
       "headers": [
         {
           "key": "Link",
-          "value": "<https://majestepresse.com/conditions-vendeurs.html>; rel=\"canonical\""
+          "value": "<https://www.majestepresse.com/conditions-vendeurs.html>; rel=\"canonical\""
         }
       ]
     }

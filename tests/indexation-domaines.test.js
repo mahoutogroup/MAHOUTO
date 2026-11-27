@@ -49,15 +49,20 @@ test("pages publiques à garder indexées : aucun noindex (meta ni en-tête), au
 const PAGES = [["/", "/"], ["/index.html", "/"], ["/accueil-majeste.html", "/accueil-majeste.html"], ["/academie-majestepresse.html", "/academie-majestepresse.html"],
   ["/regles-pages-publiques", "/regles-pages-publiques"], ["/regles-pages-publiques.html", "/regles-pages-publiques"], ["/mentions-legales.html", "/mentions-legales.html"],
   ["/conditions-vente.html", "/conditions-vente.html"], ["/conditions-vendeurs.html", "/conditions-vendeurs.html"]];
-test("canonical par domaine : en-tête Link avec condition d'hôte ; chaque domaine pointe vers lui-même (www vers le domaine sans www), jamais vers l'autre", () => {
-  const BASE = { "mahouto.com": "https://mahouto.com", "www.mahouto.com": "https://mahouto.com", "majestepresse.com": "https://majestepresse.com", "www.majestepresse.com": "https://majestepresse.com" };
+test("canonical par domaine : en-tête Link avec condition d'hôte ; mahouto.com (et www) → https://mahouto.com ; majestepresse.com (redirigé en 308 vers www) et www → https://www.majestepresse.com ; jamais de croisement", () => {
+  const BASE = { "mahouto.com": "https://mahouto.com", "www.mahouto.com": "https://mahouto.com", "majestepresse.com": "https://www.majestepresse.com", "www.majestepresse.com": "https://www.majestepresse.com" };
   PAGES.forEach(([p, canon]) => Object.entries(BASE).forEach(([host, base]) => {
     const link = headersFor(host, p).Link; assert.deepStrictEqual(link, ['<' + base + canon + '>; rel="canonical"'], p + " sur " + host);
   }));
   assert.deepStrictEqual(headersFor("mahouto-git-x.vercel.app", "/mentions-legales.html").Link, undefined, "hôte inconnu (aperçu) : aucun canonical");
   const liens = V.headers.filter((h) => h.headers.some((x) => x.key === "Link"));
   assert.ok(liens.length === PAGES.length * 4 && liens.every((h) => h.has && h.has.length === 1 && h.has[0].type === "host"), "chaque règle Link a une condition d'hôte");
-  liens.forEach((h) => { const host = h.has[0].value, val = h.headers[0].value; const dom = host.replace(/^www\./, ""); assert.ok(val.startsWith("<https://" + dom + "/") || val.startsWith("<https://" + dom + ">"), host + " → " + val); assert.ok(!/mahouto\.com/.test(val) || dom === "mahouto.com", host + " : pas de croisement"); });
+  liens.forEach((h) => {
+    const host = h.has[0].value, val = h.headers[0].value, attendu = BASE[host];
+    const origine = (val.match(/^<(https:\/\/[^/>]+)/) || [])[1];
+    assert.strictEqual(origine, attendu, host + " : origine exacte, pas de croisement");
+    assert.ok(!/^<https:\/\/majestepresse\.com/.test(val), host + " : jamais majestepresse.com sans www");
+  });
 });
 
 test("robots.txt par domaine : majestepresse.com (et www) → robots-majestepresse.txt (Allow, sans Sitemap) ; mahouto.com et tout autre hôte → robots-mahouto.txt (contenu d'avant)", () => {
@@ -70,5 +75,5 @@ test("robots.txt par domaine : majestepresse.com (et www) → robots-majestepres
   assert.strictEqual(mah, "User-agent: *\nAllow: /\n\nSitemap: https://mahouto.com/sitemap-cartes.xml\n");
   const list = (d) => fs.readdirSync(path.join(root, d)).filter((f) => f.endsWith(".js") && !f.startsWith("_")); assert.strictEqual(list("api").length + list("api/admin").length, 12, "12 fonctions");
   ["/m/:adresse", "/r/:id", "/sitemap-cartes.xml"].forEach((s) => assert.ok(V.rewrites.some((r) => r.source === s), s + " intacte"));
-  assert.match(read("sw.js"), /const CACHE_NAME = "mahoutoplus-shell-v(142|14[3-9]|1[5-9]\d)";/);
+  assert.match(read("sw.js"), /const CACHE_NAME = "mahoutoplus-shell-v(14[3-9]|1[5-9]\d)";/);
 });
