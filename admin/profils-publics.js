@@ -21,6 +21,9 @@
    - Adresses supplémentaires (alias) : liste (profils_publics_admin_alias_lister), formulaire d'ajout
      (profils_publics_admin_alias_ajouter, un message clair par code), « Retirer » avec confirmation
      (profils_publics_admin_alias_retirer). L'adresse principale reste la seule vraie adresse.
+   - Indexation Google : badge « Visible sur Google » / « Non indexée » par page (profils_publics_admin_indexables : adresses seulement),
+     « Autoriser Google » (page publiée, non suspendue, non indexée ; confirmation) et « Retirer de Google » (profils_publics_admin_indexable,
+     un clic de confirmation). Si le SQL n'est pas exécuté, la liste s'affiche sans badge ni bouton d'indexation.
    - Tout texte dynamique passe par textContent : aucun innerHTML.
    ========================================================= */
 (function () {
@@ -31,6 +34,7 @@
   var $ = function (id) { return document.getElementById(id); };
   var supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
   var ouvert = null, busy = false, majLe = null, tick = null;
+  var indexables = null;   // Set des adresses indexables ; null = indisponible (SQL pas encore exécuté)
 
   function el(tag, props, children) {
     var n = document.createElement(tag);
@@ -89,6 +93,7 @@
 
   // ---------- Liste des pages ----------
   function yesNo(v) { return v === true ? "oui" : "non"; }
+  var CONFIRM_AUTORISER = function (adresse) { return "Autoriser Google à afficher la page /m/" + adresse + " (nom, métier, ville, présentation) ? Faites-le seulement si le membre l'a demandé clairement, de préférence par écrit."; };
   function renderList(rows) {
     var box = $("liste-pages");
     box.textContent = "";
@@ -98,7 +103,8 @@
       var card = el("div", { class: "card item" }, [
         el("div", { class: "top" }, [
           el("span", { class: "who", text: String(r.nom_affiche || "") }),
-          el("span", { class: "badge" + (r.suspendu === true ? " refusee" : r.publie === true ? " validee" : ""), text: r.suspendu === true ? "Suspendue" : r.publie === true ? "Publiée" : "Brouillon" })
+          el("span", { class: "badge" + (r.suspendu === true ? " refusee" : r.publie === true ? " validee" : ""), text: r.suspendu === true ? "Suspendue" : r.publie === true ? "Publiée" : "Brouillon" }),
+          indexables ? el("span", { class: "badge" + (indexables.has(adresse) ? " validee" : ""), text: indexables.has(adresse) ? "Visible sur Google" : "Non indexée" }) : null
         ]),
         el("div", { class: "meta", text: "/m/" + adresse }),
         el("div", { class: "meta", text: "Publiée : " + yesNo(r.publie) + " · Suspendue : " + yesNo(r.suspendu) + " · Date de publication : " + PU.formatDateFr(r.publie_le) })
@@ -113,16 +119,46 @@
       var b = el("button", { type: "button", class: "btn " + (susp ? "btn-ok" : "btn-no"), text: susp ? "Réactiver" : "Suspendre" });
       b.addEventListener("click", function () { setSuspendu(r.id, adresse, !susp); });
       actions.appendChild(b);
+      if (indexables && PU.ADRESSE_RE.test(adresse)) {
+        var deja = indexables.has(adresse);
+        if (deja) {
+          var retirer = el("button", { type: "button", class: "btn btn-no", text: "Retirer de Google" });
+          retirer.addEventListener("click", function () { setIndexable(adresse, false); });
+          actions.appendChild(retirer);
+        } else if (r.publie === true && r.suspendu !== true) {
+          var autoriser = el("button", { type: "button", class: "btn btn-ok", text: "Autoriser Google" });
+          autoriser.addEventListener("click", function () { setIndexable(adresse, true); });
+          actions.appendChild(autoriser);
+        }
+      }
       card.appendChild(actions);
       box.appendChild(card);
     });
   }
+  // Adresses indexables (aucune autre colonne). Échec (SQL pas encore exécuté, droits) : null, la liste reste affichée sans indexation.
+  async function loadIndexables() {
+    try {
+      var res = await supabase.rpc("profils_publics_admin_indexables");
+      if (res.error || !Array.isArray(res.data)) return null;
+      var set = new Set();
+      res.data.forEach(function (x) { if (x && typeof x.adresse === "string") set.add(x.adresse); });
+      return set;
+    } catch (e) { return null; }
+  }
   async function loadList() {
     setStatus("msg-liste", "Chargement…", false);
-    var res = await supabase.rpc("profils_publics_admin_lister");
+    var both = await Promise.all([supabase.rpc("profils_publics_admin_lister"), loadIndexables()]);
+    var res = both[0]; indexables = both[1];
     if (res.error) { setStatus("msg-liste", "Impossible de charger la liste (le SQL du profil public est-il exécuté ?).", true); return; }
-    setStatus("msg-liste", "", false);
+    setStatus("msg-liste", indexables === null ? "Indexation : SQL à exécuter." : "", false);
     renderList(Array.isArray(res.data) ? res.data : []);
+  }
+  async function setIndexable(adresse, autoriser) {
+    if (autoriser ? !confirm(CONFIRM_AUTORISER(adresse)) : !confirm("Retirer la page /m/" + adresse + " de Google ?")) return;
+    var res = await supabase.rpc("profils_publics_admin_indexable", { p_adresse: adresse, p_indexable: autoriser });
+    if (res.error || res.data !== true) { setStatus("msg-liste", "Action impossible : " + (res.error ? res.error.message : "page introuvable") + ".", true); return; }
+    await loadList();
+    setStatus("msg-liste", autoriser ? "Page autorisée pour Google." : "Page retirée de Google.", false);
   }
   async function setSuspendu(id, adresse, suspendre) {
     var question = suspendre
